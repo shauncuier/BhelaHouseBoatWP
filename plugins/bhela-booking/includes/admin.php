@@ -1,0 +1,381 @@
+<?php
+/**
+ * Admin: booking list columns, editable meta box, status workflow, settings page.
+ *
+ * @package BhelaBooking
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/* ---------- List table columns ---------- */
+
+function bhela_bm_table_columns( $columns ) {
+	return array(
+		'cb'          => $columns['cb'],
+		'title'       => __( 'Name', 'bhela-booking' ),
+		'invoice_no'  => __( 'Invoice', 'bhela-booking' ),
+		'phone'       => __( 'Phone', 'bhela-booking' ),
+		'travel_date' => __( 'Travel Date', 'bhela-booking' ),
+		'cabin'       => __( 'Cabin', 'bhela-booking' ),
+		'guests'      => __( 'Guests', 'bhela-booking' ),
+		'total'       => __( 'Total / Paid', 'bhela-booking' ),
+		'bstatus'     => __( 'Status', 'bhela-booking' ),
+		'date'        => __( 'Submitted', 'bhela-booking' ),
+	);
+}
+add_filter( 'manage_bhela_booking_posts_columns', 'bhela_bm_table_columns' );
+
+function bhela_bm_table_column_content( $column, $post_id ) {
+	switch ( $column ) {
+		case 'invoice_no':
+			$no = get_post_meta( $post_id, '_bhela_invoice_no', true );
+			if ( $no ) {
+				printf( '<a href="%s" target="_blank"><strong>%s</strong></a>', esc_url( bhela_bm_invoice_url( $post_id ) ), esc_html( $no ) );
+			} else {
+				echo '—';
+			}
+			break;
+		case 'phone':
+			$phone = get_post_meta( $post_id, '_bhela_phone', true );
+			echo $phone ? '<a href="tel:' . esc_attr( $phone ) . '">' . esc_html( $phone ) . '</a>' : '—';
+			break;
+		case 'travel_date':
+			echo esc_html( get_post_meta( $post_id, '_bhela_travel_date', true ) ?: '—' );
+			break;
+		case 'cabin':
+			echo esc_html( get_post_meta( $post_id, '_bhela_cabin_type', true ) ?: '—' );
+			break;
+		case 'guests':
+			echo esc_html( get_post_meta( $post_id, '_bhela_guests', true ) ?: '—' );
+			break;
+		case 'total':
+			$total = (int) get_post_meta( $post_id, '_bhela_total', true );
+			$paid  = (int) get_post_meta( $post_id, '_bhela_paid_amount', true );
+			echo $total ? esc_html( bhela_bm_money( $total ) ) . ' / <span style="color:#1a7f37">' . esc_html( bhela_bm_money( $paid ) ) . '</span>' : '—';
+			break;
+		case 'bstatus':
+			$status   = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
+			$statuses = bhela_bm_statuses();
+			printf(
+				'<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-weight:600;color:#fff;background:%s;font-size:11px;">%s</span>',
+				esc_attr( bhela_bm_status_color( $status ) ),
+				esc_html( isset( $statuses[ $status ] ) ? strtok( $statuses[ $status ], ' ' ) : $status )
+			);
+			break;
+	}
+}
+add_action( 'manage_bhela_booking_posts_custom_column', 'bhela_bm_table_column_content', 10, 2 );
+
+function bhela_bm_sortable_columns( $columns ) {
+	$columns['travel_date'] = 'travel_date';
+	return $columns;
+}
+add_filter( 'manage_edit-bhela_booking_sortable_columns', 'bhela_bm_sortable_columns' );
+
+/** Status filter dropdown. */
+function bhela_bm_status_filter() {
+	global $typenow;
+	if ( 'bhela_booking' !== $typenow ) {
+		return;
+	}
+	$current = isset( $_GET['bhela_status'] ) ? sanitize_key( $_GET['bhela_status'] ) : '';
+	echo '<select name="bhela_status"><option value="">' . esc_html__( 'All statuses', 'bhela-booking' ) . '</option>';
+	foreach ( bhela_bm_statuses() as $key => $label ) {
+		printf( '<option value="%s"%s>%s</option>', esc_attr( $key ), selected( $current, $key, false ), esc_html( $label ) );
+	}
+	echo '</select>';
+}
+add_action( 'restrict_manage_posts', 'bhela_bm_status_filter' );
+
+function bhela_bm_status_filter_query( $query ) {
+	global $pagenow;
+	if ( is_admin() && 'edit.php' === $pagenow && $query->is_main_query()
+		&& 'bhela_booking' === ( $_GET['post_type'] ?? '' ) && ! empty( $_GET['bhela_status'] ) ) {
+		$query->set( 'meta_key', '_bhela_status' );
+		$query->set( 'meta_value', sanitize_key( $_GET['bhela_status'] ) );
+	}
+}
+add_action( 'pre_get_posts', 'bhela_bm_status_filter_query' );
+
+/* ---------- Meta boxes ---------- */
+
+function bhela_bm_add_meta_boxes() {
+	add_meta_box( 'bhela_booking_details', __( 'Booking Details', 'bhela-booking' ), 'bhela_bm_details_metabox', 'bhela_booking', 'normal', 'high' );
+	add_meta_box( 'bhela_booking_actions', __( 'Invoice & Actions', 'bhela-booking' ), 'bhela_bm_actions_metabox', 'bhela_booking', 'side', 'high' );
+}
+add_action( 'add_meta_boxes', 'bhela_bm_add_meta_boxes' );
+
+function bhela_bm_details_metabox( $post ) {
+	wp_nonce_field( 'bhela_bm_save', 'bhela_bm_nonce' );
+	$m = function ( $k, $d = '' ) use ( $post ) {
+		$v = get_post_meta( $post->ID, $k, true );
+		return '' !== $v ? $v : $d;
+	};
+	$rates     = bhela_bm_get_rates();
+	$cabin_key = $m( '_bhela_cabin_key' );
+	?>
+	<style>.bhela-meta th{width:180px;text-align:left}.bhela-meta input[type=text],.bhela-meta input[type=email],.bhela-meta input[type=date],.bhela-meta input[type=number],.bhela-meta select,.bhela-meta textarea{width:100%;max-width:420px}</style>
+	<table class="form-table bhela-meta">
+		<tr><th><?php esc_html_e( 'Phone', 'bhela-booking' ); ?> *</th>
+			<td><input type="text" name="bhela_phone" value="<?php echo esc_attr( $m( '_bhela_phone' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Email', 'bhela-booking' ); ?></th>
+			<td><input type="email" name="bhela_email" value="<?php echo esc_attr( $m( '_bhela_email' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Travel Date', 'bhela-booking' ); ?> *</th>
+			<td><input type="date" name="bhela_travel_date" value="<?php echo esc_attr( $m( '_bhela_travel_date' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Cabin', 'bhela-booking' ); ?></th>
+			<td><select name="bhela_cabin_key">
+				<option value=""><?php esc_html_e( '— Custom / Unknown —', 'bhela-booking' ); ?></option>
+				<?php foreach ( $rates as $key => $row ) : ?>
+					<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $cabin_key, $key ); ?>><?php echo esc_html( $row['label'] ); ?></option>
+				<?php endforeach; ?>
+			</select>
+			<p class="description"><?php esc_html_e( 'Changing cabin/date/guests recalculates the price on save (unless manual override is checked).', 'bhela-booking' ); ?></p></td></tr>
+		<tr><th><?php esc_html_e( 'Guests', 'bhela-booking' ); ?></th>
+			<td><input type="number" name="bhela_guests" min="1" max="40" value="<?php echo esc_attr( $m( '_bhela_guests', 1 ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Per Person (৳)', 'bhela-booking' ); ?></th>
+			<td><input type="number" name="bhela_per_person" value="<?php echo esc_attr( $m( '_bhela_per_person' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Total (৳)', 'bhela-booking' ); ?></th>
+			<td><input type="number" name="bhela_total" value="<?php echo esc_attr( $m( '_bhela_total' ) ); ?>">
+			<label style="margin-left:8px"><input type="checkbox" name="bhela_manual_price" value="1" <?php checked( $m( '_bhela_manual_price' ), '1' ); ?>> <?php esc_html_e( 'Manual price override', 'bhela-booking' ); ?></label></td></tr>
+		<tr><th><?php esc_html_e( 'Advance Due (৳)', 'bhela-booking' ); ?></th>
+			<td><input type="number" name="bhela_advance" value="<?php echo esc_attr( $m( '_bhela_advance' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Paid Amount (৳)', 'bhela-booking' ); ?></th>
+			<td><input type="number" name="bhela_paid_amount" value="<?php echo esc_attr( $m( '_bhela_paid_amount', 0 ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Payment Method', 'bhela-booking' ); ?></th>
+			<td><select name="bhela_pay_method">
+				<?php foreach ( array( '' => '—', 'bkash' => 'bKash', 'nagad' => 'Nagad', 'bank' => 'Bank Transfer', 'cash' => 'Cash' ) as $k => $l ) : ?>
+					<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $m( '_bhela_pay_method' ), $k ); ?>><?php echo esc_html( $l ); ?></option>
+				<?php endforeach; ?>
+			</select></td></tr>
+		<tr><th><?php esc_html_e( 'Transaction ID', 'bhela-booking' ); ?></th>
+			<td><input type="text" name="bhela_txn_id" value="<?php echo esc_attr( $m( '_bhela_txn_id' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Customer Note', 'bhela-booking' ); ?></th>
+			<td><textarea name="bhela_message" rows="3"><?php echo esc_textarea( $m( '_bhela_message' ) ); ?></textarea></td></tr>
+	</table>
+	<?php
+}
+
+function bhela_bm_actions_metabox( $post ) {
+	$status     = get_post_meta( $post->ID, '_bhela_status', true ) ?: 'pending';
+	$invoice_no = get_post_meta( $post->ID, '_bhela_invoice_no', true );
+	$email      = get_post_meta( $post->ID, '_bhela_email', true );
+	?>
+	<p><strong><?php esc_html_e( 'Invoice No:', 'bhela-booking' ); ?></strong> <?php echo esc_html( $invoice_no ?: '—' ); ?></p>
+	<p><label for="bhela_status"><strong><?php esc_html_e( 'Booking Status', 'bhela-booking' ); ?></strong></label><br>
+	<select name="bhela_status" id="bhela_status" style="width:100%">
+		<?php foreach ( bhela_bm_statuses() as $key => $label ) : ?>
+			<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $status, $key ); ?>><?php echo esc_html( $label ); ?></option>
+		<?php endforeach; ?>
+	</select></p>
+	<?php if ( $invoice_no ) : ?>
+		<p><a class="button button-secondary" href="<?php echo esc_url( bhela_bm_invoice_url( $post->ID ) ); ?>" target="_blank">🧾 <?php esc_html_e( 'View / Print Invoice', 'bhela-booking' ); ?></a></p>
+	<?php endif; ?>
+	<?php if ( $email ) : ?>
+		<p><label><input type="checkbox" name="bhela_send_email" value="1"> <?php esc_html_e( 'Email summary + invoice link to customer on save', 'bhela-booking' ); ?></label></p>
+	<?php else : ?>
+		<p class="description"><?php esc_html_e( 'No customer email on file — add one to send the invoice by email.', 'bhela-booking' ); ?></p>
+	<?php endif; ?>
+	<p class="description"><?php esc_html_e( 'Setting status to "Confirmed" automatically emails a confirmation (if email exists).', 'bhela-booking' ); ?></p>
+	<?php
+}
+
+/** Save handler. */
+function bhela_bm_save_booking( $post_id, $post ) {
+	if ( 'bhela_booking' !== $post->post_type ) {
+		return;
+	}
+	if ( ! isset( $_POST['bhela_bm_nonce'] ) || ! wp_verify_nonce( $_POST['bhela_bm_nonce'], 'bhela_bm_save' ) ) {
+		return;
+	}
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+
+	$fields = array(
+		'_bhela_phone'        => sanitize_text_field( $_POST['bhela_phone'] ?? '' ),
+		'_bhela_email'        => sanitize_email( $_POST['bhela_email'] ?? '' ),
+		'_bhela_travel_date'  => sanitize_text_field( $_POST['bhela_travel_date'] ?? '' ),
+		'_bhela_cabin_key'    => sanitize_key( $_POST['bhela_cabin_key'] ?? '' ),
+		'_bhela_guests'       => max( 1, (int) ( $_POST['bhela_guests'] ?? 1 ) ),
+		'_bhela_pay_method'   => sanitize_key( $_POST['bhela_pay_method'] ?? '' ),
+		'_bhela_txn_id'       => sanitize_text_field( $_POST['bhela_txn_id'] ?? '' ),
+		'_bhela_message'      => sanitize_textarea_field( $_POST['bhela_message'] ?? '' ),
+		'_bhela_paid_amount'  => max( 0, (int) ( $_POST['bhela_paid_amount'] ?? 0 ) ),
+		'_bhela_manual_price' => isset( $_POST['bhela_manual_price'] ) ? '1' : '',
+	);
+	foreach ( $fields as $key => $value ) {
+		update_post_meta( $post_id, $key, $value );
+	}
+
+	if ( ! get_post_meta( $post_id, '_bhela_invoice_no', true ) ) {
+		update_post_meta( $post_id, '_bhela_invoice_no', bhela_bm_next_invoice_number() );
+	}
+
+	$cabin_key = $fields['_bhela_cabin_key'];
+	if ( '1' === $fields['_bhela_manual_price'] || ! $cabin_key ) {
+		update_post_meta( $post_id, '_bhela_per_person', (int) ( $_POST['bhela_per_person'] ?? 0 ) );
+		update_post_meta( $post_id, '_bhela_total', (int) ( $_POST['bhela_total'] ?? 0 ) );
+		update_post_meta( $post_id, '_bhela_advance', (int) ( $_POST['bhela_advance'] ?? 0 ) );
+	} else {
+		$price = bhela_bm_calc_price( $cabin_key, $fields['_bhela_guests'], $fields['_bhela_travel_date'] );
+		if ( ! is_wp_error( $price ) ) {
+			update_post_meta( $post_id, '_bhela_cabin_type', $price['cabin_label'] );
+			update_post_meta( $post_id, '_bhela_day_type', $price['day_type'] );
+			update_post_meta( $post_id, '_bhela_per_person', $price['per_person'] );
+			update_post_meta( $post_id, '_bhela_total', $price['total'] );
+			update_post_meta( $post_id, '_bhela_advance', $price['advance'] );
+		}
+	}
+
+	$old_status = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
+	$new_status = sanitize_key( $_POST['bhela_status'] ?? $old_status );
+	if ( array_key_exists( $new_status, bhela_bm_statuses() ) ) {
+		update_post_meta( $post_id, '_bhela_status', $new_status );
+		if ( 'confirmed' === $new_status && 'confirmed' !== $old_status ) {
+			bhela_bm_email_customer( $post_id, 'confirmed' );
+		}
+	}
+
+	if ( ! empty( $_POST['bhela_send_email'] ) ) {
+		bhela_bm_email_customer( $post_id, 'confirmed' === $new_status ? 'confirmed' : 'request' );
+	}
+}
+add_action( 'save_post', 'bhela_bm_save_booking', 10, 2 );
+
+/* ---------- Settings page ---------- */
+
+function bhela_bm_settings_menu() {
+	add_submenu_page(
+		'edit.php?post_type=bhela_booking',
+		__( 'Booking Settings', 'bhela-booking' ),
+		__( 'Settings', 'bhela-booking' ),
+		'manage_options',
+		'bhela-bm-settings',
+		'bhela_bm_settings_page'
+	);
+}
+add_action( 'admin_menu', 'bhela_bm_settings_menu' );
+
+function bhela_bm_settings_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+
+	if ( isset( $_POST['bhela_bm_settings_nonce'] ) && wp_verify_nonce( $_POST['bhela_bm_settings_nonce'], 'bhela_bm_settings' ) ) {
+		$s = bhela_bm_get_settings();
+		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'email', 'bkash_number', 'nagad_number', 'invoice_prefix' ) as $f ) {
+			$s[ $f ] = sanitize_text_field( $_POST[ $f ] ?? $s[ $f ] );
+		}
+		$s['bank_details']    = sanitize_textarea_field( $_POST['bank_details'] ?? '' );
+		$s['holidays']        = sanitize_textarea_field( $_POST['holidays'] ?? '' );
+		$s['invoice_note']    = sanitize_textarea_field( $_POST['invoice_note'] ?? '' );
+		$s['advance_percent'] = min( 100, max( 1, (int) ( $_POST['advance_percent'] ?? 50 ) ) );
+		$s['weekend_days']    = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
+		update_option( 'bhela_bm_settings', $s );
+
+		$rates = bhela_bm_get_rates();
+		foreach ( $rates as $key => $row ) {
+			if ( isset( $_POST[ 'rate_label_' . $key ] ) ) {
+				$rates[ $key ]['label']   = sanitize_text_field( $_POST[ 'rate_label_' . $key ] );
+				$rates[ $key ]['sharing'] = max( 1, (int) $_POST[ 'rate_sharing_' . $key ] );
+				$rates[ $key ]['regular'] = max( 0, (int) $_POST[ 'rate_regular_' . $key ] );
+				$rates[ $key ]['weekday'] = max( 0, (int) $_POST[ 'rate_weekday_' . $key ] );
+			}
+		}
+		update_option( 'bhela_bm_rates', $rates );
+		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Settings saved.', 'bhela-booking' ) . '</p></div>';
+	}
+
+	$s     = bhela_bm_get_settings();
+	$rates = bhela_bm_get_rates();
+	$days  = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday' );
+	?>
+	<div class="wrap">
+		<h1>🛶 <?php esc_html_e( 'BHELA Booking Settings', 'bhela-booking' ); ?></h1>
+		<form method="post">
+			<?php wp_nonce_field( 'bhela_bm_settings', 'bhela_bm_settings_nonce' ); ?>
+
+			<h2><?php esc_html_e( 'Business Information', 'bhela-booking' ); ?></h2>
+			<table class="form-table">
+				<tr><th>Business Name</th><td><input type="text" class="regular-text" name="business_name" value="<?php echo esc_attr( $s['business_name'] ); ?>"></td></tr>
+				<tr><th>Tagline</th><td><input type="text" class="regular-text" name="business_tagline" value="<?php echo esc_attr( $s['business_tagline'] ); ?>"></td></tr>
+				<tr><th>Address</th><td><input type="text" class="regular-text" name="address" value="<?php echo esc_attr( $s['address'] ); ?>"></td></tr>
+				<tr><th>Phone 1</th><td><input type="text" name="phone_1" value="<?php echo esc_attr( $s['phone_1'] ); ?>"></td></tr>
+				<tr><th>Phone 2</th><td><input type="text" name="phone_2" value="<?php echo esc_attr( $s['phone_2'] ); ?>"></td></tr>
+				<tr><th>WhatsApp</th><td><input type="text" name="whatsapp" value="<?php echo esc_attr( $s['whatsapp'] ); ?>"></td></tr>
+				<tr><th>Business Email</th><td><input type="text" class="regular-text" name="email" value="<?php echo esc_attr( $s['email'] ); ?>"></td></tr>
+			</table>
+
+			<h2><?php esc_html_e( 'Payment Details (shown on invoice)', 'bhela-booking' ); ?></h2>
+			<table class="form-table">
+				<tr><th>bKash</th><td><input type="text" class="regular-text" name="bkash_number" value="<?php echo esc_attr( $s['bkash_number'] ); ?>"></td></tr>
+				<tr><th>Nagad</th><td><input type="text" class="regular-text" name="nagad_number" value="<?php echo esc_attr( $s['nagad_number'] ); ?>"></td></tr>
+				<tr><th>Bank Details</th><td><textarea name="bank_details" rows="3" class="large-text"><?php echo esc_textarea( $s['bank_details'] ); ?></textarea></td></tr>
+				<tr><th>Advance %</th><td><input type="number" name="advance_percent" min="1" max="100" value="<?php echo esc_attr( $s['advance_percent'] ); ?>"> %</td></tr>
+				<tr><th>Invoice Prefix</th><td><input type="text" name="invoice_prefix" value="<?php echo esc_attr( $s['invoice_prefix'] ); ?>"></td></tr>
+				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="3" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea></td></tr>
+			</table>
+
+			<h2><?php esc_html_e( 'Pricing Days', 'bhela-booking' ); ?></h2>
+			<table class="form-table">
+				<tr><th><?php esc_html_e( 'Weekend Days (regular rate)', 'bhela-booking' ); ?></th><td>
+					<?php foreach ( $days as $num => $label ) : ?>
+						<label style="margin-right:14px"><input type="checkbox" name="weekend_days[]" value="<?php echo esc_attr( $num ); ?>" <?php checked( in_array( $num, array_map( 'intval', (array) $s['weekend_days'] ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
+					<?php endforeach; ?>
+				</td></tr>
+				<tr><th><?php esc_html_e( 'Holidays (one per line, YYYY-MM-DD)', 'bhela-booking' ); ?></th>
+					<td><textarea name="holidays" rows="5" class="regular-text"><?php echo esc_textarea( $s['holidays'] ); ?></textarea>
+					<p class="description"><?php esc_html_e( 'Holiday & weekend dates use the Regular rate; other days use the Weekday rate.', 'bhela-booking' ); ?></p></td></tr>
+			</table>
+
+			<h2><?php esc_html_e( 'Cabin Rates (per person, 2D1N)', 'bhela-booking' ); ?></h2>
+			<table class="widefat striped" style="max-width:900px">
+				<thead><tr><th>Cabin Label</th><th>Sharing</th><th>Regular/Holiday ৳</th><th>Weekday ৳</th></tr></thead>
+				<tbody>
+				<?php foreach ( $rates as $key => $row ) : ?>
+					<tr>
+						<td><input type="text" style="width:95%" name="rate_label_<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $row['label'] ); ?>"></td>
+						<td><input type="number" style="width:70px" name="rate_sharing_<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $row['sharing'] ); ?>"></td>
+						<td><input type="number" style="width:100px" name="rate_regular_<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $row['regular'] ); ?>"></td>
+						<td><input type="number" style="width:100px" name="rate_weekday_<?php echo esc_attr( $key ); ?>" value="<?php echo esc_attr( $row['weekday'] ); ?>"></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+
+			<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Save Settings', 'bhela-booking' ); ?></button></p>
+		</form>
+	</div>
+	<?php
+}
+
+/* ---------- Dashboard widget ---------- */
+
+function bhela_bm_dashboard_widget() {
+	wp_add_dashboard_widget( 'bhela_bm_glance', '🛶 BHELA Bookings', function () {
+		echo '<ul>';
+		foreach ( bhela_bm_statuses() as $key => $label ) {
+			$q = new WP_Query( array(
+				'post_type'      => 'bhela_booking',
+				'meta_key'       => '_bhela_status',
+				'meta_value'     => $key,
+				'posts_per_page' => 1,
+				'fields'         => 'ids',
+			) );
+			printf(
+				'<li><a href="%s"><strong style="color:%s">%d</strong> — %s</a></li>',
+				esc_url( admin_url( 'edit.php?post_type=bhela_booking&bhela_status=' . $key ) ),
+				esc_attr( bhela_bm_status_color( $key ) ),
+				(int) $q->found_posts,
+				esc_html( $label )
+			);
+		}
+		echo '</ul>';
+	} );
+}
+add_action( 'wp_dashboard_setup', 'bhela_bm_dashboard_widget' );

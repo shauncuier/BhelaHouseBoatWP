@@ -1,0 +1,19 @@
+# Ignore everything by default
+/*
+
+# Allow specific root files
+!.gitignore
+!index.php
+!BHELA-SETUP-README.md
+
+# Allow custom plugins directory, plugins/index.php, and custom plugin
+!/plugins/
+/plugins/*
+!/plugins/index.php
+!/plugins/bhela-booking/
+
+# Allow custom themes directory, themes/index.php, and custom theme
+!/themes/
+/themes/*
+!/themes/index.php
+!/themes/bhela/
