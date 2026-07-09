@@ -1,0 +1,25 @@
+# BHELA Booking Engine Plugin gitignore
+# ===================================
+
+# Database backups & local exports
+*.sql
+*.sql.gz
+*.backup
+
+# PHP local error logging
+error_log
+php_errors.log
+debug.log
+
+# Composer & testing dependencies
+/vendor/
+composer.lock
+.phpunit.result.cache
+
+# System & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace

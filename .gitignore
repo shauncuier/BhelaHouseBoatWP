@@ -4,6 +4,7 @@
 # Allow specific root files
 !.gitignore
 !index.php
+!README.md
 !BHELA-SETUP-README.md
 
 # Allow custom plugins directory, plugins/index.php, and custom plugin

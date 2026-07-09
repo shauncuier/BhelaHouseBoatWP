@@ -1,0 +1,27 @@
+# BHELA Theme specific gitignore
+# ==============================
+
+# Node / Build directories
+node_modules/
+dist/
+.sass-cache/
+.parcel-cache/
+.eslintcache
+
+# Local configuration & environment
+.env
+.env.local
+
+# Server and Compilation Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# System & Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
