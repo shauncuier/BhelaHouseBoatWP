@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.3.0' );
+define( 'BHELA_VERSION', '2.4.0' );
 
 /* ---------- Setup ---------- */
 
@@ -111,6 +111,33 @@ function bhela_customize_register( $wp_customize ) {
 	}
 }
 add_action( 'customize_register', 'bhela_customize_register' );
+
+/** Homepage texts — editable without code (Appearance → Customize → BHELA Homepage). */
+function bhela_customize_homepage( $wp_customize ) {
+	$wp_customize->add_section( 'bhela_home', array( 'title' => 'BHELA Homepage', 'priority' => 31 ) );
+	$fields = array(
+		'hero_kicker' => array( 'label' => 'Hero Top Badge', 'default' => '🌧️ টাঙ্গুয়ার হাওর · প্রিমিয়াম হাউসবোট' ),
+		'hero_title'  => array( 'label' => 'Hero Title (use | for line break, *word* = gold)', 'default' => 'ভেলার আকর্ষণ|ভেলা নয়, *হাওর!*' ),
+		'hero_sub'    => array( 'label' => 'Hero Subtitle', 'default' => 'মাত্র ৬টি ফ্যামিলি কেবিন, AC ও Attached Washroom, দেশি খাবার আর অথৈ জলরাশি — ২ দিন ১ রাতের সম্পূর্ণ প্যাকেজে হাওরের সেরা অভিজ্ঞতা।' ),
+	);
+	foreach ( $fields as $key => $f ) {
+		$wp_customize->add_setting( 'bhela_home_' . $key, array( 'default' => $f['default'], 'sanitize_callback' => 'sanitize_text_field' ) );
+		$wp_customize->add_control( 'bhela_home_' . $key, array( 'label' => $f['label'], 'section' => 'bhela_home', 'type' => 'hero_sub' === $key ? 'textarea' : 'text' ) );
+	}
+}
+add_action( 'customize_register', 'bhela_customize_homepage' );
+
+/** Render hero title mod: | -> <br>, *text* -> gold em. */
+function bhela_home_text( $key, $default = '' ) {
+	$v = get_theme_mod( 'bhela_home_' . $key, $default );
+	if ( 'hero_title' === $key ) {
+		$v = esc_html( $v );
+		$v = str_replace( '|', '<br>', $v );
+		$v = preg_replace( '/\*(.+?)\*/u', '<em>$1</em>', $v );
+		return $v;
+	}
+	return esc_html( $v );
+}
 
 /* ---------- Schema ---------- */
 
@@ -299,3 +326,37 @@ function bhela_fallback_menu() {
 	printf( '<li><a class="btn btn--cta site-nav__book" href="%s">বুক করুন</a></li>', esc_url( bhela_page_url( 'book-now' ) ) );
 	echo '</ul>';
 }
+
+/* ---------- Elementor compatibility ---------- */
+
+// Content width (Elementor reads this for default widths).
+if ( ! isset( $GLOBALS['content_width'] ) ) {
+	$GLOBALS['content_width'] = 1200;
+}
+
+/** Is this page built with Elementor? */
+function bhela_is_elementor_page( $post_id = 0 ) {
+	if ( ! did_action( 'elementor/loaded' ) ) {
+		return false;
+	}
+	$post_id = $post_id ? $post_id : get_the_ID();
+	if ( ! $post_id ) {
+		return false;
+	}
+	return 'builder' === get_post_meta( $post_id, '_elementor_edit_mode', true );
+}
+
+/** Elementor Pro Theme Builder: allow header/footer/single/archive overrides. */
+function bhela_register_elementor_locations( $elementor_theme_manager ) {
+	$elementor_theme_manager->register_all_core_location();
+}
+add_action( 'elementor/theme/register_locations', 'bhela_register_elementor_locations' );
+
+/** Default kit hint: keep Elementor defaults aligned with BHELA fonts/colors. */
+function bhela_elementor_body_class( $classes ) {
+	if ( bhela_is_elementor_page() ) {
+		$classes[] = 'bhela-elementor';
+	}
+	return $classes;
+}
+add_filter( 'body_class', 'bhela_elementor_body_class' );

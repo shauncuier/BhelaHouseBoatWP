@@ -39,3 +39,23 @@ Totally redesigned build ("Midnight Monsoon" design). Old theme & plugin were re
 - [ ] Set real bKash/Nagad numbers in Bookings → Settings
 - [ ] Add 2027+ holiday dates as needed
 - [ ] Test one full booking + view its invoice + confirm status email
+
+---
+
+## ✏️ How to Edit Pages (3 ways)
+
+The 7 auto-created pages (Cabins, Schedule, Food, FAQ, Gallery, Book Now, Policies) get their design from **theme templates** — that's why the editor looks "empty". You have 3 editing options:
+
+### 1. Elementor (now fully supported)
+- Install Elementor → edit ANY page with Elementor → **the moment a page is built with Elementor, it takes over the full layout** (theme hero/sections disappear, your Elementor design shows edge-to-edge with the theme header/footer).
+- For blank-canvas pages choose template **"BHELA — Full Width (Elementor)"**, or Elementor's own Canvas template (hides header/footer too).
+- Works on the homepage as well — design it in Elementor and it replaces the default homepage.
+- Elementor Pro Theme Builder can even override the header/footer (locations registered).
+
+### 2. Gutenberg (default editor)
+- On templated pages: anything you add in the editor appears in a styled section **below the page hero, above the template content**. Use the 🛶 BHELA block patterns.
+- On the **হোম (front) page**: adding any blocks REPLACES the default homepage design entirely. Leave it empty to keep the designed homepage.
+- To fully control a page with Gutenberg: in the page editor sidebar → **Template → Default**, then the page shows only your editor content.
+
+### 3. Keep the built-in design
+- Leave page content empty → the premium coded design shows. Rates/trips/contacts are edited in **Bookings → Settings** and **Bookings → Trip Calendar**, not in page editors.

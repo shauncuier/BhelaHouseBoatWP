@@ -143,3 +143,19 @@
 	.bhela-trip__cta { grid-column: 2; justify-self: end; }
 	.bhela-trip__status { grid-column: 1; }
 }
+
+/* ---- Guest reviews ([bhela_reviews]) ---- */
+.bhela-reviews-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.4rem; }
+.bhela-review-card {
+	background: #fff; border: 1px solid rgba(10,42,47,.1); border-radius: 16px; padding: 1.6rem;
+	box-shadow: 0 8px 26px rgba(10,42,47,.07);
+}
+.bhela-review-card__stars { color: #F5C97B; letter-spacing: .2em; margin-bottom: .7rem; font-size: 1.05rem; }
+.bhela-review-card p { font-size: .96rem; line-height: 1.8; margin: 0 0 1rem; }
+.bhela-review-card__who { display: flex; align-items: center; gap: .7rem; }
+.bhela-review-card__avatar {
+	width: 42px; height: 42px; border-radius: 50%; background: var(--primary, #137A74); color: #fff;
+	display: flex; align-items: center; justify-content: center; font-weight: 700;
+}
+.bhela-review-card__who strong { display: block; line-height: 1.3; color: var(--ink, #0A2A2F); }
+.bhela-review-card__who span { font-size: .8rem; color: #5E7472; }

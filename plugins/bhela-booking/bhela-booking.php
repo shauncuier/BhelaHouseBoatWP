@@ -203,6 +203,10 @@ require_once BHELA_BM_PATH . 'includes/frontend.php';
 require_once BHELA_BM_PATH . 'includes/invoice.php';
 require_once BHELA_BM_PATH . 'includes/emails.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
+require_once BHELA_BM_PATH . 'includes/reviews.php';
+if ( is_admin() ) {
+	require_once BHELA_BM_PATH . 'includes/guide.php';
+}
 if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/admin.php';
 }

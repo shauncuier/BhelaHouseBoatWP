@@ -8,8 +8,17 @@
 // Gutenberg override: if the front page has its own block content, render that
 // instead of the default design — making the homepage fully editable.
 $front_id = (int) get_option( 'page_on_front' );
-if ( $front_id && is_page( $front_id ) && trim( get_post_field( 'post_content', $front_id ) ) ) {
+$bhela_front_elementor = function_exists( 'bhela_is_elementor_page' ) && bhela_is_elementor_page( $front_id );
+if ( $front_id && is_page( $front_id ) && ( $bhela_front_elementor || trim( get_post_field( 'post_content', $front_id ) ) ) ) {
 	get_header();
+	if ( $bhela_front_elementor ) {
+		while ( have_posts() ) {
+			the_post();
+			the_content();
+		}
+		get_footer();
+		return;
+	}
 	echo '<div class="bhela-gb-home"><div class="container"><div class="entry-content">';
 	while ( have_posts() ) {
 		the_post();
@@ -29,9 +38,9 @@ $img = get_template_directory_uri() . '/assets/images';
 	<div class="hero__bg"><img src="<?php echo esc_url( $img . '/hero/hero-haor.jpg' ); ?>" alt="টাঙ্গুয়ার হাওরে ভেলা হাউসবোট" fetchpriority="high"></div>
 	<div class="container hero__inner">
 		<div>
-			<span class="hero__kicker">🌧️ টাঙ্গুয়ার হাওর · প্রিমিয়াম হাউসবোট</span>
-			<h1 class="hero__title">ভেলার আকর্ষণ<br>ভেলা নয়, <em>হাওর!</em></h1>
-			<p class="hero__sub">মাত্র ৬টি ফ্যামিলি কেবিন, AC ও Attached Washroom, দেশি খাবার আর অথৈ জলরাশি — ২ দিন ১ রাতের সম্পূর্ণ প্যাকেজে হাওরের সেরা অভিজ্ঞতা।</p>
+			<span class="hero__kicker"><?php echo bhela_home_text( 'hero_kicker', '🌧️ টাঙ্গুয়ার হাওর · প্রিমিয়াম হাউসবোট' ); ?></span>
+			<h1 class="hero__title"><?php echo wp_kses( bhela_home_text( 'hero_title', 'ভেলার আকর্ষণ|ভেলা নয়, *হাওর!*' ), array( 'br' => array(), 'em' => array() ) ); ?></h1>
+			<p class="hero__sub"><?php echo bhela_home_text( 'hero_sub', 'মাত্র ৬টি ফ্যামিলি কেবিন, AC ও Attached Washroom, দেশি খাবার আর অথৈ জলরাশি — ২ দিন ১ রাতের সম্পূর্ণ প্যাকেজে হাওরের সেরা অভিজ্ঞতা।' ); ?></p>
 			<div class="hero__actions">
 				<a class="btn btn--cta" href="<?php echo esc_url( bhela_page_url( 'book-now' ) ); ?>">তারিখ দেখে বুক করুন</a>
 				<a class="btn btn--ghost" href="<?php echo esc_url( bhela_page_url( 'cabins' ) ); ?>">কেবিন ও রেট</a>
@@ -198,21 +207,26 @@ $img = get_template_directory_uri() . '/assets/images';
 			<h2 class="section-title reveal">যারা ঘুরে এসেছেন</h2>
 		</div>
 		<div class="reviews-grid" style="margin-top:2.5rem">
-			<div class="review reveal">
-				<div class="review__stars">★★★★★</div>
-				<p>"পরিবার নিয়ে গিয়েছিলাম — কেবিন, খাবার, ক্রুদের ব্যবহার সবকিছু এক কথায় অসাধারণ। বাচ্চাদের নিয়ে এত নিরাপদ লেগেছে!"</p>
-				<div class="review__who"><span class="avatar">R</span><div><strong>রাশেদুল ইসলাম</strong><span>Family Trip · Dhaka</span></div></div>
-			</div>
-			<div class="review reveal">
-				<div class="review__stars">★★★★★</div>
-				<p>"অফিসের ২৮ জনের টিম নিয়ে Full Boat নিয়েছিলাম। রুফটপে টিম আড্ডা আর হাওরের সূর্যাস্ত — best team retreat ever!"</p>
-				<div class="review__who"><span class="avatar">S</span><div><strong>সাবরিনা আক্তার</strong><span>Corporate Tour</span></div></div>
-			</div>
-			<div class="review reveal">
-				<div class="review__stars">★★★★★</div>
-				<p>"Weekday অফারে বন্ধুরা মিলে গিয়েছিলাম। এই দামে AC কেবিন, এত খাবার আর ৭টা স্পট — টাঙ্গুয়ায় এর চেয়ে ভালো ডিল নেই।"</p>
-				<div class="review__who"><span class="avatar">T</span><div><strong>তানভীর হাসান</strong><span>Friends Group</span></div></div>
-			</div>
+			<?php
+			$bhela_reviews = function_exists( 'bhela_bm_get_reviews' ) ? bhela_bm_get_reviews( 3 ) : array();
+			if ( ! $bhela_reviews ) {
+				$bhela_reviews = array(
+					array( 'name' => 'রাশেদুল ইসলাম', 'text' => 'পরিবার নিয়ে গিয়েছিলাম — কেবিন, খাবার, ক্রুদের ব্যবহার সবকিছু এক কথায় অসাধারণ। বাচ্চাদের নিয়ে এত নিরাপদ লেগেছে!', 'rating' => 5, 'subtitle' => 'Family Trip · Dhaka' ),
+					array( 'name' => 'সাবরিনা আক্তার', 'text' => 'অফিসের ২৮ জনের টিম নিয়ে Full Boat নিয়েছিলাম। রুফটপে টিম আড্ডা আর হাওরের সূর্যাস্ত — best team retreat ever!', 'rating' => 5, 'subtitle' => 'Corporate Tour' ),
+					array( 'name' => 'তানভীর হাসান', 'text' => 'Weekday অফারে বন্ধুরা মিলে গিয়েছিলাম। এই দামে AC কেবিন, এত খাবার আর ৭টা স্পট — টাঙ্গুয়ায় এর চেয়ে ভালো ডিল নেই।', 'rating' => 5, 'subtitle' => 'Friends Group' ),
+				);
+			}
+			foreach ( $bhela_reviews as $r ) :
+				?>
+				<div class="review reveal">
+					<div class="review__stars"><?php echo esc_html( str_repeat( '★', max( 1, (int) $r['rating'] ) ) ); ?></div>
+					<p>"<?php echo esc_html( $r['text'] ); ?>"</p>
+					<div class="review__who">
+						<span class="avatar"><?php echo esc_html( mb_substr( $r['name'], 0, 1 ) ); ?></span>
+						<div><strong><?php echo esc_html( $r['name'] ); ?></strong><span><?php echo esc_html( $r['subtitle'] ); ?></span></div>
+					</div>
+				</div>
+			<?php endforeach; ?>
 		</div>
 	</div>
 </section>
