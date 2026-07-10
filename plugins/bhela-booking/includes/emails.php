@@ -108,7 +108,7 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 <!DOCTYPE html>
 <html lang="bn">
 <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-<body style="margin:0;padding:0;background:#EEF2F1;font-family:'Hind Siliguri','Segoe UI',Tahoma,sans-serif;">
+<body style="margin:0;padding:0;background:#EEF2F1;font-family:'Noto Sans Bengali','Hind Siliguri','Segoe UI',Tahoma,sans-serif;">
 	<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF2F1;padding:24px 12px;">
 		<tr><td align="center">
 			<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;">

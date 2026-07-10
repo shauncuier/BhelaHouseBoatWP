@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.3.0
+Version: 2.5.1
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -37,8 +37,8 @@ Tags: houseboat, travel, tourism, bangla, dark, luxury, responsive
 	--line-inverse: rgba(220, 235, 233, 0.16);
 
 	/* Type */
-	--font-display: 'Fraunces', 'Hind Siliguri', serif;
-	--font-body: 'Hind Siliguri', 'Poppins', sans-serif;
+	--font-display: 'Fraunces', 'Noto Serif Bengali', 'Hind Siliguri', serif;
+	--font-body: 'Noto Sans Bengali', 'Hind Siliguri', 'Poppins', sans-serif;
 	--fs-hero: clamp(2.4rem, 6vw, 4.6rem);
 	--fs-h2: clamp(1.8rem, 4vw, 2.8rem);
 	--fs-h3: clamp(1.25rem, 2.5vw, 1.6rem);
@@ -62,16 +62,19 @@ html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 body {
 	font-family: var(--font-body);
 	font-size: var(--fs-body);
-	line-height: 1.8;
+	line-height: 1.85;
 	color: var(--text);
 	background: var(--cream);
 	overflow-x: hidden;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
 }
 img { max-width: 100%; height: auto; display: block; }
 a { color: var(--primary); text-decoration: none; transition: color .2s; }
 a:hover { color: var(--cta); }
 ul, ol { padding-left: 1.4em; }
-h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height: 1.25; color: var(--ink); }
+h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height: 1.4; color: var(--ink); }
 :focus-visible { outline: 3px solid var(--cta); outline-offset: 3px; border-radius: 4px; }
 @media (prefers-reduced-motion: reduce) {
 	*, *::before, *::after { animation: none !important; transition: none !important; }
@@ -88,7 +91,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 /* Eyebrow + headings */
 .eyebrow {
 	display: inline-flex; align-items: center; gap: .6rem;
-	font-size: .82rem; font-weight: 700; letter-spacing: .22em; text-transform: uppercase;
+	font-size: .84rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
 	color: var(--primary); margin-bottom: 1rem;
 }
 .eyebrow::before { content: ""; width: 34px; height: 2px; background: var(--cta); }
@@ -192,7 +195,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 }
 .hero__inner { position: relative; z-index: 2; padding-block: 8rem 6rem; display: grid; grid-template-columns: 1.2fr .9fr; gap: 3rem; align-items: center; }
 .hero__kicker { display: inline-flex; align-items: center; gap: .6rem; background: rgba(111,199,191,.14); border: 1px solid rgba(111,199,191,.35); color: var(--aqua); padding: .45rem 1.1rem; border-radius: 999px; font-size: .85rem; font-weight: 700; letter-spacing: .08em; margin-bottom: 1.6rem; }
-.hero__title { font-size: var(--fs-hero); color: #fff; margin-bottom: 1.2rem; letter-spacing: -0.01em; }
+.hero__title { font-size: var(--fs-hero); color: #fff; margin-bottom: 1.2rem; letter-spacing: 0; line-height: 1.28; padding-top: .1em; }
 .hero__title em { font-style: normal; color: var(--gold); }
 .hero__sub { font-size: clamp(1.05rem, 2vw, 1.25rem); color: var(--text-inverse); max-width: 34rem; margin-bottom: 2.2rem; }
 .hero__actions { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 2.8rem; }
@@ -713,3 +716,23 @@ input, select, textarea { font-family: inherit; }
 /* Elementor Canvas template hides theme chrome itself — nothing to do.
    For "Full Width (Elementor)" template the fixed nav overlays content;
    start pages with a dark section, or add 90px top padding to the first section. */
+
+/* ==========================================================
+   19. BANGLA TYPOGRAPHY POLISH
+   ========================================================== */
+/* Give Bangla glyph stacks breathing room everywhere */
+.section-title { line-height: 1.42; }
+.page-hero h1 { line-height: 1.35; }
+.cabin-card__title, .menu-day h3, .review__who strong { line-height: 1.45; }
+.faq-item summary { line-height: 1.7; }
+.btn { line-height: 1.5; }
+/* Footer tagline: Bangla serif looks better with more air */
+.footer-tagline { line-height: 1.7; font-weight: 600; }
+/* Trust strip + labels: no tracking on Bangla */
+.trust__item { letter-spacing: 0; }
+.hero__kicker { letter-spacing: .02em; }
+.hero__stat span { letter-spacing: .02em; }
+/* Numerals: keep tabular where prices align */
+.cabin-card__price .now, .sched-table td, .bhela-bm-price__row strong { font-variant-numeric: tabular-nums; }
+/* Bolder Bangla display weight for better presence */
+.hero__title, .section-title { font-weight: 700; }

@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.4.0' );
+define( 'BHELA_VERSION', '2.5.1' );
 
 /* ---------- Setup ---------- */
 
@@ -43,7 +43,7 @@ require_once get_template_directory() . '/inc/block-patterns.php';
 function bhela_assets() {
 	wp_enqueue_style(
 		'bhela-fonts',
-		'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hind+Siliguri:wght@400;500;600;700&display=swap',
+		'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Hind+Siliguri:wght@400;500;600;700&family=Noto+Sans+Bengali:wght@400;500;600;700&family=Noto+Serif+Bengali:wght@500;600;700&display=swap',
 		array(),
 		null
 	);

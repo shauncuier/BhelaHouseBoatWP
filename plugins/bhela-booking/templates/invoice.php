@@ -25,10 +25,10 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <title>Invoice <?php echo esc_html( $invoice['invoice_no'] ); ?> — <?php echo esc_html( $s['business_name'] ); ?></title>
-<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Noto+Sans+Bengali:wght@400;600;700&family=Noto+Serif+Bengali:wght@600;700&family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 	* { margin:0; padding:0; box-sizing:border-box; }
-	body { font-family:'Hind Siliguri','Poppins',sans-serif; background:#eef2f2; color:#1B2B2A; padding:24px; font-size:15px; }
+	body { font-family:'Noto Sans Bengali','Hind Siliguri','Poppins',sans-serif; background:#eef2f2; color:#1B2B2A; padding:24px; font-size:15px; }
 	.invoice { max-width:820px; margin:0 auto; background:#fff; border-radius:14px; overflow:hidden; box-shadow:0 8px 40px rgba(11,46,51,.12); }
 	.inv-head { background:linear-gradient(135deg,#0B2E33,#14676B); color:#fff; padding:32px 40px; display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
 	.inv-head img { height:64px; border-radius:10px; background:#fff; padding:4px; }
