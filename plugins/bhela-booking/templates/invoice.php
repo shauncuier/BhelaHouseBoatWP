@@ -61,8 +61,11 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.note { font-size:12.5px; color:#5b6b6a; line-height:1.8; border-top:1px dashed #cdd9d8; padding-top:16px; }
 	.inv-foot { background:#0B2E33; color:#cfe3e2; text-align:center; padding:18px; font-size:13px; }
 	.print-bar { max-width:820px; margin:0 auto 16px; display:flex; justify-content:flex-end; gap:10px; }
-	.print-bar button { background:#F2762E; color:#fff; border:0; padding:12px 26px; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+	.print-bar button { background:#F2762E; color:#fff; border:0; padding:12px 26px; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; }
 	.print-bar button:hover { background:#D8621E; }
+	.inv-meta-row { display:inline-flex; align-items:center; gap:8px; margin-top:6px; vertical-align:middle; width:100%; }
+	.inv-icon { display:inline-block; width:16px; height:16px; fill:#14676B; flex-shrink:0; }
+	.btn-icon { display:inline-block; width:18px; height:18px; fill:currentColor; margin-right:8px; flex-shrink:0; }
 	@media print {
 		body { background:#fff; padding:0; }
 		.print-bar { display:none; }
@@ -71,7 +74,12 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 </style>
 </head>
 <body>
-	<div class="print-bar"><button onclick="window.print()">🖨️ Print / Save as PDF</button></div>
+	<div class="print-bar">
+		<button onclick="window.print()">
+			<svg class="btn-icon" viewBox="0 0 24 24"><path d="M19 8H5c-1.66 0-3 1.34-3 3v6h4v4h12v-4h4v-6c0-1.66-1.34-3-3-3zm-3 11H8v-5h8v5zm3-7c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1zm-1-9H6v4h12V3z"/></svg>
+			Print / Save as PDF
+		</button>
+	</div>
 	<div class="invoice">
 		<div class="inv-head">
 			<div style="display:flex;align-items:center;gap:16px">
@@ -95,15 +103,14 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<div>
 					<h3>Bill To / অতিথি</h3>
 					<p><strong><?php echo esc_html( $invoice['name'] ); ?></strong><br>
-					📱 <?php echo esc_html( $invoice['phone'] ); ?>
-					<?php if ( $invoice['email'] ) : ?><br>✉️ <?php echo esc_html( $invoice['email'] ); ?><?php endif; ?></p>
+					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg><?php echo esc_html( $invoice['phone'] ); ?></span>
+					<?php if ( $invoice['email'] ) : ?><br><span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><?php echo esc_html( $invoice['email'] ); ?></span><?php endif; ?></p>
 				</div>
 				<div>
 					<h3>Trip Details / ভ্রমণ</h3>
-					<p>📅 <strong><?php echo esc_html( $invoice['travel_date'] ); ?></strong>
-					<?php if ( $invoice['day_type'] ) : ?> (<?php echo esc_html( $day_labels[ $invoice['day_type'] ] ?? $invoice['day_type'] ); ?>)<?php endif; ?><br>
-					⏳ ২ দিন ১ রাত প্যাকেজ<br>
-					🚤 Boarding: Anwarpur Ghat</p>
+					<p><span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg><strong><?php echo esc_html( $invoice['travel_date'] ); ?></strong><?php if ( $invoice['day_type'] ) : ?>&nbsp;(<?php echo esc_html( $day_labels[ $invoice['day_type'] ] ?? $invoice['day_type'] ); ?>)<?php endif; ?></span><br>
+					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5L8 7.5V4h8v3.5l-4 4z"/></svg>২ দিন ১ রাত প্যাকেজ</span><br>
+					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Boarding: Anwarpur Ghat</span></p>
 				</div>
 			</div>
 
