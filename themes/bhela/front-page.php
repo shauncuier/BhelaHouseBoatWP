@@ -122,6 +122,29 @@ $img = get_template_directory_uri() . '/assets/images';
 	</div>
 </section>
 
+<!-- FOOD -->
+<section class="section section--sand" id="food">
+	<div class="container split">
+		<div class="split__media reveal">
+			<img src="<?php echo esc_url( bhela_img( 'food', 'food/food-spread.jpg' ) ); ?>" alt="ভেলার দেশি খাবার" loading="lazy">
+		</div>
+		<div class="reveal">
+			<span class="eyebrow">খাবারের আয়োজন</span>
+			<h2 class="section-title">হাওরের তাজা মাছ,<br>দেশি স্বাদের ভরপুর আয়োজন</h2>
+			<p class="section-lead">২ দিন ১ রাতে ৬ বেলা খাবার — ভুনা খিচুড়ি থেকে দেশি হাঁস, আকনি থেকে BBQ (বিশেষ প্যাকেজে)।</p>
+			<ul class="checklist">
+				<li>হাওরের বড় তাজা মাছ</li>
+				<li>দেশি মুরগি ও হাঁস</li>
+				<li>বাহারি ভর্তা ও শুটকি</li>
+				<li>Welcome Drinks</li>
+				<li>সিজনাল ফল</li>
+				<li>আনলিমিটেড চা-কফি</li>
+			</ul>
+			<a class="btn btn--ghost-dark" href="<?php echo esc_url( bhela_page_url( 'food' ) ); ?>">সম্পূর্ণ মেনু দেখুন</a>
+		</div>
+	</div>
+</section>
+
 <!-- EXPERIENCE / SPOTS -->
 <section class="section section--dark has-wave-top" id="experience">
 	<div class="container">
@@ -146,29 +169,6 @@ $img = get_template_directory_uri() . '/assets/images';
 					<span class="spot__label"><strong><?php echo esc_html( $s[0] ); ?></strong><span><?php echo esc_html( $s[1] ); ?></span></span>
 				</a>
 			<?php endforeach; ?>
-		</div>
-	</div>
-</section>
-
-<!-- FOOD -->
-<section class="section section--sand" id="food">
-	<div class="container split">
-		<div class="split__media reveal">
-			<img src="<?php echo esc_url( bhela_img( 'food', 'food/food-spread.jpg' ) ); ?>" alt="ভেলার দেশি খাবার" loading="lazy">
-		</div>
-		<div class="reveal">
-			<span class="eyebrow">খাবারের আয়োজন</span>
-			<h2 class="section-title">হাওরের তাজা মাছ,<br>দেশি স্বাদের ভরপুর আয়োজন</h2>
-			<p class="section-lead">২ দিন ১ রাতে ৬ বেলা খাবার — ভুনা খিচুড়ি থেকে দেশি হাঁস, আকনি থেকে BBQ (বিশেষ প্যাকেজে)।</p>
-			<ul class="checklist">
-				<li>হাওরের বড় তাজা মাছ</li>
-				<li>দেশি মুরগি ও হাঁস</li>
-				<li>বাহারি ভর্তা ও শুটকি</li>
-				<li>Welcome Drinks</li>
-				<li>সিজনাল ফল</li>
-				<li>আনলিমিটেড চা-কফি</li>
-			</ul>
-			<a class="btn btn--ghost-dark" href="<?php echo esc_url( bhela_page_url( 'food' ) ); ?>">সম্পূর্ণ মেনু দেখুন</a>
 		</div>
 	</div>
 </section>

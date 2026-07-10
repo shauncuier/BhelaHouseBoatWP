@@ -159,3 +159,62 @@
 }
 .bhela-review-card__who strong { display: block; line-height: 1.3; color: var(--ink, #0A2A2F); }
 .bhela-review-card__who span { font-size: .8rem; color: #5E7472; }
+
+/* ---- Multi-cabin builder ---- */
+.bhela-bm-cabins-head { margin: 1rem 0 .5rem; }
+.bhela-bm-cabins-head label { font-weight: 700; font-size: .95rem; color: var(--bm-ink); }
+.bhela-bm-cabins-head span { font-weight: 400; color: #7a8a89; font-size: .8rem; }
+.bm-cabin-row {
+	display: grid; grid-template-columns: 2fr .8fr .8fr .8fr 1fr auto; gap: .6rem; align-items: end;
+	background: #F7FAF9; border: 1.5px solid #e2ebe9; border-radius: 12px;
+	padding: .8rem .9rem; margin-bottom: .7rem;
+}
+.bm-cabin-row.is-over { border-color: #e5a34b; background: #FDF6EC; }
+.bm-cabin-row.is-over::after { content: "⚠️ কেবিনের ধারণক্ষমতার চেয়ে বেশি — প্রয়োজনে আরেকটি কেবিন নিন"; grid-column: 1 / -1; font-size: .76rem; color: #b45309; }
+.bm-cabin-row label { display: block; font-size: .74rem; font-weight: 700; color: #5E7472; margin-bottom: .3rem; }
+.bm-cabin-row select {
+	width: 100%; padding: .55rem .5rem; min-height: 42px;
+	border: 1.5px solid #d5e0df; border-radius: 9px; background: #fff;
+	font-family: inherit; font-size: .92rem; color: var(--bm-ink);
+}
+.bm-cabin-row select:focus { outline: none; border-color: var(--bm-primary); box-shadow: 0 0 0 3px rgba(19,122,116,.13); }
+.bm-cabin-row__price { text-align: right; }
+.bm-cabin-row__price .bm-row-total { font-weight: 700; color: var(--bm-primary); font-size: .98rem; white-space: nowrap; }
+.bm-cabin-row__remove {
+	background: #fff; border: 1.5px solid #e3cccc; color: #b32d2e; border-radius: 9px;
+	width: 36px; height: 42px; cursor: pointer; font-size: .9rem;
+}
+.bm-cabin-row__remove:hover { background: #b32d2e; color: #fff; border-color: #b32d2e; }
+@media (max-width: 720px) {
+	.bm-cabin-row { grid-template-columns: 1fr 1fr 1fr; }
+	.bm-cabin-row__type { grid-column: 1 / -1; }
+	.bm-cabin-row__price { grid-column: 1 / 3; text-align: left; align-self: center; }
+}
+.bhela-bm-addcabin {
+	background: transparent; border: 2px dashed var(--bm-primary); color: var(--bm-primary);
+	border-radius: 11px; padding: .7rem 1.2rem; width: 100%; font-family: inherit;
+	font-weight: 700; font-size: .95rem; cursor: pointer; transition: background .2s, color .2s;
+}
+.bhela-bm-addcabin:hover { background: var(--bm-primary); color: #fff; }
+.bhela-bm-childnote { font-size: .8rem; color: #7a8a89; margin: .8rem 0 0; line-height: 1.7; }
+
+/* Availability */
+.bhela-bm-avail-btn {
+	width: 100%; min-height: 48px; padding: .8rem 1rem;
+	background: var(--bm-ink); color: #fff; border: 0; border-radius: 11px;
+	font-family: inherit; font-weight: 700; font-size: .95rem; cursor: pointer;
+	transition: filter .2s, transform .15s;
+}
+.bhela-bm-avail-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+.bhela-bm-avail-btn:disabled { opacity: .7; cursor: wait; }
+.bhela-bm-avail { margin: -.2rem 0 1rem; font-size: .9rem; }
+.bm-avail-chip { display: inline-block; padding: .35rem 1rem; border-radius: 999px; font-weight: 700; font-size: .85rem; }
+.bm-avail-trip { color: #5E7472; font-size: .85rem; }
+.bm-avail-note { margin-top: .4rem; font-size: .82rem; color: #7a8a89; line-height: 1.7; }
+
+/* Summary breakdown lines */
+#bm-breakdown { border-bottom: 1px dashed rgba(255,255,255,.3); margin-bottom: .5rem; padding-bottom: .5rem; }
+.bm-bd-line { display: flex; justify-content: space-between; align-items: baseline; gap: 1rem; padding: .35rem 0; }
+.bm-bd-line span { font-size: .86rem; color: rgba(220,235,233,.9); line-height: 1.4; }
+.bm-bd-line span small { display: block; font-size: .75rem; color: rgba(220,235,233,.6); }
+.bm-bd-line strong { color: #fff; font-size: .95rem; white-space: nowrap; }

@@ -90,7 +90,9 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	$rows .= bhela_bm_email_row( 'কেবিন', $m( '_bhela_cabin_type' ) );
 	$rows .= bhela_bm_email_row( 'অতিথি', $m( '_bhela_guests' ) . ' জন' );
 	if ( $total ) {
-		$rows .= bhela_bm_email_row( 'জনপ্রতি', bhela_bm_money( $m( '_bhela_per_person' ) ) );
+		if ( (int) $m( '_bhela_per_person' ) > 0 ) {
+			$rows .= bhela_bm_email_row( 'জনপ্রতি', bhela_bm_money( $m( '_bhela_per_person' ) ) );
+		}
 		$rows .= bhela_bm_email_row( 'মোট', bhela_bm_money( $total ), true );
 		$rows .= bhela_bm_email_row( 'অগ্রিম (৫০%)', bhela_bm_money( $advance ), true, '#E5601F' );
 		$rows .= bhela_bm_email_row( 'পরিশোধিত', bhela_bm_money( $paid ), false, '#1a7f37' );
