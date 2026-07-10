@@ -127,6 +127,50 @@ function bhela_customize_homepage( $wp_customize ) {
 }
 add_action( 'customize_register', 'bhela_customize_homepage' );
 
+/** Theme image: Customizer upload wins, else bundled theme asset. */
+function bhela_img( $key, $fallback_relpath ) {
+	$custom = get_theme_mod( 'bhela_img_' . $key, '' );
+	if ( $custom ) {
+		return $custom;
+	}
+	return get_template_directory_uri() . '/assets/images/' . $fallback_relpath;
+}
+
+/** Image slots (key => label + bundled fallback). */
+function bhela_image_slots() {
+	return array(
+		'hero'         => array( 'label' => 'Hero Background (হোমপেজ বড় ছবি)', 'file' => 'hero/hero-haor.jpg' ),
+		'food'         => array( 'label' => 'Food Section (খাবারের ছবি)', 'file' => 'food/food-spread.jpg' ),
+		'rooftop'      => array( 'label' => 'Why BHELA (রুফটপ ছবি)', 'file' => 'boat/rooftop-1.jpg' ),
+		'cabin_budget' => array( 'label' => 'Cabin — Budget Friendly', 'file' => 'cabins/cabin-1.jpg' ),
+		'cabin_comfort'=> array( 'label' => 'Cabin — Comfort', 'file' => 'cabins/cabin-2.jpg' ),
+		'cabin_deluxe' => array( 'label' => 'Cabin — Double Deluxe', 'file' => 'cabins/cabin-3.jpg' ),
+		'cabin_luxury' => array( 'label' => 'Cabin — Luxury Triple', 'file' => 'cabins/cabin-4.jpg' ),
+		'cabin_couple' => array( 'label' => 'Cabin — Exclusive Couple', 'file' => 'cabins/cabin-5.jpg' ),
+		'spot_1'       => array( 'label' => 'Spot — টাঙ্গুয়ার হাওর', 'file' => 'spots/spot-1.jpg' ),
+		'spot_2'       => array( 'label' => 'Spot — নীলাদ্রি লেক', 'file' => 'spots/spot-2.jpg' ),
+		'spot_3'       => array( 'label' => 'Spot — জাদুকাটা নদী', 'file' => 'spots/spot-3.jpg' ),
+		'spot_4'       => array( 'label' => 'Spot — বারিক্কা টিলা', 'file' => 'spots/spot-4.jpg' ),
+		'spot_5'       => array( 'label' => 'Spot — ওয়াচ টাওয়ার', 'file' => 'spots/spot-5.jpg' ),
+		'spot_6'       => array( 'label' => 'Spot — শিমুল বাগান', 'file' => 'spots/spot-6.jpg' ),
+		'spot_7'       => array( 'label' => 'Spot — খরচার হাওর', 'file' => 'spots/spot-7.jpg' ),
+	);
+}
+
+/** Customizer: image upload controls (Appearance → Customize → BHELA Images). */
+function bhela_customize_images( $wp_customize ) {
+	$wp_customize->add_section( 'bhela_images', array( 'title' => 'BHELA Images (ছবি বদলান)', 'priority' => 32 ) );
+	foreach ( bhela_image_slots() as $key => $slot ) {
+		$wp_customize->add_setting( 'bhela_img_' . $key, array( 'sanitize_callback' => 'esc_url_raw' ) );
+		$wp_customize->add_control( new WP_Customize_Image_Control( $wp_customize, 'bhela_img_' . $key, array(
+			'label'       => $slot['label'],
+			'section'     => 'bhela_images',
+			'description' => 'খালি রাখলে ডিফল্ট ছবি দেখাবে',
+		) ) );
+	}
+}
+add_action( 'customize_register', 'bhela_customize_images' );
+
 /** Render hero title mod: | -> <br>, *text* -> gold em. */
 function bhela_home_text( $key, $default = '' ) {
 	$v = get_theme_mod( 'bhela_home_' . $key, $default );
@@ -192,7 +236,7 @@ function bhela_cabins() {
 	foreach ( $rates as $key => $row ) {
 		$extra              = isset( $names[ $key ] ) ? $names[ $key ] : array( 'name' => $row['label'], 'bn' => '', 'badge' => '' );
 		$out[ $key ]        = array_merge( $row, $extra );
-		$out[ $key ]['img'] = get_template_directory_uri() . '/assets/images/' . ( isset( $images[ $key ] ) ? $images[ $key ] : 'hero/hero-haor.jpg' );
+		$out[ $key ]['img'] = bhela_img( 'cabin_' . $key, isset( $images[ $key ] ) ? $images[ $key ] : 'hero/hero-haor.jpg' );
 	}
 	return $out;
 }
