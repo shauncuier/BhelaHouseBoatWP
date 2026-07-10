@@ -12,6 +12,9 @@ get_header();
 	<p>তারিখ, কেবিন ও অতিথি সংখ্যা দিন — সাথে সাথে রেট দেখুন, বুকিং রিকোয়েস্ট পাঠান। ৫০% অগ্রিমে বুকিং Confirmed।</p>
 </div></section>
 
+<?php bhela_page_editor_content(); // Gutenberg-editable region ?>
+
+
 <section class="section"><div class="container">
 	<?php
 	if ( shortcode_exists( 'bhela_booking_form' ) ) {

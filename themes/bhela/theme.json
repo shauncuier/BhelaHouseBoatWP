@@ -1,0 +1,60 @@
+{
+	"$schema": "https://schemas.wp.org/trunk/theme.json",
+	"version": 2,
+	"settings": {
+		"appearanceTools": true,
+		"layout": {
+			"contentSize": "820px",
+			"wideSize": "1200px"
+		},
+		"color": {
+			"defaultPalettes": false,
+			"palette": [
+				{ "slug": "ink", "name": "Ink (Dark Teal)", "color": "#0A2A2F" },
+				{ "slug": "ink-2", "name": "Ink 2", "color": "#0E3B41" },
+				{ "slug": "primary", "name": "Primary Teal", "color": "#137A74" },
+				{ "slug": "aqua", "name": "Aqua", "color": "#6FC7BF" },
+				{ "slug": "cta", "name": "Sunset Orange", "color": "#FF7A3D" },
+				{ "slug": "gold", "name": "Gold", "color": "#F5C97B" },
+				{ "slug": "sand", "name": "Sand", "color": "#F4EDE1" },
+				{ "slug": "cream", "name": "Cream", "color": "#FBF8F2" },
+				{ "slug": "white", "name": "White", "color": "#FFFFFF" },
+				{ "slug": "text", "name": "Body Text", "color": "#22403E" }
+			],
+			"gradients": [
+				{ "slug": "monsoon", "name": "Monsoon Dark", "gradient": "linear-gradient(160deg, #0A2A2F 0%, #0E3B41 100%)" },
+				{ "slug": "teal-ink", "name": "Teal to Ink", "gradient": "linear-gradient(120deg, #137A74 0%, #0E3B41 90%)" },
+				{ "slug": "sunset", "name": "Sunset CTA", "gradient": "linear-gradient(135deg, #FF8B4A 0%, #FF7A3D 55%, #F0561B 100%)" }
+			]
+		},
+		"typography": {
+			"fontFamilies": [
+				{ "slug": "display", "name": "Fraunces (Display)", "fontFamily": "'Fraunces', 'Hind Siliguri', serif" },
+				{ "slug": "body", "name": "Hind Siliguri (Body)", "fontFamily": "'Hind Siliguri', 'Poppins', sans-serif" }
+			],
+			"fontSizes": [
+				{ "slug": "small", "name": "Small", "size": "0.9rem" },
+				{ "slug": "medium", "name": "Medium", "size": "1.05rem" },
+				{ "slug": "large", "name": "Large", "size": "1.4rem" },
+				{ "slug": "x-large", "name": "XL Heading", "size": "2.2rem" },
+				{ "slug": "xx-large", "name": "Hero", "size": "3.2rem" }
+			]
+		},
+		"spacing": {
+			"units": [ "px", "rem", "%", "vw" ]
+		}
+	},
+	"styles": {
+		"color": { "background": "#FBF8F2", "text": "#22403E" },
+		"typography": { "fontFamily": "var(--wp--preset--font-family--body)", "fontSize": "1.05rem", "lineHeight": "1.8" },
+		"elements": {
+			"heading": { "typography": { "fontFamily": "var(--wp--preset--font-family--display)", "fontWeight": "600" }, "color": { "text": "#0A2A2F" } },
+			"link": { "color": { "text": "#137A74" } },
+			"button": {
+				"color": { "background": "#FF7A3D", "text": "#FFFFFF" },
+				"border": { "radius": "999px" },
+				"typography": { "fontWeight": "700" }
+			}
+		}
+	}
+}

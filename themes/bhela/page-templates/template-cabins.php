@@ -12,6 +12,9 @@ get_header();
 	<p>৬টি বড় ফ্যামিলি কেবিন — AC, Attached Washroom, Infinity Glass Window। এক কেবিনে যত বেশি সদস্য, জনপ্রতি খরচ তত কম।</p>
 </div></section>
 
+<?php bhela_page_editor_content(); // Gutenberg-editable region ?>
+
+
 <section class="section"><div class="container">
 	<div class="cabins-grid">
 		<?php foreach ( bhela_cabins() as $key => $c ) : ?>

@@ -21,6 +21,9 @@ foreach ( array( 'hero', 'boat', 'cabins', 'spots', 'food' ) as $folder ) {
 	<p>ভেলা আর টাঙ্গুয়ার হাওরের মুহূর্তগুলো — কেবিন, রুফটপ, খাবার আর হাওরের রূপ।</p>
 </div></section>
 
+<?php bhela_page_editor_content(); // Gutenberg-editable region ?>
+
+
 <section class="section"><div class="container">
 	<?php if ( $imgs ) : ?>
 		<div class="gallery-grid">

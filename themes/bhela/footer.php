@@ -47,6 +47,7 @@
 		<div class="footer-bottom">
 			<span>© <?php echo esc_html( date( 'Y' ) ); ?> BHELA – The Haor Exclusive. All rights reserved.</span>
 			<span>"Where Nature, Comfort &amp; Memories Meet"</span>
+			<span class="footer-credit">Developed by <a href="https://3s-soft.com" target="_blank" rel="noopener">3s-Soft</a></span>
 		</div>
 	</div>
 </footer>

@@ -222,3 +222,25 @@ function bhela_bm_activate() {
 	}
 }
 register_activation_hook( __FILE__, 'bhela_bm_activate' );
+
+/* =========================================================
+ * SETTINGS UPGRADE (one-time migrations for saved options)
+ * ========================================================= */
+
+function bhela_bm_maybe_upgrade() {
+	$ver = (int) get_option( 'bhela_bm_settings_version', 0 );
+	if ( $ver >= 2 ) {
+		return;
+	}
+	$s = get_option( 'bhela_bm_settings', array() );
+	if ( ! is_array( $s ) ) {
+		$s = array();
+	}
+	// v2: new payment numbers + main WhatsApp CTA.
+	$s['bkash_number'] = '01703-284728 (Bangla QR — bKash/Bank App)';
+	$s['nagad_number'] = '01684-498885 (KEYTO BD)';
+	$s['whatsapp']     = '+8801891562461';
+	update_option( 'bhela_bm_settings', $s );
+	update_option( 'bhela_bm_settings_version', 2 );
+}
+add_action( 'plugins_loaded', 'bhela_bm_maybe_upgrade' );

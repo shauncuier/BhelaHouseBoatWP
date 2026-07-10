@@ -10,16 +10,16 @@ get_header();
 $trips = array(
 	array( '31 Jul – 1 Aug 2026', 'শুক্র – শনি', 'weekend', 'Weekend' ),
 	array( '2 – 3 Aug 2026', 'রবি – সোম', 'weekday', 'Weekday −20%' ),
-	array( '4 – 5 Aug 2026', 'মঙ্গল – বুধ', 'holiday', '৫ আগস্ট ছুটি' ),
+	array( '4 – 5 / 5 – 6 Aug 2026', 'মঙ্গল – বুধ / বুধ – বৃহস্পতি', 'holiday', '৫ আগস্ট ছুটি' ),
 	array( '7 – 8 Aug 2026', 'শুক্র – শনি', 'weekend', 'Weekend' ),
 	array( '9 – 10 Aug 2026', 'রবি – সোম', 'weekday', 'Weekday −20%' ),
-	array( '11 – 12 Aug 2026', 'মঙ্গল – বুধ', 'holiday', '১২ আগস্ট ছুটি' ),
+	array( '11 – 12 / 12 – 13 Aug 2026', 'মঙ্গল – বুধ / বুধ – বৃহস্পতি', 'holiday', '১২ আগস্ট ছুটি' ),
 	array( '14 – 15 Aug 2026', 'শুক্র – শনি', 'weekend', 'Weekend' ),
 	array( '16 – 17 Aug 2026', 'রবি – সোম', 'weekday', 'Weekday −20%' ),
 	array( '18 – 19 Aug 2026', 'মঙ্গল – বুধ', 'weekday', 'Weekday −20%' ),
 	array( '21 – 22 Aug 2026', 'শুক্র – শনি', 'weekend', 'Weekend' ),
 	array( '23 – 24 Aug 2026', 'রবি – সোম', 'weekday', 'Weekday −20%' ),
-	array( '25 – 26 Aug 2026', 'মঙ্গল – বুধ', 'holiday', '২৬ আগস্ট ছুটি' ),
+	array( '25 – 26 / 26 – 27 Aug 2026', 'মঙ্গল – বুধ / বুধ – বৃহস্পতি', 'holiday', '২৬ আগস্ট ছুটি' ),
 	array( '28 – 29 Aug 2026', 'শুক্র – শনি', 'weekend', 'Weekend' ),
 );
 ?>
@@ -27,6 +27,9 @@ $trips = array(
 	<h1>ট্রিপ সিডিউল</h1>
 	<p>প্রতিটি ট্রিপ ২ দিন ১ রাত — Anwarpur Ghat থেকে যাত্রা শুরু ও শেষ। Weekday ট্রিপে ২০% পর্যন্ত ছাড়।</p>
 </div></section>
+
+<?php bhela_page_editor_content(); // Gutenberg-editable region ?>
+
 
 <section class="section"><div class="container">
 	<h2 class="section-title reveal">📅 আগস্ট ২০২৬</h2>

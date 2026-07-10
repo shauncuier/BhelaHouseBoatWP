@@ -72,6 +72,9 @@ foreach ( $faqs as $group ) {
 	<p>বুকিংয়ের আগে যা যা জানা দরকার — সব প্রশ্নের উত্তর এক জায়গায়।</p>
 </div></section>
 
+<?php bhela_page_editor_content(); // Gutenberg-editable region ?>
+
+
 <section class="section"><div class="container">
 	<?php foreach ( $faqs as $group => $items ) : ?>
 		<h2 style="font-size:1.4rem;margin:2.2rem 0 1rem" class="reveal"><?php echo esc_html( $group ); ?></h2>

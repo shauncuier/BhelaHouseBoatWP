@@ -12,6 +12,9 @@ get_header();
 	<p>সকল অতিথির জন্য স্বচ্ছতা, পরিকল্পনা ও সুষ্ঠু পরিচালনার স্বার্থে নিম্নোক্ত নীতিমালা প্রযোজ্য।</p>
 </div></section>
 
+<?php bhela_page_editor_content(); // Gutenberg-editable region ?>
+
+
 <section class="section"><div class="container"><div class="entry-content">
 
 	<h2>💳 Booking &amp; Payment Policy</h2>

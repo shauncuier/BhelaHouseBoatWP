@@ -5,6 +5,21 @@
  * @package Bhela
  */
 
+// Gutenberg override: if the front page has its own block content, render that
+// instead of the default design — making the homepage fully editable.
+$front_id = (int) get_option( 'page_on_front' );
+if ( $front_id && is_page( $front_id ) && trim( get_post_field( 'post_content', $front_id ) ) ) {
+	get_header();
+	echo '<div class="bhela-gb-home"><div class="container"><div class="entry-content">';
+	while ( have_posts() ) {
+		the_post();
+		the_content();
+	}
+	echo '</div></div></div>';
+	get_footer();
+	return;
+}
+
 get_header();
 $img = get_template_directory_uri() . '/assets/images';
 ?>
@@ -223,11 +238,11 @@ $img = get_template_directory_uri() . '/assets/images';
 <section class="section" style="padding-top:0">
 	<div class="container">
 		<div class="cta-banner reveal">
-			<h2>এই বর্ষায় হাওর ডাকছে 🌧️</h2>
+			<h2>এই বর্ষায় হাওর ডাকছে</h2>
 			<p>তারিখ আর অতিথি সংখ্যা জানান — ২ মিনিটে রেটসহ বিস্তারিত পেয়ে যাবেন WhatsApp-এ।</p>
 			<div class="btn-row">
 				<a class="btn btn--cta" href="<?php echo esc_url( bhela_page_url( 'book-now' ) ); ?>">অনলাইনে বুক করুন</a>
-				<a class="btn btn--wa" href="<?php echo esc_url( bhela_wa_link() ); ?>" target="_blank" rel="noopener">💬 WhatsApp-এ কথা বলুন</a>
+				<a class="btn btn--wa" href="<?php echo esc_url( bhela_wa_link() ); ?>" target="_blank" rel="noopener">WhatsApp-এ কথা বলুন</a>
 			</div>
 		</div>
 	</div>

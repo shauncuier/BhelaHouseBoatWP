@@ -1,6 +1,6 @@
 <?php
 /**
- * BHELA theme — setup, assets, customizer, helpers, auto page setup.
+ * BHELA theme — setup, assets, customizer, helpers, auto setup, Gutenberg.
  *
  * @package Bhela
  */
@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.2.0' );
+define( 'BHELA_VERSION', '2.3.0' );
 
 /* ---------- Setup ---------- */
 
@@ -27,8 +27,16 @@ function bhela_setup() {
 
 	add_image_size( 'bhela-card', 800, 600, true );
 	add_image_size( 'bhela-wide', 1600, 900, true );
+
+	// Gutenberg support.
+	add_theme_support( 'align-wide' );
+	add_theme_support( 'responsive-embeds' );
+	add_theme_support( 'editor-styles' );
+	add_editor_style( 'assets/css/editor.css' );
 }
 add_action( 'after_setup_theme', 'bhela_setup' );
+
+require_once get_template_directory() . '/inc/block-patterns.php';
 
 /* ---------- Assets ---------- */
 
@@ -42,7 +50,6 @@ function bhela_assets() {
 	wp_enqueue_style( 'bhela-style', get_stylesheet_uri(), array( 'bhela-fonts' ), BHELA_VERSION );
 	wp_enqueue_script( 'bhela-theme', get_template_directory_uri() . '/assets/js/theme.js', array(), BHELA_VERSION, true );
 
-	// Rates for the hero quick-estimator (from booking plugin if active).
 	$rates = function_exists( 'bhela_bm_get_rates' ) ? bhela_bm_get_rates() : array();
 	$set   = function_exists( 'bhela_bm_get_settings' ) ? bhela_bm_get_settings() : array();
 	wp_localize_script( 'bhela-theme', 'bhelaTheme', array(
@@ -55,7 +62,7 @@ function bhela_assets() {
 }
 add_action( 'wp_enqueue_scripts', 'bhela_assets' );
 
-/* ---------- Contact helpers (Customizer with plugin fallback) ---------- */
+/* ---------- Contact helpers ---------- */
 
 function bhela_contact( $key ) {
 	$defaults = array(
@@ -74,7 +81,7 @@ function bhela_contact( $key ) {
 			}
 		}
 	}
-	return get_theme_mod( 'bhela_' . $key, $defaults[ $key ] ?? '' );
+	return get_theme_mod( 'bhela_' . $key, isset( $defaults[ $key ] ) ? $defaults[ $key ] : '' );
 }
 
 function bhela_wa_link( $text = '' ) {
@@ -83,7 +90,6 @@ function bhela_wa_link( $text = '' ) {
 	return 'https://wa.me/' . $num . '?text=' . rawurlencode( $msg );
 }
 
-/** URL of an auto-created page by slug (fallback: home). */
 function bhela_page_url( $slug ) {
 	$page = get_page_by_path( $slug );
 	return $page ? get_permalink( $page ) : home_url( '/' );
@@ -106,32 +112,32 @@ function bhela_customize_register( $wp_customize ) {
 }
 add_action( 'customize_register', 'bhela_customize_register' );
 
-/* ---------- Schema (LocalBusiness + TouristTrip) ---------- */
+/* ---------- Schema ---------- */
 
 function bhela_schema() {
 	if ( ! is_front_page() ) {
 		return;
 	}
 	$schema = array(
-		'@context'  => 'https://schema.org',
-		'@type'     => 'TouristAttraction',
-		'name'      => 'BHELA – The Haor Exclusive',
+		'@context'    => 'https://schema.org',
+		'@type'       => 'TouristAttraction',
+		'name'        => 'BHELA – The Haor Exclusive',
 		'description' => 'Premium family & group friendly AC houseboat on Tanguar Haor, Sunamganj, Bangladesh. 2 days 1 night all-inclusive packages.',
-		'url'       => home_url( '/' ),
-		'telephone' => bhela_contact( 'phone_1' ),
-		'email'     => bhela_contact( 'email' ),
-		'address'   => array(
-			'@type'           => 'PostalAddress',
-			'streetAddress'   => 'Anwarpur Ghat, Tahirpur',
-			'addressRegion'   => 'Sunamganj',
-			'addressCountry'  => 'BD',
+		'url'         => home_url( '/' ),
+		'telephone'   => bhela_contact( 'phone_1' ),
+		'email'       => bhela_contact( 'email' ),
+		'address'     => array(
+			'@type'          => 'PostalAddress',
+			'streetAddress'  => 'Anwarpur Ghat, Tahirpur',
+			'addressRegion'  => 'Sunamganj',
+			'addressCountry' => 'BD',
 		),
 	);
 	echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
 }
 add_action( 'wp_head', 'bhela_schema' );
 
-/* ---------- Cabin data for templates (falls back if plugin inactive) ---------- */
+/* ---------- Cabin data ---------- */
 
 function bhela_cabins() {
 	$images = array(
@@ -157,8 +163,9 @@ function bhela_cabins() {
 	);
 	$out = array();
 	foreach ( $rates as $key => $row ) {
-		$out[ $key ] = array_merge( $row, $names[ $key ] ?? array( 'name' => $row['label'], 'bn' => '', 'badge' => '' ) );
-		$out[ $key ]['img'] = get_template_directory_uri() . '/assets/images/' . ( $images[ $key ] ?? 'hero/hero-haor.jpg' );
+		$extra              = isset( $names[ $key ] ) ? $names[ $key ] : array( 'name' => $row['label'], 'bn' => '', 'badge' => '' );
+		$out[ $key ]        = array_merge( $row, $extra );
+		$out[ $key ]['img'] = get_template_directory_uri() . '/assets/images/' . ( isset( $images[ $key ] ) ? $images[ $key ] : 'hero/hero-haor.jpg' );
 	}
 	return $out;
 }
@@ -167,17 +174,32 @@ function bhela_money( $n ) {
 	return '৳' . number_format( (float) $n );
 }
 
-/* ---------- Auto-create pages + menu on theme activation ---------- */
+/* ---------- Auto setup on theme activation ---------- */
 
 function bhela_auto_setup() {
+	// 1) Auto-activate the BHELA Booking Engine plugin if installed.
+	if ( ! function_exists( 'is_plugin_active' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/plugin.php';
+	}
+	$booking_plugin = 'bhela-booking/bhela-booking.php';
+	if ( file_exists( WP_PLUGIN_DIR . '/' . $booking_plugin ) && ! is_plugin_active( $booking_plugin ) ) {
+		activate_plugin( $booking_plugin );
+	}
+
+	// 2) Pretty permalinks.
+	if ( ! get_option( 'permalink_structure' ) ) {
+		update_option( 'permalink_structure', '/%postname%/' );
+	}
+
+	// 3) Create pages with templates.
 	$pages = array(
-		'cabins'    => array( 'title' => 'কেবিন ও রেট', 'template' => 'page-templates/template-cabins.php' ),
-		'schedule'  => array( 'title' => 'ট্রিপ সিডিউল', 'template' => 'page-templates/template-schedule.php' ),
-		'food'      => array( 'title' => 'খাবার মেনু', 'template' => 'page-templates/template-food.php' ),
-		'gallery'   => array( 'title' => 'গ্যালারি', 'template' => 'page-templates/template-gallery.php' ),
-		'faq'       => array( 'title' => 'সাধারণ প্রশ্ন (FAQ)', 'template' => 'page-templates/template-faq.php' ),
-		'book-now'  => array( 'title' => 'বুক করুন', 'template' => 'page-templates/template-booking.php' ),
-		'policies'  => array( 'title' => 'বুকিং নীতিমালা', 'template' => 'page-templates/template-policy.php' ),
+		'cabins'   => array( 'title' => 'কেবিন ও রেট', 'template' => 'page-templates/template-cabins.php' ),
+		'schedule' => array( 'title' => 'ট্রিপ সিডিউল', 'template' => 'page-templates/template-schedule.php' ),
+		'food'     => array( 'title' => 'খাবার মেনু', 'template' => 'page-templates/template-food.php' ),
+		'gallery'  => array( 'title' => 'গ্যালারি', 'template' => 'page-templates/template-gallery.php' ),
+		'faq'      => array( 'title' => 'সাধারণ প্রশ্ন (FAQ)', 'template' => 'page-templates/template-faq.php' ),
+		'book-now' => array( 'title' => 'বুক করুন', 'template' => 'page-templates/template-booking.php' ),
+		'policies' => array( 'title' => 'বুকিং নীতিমালা', 'template' => 'page-templates/template-policy.php' ),
 	);
 
 	$menu_items = array();
@@ -200,7 +222,24 @@ function bhela_auto_setup() {
 		}
 	}
 
-	// Primary menu.
+	// 4) Front page.
+	$home = get_page_by_path( 'home' );
+	if ( ! $home ) {
+		$home_id = wp_insert_post( array(
+			'post_title'  => 'হোম',
+			'post_name'   => 'home',
+			'post_type'   => 'page',
+			'post_status' => 'publish',
+		) );
+	} else {
+		$home_id = $home->ID;
+	}
+	if ( $home_id && ! is_wp_error( $home_id ) ) {
+		update_option( 'show_on_front', 'page' );
+		update_option( 'page_on_front', (int) $home_id );
+	}
+
+	// 5) Primary menu.
 	$menu = wp_get_nav_menu_object( 'BHELA Primary' );
 	if ( ! $menu ) {
 		$menu_id = wp_create_nav_menu( 'BHELA Primary' );
@@ -219,8 +258,29 @@ function bhela_auto_setup() {
 		$locations['primary'] = $menu_id;
 		set_theme_mod( 'nav_menu_locations', $locations );
 	}
+
+	// 6) Flush rewrite rules.
+	flush_rewrite_rules();
 }
 add_action( 'after_switch_theme', 'bhela_auto_setup' );
+
+/* ---------- Gutenberg content region for page templates ---------- */
+
+function bhela_page_editor_content() {
+	if ( ! have_posts() ) {
+		return;
+	}
+	while ( have_posts() ) {
+		the_post();
+		$content = trim( get_the_content() );
+		if ( $content ) {
+			echo '<section class="section" style="padding-bottom:0"><div class="container"><div class="entry-content">';
+			the_content();
+			echo '</div></div></section>';
+		}
+	}
+	rewind_posts();
+}
 
 /* ---------- Fallback menu ---------- */
 

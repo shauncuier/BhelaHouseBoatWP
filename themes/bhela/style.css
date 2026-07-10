@@ -363,6 +363,8 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 .footer-col li { margin-bottom: .55rem; font-size: .95rem; }
 .footer-tagline { font-family: var(--font-display); color: var(--gold); font-size: 1.1rem; margin-top: 1rem; }
 .footer-bottom { border-top: 1px solid var(--line-inverse); padding: 1.4rem 0; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .85rem; }
+.footer-credit a { color: var(--gold); font-weight: 700; }
+.footer-credit a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }
 @media (max-width: 900px) { .footer-grid { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .footer-grid { grid-template-columns: 1fr; } }
 
@@ -680,28 +682,26 @@ input, select, textarea { font-family: inherit; }
 	background: linear-gradient(90deg, transparent, rgba(245, 201, 123, .55), transparent);
 }
 
-/* --- Nav Book button: compact gradient pill --- */
-.site-nav__book { box-shadow: 0 6px 20px rgba(255, 122, 61, .4); }
-
-/* --- Schedule table: rounded row hover + weekday row tint --- */
-.sched-table td:first-child { font-variant-numeric: tabular-nums; }
-
-/* --- WhatsApp float: attention pulse ring (gentle, stops on hover) --- */
-.wa-float::before {
-	content: ""; position: absolute; inset: -6px; border-radius: 50%;
-	border: 2px solid rgba(37, 211, 102, .5);
-	animation: waPulse 2.6s ease-out infinite;
+/* --- Nav Book button: proper pill (immune to menu-link styles) --- */
+.site-nav__menu a.site-nav__book {
+	display: inline-flex; align-items: center; justify-content: center;
+	padding: .6rem 1.6rem !important; margin-left: .4rem;
+	min-height: 42px; border-radius: 999px;
+	background: linear-gradient(135deg, #FF8B4A 0%, var(--cta) 55%, #F0561B 100%);
+	color: #fff !important; font-weight: 700; font-size: .95rem; line-height: 1;
+	border: 1.5px solid rgba(255, 255, 255, .25);
+	box-shadow: 0 6px 20px rgba(255, 122, 61, .45), inset 0 1px 0 rgba(255,255,255,.3);
+	transition: transform .2s var(--ease), box-shadow .2s, filter .2s;
 }
-@keyframes waPulse { 0% { transform: scale(.8); opacity: 1; } 70%, 100% { transform: scale(1.25); opacity: 0; } }
-.wa-float:hover::before { animation-play-state: paused; opacity: 0; }
-
-/* --- Page hero: gradient mesh consistency with dark sections --- */
-.page-hero {
-	background:
-		radial-gradient(700px 300px at 90% 10%, rgba(245, 201, 123, .14), transparent 60%),
-		linear-gradient(120deg, var(--ink) 20%, var(--primary) 130%);
+.site-nav__menu a.site-nav__book::after { display: none; }
+.site-nav__menu a.site-nav__book:hover {
+	transform: translateY(-2px);
+	filter: brightness(1.06);
+	box-shadow: 0 10px 28px rgba(255, 122, 61, .55), inset 0 1px 0 rgba(255,255,255,.3);
 }
-
-@media (prefers-reduced-motion: reduce) {
-	.hero__kicker::after, .wa-float::before { animation: none; }
+.site-nav__menu a.site-nav__book:active { transform: scale(.97); }
+@media (max-width: 900px) {
+	.site-nav__menu a.site-nav__book {
+		font-size: 1.15rem; padding: .9rem 2.6rem !important; min-height: 52px; margin-left: 0;
+	}
 }

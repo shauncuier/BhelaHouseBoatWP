@@ -27,6 +27,9 @@ $day2 = array(
 	<p>২ দিন ১ রাতের স্ট্যান্ডার্ড ফুড মেনু — দেশীয় স্বাদের সমৃদ্ধ খাবার, হাওরের ঐতিহ্যবাহী রান্না এবং আন্তরিক আতিথেয়তা।</p>
 </div></section>
 
+<?php bhela_page_editor_content(); // Gutenberg-editable region ?>
+
+
 <section class="section"><div class="container">
 	<div class="menu-day reveal">
 		<h3>🌿 প্রথম দিন</h3>
