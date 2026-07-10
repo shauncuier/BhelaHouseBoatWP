@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '1.1.0' );
+define( 'BHELA_BM_VERSION', '1.2.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -28,11 +28,13 @@ function bhela_bm_default_settings() {
 		'address'          => 'Anwarpur Ghat, Tahirpur, Sunamganj, Bangladesh',
 		'phone_1'          => '01891-562461',
 		'phone_2'          => '01614-182769',
-		'whatsapp'         => '+8801793395556',
+		'whatsapp'         => '+8801891562461',
 		'email'            => 'infobhela@gmail.com',
-		'bkash_number'     => '01793-395556 (Personal)',
-		'nagad_number'     => '01793-395556 (Personal)',
+		'bkash_number'     => '01703-284728 (Bangla QR — bKash/Bank App)',
+		'nagad_number'     => '01684-498885 (KEYTO BD)',
 		'bank_details'     => '',
+		'nagad_qr'         => '',
+		'bangla_qr'        => '',
 		'invoice_prefix'   => 'BH',
 		'advance_percent'  => 50,
 		'weekend_days'     => array( 5, 6 ), // date('w'): 5 = Friday, 6 = Saturday.

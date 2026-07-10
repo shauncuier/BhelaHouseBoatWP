@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.1.0' );
+define( 'BHELA_VERSION', '2.2.0' );
 
 /* ---------- Setup ---------- */
 
@@ -61,7 +61,7 @@ function bhela_contact( $key ) {
 	$defaults = array(
 		'phone_1'  => '01891-562461',
 		'phone_2'  => '01614-182769',
-		'whatsapp' => '+8801793395556',
+		'whatsapp' => '+8801891562461',
 		'email'    => 'infobhela@gmail.com',
 		'facebook' => 'https://www.facebook.com/',
 		'address'  => 'Anwarpur Ghat, Tahirpur, Sunamganj',

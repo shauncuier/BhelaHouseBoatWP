@@ -52,6 +52,12 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.totals .row.paid strong { color:#1a7f37; }
 	.pay-info { background:#F8F5EF; border-radius:10px; padding:18px 22px; margin:26px 0; line-height:1.9; }
 	.pay-info h3 { color:#14676B; font-size:14px; margin-bottom:6px; }
+	.pay-qrs { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; margin-top:16px; padding-top:16px; border-top:1px dashed #d8cfbc; }
+	.pay-qrs figure { margin:0; text-align:center; }
+	.pay-qrs img { width:150px; height:150px; object-fit:cover; border-radius:10px; border:3px solid #fff; box-shadow:0 4px 16px rgba(11,46,51,.15); }
+	.pay-qrs figcaption { font-size:12.5px; font-weight:700; color:#0B2E33; margin-top:6px; line-height:1.4; }
+	.pay-qrs figcaption small { font-weight:400; color:#5b6b6a; }
+	.pay-qrs__hint { flex-basis:100%; font-size:12.5px; color:#5b6b6a; margin-top:4px; }
 	.note { font-size:12.5px; color:#5b6b6a; line-height:1.8; border-top:1px dashed #cdd9d8; padding-top:16px; }
 	.inv-foot { background:#0B2E33; color:#cfe3e2; text-align:center; padding:18px; font-size:13px; }
 	.print-bar { max-width:820px; margin:0 auto 16px; display:flex; justify-content:flex-end; gap:10px; }
@@ -123,10 +129,28 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 
 			<div class="pay-info">
 				<h3>💳 Payment Options / পেমেন্ট মাধ্যম</h3>
-				<strong>bKash:</strong> <?php echo esc_html( $s['bkash_number'] ); ?> &nbsp;|&nbsp;
+				<strong>Bangla QR (bKash/Bank App):</strong> <?php echo esc_html( $s['bkash_number'] ); ?><br>
 				<strong>Nagad:</strong> <?php echo esc_html( $s['nagad_number'] ); ?>
 				<?php if ( $s['bank_details'] ) : ?><br><strong>Bank:</strong> <?php echo nl2br( esc_html( $s['bank_details'] ) ); ?><?php endif; ?>
 				<br><strong>📞</strong> <?php echo esc_html( $s['phone_1'] ); ?>, <?php echo esc_html( $s['phone_2'] ); ?> &nbsp;|&nbsp; <strong>WhatsApp:</strong> <?php echo esc_html( $s['whatsapp'] ); ?>
+
+				<?php if ( ! empty( $s['nagad_qr'] ) || ! empty( $s['bangla_qr'] ) ) : ?>
+					<div class="pay-qrs">
+						<?php if ( ! empty( $s['bangla_qr'] ) ) : ?>
+							<figure>
+								<img src="<?php echo esc_url( $s['bangla_qr'] ); ?>" alt="Bangla QR — bKash বা ব্যাংক অ্যাপ দিয়ে স্ক্যান করে পেমেন্ট করুন">
+								<figcaption>Bangla QR<br><small>bKash / Bank App</small></figcaption>
+							</figure>
+						<?php endif; ?>
+						<?php if ( ! empty( $s['nagad_qr'] ) ) : ?>
+							<figure>
+								<img src="<?php echo esc_url( $s['nagad_qr'] ); ?>" alt="Nagad QR — স্ক্যান করে পেমেন্ট করুন">
+								<figcaption>Nagad<br><small><?php echo esc_html( $s['nagad_number'] ); ?></small></figcaption>
+							</figure>
+						<?php endif; ?>
+						<p class="pay-qrs__hint">📲 অ্যাপ খুলে <strong>Scan QR</strong> → পেমেন্ট করুন → Transaction ID টি WhatsApp-এ পাঠান</p>
+					</div>
+				<?php endif; ?>
 			</div>
 
 			<?php if ( $invoice['message'] ) : ?>

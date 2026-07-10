@@ -99,7 +99,7 @@ $img = get_template_directory_uri() . '/assets/images';
 </section>
 
 <!-- EXPERIENCE / SPOTS -->
-<section class="section section--dark" id="experience">
+<section class="section section--dark has-wave-top" id="experience">
 	<div class="container">
 		<span class="eyebrow reveal">ভ্রমণ অভিজ্ঞতা</span>
 		<h2 class="section-title reveal">এক ট্রিপে হাওরের সেরা ৭টি স্পট</h2>
@@ -176,7 +176,7 @@ $img = get_template_directory_uri() . '/assets/images';
 </section>
 
 <!-- REVIEWS -->
-<section class="section section--dark" id="reviews">
+<section class="section section--dark has-wave-top" id="reviews">
 	<div class="container">
 		<div class="center">
 			<span class="eyebrow reveal">অতিথিদের কথা</span>

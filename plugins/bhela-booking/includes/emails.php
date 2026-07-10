@@ -70,7 +70,8 @@ function bhela_bm_email_customer( $booking_id, $type = 'request' ) {
 	$body  = $intro . bhela_bm_booking_summary_text( $booking_id );
 	$body .= "\n\n🧾 আপনার ইনভয়েস দেখুন/প্রিন্ট করুন:\n" . bhela_bm_invoice_url( $booking_id );
 	$body .= $outro;
-	$body .= "\n\n💳 পেমেন্ট: bKash: {$settings['bkash_number']} | Nagad: {$settings['nagad_number']}";
+	$body .= "\n\n💳 পেমেন্ট:\nBangla QR (bKash/Bank App): {$settings['bkash_number']}\nNagad: {$settings['nagad_number']}";
+	$body .= "\nপেমেন্ট QR কোড ইনভয়েসে দেওয়া আছে — স্ক্যান করে পেমেন্ট করুন এবং Transaction ID টি WhatsApp-এ পাঠান।";
 	$body .= "\n📞 {$settings['phone_1']}, {$settings['phone_2']} | WhatsApp: {$settings['whatsapp']}";
 	$body .= "\n\n— {$settings['business_name']}\n\"{$settings['business_tagline']}\"";
 

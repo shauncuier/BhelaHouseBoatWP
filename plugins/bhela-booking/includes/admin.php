@@ -272,6 +272,8 @@ function bhela_bm_settings_page() {
 			$s[ $f ] = sanitize_text_field( $_POST[ $f ] ?? $s[ $f ] );
 		}
 		$s['bank_details']    = sanitize_textarea_field( $_POST['bank_details'] ?? '' );
+		$s['nagad_qr']        = esc_url_raw( $_POST['nagad_qr'] ?? '' );
+		$s['bangla_qr']       = esc_url_raw( $_POST['bangla_qr'] ?? '' );
 		$s['holidays']        = sanitize_textarea_field( $_POST['holidays'] ?? '' );
 		$s['invoice_note']    = sanitize_textarea_field( $_POST['invoice_note'] ?? '' );
 		$s['advance_percent'] = min( 100, max( 1, (int) ( $_POST['advance_percent'] ?? 50 ) ) );
@@ -316,6 +318,9 @@ function bhela_bm_settings_page() {
 				<tr><th>bKash</th><td><input type="text" class="regular-text" name="bkash_number" value="<?php echo esc_attr( $s['bkash_number'] ); ?>"></td></tr>
 				<tr><th>Nagad</th><td><input type="text" class="regular-text" name="nagad_number" value="<?php echo esc_attr( $s['nagad_number'] ); ?>"></td></tr>
 				<tr><th>Bank Details</th><td><textarea name="bank_details" rows="3" class="large-text"><?php echo esc_textarea( $s['bank_details'] ); ?></textarea></td></tr>
+				<tr><th>Nagad QR Image URL</th><td><input type="url" class="large-text" name="nagad_qr" value="<?php echo esc_attr( $s['nagad_qr'] ?? '' ); ?>" placeholder="Upload the Nagad QR photo in Media Library, paste its URL here">
+					<p class="description"><?php esc_html_e( 'Shown on the invoice so guests can scan & pay. Media → Add New → copy File URL.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th>Bangla QR Image URL</th><td><input type="url" class="large-text" name="bangla_qr" value="<?php echo esc_attr( $s['bangla_qr'] ?? '' ); ?>" placeholder="Upload the Bangla QR photo in Media Library, paste its URL here"></td></tr>
 				<tr><th>Advance %</th><td><input type="number" name="advance_percent" min="1" max="100" value="<?php echo esc_attr( $s['advance_percent'] ); ?>"> %</td></tr>
 				<tr><th>Invoice Prefix</th><td><input type="text" name="invoice_prefix" value="<?php echo esc_attr( $s['invoice_prefix'] ); ?>"></td></tr>
 				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="3" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea></td></tr>
