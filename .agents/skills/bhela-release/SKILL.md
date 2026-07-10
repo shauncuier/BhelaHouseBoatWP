@@ -1,4 +1,4 @@
-﻿---
+---
 name: bhela-release
 description: >
   Performs a full versioned release for the BHELA WordPress project.
@@ -102,24 +102,46 @@ git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" push ori
 
 ### 6. Build release ZIP files
 
-```powershell
-# Theme ZIP
-Compress-Archive `
-  -Path "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\themes\bhela" `
-  -DestinationPath "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-theme-vTHEME_VERSION.zip" `
-  -Force
+> **CRITICAL — DO NOT use `Compress-Archive`**. PowerShell's `Compress-Archive` writes Windows backslashes (`\`) into ZIP entry paths. PHP's `ZipArchive::extractTo()` running inside LocalWP's Linux environment treats `bhela\style.css` as a flat filename, not a directory path — causing WordPress to report **"The theme is missing the style.css stylesheet"**.
+>
+> Always use .NET's `ZipFile` API directly, which lets us write Unix-style forward-slash paths.
 
-# Plugin ZIP
-Compress-Archive `
-  -Path "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\plugins\bhela-booking" `
-  -DestinationPath "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-booking-vPLUGIN_VERSION.zip" `
-  -Force
+```powershell
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+# === THEME ZIP ===
+$themePath = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\themes\bhela"
+$themeZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-theme-vTHEME_VERSION.zip"
+if (Test-Path $themeZip) { Remove-Item $themeZip }
+$zip = [System.IO.Compression.ZipFile]::Open($themeZip, [System.IO.Compression.ZipArchiveMode]::Create)
+Get-ChildItem -Path $themePath -Recurse -File | ForEach-Object {
+    $rel   = $_.FullName.Substring($themePath.Length + 1).Replace('\', '/')
+    $entry = "bhela/" + $rel
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entry, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+}
+$zip.Dispose()
+
+# === PLUGIN ZIP ===
+$pluginPath = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\plugins\bhela-booking"
+$pluginZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-booking-vPLUGIN_VERSION.zip"
+if (Test-Path $pluginZip) { Remove-Item $pluginZip }
+$zip = [System.IO.Compression.ZipFile]::Open($pluginZip, [System.IO.Compression.ZipArchiveMode]::Create)
+Get-ChildItem -Path $pluginPath -Recurse -File | ForEach-Object {
+    $rel   = $_.FullName.Substring($pluginPath.Length + 1).Replace('\', '/')
+    $entry = "bhela-booking/" + $rel
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entry, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+}
+$zip.Dispose()
 ```
 
-Verify:
+Verify the ZIP entries use forward slashes before uploading:
 ```powershell
-Get-Item "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-*.zip" |
-  Select-Object Name, @{N='Size(KB)';E={[math]::Round($_.Length/1KB,1)}}
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead($themeZip)
+$zip.Entries | Where-Object { $_.FullName -like "*style*" } | Select-Object FullName
+$zip.Dispose()
+# Expected: bhela/style.css   (forward slash — if you see bhela\style.css the install WILL fail)
 ```
 
 ---
