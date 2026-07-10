@@ -71,6 +71,13 @@
 			bump('bm-advance');
 		}
 
+		// Prefill date from ?date=YYYY-MM-DD (trip calendar links)
+		var urlDate = new URLSearchParams(window.location.search).get('date');
+		if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) {
+			dateEl.value = urlDate;
+			calc();
+		}
+
 		[cabin, guests, dateEl].forEach(function (el) {
 			el.addEventListener('change', calc);
 			el.addEventListener('input', calc);

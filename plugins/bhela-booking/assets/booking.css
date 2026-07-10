@@ -110,3 +110,36 @@
 @media (prefers-reduced-motion: reduce) {
 	.bhela-bm-alert, .bhela-bm-submit.is-loading::after { animation: none; }
 }
+
+/* ---- Trip calendar ([bhela_trip_calendar]) ---- */
+.bhela-trips { display: grid; gap: .8rem; }
+.bhela-trip {
+	display: grid; grid-template-columns: 1.4fr 1.2fr auto auto; gap: .8rem 1.2rem; align-items: center;
+	background: #fff; border: 1px solid rgba(10,42,47,.1); border-left: 5px solid #1a7f37;
+	border-radius: 14px; padding: 1rem 1.3rem;
+	box-shadow: 0 6px 22px rgba(10,42,47,.06);
+	transition: transform .2s, box-shadow .2s;
+}
+.bhela-trip:hover { transform: translateY(-2px); box-shadow: 0 10px 30px rgba(10,42,47,.1); }
+.bhela-trip--filling { border-left-color: #b45309; }
+.bhela-trip--booked { border-left-color: #b32d2e; opacity: .65; }
+.bhela-trip__date strong { display: block; font-size: 1.05rem; color: var(--ink, #0A2A2F); }
+.bhela-trip__date span { font-size: .85rem; color: #5E7472; }
+.bhela-trip__meta { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.bhela-trip__type { background: rgba(19,122,116,.1); color: #137A74; font-size: .78rem; font-weight: 700; padding: .2rem .7rem; border-radius: 999px; }
+.bhela-trip__type--weekday { background: rgba(26,127,55,.12); color: #1a7f37; }
+.bhela-trip__type--holiday { background: rgba(255,122,61,.14); color: #E5601F; }
+.bhela-trip__note { font-size: .8rem; color: #5E7472; }
+.bhela-trip__status { font-weight: 700; font-size: .88rem; white-space: nowrap; }
+.bhela-trip__cta {
+	background: var(--cta, #FF7A3D); color: #fff !important; text-decoration: none; font-weight: 700;
+	padding: .55rem 1.3rem; border-radius: 999px; font-size: .9rem; white-space: nowrap; text-align: center;
+	transition: transform .15s, background .2s;
+}
+.bhela-trip__cta:hover { background: #E5601F; transform: translateY(-2px); }
+.bhela-trip__cta--off { background: #cbd5d3; color: #5E7472 !important; cursor: not-allowed; }
+@media (max-width: 760px) {
+	.bhela-trip { grid-template-columns: 1fr 1fr; }
+	.bhela-trip__cta { grid-column: 2; justify-self: end; }
+	.bhela-trip__status { grid-column: 1; }
+}
