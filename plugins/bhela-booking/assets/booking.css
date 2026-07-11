@@ -11,9 +11,24 @@
 .bhela-bm-layout { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.6rem; align-items: start; }
 @media (max-width: 860px) { .bhela-bm-layout { grid-template-columns: 1fr; } }
 
+/* Progress step bar — mobile wizard only (hidden on desktop) */
+.bhela-bm-steps { display: none; gap: .5rem; margin: 0 0 1.3rem; }
+.bm-stepdot {
+	flex: 1; display: flex; flex-direction: column; align-items: center; gap: .2rem;
+	font-weight: 700; font-size: 1rem; color: #9db2b0;
+	padding: .55rem .4rem; border-radius: 12px; background: #F1F6F5;
+	border: 1.5px solid transparent; cursor: default; transition: background .2s, color .2s, border-color .2s;
+	position: relative;
+}
+.bm-stepdot small { font-weight: 600; font-size: .72rem; letter-spacing: .01em; }
+.bm-stepdot.is-active { background: var(--bm-primary); color: #fff; }
+.bm-stepdot.is-done { background: #E3F1EC; color: var(--bm-primary); }
+.bm-stepdot.is-done::after { content: "✓"; position: absolute; top: .35rem; right: .5rem; font-size: .7rem; }
+@media (max-width: 860px) { .bm-stepdot { cursor: pointer; } }
+
 /* Steps */
 .bhela-bm-step {
-	background: #fff; border: 1px solid rgba(10, 42, 47, .09);
+	background: #fff; border: 1px solid rgba(0, 0, 0, 0.09);
 	border-radius: var(--bm-radius); padding: 1.6rem 1.7rem 1.2rem; margin: 0 0 1.3rem;
 	box-shadow: 0 6px 26px rgba(10, 42, 47, .06);
 }
@@ -218,3 +233,79 @@
 .bm-bd-line span { font-size: .86rem; color: rgba(220,235,233,.9); line-height: 1.4; }
 .bm-bd-line span small { display: block; font-size: .75rem; color: rgba(220,235,233,.6); }
 .bm-bd-line strong { color: #fff; font-size: .95rem; white-space: nowrap; }
+
+/* ---- Date-booked notice ---- */
+.bhela-bm-blocked {
+	margin: .3rem 0 0; padding: .9rem 1.1rem; border-radius: 12px; line-height: 1.7;
+	background: #FDECEC; border: 1.5px solid #f3c6c6; color: #7c2d12; font-size: .9rem;
+}
+.bhela-bm-blocked a { color: #b32d2e; font-weight: 700; }
+
+/* ---- Guest picker (guest count → auto cabin) ---- */
+.bm-guestpick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0 1rem; }
+@media (max-width: 460px) { .bm-guestpick { grid-template-columns: 1fr 1fr; } }
+
+.bm-autoplan {
+	margin: .3rem 0 1rem; padding: .9rem 1rem; border-radius: 12px;
+	background: linear-gradient(135deg, #EAF6F1, #F4FBF8); border: 1.5px solid #cfe8de;
+}
+.bm-autoplan__label { display: block; font-weight: 700; font-size: .85rem; color: var(--bm-primary); margin-bottom: .5rem; }
+#bm-autoplan-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+.bm-chip {
+	display: inline-flex; align-items: center; gap: .3rem; background: #fff;
+	border: 1.5px solid #cfe2dc; border-radius: 999px; padding: .35rem .85rem;
+	font-size: .82rem; color: var(--bm-ink);
+}
+.bm-chip b { color: var(--bm-primary); font-weight: 700; }
+
+.bm-guest-error {
+	margin: .2rem 0 1rem; padding: .7rem .95rem; border-radius: 10px; line-height: 1.6;
+	background: #FDECEC; border: 1.5px solid #f3c6c6; color: #b32d2e; font-size: .85rem; font-weight: 600;
+}
+
+.bm-manual-toggle {
+	background: transparent; border: 0; color: #5E7472; font-family: inherit;
+	font-size: .86rem; font-weight: 700; cursor: pointer; padding: .3rem .2rem; margin: 0 0 .3rem;
+	text-decoration: underline; text-underline-offset: 3px;
+}
+.bm-manual-toggle:hover { color: var(--bm-primary); }
+.bm-manual-toggle.is-on { color: var(--bm-cta); }
+.bm-manual { margin-top: .4rem; }
+
+/* ---- Step nav buttons (mobile wizard) ---- */
+.bm-nav { display: none; gap: .7rem; margin: 1.1rem 0 0; }
+.bm-nav .bm-next, .bm-nav .bm-back {
+	flex: 1; min-height: 50px; border-radius: 12px; font-family: inherit;
+	font-weight: 700; font-size: 1rem; cursor: pointer; transition: transform .15s, background .2s, opacity .2s;
+}
+.bm-nav .bm-next { background: var(--bm-primary); color: #fff; border: 0; box-shadow: 0 8px 22px rgba(19,122,116,.28); flex: 2; }
+.bm-nav .bm-next:hover { transform: translateY(-2px); }
+.bm-nav .bm-next:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; transform: none; }
+.bm-nav .bm-back { background: #fff; color: var(--bm-ink); border: 1.5px solid #d5e0df; }
+.bm-nav .bm-back:hover { border-color: var(--bm-primary); color: var(--bm-primary); }
+
+/* ---- Mobile sticky price bar ---- */
+.bm-mobilebar { display: none; }
+.bm-mobilebar.is-shown {
+	display: flex; position: sticky; bottom: 0; z-index: 20; align-items: center; justify-content: space-between;
+	margin: 1rem -.2rem 0; padding: .7rem 1.1rem; border-radius: 14px 14px 0 0;
+	background: var(--bm-ink); color: #fff; box-shadow: 0 -8px 26px rgba(10,42,47,.18);
+}
+.bm-mobilebar__price { display: flex; align-items: baseline; gap: .5rem; }
+.bm-mobilebar__price small { font-size: .8rem; color: rgba(220,235,233,.75); }
+.bm-mobilebar__price strong { font-size: 1.25rem; color: var(--bm-gold); }
+
+/* ---- Mobile one-step-at-a-time wizard ---- */
+@media (max-width: 860px) {
+	.bhela-bm-form-wrap[data-mobile="1"] .bhela-bm-steps { display: flex; }
+	.bhela-bm-form-wrap[data-mobile="1"] .bm-nav { display: flex; }
+	.bhela-bm-form-wrap[data-mobile="1"] .bhela-bm-step { display: none; }
+	.bhela-bm-form-wrap[data-mobile="1"] .bhela-bm-step.is-current { display: block; animation: bmIn .3s ease; }
+	/* Summary aside is hidden until guests/price exist (step 2+) */
+	.bhela-bm-form-wrap[data-mobile="1"] .bhela-bm-side { display: none; }
+	.bhela-bm-form-wrap[data-mobile="1"][data-mstep="2"] .bhela-bm-side,
+	.bhela-bm-form-wrap[data-mobile="1"][data-mstep="3"] .bhela-bm-side { display: block; }
+	/* On step 1 & 2 the aside's submit is premature — hide it until info step */
+	.bhela-bm-form-wrap[data-mobile="1"][data-mstep="2"] .bhela-bm-submit,
+	.bhela-bm-form-wrap[data-mobile="1"][data-mstep="2"] .bhela-bm-note { display: none; }
+}

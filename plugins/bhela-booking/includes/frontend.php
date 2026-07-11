@@ -47,11 +47,16 @@ function bhela_bm_booking_form_shortcode() {
 	ob_start();
 	?>
 	<div class="bhela-bm-form-wrap" id="bhela-booking">
+		<div class="bhela-bm-steps" id="bm-stepbar" aria-hidden="true">
+			<span class="bm-stepdot is-active" data-dot="1">১<small>তারিখ</small></span>
+			<span class="bm-stepdot" data-dot="2">২<small>কেবিন</small></span>
+			<span class="bm-stepdot" data-dot="3">৩<small>তথ্য</small></span>
+		</div>
 		<form class="bhela-bm-form" id="bhela-bm-form" novalidate>
 			<div class="bhela-bm-layout">
 				<div class="bhela-bm-main">
-					<fieldset class="bhela-bm-step">
-						<legend><span class="bhela-bm-step__num">১</span> তারিখ ও কেবিন বাছাই করুন</legend>
+					<fieldset class="bhela-bm-step" id="bm-step-date" data-step="1">
+						<legend><span class="bhela-bm-step__num">১</span> তারিখ ও Availability</legend>
 						<div class="bhela-bm-grid">
 							<p class="bhela-bm-field">
 								<label for="bm-date">ভ্রমণের তারিখ *</label>
@@ -62,17 +67,45 @@ function bhela_bm_booking_form_shortcode() {
 							</p>
 						</div>
 						<div class="bhela-bm-avail" id="bm-avail-result" hidden></div>
-
-						<div class="bhela-bm-cabins-head">
-							<label>কেবিন সাজান <span>(গ্রুপ যেভাবে ভাগ হবে — একাধিক কেবিন যোগ করা যাবে)</span></label>
+						<div class="bhela-bm-blocked" id="bm-blocked" hidden>
+							❌ <strong>এই তারিখে বুকড</strong> — অন্য তারিখ বাছাই করুন, অথবা
+							<a href="#" id="bm-blocked-wa" target="_blank" rel="noopener">WhatsApp-এ জিজ্ঞেস করুন</a>।
 						</div>
-						<div id="bm-cabin-rows"></div>
-						<button type="button" class="bhela-bm-addcabin" id="bm-add-cabin">➕ আরেকটি কেবিন যোগ করুন</button>
-						<p class="bhela-bm-childnote">👶 শিশু নীতিমালা: ০–৪ বছর ফ্রি · ৪–৮ বছর ৫০% · ৯+ বছর পূর্ণ রেট (বড় হিসেবে দিন)</p>
+						<div class="bm-nav" data-nav="1">
+							<button type="button" class="bm-next" id="bm-next-1" data-next="2" disabled>পরবর্তী: অতিথি ও কেবিন →</button>
+						</div>
 					</fieldset>
 
-					<fieldset class="bhela-bm-step">
-						<legend><span class="bhela-bm-step__num">২</span> আপনার তথ্য</legend>
+					<fieldset class="bhela-bm-step" id="bm-step-cabins" data-step="2">
+						<legend><span class="bhela-bm-step__num">২</span> অতিথি ও কেবিন</legend>
+						<div class="bm-guestpick">
+							<p class="bhela-bm-field">
+								<label for="bm-g-adults">বড় (৯+) *</label>
+								<select id="bm-g-adults"><?php for ( $i = 0; $i <= 42; $i++ ) : ?><option value="<?php echo esc_attr( $i ); ?>" <?php selected( $i, 2 ); ?>><?php echo esc_html( $i ); ?></option><?php endfor; ?></select>
+							</p>
+							<p class="bhela-bm-field">
+								<label for="bm-g-c48">শিশু ৪–৮ <span>(৫০%)</span></label>
+								<select id="bm-g-c48"><?php for ( $i = 0; $i <= 10; $i++ ) : ?><option value="<?php echo esc_attr( $i ); ?>"><?php echo esc_html( $i ); ?></option><?php endfor; ?></select>
+							</p>
+							<p class="bhela-bm-field">
+								<label for="bm-g-c04">শিশু ০–৪ <span>(ফ্রি)</span></label>
+								<select id="bm-g-c04"><?php for ( $i = 0; $i <= 10; $i++ ) : ?><option value="<?php echo esc_attr( $i ); ?>"><?php echo esc_html( $i ); ?></option><?php endfor; ?></select>
+							</p>
+						</div>
+						<p class="bm-guest-error" id="bm-guest-error" hidden>⚠️ শিশু (৪–৮) থাকলে অন্তত ১ জন বড় (৯+) থাকতে হবে।</p>
+						<div class="bm-autoplan" id="bm-autoplan" hidden>
+							<span class="bm-autoplan__label">✨ অতিথি অনুযায়ী কেবিন প্ল্যান:</span>
+							<span id="bm-autoplan-chips"></span>
+						</div>
+						<p class="bhela-bm-childnote">👶 ০–৪ বছর ফ্রি · ৪–৮ বছর ৫০% · ৯+ পূর্ণ রেট। ২–৪২ জন (৭টি কেবিন) · যত বেশি জন, জনপ্রতি রেট তত কম।</p>
+						<div class="bm-nav" data-nav="2">
+							<button type="button" class="bm-back" data-back="1">← পিছনে</button>
+							<button type="button" class="bm-next" id="bm-next-2" data-next="3" disabled>পরবর্তী: আপনার তথ্য →</button>
+						</div>
+					</fieldset>
+
+					<fieldset class="bhela-bm-step" id="bm-step-info" data-step="3">
+						<legend><span class="bhela-bm-step__num">৩</span> আপনার তথ্য</legend>
 						<div class="bhela-bm-grid">
 							<p class="bhela-bm-field">
 								<label for="bm-name">আপনার নাম *</label>
@@ -91,12 +124,15 @@ function bhela_bm_booking_form_shortcode() {
 							<label for="bm-message">বিশেষ নোট <span>(ঐচ্ছিক)</span></label>
 							<textarea id="bm-message" name="message" rows="3" placeholder="যেমন: Full Boat Reservation, Corporate Tour, BBQ..."></textarea>
 						</p>
+						<div class="bm-nav" data-nav="3">
+							<button type="button" class="bm-back" data-back="2">← পিছনে</button>
+						</div>
 					</fieldset>
 
 					<div class="bhela-bm-response" id="bhela-bm-response" role="status" aria-live="polite"></div>
 				</div>
 
-				<aside class="bhela-bm-side">
+				<aside class="bhela-bm-side" id="bm-side">
 					<div class="bhela-bm-summary">
 						<h3>🧾 আপনার বুকিং</h3>
 						<div class="bhela-bm-price" id="bhela-bm-price" hidden>
@@ -107,7 +143,7 @@ function bhela_bm_booking_form_shortcode() {
 							<div class="bhela-bm-price__row bhela-bm-price__row--save" id="bm-savings-row" hidden><span>আপনার সাশ্রয় 🎉</span><strong id="bm-savings">—</strong></div>
 							<div class="bhela-bm-price__row bhela-bm-price__row--advance"><span>অগ্রিম (৫০%)</span><strong id="bm-advance">—</strong></div>
 						</div>
-						<p class="bhela-bm-empty" id="bhela-bm-empty">তারিখ ও কেবিন বাছাই করলে এখানে বিস্তারিত হিসাব দেখা যাবে।</p>
+						<p class="bhela-bm-empty" id="bhela-bm-empty">তারিখ ও অতিথি সংখ্যা দিলে এখানে সেরা কেবিন প্ল্যান ও দাম দেখা যাবে।</p>
 						<button type="submit" class="bhela-bm-submit" id="bhela-bm-submit"><span class="bhela-bm-submit__label">বুকিং রিকোয়েস্ট পাঠান →</span></button>
 						<p class="bhela-bm-note">অগ্রিম পাওয়ার পরই বুকিং Confirmed হয়। আমাদের টিম ফোন/WhatsApp-এ যোগাযোগ করবে।</p>
 						<ul class="bhela-bm-trust">
@@ -139,6 +175,8 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 	$total   = 0;
 	$regular_total = 0;
 	$guests  = 0;
+	$adults_total = 0;
+	$c48_total    = 0;
 	$lines   = array();
 
 	foreach ( (array) $cabins as $c ) {
@@ -152,6 +190,10 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 		if ( $adults + $c48 + $c04 < 1 ) {
 			continue;
 		}
+		// Every cabin must hold at least 2 guests — no lone-guest cabin.
+		if ( $adults + $c48 === 1 ) {
+			return new WP_Error( 'lone_cabin', __( 'প্রতিটি কেবিনে অন্তত ২ জন অতিথি থাকতে হবে।', 'bhela-booking' ) );
+		}
 		$row  = $rates[ $type ];
 		$rate = ( 'weekday' === $day_type ) ? (int) $row['weekday'] : (int) $row['regular'];
 		$line_total   = $adults * $rate + (int) ceil( $c48 * $rate * 0.5 );
@@ -159,7 +201,9 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 
 		$total         += $line_total;
 		$regular_total += $line_regular;
-		$guests        += $adults + $c48 + $c04;
+		$guests        += $adults + $c48; // 0–4 infants are free, not counted as guests
+		$adults_total  += $adults;
+		$c48_total     += $c48;
 
 		$who = $adults . ' বড়';
 		if ( $c48 ) {
@@ -177,6 +221,21 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 
 	if ( ! $lines ) {
 		return new WP_Error( 'no_cabins', __( 'অন্তত একটি কেবিনে অতিথি সংখ্যা দিন।', 'bhela-booking' ) );
+	}
+
+	// A booking needs at least 2 guests (infants 0–4 don't count).
+	if ( $adults_total + $c48_total < 2 ) {
+		return new WP_Error( 'min_guests', __( 'অন্তত ২ জন অতিথি প্রয়োজন — একা একজনের বুকিং সম্ভব নয়।', 'bhela-booking' ) );
+	}
+
+	// Boat capacity: 7 cabins / 42 guests.
+	if ( $adults_total + $c48_total > 42 || count( $lines ) > 7 ) {
+		return new WP_Error( 'over_capacity', __( 'সর্বোচ্চ ৪২ জন অতিথি (৭টি কেবিন)। বড় গ্রুপের জন্য সরাসরি যোগাযোগ করুন।', 'bhela-booking' ) );
+	}
+
+	// A 4–8 child (50%) cannot be booked without at least one adult.
+	if ( $c48_total > 0 && $adults_total < 1 ) {
+		return new WP_Error( 'need_adult', __( 'শিশু (৪–৮) থাকলে অন্তত ১ জন বড় (৯+) থাকতে হবে।', 'bhela-booking' ) );
 	}
 
 	$advance = (int) ceil( $total * ( (float) $settings['advance_percent'] / 100 ) );
@@ -206,9 +265,11 @@ function bhela_bm_process_submission( $data ) {
 		return new WP_Error( 'missing', __( 'অনুগ্রহ করে নাম, মোবাইল নম্বর ও তারিখ পূরণ করুন।', 'bhela-booking' ) );
 	}
 
-	$price = is_array( $cabins ) ? bhela_bm_calc_multi( $cabins, $date ) : new WP_Error( 'no_cabins', 'no cabins' );
+	$price = is_array( $cabins )
+		? bhela_bm_calc_multi( $cabins, $date )
+		: new WP_Error( 'no_cabins', __( 'অন্তত একটি কেবিনে অতিথি সংখ্যা দিন।', 'bhela-booking' ) );
 	if ( is_wp_error( $price ) ) {
-		return new WP_Error( 'cabins', __( 'অন্তত একটি কেবিনে অতিথি সংখ্যা দিন।', 'bhela-booking' ) );
+		return $price; // pass through the specific reason (no cabins / needs an adult)
 	}
 
 	$post_id = wp_insert_post( array(
