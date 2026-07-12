@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.0.2
+ * Version: 2.2.1
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.0.2' );
+define( 'BHELA_BM_VERSION', '2.2.1' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -67,6 +67,49 @@ function bhela_bm_get_rates() {
 		}
 	}
 	return $defaults;
+}
+
+/**
+ * Rate rows indexed by cabin occupancy (people sharing) — 2..6.
+ * The per-person rate is decided by how many people share a cabin.
+ */
+function bhela_bm_rates_by_occupancy() {
+	$map = array();
+	foreach ( bhela_bm_get_rates() as $key => $row ) {
+		$occ = (int) $row['sharing'];
+		$row['key'] = $key;
+		$map[ $occ ] = $row;
+	}
+	return $map;
+}
+
+/** Boat physical capacity. */
+function bhela_bm_max_cabins() {
+	return 6;
+}
+function bhela_bm_max_guests() {
+	$occ = bhela_bm_rates_by_occupancy();
+	$max = $occ ? max( array_keys( $occ ) ) : 6;
+	return bhela_bm_max_cabins() * (int) $max; // 6 × 6 = 36
+}
+
+/**
+ * The rate row for a given cabin occupancy (falls back to the nearest larger,
+ * then nearest smaller, tier if an exact one is not configured).
+ */
+function bhela_bm_rate_for_occupancy( $occ ) {
+	$map = bhela_bm_rates_by_occupancy();
+	if ( isset( $map[ $occ ] ) ) {
+		return $map[ $occ ];
+	}
+	$keys = array_keys( $map );
+	sort( $keys );
+	foreach ( $keys as $k ) {
+		if ( $k >= $occ ) {
+			return $map[ $k ];
+		}
+	}
+	return $map[ end( $keys ) ];
 }
 
 /* =========================================================

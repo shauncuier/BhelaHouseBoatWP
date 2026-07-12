@@ -104,8 +104,47 @@ add_action( 'pre_get_posts', 'bhela_bm_status_filter_query' );
 function bhela_bm_add_meta_boxes() {
 	add_meta_box( 'bhela_booking_details', __( 'Booking Details', 'bhela-booking' ), 'bhela_bm_details_metabox', 'bhela_booking', 'normal', 'high' );
 	add_meta_box( 'bhela_booking_actions', __( 'Invoice & Actions', 'bhela-booking' ), 'bhela_bm_actions_metabox', 'bhela_booking', 'side', 'high' );
+	add_meta_box( 'bhela_booking_discount', __( 'Discount & Counter-Offer', 'bhela-booking' ), 'bhela_bm_discount_metabox', 'bhela_booking', 'side', 'high' );
 }
 add_action( 'add_meta_boxes', 'bhela_bm_add_meta_boxes' );
+
+/** Admin discount panel: base → %/flat/custom → offer price → apply. */
+function bhela_bm_discount_metabox( $post ) {
+	$base      = (int) ( get_post_meta( $post->ID, '_bhela_base_price', true ) ?: get_post_meta( $post->ID, '_bhela_total', true ) );
+	$requested = (int) get_post_meta( $post->ID, '_bhela_requested_price', true );
+	$disc_msg  = get_post_meta( $post->ID, '_bhela_discount_msg', true );
+	$pct       = get_post_meta( $post->ID, '_bhela_discount_percent', true );
+	$flat      = get_post_meta( $post->ID, '_bhela_discount_flat', true );
+	$custom    = get_post_meta( $post->ID, '_bhela_custom_total', true );
+	$offer     = (int) get_post_meta( $post->ID, '_bhela_offer_price', true );
+	$full      = get_post_meta( $post->ID, '_bhela_full_boat', true );
+	?>
+	<style>.bhela-disc label{display:block;font-weight:600;margin:8px 0 2px}.bhela-disc input{width:100%}.bhela-disc .req{background:#FFF7E6;border:1px solid #F5C97B;border-radius:8px;padding:8px 10px;margin:0 0 10px;font-size:12.5px;line-height:1.6}</style>
+	<div class="bhela-disc">
+		<?php if ( $full ) : ?>
+			<p class="req">🚢 <strong><?php esc_html_e( 'Full Boat — custom quote requested.', 'bhela-booking' ); ?></strong> <?php esc_html_e( 'Set the price with Custom Total below.', 'bhela-booking' ); ?></p>
+		<?php endif; ?>
+		<?php if ( $requested || $disc_msg ) : ?>
+			<div class="req">💬 <strong><?php esc_html_e( 'Guest request', 'bhela-booking' ); ?></strong><br>
+				<?php if ( $requested ) : ?><?php esc_html_e( 'Budget:', 'bhela-booking' ); ?> <strong><?php echo esc_html( bhela_bm_money( $requested ) ); ?></strong><br><?php endif; ?>
+				<?php if ( $disc_msg ) : ?><em><?php echo esc_html( $disc_msg ); ?></em><?php endif; ?>
+			</div>
+		<?php endif; ?>
+		<p><?php esc_html_e( 'Base Price:', 'bhela-booking' ); ?> <strong><?php echo esc_html( bhela_bm_money( $base ) ); ?></strong></p>
+		<label><?php esc_html_e( 'Discount %', 'bhela-booking' ); ?></label>
+		<input type="number" name="bhela_discount_percent" min="0" max="100" step="0.5" value="<?php echo esc_attr( $pct ); ?>">
+		<label><?php esc_html_e( 'Flat Discount (৳)', 'bhela-booking' ); ?></label>
+		<input type="number" name="bhela_discount_flat" min="0" value="<?php echo esc_attr( $flat ); ?>">
+		<label><?php esc_html_e( 'Custom Total (৳ — overrides both)', 'bhela-booking' ); ?></label>
+		<input type="number" name="bhela_custom_total" min="0" value="<?php echo esc_attr( $custom ); ?>">
+		<?php if ( $offer ) : ?>
+			<p style="margin-top:10px"><?php esc_html_e( 'Computed Offer:', 'bhela-booking' ); ?> <strong style="color:#137A74;font-size:15px"><?php echo esc_html( bhela_bm_money( $offer ) ); ?></strong></p>
+		<?php endif; ?>
+		<p style="margin-top:8px"><label style="font-weight:400"><input type="checkbox" name="bhela_apply_offer" value="1"> <?php esc_html_e( 'Apply offer as the booking Total on save', 'bhela-booking' ); ?></label></p>
+		<p class="description"><?php esc_html_e( 'Offer = Custom Total, or Base − %% − Flat. Applying it updates Total & Advance.', 'bhela-booking' ); ?></p>
+	</div>
+	<?php
+}
 
 function bhela_bm_details_metabox( $post ) {
 	wp_nonce_field( 'bhela_bm_save', 'bhela_bm_nonce' );
@@ -133,7 +172,7 @@ function bhela_bm_details_metabox( $post ) {
 			</select>
 			<p class="description"><?php esc_html_e( 'Changing cabin/date/guests recalculates the price on save (unless manual override is checked).', 'bhela-booking' ); ?></p></td></tr>
 		<tr><th><?php esc_html_e( 'Guests', 'bhela-booking' ); ?></th>
-			<td><input type="number" name="bhela_guests" min="1" max="40" value="<?php echo esc_attr( $m( '_bhela_guests', 1 ) ); ?>"></td></tr>
+			<td><input type="number" name="bhela_guests" min="1" max="<?php echo esc_attr( bhela_bm_max_guests() ); ?>" value="<?php echo esc_attr( $m( '_bhela_guests', 1 ) ); ?>"></td></tr>
 		<tr><th><?php esc_html_e( 'Per Person (৳)', 'bhela-booking' ); ?></th>
 			<td><input type="number" name="bhela_per_person" value="<?php echo esc_attr( $m( '_bhela_per_person' ) ); ?>"></td></tr>
 		<tr><th><?php esc_html_e( 'Total (৳)', 'bhela-booking' ); ?></th>
@@ -154,6 +193,56 @@ function bhela_bm_details_metabox( $post ) {
 		<tr><th><?php esc_html_e( 'Customer Note', 'bhela-booking' ); ?></th>
 			<td><textarea name="bhela_message" rows="3"><?php echo esc_textarea( $m( '_bhela_message' ) ); ?></textarea></td></tr>
 	</table>
+
+	<?php
+	$cabins = json_decode( (string) get_post_meta( $post->ID, '_bhela_cabins_json', true ), true );
+	if ( ! is_array( $cabins ) || ! $cabins ) {
+		$cabins = array( array( 'adults' => (int) $m( '_bhela_guests', 2 ), 'c48' => 0, 'c04' => 0 ) );
+	}
+	$max_cap = max( array_keys( bhela_bm_rates_by_occupancy() ) );
+	?>
+	<h4 style="margin:14px 0 6px"><?php esc_html_e( '🛏️ Cabin Combination (edit & recalculate)', 'bhela-booking' ); ?></h4>
+	<p class="description" style="margin:0 0 8px"><?php printf( esc_html__( 'Each cabin = %1$d–%2$d people. Tick "Recalculate" to reprice from this combination on save (occupancy-based; 0–4 infants free).', 'bhela-booking' ), 2, (int) $max_cap ); ?></p>
+	<table class="widefat" id="bhela-combo-table" style="max-width:520px">
+		<thead><tr><th><?php esc_html_e( 'Cabin', 'bhela-booking' ); ?></th><th><?php esc_html_e( 'Adults (9+)', 'bhela-booking' ); ?></th><th><?php esc_html_e( 'Child 4–8', 'bhela-booking' ); ?></th><th><?php esc_html_e( 'Infant 0–4', 'bhela-booking' ); ?></th><th></th></tr></thead>
+		<tbody>
+		<?php foreach ( $cabins as $i => $cab ) : ?>
+			<tr>
+				<td><?php echo (int) $i + 1; ?></td>
+				<td><input type="number" name="bhela_cabin_adults[]" min="0" max="<?php echo esc_attr( $max_cap ); ?>" value="<?php echo esc_attr( (int) ( $cab['adults'] ?? 0 ) ); ?>" style="width:70px"></td>
+				<td><input type="number" name="bhela_cabin_c48[]" min="0" max="<?php echo esc_attr( $max_cap ); ?>" value="<?php echo esc_attr( (int) ( $cab['c48'] ?? 0 ) ); ?>" style="width:70px"></td>
+				<td><input type="number" name="bhela_cabin_c04[]" min="0" max="<?php echo esc_attr( $max_cap ); ?>" value="<?php echo esc_attr( (int) ( $cab['c04'] ?? 0 ) ); ?>" style="width:70px"></td>
+				<td><button type="button" class="button bhela-combo-del">✕</button></td>
+			</tr>
+		<?php endforeach; ?>
+		</tbody>
+	</table>
+	<p>
+		<button type="button" class="button" id="bhela-combo-add">➕ <?php esc_html_e( 'Add Cabin', 'bhela-booking' ); ?></button>
+		<label style="margin-left:12px"><input type="checkbox" name="bhela_combo_recalc" value="1"> <strong><?php esc_html_e( 'Recalculate price from combination on save', 'bhela-booking' ); ?></strong></label>
+	</p>
+	<script>
+	(function () {
+		var tbl = document.getElementById('bhela-combo-table');
+		var max = <?php echo (int) $max_cap; ?>;
+		function renum() { tbl.querySelectorAll('tbody tr').forEach(function (tr, i) { tr.cells[0].textContent = i + 1; }); }
+		document.getElementById('bhela-combo-add').addEventListener('click', function () {
+			var tr = document.createElement('tr');
+			tr.innerHTML = '<td></td>' +
+				'<td><input type="number" name="bhela_cabin_adults[]" min="0" max="' + max + '" value="2" style="width:70px"></td>' +
+				'<td><input type="number" name="bhela_cabin_c48[]" min="0" max="' + max + '" value="0" style="width:70px"></td>' +
+				'<td><input type="number" name="bhela_cabin_c04[]" min="0" max="' + max + '" value="0" style="width:70px"></td>' +
+				'<td><button type="button" class="button bhela-combo-del">✕</button></td>';
+			tbl.querySelector('tbody').appendChild(tr); renum();
+		});
+		tbl.addEventListener('click', function (e) {
+			if (e.target.classList.contains('bhela-combo-del')) {
+				var rows = tbl.querySelectorAll('tbody tr');
+				if (rows.length > 1) { e.target.closest('tr').remove(); renum(); }
+			}
+		});
+	})();
+	</script>
 	<?php
 }
 
@@ -232,6 +321,56 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		}
 	}
 
+	// Cabin combination editor → reprice via the occupancy engine.
+	if ( ! empty( $_POST['bhela_combo_recalc'] ) ) {
+		$adults_in = (array) ( $_POST['bhela_cabin_adults'] ?? array() );
+		$c48_in    = (array) ( $_POST['bhela_cabin_c48'] ?? array() );
+		$c04_in    = (array) ( $_POST['bhela_cabin_c04'] ?? array() );
+		$combo     = array();
+		foreach ( $adults_in as $i => $a ) {
+			$combo[] = array(
+				'adults' => max( 0, (int) $a ),
+				'c48'    => max( 0, (int) ( $c48_in[ $i ] ?? 0 ) ),
+				'c04'    => max( 0, (int) ( $c04_in[ $i ] ?? 0 ) ),
+			);
+		}
+		$cprice = bhela_bm_calc_multi( $combo, $fields['_bhela_travel_date'] );
+		if ( is_wp_error( $cprice ) ) {
+			set_transient( 'bhela_combo_err_' . $post_id, $cprice->get_error_message(), 45 );
+		} else {
+			$parts = array();
+			foreach ( $cprice['lines'] as $l ) {
+				$parts[] = $l['label'] . ' (' . $l['who'] . ')';
+			}
+			update_post_meta( $post_id, '_bhela_cabins_json', wp_json_encode( $combo, JSON_UNESCAPED_UNICODE ) );
+			update_post_meta( $post_id, '_bhela_cabin_type', implode( ' + ', $parts ) );
+			update_post_meta( $post_id, '_bhela_guests', $cprice['guests'] );
+			update_post_meta( $post_id, '_bhela_day_type', $cprice['day_type'] );
+			update_post_meta( $post_id, '_bhela_per_person', 0 );
+			update_post_meta( $post_id, '_bhela_total', $cprice['total'] );
+			update_post_meta( $post_id, '_bhela_base_price', $cprice['total'] );
+			update_post_meta( $post_id, '_bhela_advance', $cprice['advance'] );
+			update_post_meta( $post_id, '_bhela_manual_price', '1' );
+		}
+	}
+
+	// Discount & counter-offer panel.
+	$base   = (int) ( get_post_meta( $post_id, '_bhela_base_price', true ) ?: get_post_meta( $post_id, '_bhela_total', true ) );
+	$pct    = max( 0, min( 100, (float) ( $_POST['bhela_discount_percent'] ?? 0 ) ) );
+	$flat   = max( 0, (int) ( $_POST['bhela_discount_flat'] ?? 0 ) );
+	$custom = max( 0, (int) ( $_POST['bhela_custom_total'] ?? 0 ) );
+	update_post_meta( $post_id, '_bhela_discount_percent', $pct );
+	update_post_meta( $post_id, '_bhela_discount_flat', $flat );
+	update_post_meta( $post_id, '_bhela_custom_total', $custom );
+	$offer = $custom > 0 ? $custom : max( 0, (int) round( $base - ( $base * $pct / 100 ) - $flat ) );
+	update_post_meta( $post_id, '_bhela_offer_price', $offer );
+	if ( ! empty( $_POST['bhela_apply_offer'] ) && $offer > 0 ) {
+		$settings = bhela_bm_get_settings();
+		update_post_meta( $post_id, '_bhela_total', $offer );
+		update_post_meta( $post_id, '_bhela_advance', (int) ceil( $offer * ( (float) $settings['advance_percent'] / 100 ) ) );
+		update_post_meta( $post_id, '_bhela_manual_price', '1' );
+	}
+
 	$old_status = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
 	$new_status = sanitize_key( $_POST['bhela_status'] ?? $old_status );
 	if ( array_key_exists( $new_status, bhela_bm_statuses() ) ) {
@@ -246,6 +385,20 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	}
 }
 add_action( 'save_post', 'bhela_bm_save_booking', 10, 2 );
+
+/** Surface a combination recalculation error after save. */
+function bhela_bm_combo_error_notice() {
+	global $post;
+	if ( ! $post || 'bhela_booking' !== $post->post_type ) {
+		return;
+	}
+	$err = get_transient( 'bhela_combo_err_' . $post->ID );
+	if ( $err ) {
+		delete_transient( 'bhela_combo_err_' . $post->ID );
+		echo '<div class="notice notice-error is-dismissible"><p><strong>Cabin combination not applied:</strong> ' . esc_html( $err ) . '</p></div>';
+	}
+}
+add_action( 'admin_notices', 'bhela_bm_combo_error_notice' );
 
 /* ---------- Settings page ---------- */
 

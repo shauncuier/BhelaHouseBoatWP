@@ -27,21 +27,27 @@
 		var blockedBox = document.getElementById('bm-blocked');
 		var blockedWa = document.getElementById('bm-blocked-wa');
 		var guestError = document.getElementById('bm-guest-error');
+		var fullBoatEl = document.getElementById('bm-fullboat');
+		var editToggle = document.getElementById('bm-edit-toggle');
+		var editBox = document.getElementById('bm-edit');
+		var editRows = document.getElementById('bm-edit-rows');
+		var editAdd = document.getElementById('bm-edit-add');
+		var editClose = document.getElementById('bm-edit-close');
+		var editNote = document.getElementById('bm-edit-note');
+		var discountToggle = document.getElementById('bm-discount-toggle');
+		var discountBody = document.getElementById('bm-discount-body');
 		var next1 = document.getElementById('bm-next-1');
 		var next2 = document.getElementById('bm-next-2');
+		var EMPTY_DEFAULT = emptyMsg ? emptyMsg.textContent : '';
 
 		var availChecked = false;    // date availability confirmed (not booked)
 
-		/* Cabin capacities available, largest first (e.g. [6,5,4,3,2]). */
-		var CAPS = Object.keys(bhelaBM.rates)
-			.map(function (k) { return bhelaBM.rates[k].sharing; })
-			.sort(function (a, b) { return b - a; });
-		var MAX_CAP = CAPS[0] || 6;
-		var MIN_CAP = CAPS[CAPS.length - 1] || 2;
-		var MAX_CABINS = 7;                     // boat has 7 cabins
-		var MAX_GUESTS = MAX_CABINS * MAX_CAP;  // → 42 guest capacity
-		var CAP_TO_TYPE = {};
-		Object.keys(bhelaBM.rates).forEach(function (k) { CAP_TO_TYPE[bhelaBM.rates[k].sharing] = k; });
+		/* Cabin occupancy tiers available (e.g. [2,3,4,5,6]) + boat limits. */
+		var OCC_SIZES = Object.keys(bhelaBM.occRates).map(Number).sort(function (a, b) { return a - b; });
+		var MIN_CAP = OCC_SIZES[0] || 2;
+		var MAX_CAP = OCC_SIZES[OCC_SIZES.length - 1] || 6;
+		var MAX_CABINS = bhelaBM.maxCabins || 7;
+		var MAX_GUESTS = bhelaBM.maxGuests || (MAX_CABINS * MAX_CAP);
 
 		function money(n) { return '৳' + Number(n).toLocaleString('en-IN'); }
 
@@ -53,64 +59,16 @@
 			return bhelaBM.weekendDays.indexOf(d.getDay()) !== -1 ? 'weekend' : 'weekday';
 		}
 
-		function rateFor(typeKey, dt) {
-			var r = bhelaBM.rates[typeKey];
-			if (!r) return 0;
-			return dt === 'weekday' ? r.weekday : r.regular;
-		}
+		/* ---------- Combination engine (occupancy-priced) ---------- */
 
-		/* ---------- Auto cabin plan (guest count → best-fit cabins) ---------- */
-
-		/**
-		 * Choose cabin capacities that seat `total` guests (min 2 per cabin):
-		 * fill the largest cabin repeatedly, then an exact-fit cabin for the
-		 * remainder. A remainder of 1 would strand a lone guest, so borrow a
-		 * full cabin and split it (e.g. 7 → 5+2, not 6+1).
-		 * e.g. 2→[2], 6→[6], 7→[5,2], 12→[6,6], 13→[6,5,2].
-		 */
-		function planCapacities(total) {
-			var caps = [];
-			var rem = total;
-			while (rem > MAX_CAP) { caps.push(MAX_CAP); rem -= MAX_CAP; }
-			if (rem === 1) {
-				if (caps.length) {
-					caps.pop();                       // give back a full cabin…
-					caps.push(MAX_CAP - 1, MIN_CAP);  // …split its 7 people as 5 + 2
-				} else {
-					caps.push(MIN_CAP);               // lone guest (blocked upstream by min-2)
-				}
-			} else if (rem >= 2) {
-				var fit = CAPS.filter(function (c) { return c >= rem; }).sort(function (a, b) { return a - b; })[0];
-				caps.push(fit || MIN_CAP);
+		function occRate(size, dt) {
+			var r = bhelaBM.occRates[size];
+			if (!r) { // nearest configured tier ≥ size, else largest
+				var keys = Object.keys(bhelaBM.occRates).map(Number).sort(function (a, b) { return a - b; });
+				var pick = keys.filter(function (k) { return k >= size; })[0] || keys[keys.length - 1];
+				r = bhelaBM.occRates[pick];
 			}
-			return caps;
-		}
-
-		/**
-		 * Build cabin objects {type,adults,c48,c04} from guest totals.
-		 * 0–4 infants are FREE — they don't occupy a seat or size the plan;
-		 * they're just attached to the first cabin as recorded info.
-		 */
-		function buildAutoPlan(adults, c48, c04) {
-			var occ = adults + c48; // paying/seated occupants
-			if (occ < 2) return []; // a cabin needs at least 2 guests
-			var caps = planCapacities(occ);
-			var pools = [
-				{ k: 'adults', n: adults },
-				{ k: 'c48', n: c48 }
-			];
-			var cabins = caps.map(function (cap) {
-				var cab = { type: CAP_TO_TYPE[cap] || CAP_TO_TYPE[MAX_CAP], adults: 0, c48: 0, c04: 0 };
-				var space = cap;
-				pools.forEach(function (p) {
-					if (space <= 0 || p.n <= 0) return;
-					var take = Math.min(space, p.n);
-					cab[p.k] += take; p.n -= take; space -= take;
-				});
-				return cab;
-			});
-			if (c04 > 0 && cabins.length) cabins[0].c04 = c04; // ride-along, no seat used
-			return cabins;
+			return dt === 'weekday' ? r.weekday : r.regular;
 		}
 
 		function guestTotals() {
@@ -121,101 +79,348 @@
 			};
 		}
 
-		function renderAutoPlan(cabins, dt) {
-			if (!cabins.length) { autoplanBox.hidden = true; return; }
-			autoplanChips.innerHTML = cabins.map(function (c) {
-				var r = bhelaBM.rates[c.type];
-				var seats = c.adults + c.c48; // infants (0–4) are free, not seated
-				var per = rateFor(c.type, dt || 'weekend');
-				var label = r.label.split('(')[0].trim();
-				return '<span class="bm-chip"><b>' + label + '</b> · ' + seats + ' জন' +
-					(c.c04 ? ' <i>+' + c.c04 + ' শিশু(ফ্রি)</i>' : '') +
-					(dt ? ' · ' + money(per) + '/জন' : '') + '</span>';
-			}).join('');
+		/**
+		 * Every partition of `bodies` into cabins of size MIN_CAP..MAX_CAP,
+		 * using at most MAX_CABINS cabins. Each partition is a size list (desc).
+		 * e.g. 5 → [[5],[3,2]]; 8 → [[6,2],[5,3],[4,4],[4,2,2],[3,3,2],[2,2,2,2]].
+		 */
+		function genCombinations(bodies) {
+			var out = [];
+			(function recurse(remaining, maxPart, current) {
+				if (remaining === 0) { out.push(current.slice()); return; }
+				if (current.length >= MAX_CABINS) return;
+				var hi = Math.min(maxPart, remaining);
+				for (var p = hi; p >= MIN_CAP; p--) {
+					// leftover after taking p must be 0 or ≥ MIN_CAP (no lone remainder)
+					if (remaining - p !== 0 && remaining - p < MIN_CAP) continue;
+					current.push(p);
+					recurse(remaining - p, p, current);
+					current.pop();
+				}
+			})(bodies, MAX_CAP, []);
+			return out;
+		}
+
+		/**
+		 * Distribute adults→c48 across a size list (largest cabin first). Cabin
+		 * size = paying occupants (adults + 4–8 children). 0–4 infants are FREE
+		 * riders: attached to the first cabin, they do NOT change the size/rate.
+		 */
+		function fillCombo(sizes, adults, c48, c04) {
+			var pools = [{ k: 'adults', n: adults }, { k: 'c48', n: c48 }];
+			var cabins = sizes.map(function (size) {
+				var cab = { size: size, adults: 0, c48: 0, c04: 0 };
+				var space = size;
+				pools.forEach(function (pl) {
+					if (space <= 0 || pl.n <= 0) return;
+					var take = Math.min(space, pl.n);
+					cab[pl.k] += take; pl.n -= take; space -= take;
+				});
+				return cab;
+			});
+			if (c04 > 0 && cabins.length) cabins[0].c04 = c04; // free ride-along, no seat used
+			return cabins;
+		}
+
+		/** Price a filled combo. `occupants` = paying guests (infants excluded). */
+		function priceCombo(cabins, dt, occupants) {
+			var total = 0, regular = 0;
+			cabins.forEach(function (c) {
+				var rate = occRate(c.size, dt || 'weekend');
+				var reg = occRate(c.size, 'weekend');
+				total += c.adults * rate + Math.ceil(c.c48 * rate * (bhelaBM.childPercent / 100));
+				regular += c.adults * reg + Math.ceil(c.c48 * reg * (bhelaBM.childPercent / 100));
+			});
+			return { cabins: cabins, total: total, regular: regular, bodies: occupants,
+				perPerson: occupants ? Math.round(total / occupants) : 0 };
+		}
+
+		/**
+		 * Every valid combination, priced and sorted cheapest-first. The first
+		 * (lowest total) is flagged as our suggestion; the guest may pick any.
+		 */
+		function buildOptions(g, dt) {
+			var occupants = g.adults + g.c48; // infants don't size cabins
+			var combos = genCombinations(occupants).map(function (sizes) {
+				return priceCombo(fillCombo(sizes, g.adults, g.c48, g.c04), dt, occupants);
+			});
+			if (!combos.length) return [];
+			combos.sort(function (a, b) { return a.total - b.total || a.cabins.length - b.cabins.length; });
+			return combos.map(function (c, i) {
+				return { combo: c, suggested: i === 0 };
+			});
+		}
+
+		/* ---------- Options UI + selection ---------- */
+
+		var currentOptions = [];   // [{combo, suggested}]
+		var selectedIndex = 0;
+		var showAllOptions = false;
+
+		function comboSizesLabel(cabins) {
+			return cabins.map(function (c) { return c.size; }).join(' + ');
+		}
+
+		function optionCard(o, i, dt) {
+			var c = o.combo;
+			var detail = c.cabins.map(function (cb, n) {
+				return 'কেবিন ' + (n + 1) + ': ' + cb.size + '×' + money(occRate(cb.size, dt || 'weekend'));
+			}).join(' · ');
+			var badge = o.suggested
+				? '<span class="bm-opt__badge">✨ আমাদের সাজেশন</span>'
+				: '<span class="bm-opt__badge bm-opt__badge--alt">' + c.cabins.length + ' কেবিন</span>';
+			return '<label class="bm-opt' + (o.suggested ? ' bm-opt--best' : '') + (i === selectedIndex ? ' is-selected' : '') + '">' +
+				'<input type="radio" name="bm-opt" value="' + i + '"' + (i === selectedIndex ? ' checked' : '') + '>' +
+				'<span class="bm-opt__head">' + badge +
+				'<span class="bm-opt__combo">' + comboSizesLabel(c.cabins) + '</span></span>' +
+				'<span class="bm-opt__detail">' + detail + '</span>' +
+				'<span class="bm-opt__total">' + money(c.total) + ' <small>· জনপ্রতি গড় ' + money(c.perPerson) + '</small></span>' +
+				'</label>';
+		}
+
+		function renderOptions(dt) {
+			if (!currentOptions.length) { autoplanBox.hidden = true; return; }
+
+			// Collapsed: show the suggestion + the current pick (if different).
+			var idxs;
+			if (showAllOptions) {
+				idxs = currentOptions.map(function (_, i) { return i; });
+			} else {
+				idxs = [0];
+				if (selectedIndex !== 0) idxs.push(selectedIndex);
+			}
+			var cards = idxs.map(function (i) { return optionCard(currentOptions[i], i, dt); }).join('');
+
+			var more = '';
+			if (currentOptions.length > 1) {
+				more = '<button type="button" class="bm-opts__more" id="bm-opts-more">' +
+					(showAllOptions ? '▲ কম দেখান' : '🔧 নিজের কম্বিনেশন বাছাই করুন (' + currentOptions.length + ' অপশন)') +
+					'</button>';
+			}
+			autoplanChips.innerHTML = cards + more;
+
+			autoplanChips.querySelectorAll('input[name="bm-opt"]').forEach(function (input) {
+				input.addEventListener('change', function () {
+					selectedIndex = parseInt(input.value, 10) || 0;
+					renderOptions(dayType(dateEl.value));
+					renderSummary(dayType(dateEl.value));
+				});
+			});
+			var moreBtn = document.getElementById('bm-opts-more');
+			if (moreBtn) moreBtn.addEventListener('click', function () {
+				showAllOptions = !showAllOptions;
+				renderOptions(dayType(dateEl.value));
+			});
 			autoplanBox.hidden = false;
 		}
 
-		/** Cabins currently in effect — always derived from the guest count. */
+		/** The cabins array for submission — edited builder, or selected option. */
 		function activeCabins() {
-			var g = guestTotals();
-			return buildAutoPlan(g.adults, g.c48, g.c04);
+			if (editMode) return builderCabins();
+			var o = currentOptions[selectedIndex];
+			if (!o) return [];
+			return o.combo.cabins.map(function (c) {
+				return { adults: c.adults, c48: c.c48, c04: c.c04 };
+			});
 		}
 
-		/* ---------- Price calculation ---------- */
+		/* ---------- Custom combination editor ---------- */
+
+		var editMode = false;
+
+		function numSelect(cls, max, val) {
+			var out = '<select class="' + cls + '">';
+			for (var i = 0; i <= max; i++) out += '<option value="' + i + '"' + (i === val ? ' selected' : '') + '>' + i + '</option>';
+			return out + '</select>';
+		}
+
+		function addBuilderRow(cab) {
+			cab = cab || { adults: 2, c48: 0, c04: 0 };
+			var row = document.createElement('div');
+			row.className = 'bm-cabin-row';
+			row.innerHTML =
+				'<div class="bm-cabin-row__n"><label>বড় (৯+)</label>' + numSelect('bm-b-adults', MAX_CAP, cab.adults || 0) + '</div>' +
+				'<div class="bm-cabin-row__n"><label>শিশু ৪–৮</label>' + numSelect('bm-b-c48', MAX_CAP, cab.c48 || 0) + '</div>' +
+				'<div class="bm-cabin-row__n"><label>শিশু ০–৪</label>' + numSelect('bm-b-c04', MAX_CAP, cab.c04 || 0) + '</div>' +
+				'<div class="bm-cabin-row__price"><span class="bm-row-total">—</span></div>' +
+				'<button type="button" class="bm-cabin-row__remove" aria-label="Remove">✕</button>';
+			editRows.appendChild(row);
+			row.querySelector('.bm-cabin-row__remove').addEventListener('click', function () {
+				if (editRows.children.length > 1) row.remove();
+				calc();
+			});
+			row.querySelectorAll('select').forEach(function (el) { el.addEventListener('change', calc); });
+		}
+
+		function builderCabins() {
+			var cabins = [];
+			editRows.querySelectorAll('.bm-cabin-row').forEach(function (row) {
+				cabins.push({
+					adults: parseInt(row.querySelector('.bm-b-adults').value, 10) || 0,
+					c48: parseInt(row.querySelector('.bm-b-c48').value, 10) || 0,
+					c04: parseInt(row.querySelector('.bm-b-c04').value, 10) || 0
+				});
+			});
+			return cabins;
+		}
+
+		function openEdit() {
+			editMode = true;
+			editRows.innerHTML = '';
+			var seed = (currentOptions[selectedIndex] && currentOptions[selectedIndex].combo.cabins) || [{ adults: 2, c48: 0, c04: 0 }];
+			seed.forEach(function (c) { addBuilderRow({ adults: c.adults, c48: c.c48, c04: c.c04 }); });
+			autoplanBox.hidden = true;
+			editBox.hidden = false;
+			calc();
+		}
+
+		function closeEdit() {
+			editMode = false;
+			editBox.hidden = true;
+			calc();
+		}
+
+		/** Validate + price the builder; returns {ok, msg, priced}. */
+		function evalBuilder(dt) {
+			var cabins = builderCabins();
+			var adults = 0, occupants = 0, badCabin = false;
+			cabins.forEach(function (c, i) {
+				var occ = c.adults + c.c48;   // paying occupants = cabin size (infants free)
+				var infantOnly = occ === 0 && c.c04 > 0;
+				var over = (occ > 0 && (occ < 2 || occ > MAX_CAP)) || infantOnly;
+				var rowEl = editRows.querySelectorAll('.bm-cabin-row')[i];
+				if (rowEl) {
+					rowEl.classList.toggle('is-over', over);
+					var tEl = rowEl.querySelector('.bm-row-total');
+					if (tEl) tEl.textContent = (occ >= 2 && occ <= MAX_CAP && dt)
+						? money(c.adults * occRate(occ, dt) + Math.ceil(c.c48 * occRate(occ, dt) * (bhelaBM.childPercent / 100)))
+						: '—';
+				}
+				if (over) badCabin = true;
+				adults += c.adults; occupants += occ;
+			});
+			var msg = '';
+			if (badCabin) msg = '⚠️ প্রতিটি কেবিনে ২–' + MAX_CAP + ' জন (শিশু ০–৪ বাদে) থাকতে হবে।';
+			else if (adults < 1) msg = '⚠️ অন্তত ১ জন বড় (৯+) থাকতে হবে।';
+			else if (occupants < 2) msg = '⚠️ অন্তত ২ জন প্রয়োজন।';
+			else if (cabins.length > MAX_CABINS) msg = '⚠️ সর্বোচ্চ ' + MAX_CABINS + 'টি কেবিন।';
+			else if (occupants > MAX_GUESTS) msg = '⚠️ সর্বোচ্চ ' + MAX_GUESTS + ' জন।';
+			var priced = null;
+			if (!msg && dt) {
+				var filled = cabins.map(function (c) { return { size: c.adults + c.c48, adults: c.adults, c48: c.c48, c04: c.c04 }; });
+				priced = priceCombo(filled, dt, occupants);
+			}
+			return { ok: !msg, msg: msg, priced: priced };
+		}
+
+		/* ---------- Recompute options + summary ---------- */
+
+		function fullBoat() { return !!(fullBoatEl && fullBoatEl.checked); }
 
 		function calc() {
 			var dt = dayType(dateEl.value);
-			var cabins = activeCabins();
-			renderAutoPlan(cabins, dt);
+			if (emptyMsg) emptyMsg.textContent = EMPTY_DEFAULT;
 
-			var total = 0, regularTotal = 0, guests = 0, infants = 0;
-			var adultsTotal = 0, c48Total = 0;
-			var lines = [];
+			// Full Boat → custom quote request; skip combo pricing entirely.
+			if (fullBoat()) {
+				currentOptions = [];
+				editMode = false;
+				editBox.hidden = true;
+				autoplanBox.hidden = true;
+				if (guestError) guestError.hidden = true;
+				priceBox.hidden = true;
+				if (emptyMsg) { emptyMsg.hidden = false; emptyMsg.textContent = '🚢 পুরো বোট রিজার্ভ — কাস্টম কোটের জন্য রিকোয়েস্ট পাঠান। তারিখ ও চাহিদা অনুযায়ী আমরা দাম জানাবো।'; }
+				if (next2) next2.disabled = false;
+				if (submitBtn) submitBtn.disabled = false;
+				updateMobileBar('কাস্টম কোট', dt);
+				return;
+			}
 
-			cabins.forEach(function (c) {
-				var r = bhelaBM.rates[c.type];
-				if (!r || (c.adults + c.c48 + c.c04) < 1) return;
-				adultsTotal += c.adults;
-				c48Total += c.c48;
-				guests += c.adults + c.c48; // 0–4 infants are free, not counted as guests
-				infants += c.c04;
-				if (!dt) return;
-				var rate = rateFor(c.type, dt);
-				var lineTotal = c.adults * rate + Math.ceil(c.c48 * rate * (bhelaBM.childPercent / 100));
-				var lineRegular = c.adults * r.regular + Math.ceil(c.c48 * r.regular * (bhelaBM.childPercent / 100));
-				total += lineTotal;
-				regularTotal += lineRegular;
-				var who = c.adults + ' বড়';
-				if (c.c48) who += ' + ' + c.c48 + ' শিশু(৪–৮)';
-				if (c.c04) who += ' + ' + c.c04 + ' শিশু(০–৪)';
-				lines.push({ label: r.label.split('(')[0].trim(), who: who, total: lineTotal });
-			});
+			// Custom combination editor is the source of truth when open.
+			if (editMode) {
+				var ev = evalBuilder(dt);
+				editNote.textContent = ev.msg;
+				editNote.hidden = !ev.msg;
+				if (guestError) guestError.hidden = true;
+				if (next2) next2.disabled = !ev.ok;
+				if (submitBtn) submitBtn.disabled = !ev.ok;
+				if (!ev.ok || !dt || !ev.priced) {
+					priceBox.hidden = true;
+					if (emptyMsg) emptyMsg.hidden = false;
+					updateMobileBar('', dt);
+					return;
+				}
+				paintSummary(ev.priced, dt);
+				return;
+			}
 
-			// Validation rules (in priority order):
-			//  • a 4–8 child (50%) needs at least one adult in the party;
-			//  • a booking needs at least 2 guests (no solo booking).
 			var g = guestTotals();
-			var rawOcc = g.adults + g.c48;
-			var loneCabin = cabins.some(function (c) { return (c.adults + c.c48) === 1; });
+			// `occupants` = paying guests (adults + 4–8 children). 0–4 infants are
+			// free ride-alongs and never affect cabin sizing, count, or capacity.
+			var occupants = g.adults + g.c48;
+
 			var errMsg = '';
-			if (c48Total > 0 && adultsTotal < 1) errMsg = '⚠️ শিশু (৪–৮) থাকলে অন্তত ১ জন বড় (৯+) থাকতে হবে।';
-			else if (rawOcc === 1) errMsg = '⚠️ অন্তত ২ জন অতিথি প্রয়োজন — একা একজনের বুকিং সম্ভব নয়।';
-			else if (rawOcc > MAX_GUESTS) errMsg = '⚠️ সর্বোচ্চ ' + MAX_GUESTS + ' জন অতিথি (৭টি কেবিন) — বড় গ্রুপের জন্য WhatsApp-এ যোগাযোগ করুন।';
-			else if (loneCabin) errMsg = '⚠️ প্রতিটি কেবিনে অন্তত ২ জন অতিথি থাকতে হবে।';
+			if ((g.c48 > 0 || g.c04 > 0) && g.adults < 1) errMsg = '⚠️ অন্তত ১ জন বড় (৯+) থাকতে হবে — শিশুরা একা ভ্রমণ করতে পারে না।';
+			else if (occupants === 1) errMsg = '⚠️ অন্তত ২ জন প্রয়োজন — একা একজনের বুকিং সম্ভব নয়।';
+			else if (occupants > MAX_GUESTS) errMsg = '⚠️ সর্বোচ্চ ' + MAX_GUESTS + ' জন (' + MAX_CABINS + 'টি কেবিন) — বড় গ্রুপের জন্য WhatsApp-এ যোগাযোগ করুন।';
 			var invalid = !!errMsg;
-			if (guestError) { guestError.hidden = !invalid; if (invalid) guestError.textContent = errMsg; }
-			if (invalid) autoplanBox.hidden = true;
 
-			var hasGuests = guests >= 2 && !invalid;
-			// Gate step 2 → 3 and submission: need a valid party.
-			if (next2) next2.disabled = !hasGuests;
-			if (submitBtn) submitBtn.disabled = invalid;
-
-			if (invalid || !dt || total < 1) {
+			if (invalid || occupants < 2) {
+				currentOptions = [];
+				if (guestError) { guestError.hidden = !invalid; if (invalid) guestError.textContent = errMsg; }
+				autoplanBox.hidden = true;
+				if (next2) next2.disabled = true;
+				if (submitBtn) submitBtn.disabled = invalid;
 				priceBox.hidden = true;
 				if (emptyMsg) emptyMsg.hidden = false;
 				updateMobileBar('', dt);
 				return;
 			}
+			if (guestError) guestError.hidden = true;
+
+			currentOptions = buildOptions(g, dt);
+			if (selectedIndex >= currentOptions.length) selectedIndex = 0;
+			renderOptions(dt);
+
+			if (next2) next2.disabled = false;
+			if (submitBtn) submitBtn.disabled = false;
+			renderSummary(dt);
+		}
+
+		function renderSummary(dt) {
+			var o = currentOptions[selectedIndex];
+			if (!o) { priceBox.hidden = true; if (emptyMsg) emptyMsg.hidden = false; updateMobileBar('', dt); return; }
+			if (!dt) { priceBox.hidden = true; if (emptyMsg) emptyMsg.hidden = false; updateMobileBar('', dt); return; }
+			paintSummary(o.combo, dt);
+		}
+
+		/** Paint the price summary from a priced combo {cabins,total,regular,bodies}. */
+		function paintSummary(c, dt) {
+			var infants = c.cabins.reduce(function (s, cb) { return s + cb.c04; }, 0);
 
 			var labels = { weekday: 'Weekday −20% 🔥', weekend: 'Weekend', holiday: 'সরকারি ছুটি' };
+			var paying = c.bodies; // already paying guests only (infants excluded)
 			document.getElementById('bm-daytype').textContent = labels[dt];
-			document.getElementById('bm-guests-echo').textContent = guests + ' জন' + (infants ? ' + ' + infants + ' শিশু (০–৪, ফ্রি)' : '');
-			document.getElementById('bm-total').textContent = money(total);
-			var advance = Math.ceil(total * (bhelaBM.advancePercent / 100));
+			document.getElementById('bm-guests-echo').textContent = paying + ' জন' + (infants ? ' + ' + infants + ' শিশু (০–৪, ফ্রি)' : '');
+			document.getElementById('bm-total').textContent = money(c.total);
+			var advance = Math.ceil(c.total * (bhelaBM.advancePercent / 100));
 			document.getElementById('bm-advance').textContent = money(advance);
 
-			var savings = Math.max(0, regularTotal - total);
+			var savings = Math.max(0, c.regular - c.total);
 			savingsRow.hidden = savings <= 0;
 			if (savings > 0) document.getElementById('bm-savings').textContent = money(savings);
 
-			breakdown.innerHTML = lines.map(function (l) {
-				return '<div class="bm-bd-line"><span>' + l.label + '<small>' + l.who + '</small></span><strong>' + money(l.total) + '</strong></div>';
+			breakdown.innerHTML = c.cabins.map(function (cb, n) {
+				var who = cb.adults + ' বড়';
+				if (cb.c48) who += ' + ' + cb.c48 + ' শিশু(৪–৮)';
+				if (cb.c04) who += ' + ' + cb.c04 + ' শিশু(০–৪ ফ্রি)';
+				var line = cb.adults * occRate(cb.size, dt) + Math.ceil(cb.c48 * occRate(cb.size, dt) * (bhelaBM.childPercent / 100));
+				return '<div class="bm-bd-line"><span>কেবিন ' + (n + 1) + ' (' + cb.size + ' জন)<small>' + who + '</small></span><strong>' + money(line) + '</strong></div>';
 			}).join('');
 
 			priceBox.hidden = false;
 			if (emptyMsg) emptyMsg.hidden = true;
-			updateMobileBar(money(total), dt);
+			updateMobileBar(money(c.total), dt);
 		}
 
 		/* ---------- Mobile step wizard ---------- */
@@ -360,7 +565,20 @@
 
 		/* ---------- Init ---------- */
 
-		[gAdults, gC48, gC04].forEach(function (el) { el.addEventListener('change', calc); });
+		[gAdults, gC48, gC04].forEach(function (el) {
+			el.addEventListener('change', function () { selectedIndex = 0; showAllOptions = false; calc(); });
+		});
+		if (fullBoatEl) fullBoatEl.addEventListener('change', calc);
+		if (editToggle) editToggle.addEventListener('click', openEdit);
+		if (editClose) editClose.addEventListener('click', closeEdit);
+		if (editAdd) editAdd.addEventListener('click', function () {
+			if (editRows.children.length < MAX_CABINS) addBuilderRow();
+			calc();
+		});
+		if (discountToggle) discountToggle.addEventListener('click', function () {
+			discountBody.hidden = !discountBody.hidden;
+			discountToggle.classList.toggle('is-on', !discountBody.hidden);
+		});
 
 		var urlDate = new URLSearchParams(window.location.search).get('date');
 		if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) dateEl.value = urlDate;
@@ -389,7 +607,10 @@
 			['name', 'phone', 'email', 'date', 'message'].forEach(function (f) {
 				params.append(f, fd.get(f) || '');
 			});
-			params.append('cabins', JSON.stringify(activeCabins()));
+			params.append('cabins', JSON.stringify(fullBoat() ? [] : activeCabins()));
+			params.append('full_boat', fullBoat() ? '1' : '');
+			params.append('requested_price', fd.get('requested_price') || '');
+			params.append('discount_msg', fd.get('discount_msg') || '');
 
 			fetch(bhelaBM.ajaxUrl, {
 				method: 'POST',

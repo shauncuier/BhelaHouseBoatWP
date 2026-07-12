@@ -30,6 +30,15 @@ function bhela_bm_booking_summary_text( $booking_id ) {
 		$lines[] = 'Advance (50%): ' . bhela_bm_money( $m( '_bhela_advance' ) );
 		$lines[] = 'Paid: ' . bhela_bm_money( $m( '_bhela_paid_amount' ) );
 	}
+	if ( $m( '_bhela_full_boat' ) ) {
+		$lines[] = '★ FULL BOAT — custom quote requested';
+	}
+	if ( $m( '_bhela_requested_price' ) ) {
+		$lines[] = '★ Requested price / budget: ' . bhela_bm_money( $m( '_bhela_requested_price' ) );
+	}
+	if ( $m( '_bhela_discount_msg' ) ) {
+		$lines[] = 'Discount note: ' . $m( '_bhela_discount_msg' );
+	}
 	if ( $m( '_bhela_message' ) ) {
 		$lines[] = 'Note: ' . $m( '_bhela_message' );
 	}
