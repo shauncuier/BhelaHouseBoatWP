@@ -59,6 +59,16 @@ function bhela_bm_booking_form_shortcode() {
 	ob_start();
 	?>
 	<div class="bhela-bm-form-wrap" id="bhela-booking">
+		<div class="bhela-bm-tabs" id="bm-tabs">
+			<button type="button" class="bhela-bm-tab is-active" data-tab="book">🛶 বুক করুন</button>
+			<button type="button" class="bhela-bm-tab" data-tab="track">📍 বুকিং ট্র্যাক করুন</button>
+		</div>
+
+		<div class="bm-done" id="bm-done" hidden></div>
+
+		<div class="bm-panel" id="bm-track-panel" hidden><?php echo bhela_bm_track_panel_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
+
+		<div class="bm-panel" id="bm-book-panel">
 		<div class="bhela-bm-steps" id="bm-stepbar" aria-hidden="true">
 			<span class="bm-stepdot is-active" data-dot="1">১<small>তারিখ</small></span>
 			<span class="bm-stepdot" data-dot="2">২<small>কেবিন</small></span>
@@ -187,6 +197,7 @@ function bhela_bm_booking_form_shortcode() {
 				</aside>
 			</div>
 		</form>
+		</div><!-- #bm-book-panel -->
 	</div>
 	<?php
 	return ob_get_clean();
@@ -196,12 +207,12 @@ add_shortcode( 'bhela_booking_form', 'bhela_bm_booking_form_shortcode' );
 /* ---------- Multi-cabin price calculation (server-side, authoritative) ---------- */
 
 /**
- * Price a chosen cabin combination. Rate is decided by each cabin's OCCUPANCY
- * (adults + 4–8 children + 0–4 infants); adults pay full, 4–8 children 50%,
- * 0–4 infants are free but still count toward occupancy (per guideline).
+ * Price a chosen cabin combination. Rate is decided by each cabin's paying
+ * occupancy (adults + 4–8 children); adults pay full, 4–8 children 50%.
+ * 0–4 infants are FREE ride-alongs — they do NOT affect the cabin size, rate
+ * tier, guest count, or capacity.
  *
- * $cabins: array of ['adults' => n, 'c48' => n, 'c04' => n] (a 'type' key is
- * ignored — occupancy alone decides the rate).
+ * $cabins: array of ['adults' => n, 'c48' => n, 'c04' => n].
  * Returns array|WP_Error.
  */
 function bhela_bm_calc_multi( $cabins, $date ) {
@@ -439,3 +450,129 @@ function bhela_bm_ajax_availability() {
 }
 add_action( 'wp_ajax_bhela_bm_availability', 'bhela_bm_ajax_availability' );
 add_action( 'wp_ajax_nopriv_bhela_bm_availability', 'bhela_bm_ajax_availability' );
+
+/* ---------- Booking tracking ---------- */
+
+/** Mask a customer name for public status results (e.g. "রাকিব হাসান" → "রা••• ন"). */
+function bhela_bm_mask_name( $name ) {
+	$name = trim( wp_strip_all_tags( (string) $name ) );
+	if ( '' === $name ) {
+		return '—';
+	}
+	$len = mb_strlen( $name );
+	if ( $len <= 2 ) {
+		return mb_substr( $name, 0, 1 ) . '•';
+	}
+	return mb_substr( $name, 0, 2 ) . '•••' . mb_substr( $name, -1 );
+}
+
+/**
+ * Find bookings by invoice number, phone, or email (exact match on the trimmed
+ * input). Returns up to 5 booking IDs, newest first.
+ */
+function bhela_bm_find_bookings( $q ) {
+	$q = trim( (string) $q );
+	if ( mb_strlen( $q ) < 4 ) {
+		return array();
+	}
+	$query = new WP_Query( array(
+		'post_type'      => 'bhela_booking',
+		'post_status'    => 'publish',
+		'posts_per_page' => 5,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'orderby'        => 'date',
+		'order'          => 'DESC',
+		'meta_query'     => array(
+			'relation' => 'OR',
+			array( 'key' => '_bhela_invoice_no', 'value' => $q, 'compare' => '=' ),
+			array( 'key' => '_bhela_phone', 'value' => $q, 'compare' => '=' ),
+			array( 'key' => '_bhela_email', 'value' => $q, 'compare' => '=' ),
+		),
+	) );
+	return $query->posts;
+}
+
+/** Public, privacy-safe status summary for a booking. No PII, no secret link. */
+function bhela_bm_track_payload( $booking_id ) {
+	$m = function ( $k ) use ( $booking_id ) {
+		return get_post_meta( $booking_id, $k, true );
+	};
+	$status   = $m( '_bhela_status' ) ? $m( '_bhela_status' ) : 'pending';
+	$statuses = bhela_bm_statuses();
+	$total    = (int) $m( '_bhela_total' );
+	$paid     = (int) $m( '_bhela_paid_amount' );
+
+	return array(
+		'invoice_no'   => (string) $m( '_bhela_invoice_no' ),
+		'name'         => bhela_bm_mask_name( get_the_title( $booking_id ) ),
+		'travel_date'  => (string) $m( '_bhela_travel_date' ),
+		'cabin'        => (string) $m( '_bhela_cabin_type' ),
+		'guests'       => (int) $m( '_bhela_guests' ),
+		'total'        => $total,
+		'advance'      => (int) $m( '_bhela_advance' ),
+		'paid'         => $paid,
+		'due'          => max( 0, $total - $paid ),
+		'status_key'   => $status,
+		'status_label' => isset( $statuses[ $status ] ) ? $statuses[ $status ] : $status,
+		'status_color' => bhela_bm_status_color( $status ),
+	);
+}
+
+/** AJAX: track booking(s) by phone / email / invoice number. */
+function bhela_bm_ajax_track() {
+	check_ajax_referer( 'bhela_bm_booking', 'nonce' );
+	$q = sanitize_text_field( wp_unslash( $_POST['q'] ?? '' ) );
+	if ( mb_strlen( trim( $q ) ) < 4 ) {
+		wp_send_json_error( array( 'message' => __( 'মোবাইল নম্বর, ইমেইল বা বুকিং নম্বর সঠিকভাবে দিন।', 'bhela-booking' ) ) );
+	}
+
+	// Light per-IP rate limit to blunt enumeration.
+	$ip  = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$key = 'bhela_bm_track_' . md5( $ip );
+	$hits = (int) get_transient( $key );
+	if ( $hits >= 20 ) {
+		wp_send_json_error( array( 'message' => __( 'অনেকবার চেষ্টা হয়েছে — কিছুক্ষণ পর আবার চেষ্টা করুন।', 'bhela-booking' ) ) );
+	}
+	set_transient( $key, $hits + 1, HOUR_IN_SECONDS );
+
+	$ids = bhela_bm_find_bookings( $q );
+	if ( ! $ids ) {
+		$settings = bhela_bm_get_settings();
+		wp_send_json_success( array(
+			'found'    => false,
+			'message'  => __( 'এই তথ্যে কোনো বুকিং পাওয়া যায়নি। নম্বর/ইমেইল/বুকিং নম্বর যাচাই করুন অথবা WhatsApp-এ যোগাযোগ করুন।', 'bhela-booking' ),
+			'whatsapp' => preg_replace( '/[^0-9]/', '', $settings['whatsapp'] ),
+		) );
+	}
+
+	$bookings = array_map( 'bhela_bm_track_payload', $ids );
+	wp_send_json_success( array( 'found' => true, 'bookings' => $bookings ) );
+}
+add_action( 'wp_ajax_bhela_bm_track', 'bhela_bm_ajax_track' );
+add_action( 'wp_ajax_nopriv_bhela_bm_track', 'bhela_bm_ajax_track' );
+
+/** Inner markup for the tracking UI — shared by the form tab and the standalone shortcode. */
+function bhela_bm_track_panel_html() {
+	ob_start();
+	?>
+	<div class="bm-track">
+		<p class="bm-track__lead">মোবাইল নম্বর, ইমেইল বা বুকিং নম্বর দিয়ে আপনার বুকিং-এর সর্বশেষ অবস্থা দেখুন।</p>
+		<div class="bm-track__form">
+			<input type="text" id="bm-track-q" placeholder="01XXXXXXXXX / you@email.com / BH-2026-0001" autocomplete="off">
+			<button type="button" class="bm-track__btn" id="bm-track-btn">🔍 ট্র্যাক করুন</button>
+		</div>
+		<div class="bm-track__result" id="bm-track-result" role="status" aria-live="polite"></div>
+	</div>
+	<?php
+	return ob_get_clean();
+}
+
+/* ---------- Shortcode: [bhela_booking_track] ---------- */
+
+function bhela_bm_booking_track_shortcode() {
+	wp_enqueue_style( 'bhela-bm-booking' );
+	wp_enqueue_script( 'bhela-bm-booking' );
+	return '<div class="bhela-bm-form-wrap bhela-bm-track-wrap" id="bhela-booking-track">' . bhela_bm_track_panel_html() . '</div>';
+}
+add_shortcode( 'bhela_booking_track', 'bhela_bm_booking_track_shortcode' );

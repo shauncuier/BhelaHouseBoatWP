@@ -6,9 +6,75 @@
 	'use strict';
 
 	document.addEventListener('DOMContentLoaded', function () {
+		if (typeof bhelaBM === 'undefined') return;
+
+		/* ================= Booking tracking (works standalone + in the tab) ================= */
+
+		function fmt(n) { return '৳' + Number(n).toLocaleString('en-IN'); }
+
+		function fetchTrack(q) {
+			var params = new URLSearchParams();
+			params.append('action', 'bhela_bm_track');
+			params.append('nonce', bhelaBM.nonce);
+			params.append('q', q);
+			return fetch(bhelaBM.ajaxUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: params.toString()
+			}).then(function (r) { return r.json(); });
+		}
+
+		function trackChip(label, color) {
+			color = color || '#555d66';
+			return '<span class="bm-status-chip" style="background:' + color + '1a;color:' + color + ';border:1px solid ' + color + '55">' + (label || '—') + '</span>';
+		}
+
+		function trackCardHtml(b) {
+			var rows = [
+				['নাম', b.name], ['তারিখ', b.travel_date || '—'], ['কেবিন', b.cabin || '—'],
+				['অতিথি', (b.guests || 0) + ' জন'], ['মোট', fmt(b.total)], ['অগ্রিম', fmt(b.advance)],
+				['পরিশোধিত', fmt(b.paid)], ['বাকি', fmt(b.due)]
+			].map(function (r) { return '<div class="bm-tc__row"><span>' + r[0] + '</span><strong>' + r[1] + '</strong></div>'; }).join('');
+			return '<div class="bm-trackcard">' +
+				'<div class="bm-trackcard__head"><strong>' + (b.invoice_no || '—') + '</strong>' + trackChip(b.status_label, b.status_color) + '</div>' +
+				'<div class="bm-trackcard__rows">' + rows + '</div></div>';
+		}
+
+		(function initTracking() {
+			var qEl = document.getElementById('bm-track-q');
+			var btn = document.getElementById('bm-track-btn');
+			var result = document.getElementById('bm-track-result');
+			if (!qEl || !btn || !result) return;
+			function run() {
+				var val = (qEl.value || '').trim();
+				if (val.length < 4) {
+					result.innerHTML = '<div class="bm-track__msg">মোবাইল নম্বর, ইমেইল বা বুকিং নম্বর সঠিকভাবে দিন।</div>';
+					return;
+				}
+				btn.disabled = true; btn.textContent = '⏳ খুঁজছি...';
+				fetchTrack(val).then(function (res) {
+					if (res.success && res.data && res.data.found) {
+						result.innerHTML = res.data.bookings.map(trackCardHtml).join('');
+					} else {
+						var d = (res && res.data) || {};
+						var wa = d.whatsapp ? '<a class="bhela-bm-btn" href="https://wa.me/' + d.whatsapp + '" target="_blank" rel="noopener">💬 WhatsApp-এ জিজ্ঞেস করুন</a>' : '';
+						result.innerHTML = '<div class="bm-track__msg bm-track__msg--none">' + (d.message || 'কোনো বুকিং পাওয়া যায়নি।') + (wa ? '<br>' + wa : '') + '</div>';
+					}
+				}).catch(function () {
+					result.innerHTML = '<div class="bm-track__msg">নেটওয়ার্ক সমস্যা — আবার চেষ্টা করুন।</div>';
+				}).finally(function () {
+					btn.disabled = false; btn.textContent = '🔍 ট্র্যাক করুন';
+				});
+			}
+			btn.addEventListener('click', run);
+			qEl.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); run(); } });
+		})();
+
+		/* ================= Booking form (only when the form is present) ================= */
+
 		var wrap = document.getElementById('bhela-booking');
 		var form = document.getElementById('bhela-bm-form');
-		if (!wrap || !form || typeof bhelaBM === 'undefined') return;
+		if (!wrap || !form) return;
 
 		var dateEl = document.getElementById('bm-date');
 		var gAdults = document.getElementById('bm-g-adults');
@@ -592,6 +658,68 @@
 		if (mq.addEventListener) mq.addEventListener('change', syncMode);
 		else if (mq.addListener) mq.addListener(syncMode);
 
+		/* ---------- Tabs (Book / Track) + post-submit persistence ---------- */
+
+		var tabsEl = document.getElementById('bm-tabs');
+		var bookPanel = document.getElementById('bm-book-panel');
+		var trackPanel = document.getElementById('bm-track-panel');
+		var doneBox = document.getElementById('bm-done');
+		var STORE_KEY = 'bhela_bm_last_booking';
+
+		function getStored() { try { return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { return null; } }
+		function setStored(o) { try { localStorage.setItem(STORE_KEY, JSON.stringify(o)); } catch (e) {} }
+		function clearStored() { try { localStorage.removeItem(STORE_KEY); } catch (e) {} }
+
+		function setTab(name) {
+			var track = name === 'track';
+			if (tabsEl) tabsEl.querySelectorAll('.bhela-bm-tab').forEach(function (t) {
+				t.classList.toggle('is-active', t.getAttribute('data-tab') === name);
+			});
+			var showDoneNow = !track && !!getStored();
+			if (trackPanel) trackPanel.hidden = !track;
+			if (doneBox) doneBox.hidden = track ? true : !showDoneNow;
+			if (bookPanel) bookPanel.hidden = track ? true : showDoneNow;
+		}
+
+		function renderDone(opts) {
+			if (!doneBox) return;
+			var title = opts.recent ? '🛶 আপনার সর্বশেষ বুকিং' : '🎉 ' + (opts.message || 'বুকিং রিকোয়েস্ট জমা হয়েছে');
+			var btns = '';
+			if (opts.whatsapp_url) btns += '<a class="bhela-bm-btn" href="' + opts.whatsapp_url + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+			if (opts.invoice_url) btns += '<a class="bhela-bm-btn bhela-bm-btn--invoice" href="' + opts.invoice_url + '" target="_blank" rel="noopener">🧾 ইনভয়েস</a>';
+			doneBox.innerHTML =
+				'<div class="bm-done__card">' +
+					'<div class="bm-done__title">' + title + '</div>' +
+					(opts.invoice_no ? '<div class="bm-done__inv">Booking No: <strong>' + opts.invoice_no + '</strong></div>' : '') +
+					'<div class="bm-done__status" id="bm-done-status">স্ট্যাটাস দেখা হচ্ছে…</div>' +
+					'<div class="bm-done__btns">' + btns + '</div>' +
+					'<button type="button" class="bm-newbooking" id="bm-newbooking">＋ নতুন বুকিং করুন</button>' +
+				'</div>';
+			var nb = document.getElementById('bm-newbooking');
+			if (nb) nb.addEventListener('click', function () { clearStored(); setTab('book'); });
+			if (opts.invoice_no) {
+				fetchTrack(opts.invoice_no).then(function (res) {
+					var el = document.getElementById('bm-done-status');
+					if (!el) return;
+					if (res.success && res.data && res.data.found && res.data.bookings[0]) {
+						var b = res.data.bookings[0];
+						el.innerHTML = trackChip(b.status_label, b.status_color) + ' <span class="bm-done__meta">' + (b.travel_date || '') + ' · বাকি ' + fmt(b.due) + '</span>';
+					} else { el.textContent = ''; }
+				}).catch(function () { var el = document.getElementById('bm-done-status'); if (el) el.textContent = ''; });
+			}
+		}
+
+		if (tabsEl) tabsEl.querySelectorAll('.bhela-bm-tab').forEach(function (t) {
+			t.addEventListener('click', function () { setTab(t.getAttribute('data-tab')); });
+		});
+
+		// On load: if a booking is remembered, show its card instead of the form.
+		var storedBooking = getStored();
+		if (storedBooking && storedBooking.invoice_no) {
+			renderDone({ invoice_no: storedBooking.invoice_no, invoice_url: storedBooking.invoice_url, whatsapp_url: storedBooking.whatsapp_url, recent: true });
+		}
+		setTab('book');
+
 		/* ---------- Submit ---------- */
 
 		form.addEventListener('submit', function (e) {
@@ -621,15 +749,12 @@
 				.then(function (data) {
 					if (data.success) {
 						var d = data.data;
-						var html = '<div class="bhela-bm-alert bhela-bm-alert--ok">🎉 ' + d.message;
-						if (d.whatsapp_url) {
-							html += '<br><a class="bhela-bm-btn" href="' + d.whatsapp_url + '" target="_blank" rel="noopener">💬 WhatsApp-এ কনফার্ম করুন</a>';
-						}
-						if (d.invoice_url) {
-							html += '<a class="bhela-bm-btn bhela-bm-btn--invoice" href="' + d.invoice_url + '" target="_blank" rel="noopener">🧾 ইনভয়েস দেখুন</a>';
-						}
-						html += '</div>';
-						response.innerHTML = html;
+						// Remember the booking and replace the form with a status card.
+						setStored({ invoice_no: d.invoice_no, invoice_url: d.invoice_url, whatsapp_url: d.whatsapp_url });
+						renderDone({ message: d.message, invoice_no: d.invoice_no, invoice_url: d.invoice_url, whatsapp_url: d.whatsapp_url, recent: false });
+						response.innerHTML = '';
+						setTab('book');
+						try { window.scrollTo({ top: wrap.offsetTop - 12, behavior: 'smooth' }); } catch (e) {}
 					} else {
 						response.innerHTML = '<div class="bhela-bm-alert bhela-bm-alert--err">❌ ' + ((data.data && data.data.message) || 'একটি ত্রুটি ঘটেছে। আবার চেষ্টা করুন।') + '</div>';
 					}
@@ -640,7 +765,7 @@
 				.finally(function () {
 					submitBtn.disabled = false;
 					submitBtn.classList.remove('is-loading');
-					response.scrollIntoView({ behavior: 'smooth', block: 'center' });
+					if (response.innerHTML) response.scrollIntoView({ behavior: 'smooth', block: 'center' });
 				});
 		});
 	});
