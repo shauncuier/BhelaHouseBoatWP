@@ -57,9 +57,9 @@
 </a>
 
 <div class="mobile-bar">
-	<a class="call" href="tel:<?php echo esc_attr( bhela_contact( 'phone_1' ) ); ?>">📞 কল</a>
-	<a class="wa" href="<?php echo esc_url( bhela_wa_link() ); ?>" target="_blank" rel="noopener">💬 WhatsApp</a>
-	<a class="book" href="<?php echo esc_url( bhela_page_url( 'book-now' ) ); ?>">🛶 বুক করুন</a>
+	<a class="call" href="tel:<?php echo esc_attr( bhela_contact( 'phone_1' ) ); ?>"><span class="mobile-bar__i">📞</span><span class="mobile-bar__t">কল</span></a>
+	<a class="wa" href="<?php echo esc_url( bhela_wa_link() ); ?>" target="_blank" rel="noopener"><span class="mobile-bar__i">💬</span><span class="mobile-bar__t">WhatsApp</span></a>
+	<a class="book" href="<?php echo esc_url( bhela_page_url( 'book-now' ) ); ?>"><span class="mobile-bar__i">🛶</span><span class="mobile-bar__t">বুক করুন</span></a>
 </div>
 
 <?php wp_footer(); ?>

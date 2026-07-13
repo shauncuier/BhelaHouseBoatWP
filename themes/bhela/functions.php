@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.5.6' );
+define( 'BHELA_VERSION', '2.6.1' );
 
 /* ---------- Setup ---------- */
 
@@ -400,6 +400,12 @@ add_action( 'elementor/theme/register_locations', 'bhela_register_elementor_loca
 function bhela_elementor_body_class( $classes ) {
 	if ( bhela_is_elementor_page() ) {
 		$classes[] = 'bhela-elementor';
+	}
+	// Booking page: the booking form has its own sticky price/action bar on
+	// mobile, so the generic Call/WhatsApp/Book bar is hidden there (CSS) to
+	// avoid a duplicate, overlapping bottom bar.
+	if ( is_page_template( 'page-templates/template-booking.php' ) ) {
+		$classes[] = 'bhela-book-page';
 	}
 	return $classes;
 }

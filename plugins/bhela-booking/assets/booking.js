@@ -743,6 +743,9 @@
 			if (trackPanel) trackPanel.hidden = !track;
 			if (doneBox) doneBox.hidden = track ? true : !showDoneNow;
 			if (bookPanel) bookPanel.hidden = track ? true : showDoneNow;
+			// The mobile price bar lives outside #bm-book-panel — hide it whenever
+			// the form isn't the active view (track tab or post-submit done card).
+			if (mBar && (track || showDoneNow)) mBar.classList.remove('is-shown');
 		}
 
 		function renderDone(opts) {

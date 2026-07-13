@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.5.7
+Version: 2.6.1
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -132,12 +132,17 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 	padding: .9rem 0;
 	transition: background .3s, box-shadow .3s, padding .3s;
 }
-.site-nav.is-scrolled {
+/* Scrolled background sits on a ::before layer, NOT on .site-nav itself.
+   Putting backdrop-filter on .site-nav would make it the containing block
+   for its position:fixed descendants — collapsing the full-screen mobile
+   menu into the nav bar after any scroll. The pseudo-element avoids that. */
+.site-nav.is-scrolled { padding: .55rem 0; }
+.site-nav.is-scrolled::before {
+	content: ""; position: absolute; inset: 0; z-index: -1;
 	background: rgba(10, 42, 47, 0.92);
 	backdrop-filter: blur(14px);
 	-webkit-backdrop-filter: blur(14px);
 	box-shadow: 0 4px 30px rgba(0,0,0,.25);
-	padding: .55rem 0;
 }
 .site-nav__inner { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .site-nav__brand { display: flex; align-items: center; gap: .7rem; }
@@ -167,9 +172,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 @media (max-width: 900px) {
 	.site-nav__toggle { display: flex; }
 	.site-nav__menu {
-		position: fixed; inset: 0; background: rgba(10, 42, 47, 0.98);
+		position: fixed; inset: 0; z-index: 1001; background: rgba(10, 42, 47, 0.98);
 		flex-direction: column; justify-content: center; gap: 2rem;
 		transform: translateX(100%); transition: transform .35s var(--ease);
+		overflow-y: auto; -webkit-overflow-scrolling: touch;
 	}
 	.site-nav__menu.is-open { transform: none; }
 	.site-nav__menu a { font-size: 1.35rem; }
@@ -228,7 +234,7 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 
 @media (max-width: 900px) {
 	.hero__inner { grid-template-columns: 1fr; padding-block: 7rem 5rem; }
-	.hero-card { max-width: 480px; }
+	.hero-card { max-width: 480px; margin-inline: auto; width: 100%; }
 }
 
 /* ==========================================================
@@ -384,24 +390,40 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 .wa-float:hover { transform: scale(1.1); }
 .wa-float svg { width: 30px; height: 30px; fill: #fff; }
 @media (min-width: 901px) { .wa-float { bottom: 1.6rem; } }
+/* On mobile the fixed bottom action bar already carries WhatsApp — the
+   floating button would duplicate it and overlap the bar. Hide it there. */
+@media (max-width: 900px) { .wa-float { display: none; } }
 
 .mobile-bar {
 	position: fixed; inset: auto 0 0 0; z-index: 950;
-	display: none; grid-template-columns: 1fr 1fr 1.3fr;
+	display: none; grid-template-columns: repeat(3, 1fr); align-items: stretch;
 	background: rgba(10, 42, 47, .97); backdrop-filter: blur(10px);
+	-webkit-backdrop-filter: blur(10px);
 	border-top: 1px solid var(--line-inverse);
-	padding: .55rem .7rem calc(.55rem + env(safe-area-inset-bottom));
-	gap: .6rem;
+	padding: .5rem .6rem calc(.5rem + env(safe-area-inset-bottom));
+	gap: .5rem;
 }
 .mobile-bar a {
-	display: flex; align-items: center; justify-content: center; gap: .45rem;
-	padding: .7rem .4rem; border-radius: 10px; font-weight: 700; font-size: .92rem;
-	color: #fff;
+	display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+	padding: .45rem .3rem; border-radius: 12px; color: #fff; min-height: 52px; line-height: 1.1;
 }
-.mobile-bar a.call { background: rgba(255,255,255,.1); }
+.mobile-bar__i { font-size: 1.2rem; }
+.mobile-bar__t { font-size: .78rem; font-weight: 700; white-space: nowrap; letter-spacing: .01em; }
+.mobile-bar a.call { background: rgba(255,255,255,.12); }
 .mobile-bar a.wa { background: #25D366; }
-.mobile-bar a.book { background: var(--cta); }
-@media (max-width: 900px) { .mobile-bar { display: grid; } body { padding-bottom: 66px; } }
+.mobile-bar a.book { background: var(--cta); box-shadow: 0 4px 14px rgba(255,122,61,.4); }
+@media (max-width: 360px) {
+	.mobile-bar { gap: .4rem; padding-inline: .45rem; }
+	.mobile-bar__t { font-size: .72rem; }
+	.mobile-bar__i { font-size: 1.1rem; }
+}
+@media (max-width: 900px) {
+	.mobile-bar { display: grid; }
+	body { padding-bottom: 72px; }
+	/* Booking page owns its own sticky price/action bar — drop the generic one. */
+	body.bhela-book-page .mobile-bar { display: none; }
+	body.bhela-book-page { padding-bottom: 0; }
+}
 
 /* ==========================================================
    15. INNER PAGES
@@ -436,6 +458,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 /* Food menu */
 .menu-day { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--line); padding: 2rem; margin-bottom: 1.8rem; }
 .menu-day h3 { display: flex; align-items: center; gap: .6rem; padding-bottom: .9rem; border-bottom: 2px solid var(--sand); margin-bottom: 1.2rem; }
+/* Dark "special attraction" box: light text so items aren't invisible on ink bg. */
+.menu-day--dark { color: var(--text-inverse); border-color: var(--line-inverse); }
+.menu-day--dark .checklist li { color: var(--text-inverse); }
 .menu-meals { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1.4rem; }
 .menu-meal h4 { font-family: var(--font-body); font-size: .95rem; color: var(--cta-dark); margin-bottom: .5rem; text-transform: uppercase; letter-spacing: .06em; }
 .menu-meal ul { list-style: none; padding: 0; }

@@ -53,7 +53,7 @@ $day2 = array(
 		</div>
 	</div>
 
-	<div class="menu-day reveal" style="background:linear-gradient(135deg,var(--ink),var(--ink-2))">
+	<div class="menu-day menu-day--dark reveal" style="background:linear-gradient(135deg,var(--ink),var(--ink-2))">
 		<h3 style="color:#fff;border-color:rgba(255,255,255,.2)">⭐ ভেলার খাবারের বিশেষ আকর্ষণ</h3>
 		<ul class="checklist" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
 			<li>Welcome Drinks</li><li>হাওরের তাজা মাছ</li><li>দেশি মুরগি ও হাঁস</li>
