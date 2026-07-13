@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.6.1
+Version: 2.6.2
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -461,6 +461,55 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 /* Dark "special attraction" box: light text so items aren't invisible on ink bg. */
 .menu-day--dark { color: var(--text-inverse); border-color: var(--line-inverse); }
 .menu-day--dark .checklist li { color: var(--text-inverse); }
+
+/* ==========================================================
+   18. BLOG — হাওর জার্নাল
+   ========================================================== */
+.post-card__meta {
+	display: flex; align-items: center; flex-wrap: wrap; gap: .5rem;
+	font-size: .82rem; color: var(--text-soft); margin-bottom: .6rem;
+}
+.post-card__meta .tag { font-size: .74rem; padding: .16rem .7rem; }
+.post-card__more { font-weight: 700; }
+
+/* Single post hero meta (on dark hero) */
+.post-hero-meta {
+	display: flex; align-items: center; flex-wrap: wrap; gap: .6rem;
+	margin-bottom: .9rem; color: var(--text-inverse); font-size: .9rem;
+}
+.post-hero-meta .tag { background: rgba(255,255,255,.14); color: #fff; }
+.post-hero-meta .tag:hover { background: rgba(255,255,255,.24); }
+
+/* Tags row after content */
+.post-tags { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: 2rem; }
+
+/* Prev / next post navigation */
+.post-nav { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 3rem; max-width: 820px; margin-inline: auto; }
+.post-nav a {
+	display: block; background: var(--white); border: 1px solid var(--line);
+	border-radius: 14px; padding: 1.1rem 1.3rem; box-shadow: var(--shadow-sm);
+	transition: transform .2s var(--ease), box-shadow .2s;
+}
+.post-nav a:hover { transform: translateY(-3px); box-shadow: var(--shadow); }
+.post-nav a small { display: block; color: var(--text-soft); font-size: .8rem; margin-bottom: .2rem; }
+.post-nav a strong { color: var(--ink); line-height: 1.5; font-size: .98rem; }
+.post-nav a.next { text-align: right; }
+@media (max-width: 640px) { .post-nav { grid-template-columns: 1fr; } }
+
+/* Related posts */
+.related-posts { margin-top: 3.5rem; }
+.related-posts h2 { font-size: 1.5rem; margin-bottom: 1.4rem; }
+
+/* Pagination pills */
+.bhela-pagination { margin-top: 2.6rem; }
+.bhela-pagination .nav-links { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; }
+.bhela-pagination .page-numbers {
+	min-width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center;
+	padding: 0 .8rem; border-radius: 999px; background: var(--white);
+	border: 1px solid var(--line); color: var(--ink); font-weight: 700;
+}
+.bhela-pagination .page-numbers.current { background: var(--cta); border-color: var(--cta); color: #fff; }
+.bhela-pagination a.page-numbers:hover { border-color: var(--primary); color: var(--primary); }
 .menu-meals { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1.4rem; }
 .menu-meal h4 { font-family: var(--font-body); font-size: .95rem; color: var(--cta-dark); margin-bottom: .5rem; text-transform: uppercase; letter-spacing: .06em; }
 .menu-meal ul { list-style: none; padding: 0; }

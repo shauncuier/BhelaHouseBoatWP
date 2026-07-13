@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.6.1' );
+define( 'BHELA_VERSION', '2.6.2' );
 
 /* ---------- Setup ---------- */
 
@@ -310,11 +310,33 @@ function bhela_auto_setup() {
 		update_option( 'page_on_front', (int) $home_id );
 	}
 
+	// 4b) Blog page (posts index) + seed categories.
+	$blog = get_page_by_path( 'blog' );
+	if ( ! $blog ) {
+		$blog_id = wp_insert_post( array(
+			'post_title'  => 'ব্লগ',
+			'post_name'   => 'blog',
+			'post_type'   => 'page',
+			'post_status' => 'publish',
+		) );
+	} else {
+		$blog_id = $blog->ID;
+	}
+	if ( $blog_id && ! is_wp_error( $blog_id ) ) {
+		update_option( 'page_for_posts', (int) $blog_id );
+		$menu_items['blog'] = (int) $blog_id;
+	}
+	foreach ( array( 'travel-guide' => 'ভ্রমণ গাইড', 'haor-news' => 'হাওরের খবর', 'tips' => 'টিপস' ) as $slug => $name ) {
+		if ( ! term_exists( $slug, 'category' ) ) {
+			wp_insert_term( $name, 'category', array( 'slug' => $slug ) );
+		}
+	}
+
 	// 5) Primary menu.
 	$menu = wp_get_nav_menu_object( 'BHELA Primary' );
 	if ( ! $menu ) {
 		$menu_id = wp_create_nav_menu( 'BHELA Primary' );
-		$order   = array( 'cabins', 'schedule', 'food', 'gallery', 'faq' );
+		$order   = array( 'cabins', 'schedule', 'food', 'gallery', 'faq', 'blog' );
 		foreach ( $order as $slug ) {
 			if ( isset( $menu_items[ $slug ] ) ) {
 				wp_update_nav_menu_item( $menu_id, 0, array(
@@ -353,6 +375,51 @@ function bhela_page_editor_content() {
 	rewind_posts();
 }
 
+/* ---------- Blog (হাওর জার্নাল) ---------- */
+
+/** Estimated reading time, e.g. "৫ মিনিট পড়া". Unicode-safe for Bangla. */
+function bhela_reading_time( $post_id = 0 ) {
+	$post_id = $post_id ? $post_id : get_the_ID();
+	$text    = trim( wp_strip_all_tags( (string) get_post_field( 'post_content', $post_id ) ) );
+	$words   = $text ? count( preg_split( '/\s+/u', $text, -1, PREG_SPLIT_NO_EMPTY ) ) : 0;
+	$mins    = max( 1, (int) ceil( $words / 200 ) );
+	/* translators: %s: minutes. */
+	return sprintf( __( '%s মিনিট পড়া', 'bhela' ), number_format_i18n( $mins ) );
+}
+
+/** Article JSON-LD on single posts (mirrors bhela_schema()). */
+function bhela_article_schema() {
+	if ( ! is_singular( 'post' ) ) {
+		return;
+	}
+	$post_id = get_queried_object_id();
+	$schema  = array(
+		'@context'         => 'https://schema.org',
+		'@type'            => 'Article',
+		'headline'         => get_the_title( $post_id ),
+		'datePublished'    => get_the_date( 'c', $post_id ),
+		'dateModified'     => get_the_modified_date( 'c', $post_id ),
+		'mainEntityOfPage' => get_permalink( $post_id ),
+		'inLanguage'       => 'bn-BD',
+		'author'           => array( '@type' => 'Organization', 'name' => 'BHELA – The Haor Exclusive' ),
+		'publisher'        => array(
+			'@type' => 'Organization',
+			'name'  => 'BHELA – The Haor Exclusive',
+			'logo'  => array( '@type' => 'ImageObject', 'url' => get_template_directory_uri() . '/assets/images/logo.png' ),
+		),
+	);
+	if ( has_post_thumbnail( $post_id ) ) {
+		$schema['image'] = get_the_post_thumbnail_url( $post_id, 'bhela-wide' );
+	}
+	echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
+}
+add_action( 'wp_head', 'bhela_article_schema' );
+
+// Comments are intentionally disabled site-wide — the blog funnels readers to
+// WhatsApp/booking instead, and a small operator shouldn't moderate spam.
+add_filter( 'comments_open', '__return_false', 20 );
+add_filter( 'pings_open', '__return_false', 20 );
+
 /* ---------- Fallback menu ---------- */
 
 function bhela_fallback_menu() {
@@ -362,6 +429,7 @@ function bhela_fallback_menu() {
 		'food'     => 'খাবার',
 		'gallery'  => 'গ্যালারি',
 		'faq'      => 'FAQ',
+		'blog'     => 'ব্লগ',
 	);
 	echo '<ul class="site-nav__menu" id="site-menu">';
 	foreach ( $items as $slug => $label ) {

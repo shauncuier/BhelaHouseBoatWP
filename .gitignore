@@ -18,3 +18,5 @@
 /themes/*
 !/themes/index.php
 !/themes/bhela/
+
+.claude/*
