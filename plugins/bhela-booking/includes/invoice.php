@@ -17,9 +17,9 @@ function bhela_bm_next_invoice_number() {
 	return sprintf( '%s-%s-%04d', $settings['invoice_prefix'], date( 'Y' ), $counter );
 }
 
-/** Secret key for a booking's public invoice link. */
+/** Secret key for a booking's public invoice link (full 128-bit wp_hash). */
 function bhela_bm_invoice_key( $booking_id ) {
-	return substr( wp_hash( 'bhela-invoice-' . $booking_id . get_post_field( 'post_date', $booking_id ) ), 0, 16 );
+	return wp_hash( 'bhela-invoice-' . $booking_id . get_post_field( 'post_date', $booking_id ) );
 }
 
 /** Public (secret) invoice URL — safe to send to the customer. */

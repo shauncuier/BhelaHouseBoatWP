@@ -63,10 +63,13 @@ function bhela_bm_review_save( $post_id, $post ) {
 	if ( 'bhela_review' !== $post->post_type ) {
 		return;
 	}
-	if ( ! isset( $_POST['bhela_bm_review_nonce'] ) || ! wp_verify_nonce( $_POST['bhela_bm_review_nonce'], 'bhela_bm_review_save' ) ) {
+	if ( ! isset( $_POST['bhela_bm_review_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_review_nonce'] ) ), 'bhela_bm_review_save' ) ) {
 		return;
 	}
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
 		return;
 	}
 	update_post_meta( $post_id, '_bhela_rating', min( 5, max( 1, (int) ( $_POST['bhela_rating'] ?? 5 ) ) ) );

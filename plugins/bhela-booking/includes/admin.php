@@ -275,7 +275,7 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	if ( 'bhela_booking' !== $post->post_type ) {
 		return;
 	}
-	if ( ! isset( $_POST['bhela_bm_nonce'] ) || ! wp_verify_nonce( $_POST['bhela_bm_nonce'], 'bhela_bm_save' ) ) {
+	if ( ! isset( $_POST['bhela_bm_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_nonce'] ) ), 'bhela_bm_save' ) ) {
 		return;
 	}
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
@@ -419,11 +419,12 @@ function bhela_bm_settings_page() {
 		return;
 	}
 
-	if ( isset( $_POST['bhela_bm_settings_nonce'] ) && wp_verify_nonce( $_POST['bhela_bm_settings_nonce'], 'bhela_bm_settings' ) ) {
+	if ( isset( $_POST['bhela_bm_settings_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_settings_nonce'] ) ), 'bhela_bm_settings' ) ) {
 		$s = bhela_bm_get_settings();
-		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'email', 'bkash_number', 'nagad_number', 'invoice_prefix' ) as $f ) {
-			$s[ $f ] = sanitize_text_field( $_POST[ $f ] ?? $s[ $f ] );
+		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix' ) as $f ) {
+			$s[ $f ] = isset( $_POST[ $f ] ) ? sanitize_text_field( wp_unslash( $_POST[ $f ] ) ) : $s[ $f ];
 		}
+		$s['email'] = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : $s['email'];
 		$s['bank_details']    = sanitize_textarea_field( $_POST['bank_details'] ?? '' );
 		$s['nagad_qr']        = esc_url_raw( $_POST['nagad_qr'] ?? '' );
 		$s['bangla_qr']       = esc_url_raw( $_POST['bangla_qr'] ?? '' );

@@ -183,10 +183,11 @@ function bhela_bm_email_customer( $booking_id, $type = 'request' ) {
 		: sprintf( '🛶 BHELA Booking Request Received — %s', $invoice_no );
 
 	$body    = bhela_bm_email_customer_html( $booking_id, $type );
-	$from    = $settings['email'] ? $settings['email'] : get_option( 'admin_email' );
-	$headers = array(
+	$from      = sanitize_email( $settings['email'] ? $settings['email'] : get_option( 'admin_email' ) );
+	$from_name = sanitize_text_field( $settings['business_name'] );
+	$headers   = array(
 		'Content-Type: text/html; charset=UTF-8',
-		'From: ' . $settings['business_name'] . ' <' . $from . '>',
+		'From: ' . $from_name . ' <' . $from . '>',
 	);
 
 	return wp_mail( $email, $subject, $body, $headers );

@@ -75,6 +75,9 @@ function bhela_bm_booking_form_shortcode() {
 			<span class="bm-stepdot" data-dot="3">৩<small>তথ্য</small></span>
 		</div>
 		<form class="bhela-bm-form" id="bhela-bm-form" novalidate>
+			<div class="bhela-bm-hp" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden">
+				<label>Leave this field empty<input type="text" name="bhela_bm_hp" tabindex="-1" autocomplete="off"></label>
+			</div>
 			<div class="bhela-bm-layout">
 				<div class="bhela-bm-main">
 					<fieldset class="bhela-bm-step" id="bm-step-date" data-step="1">
@@ -311,6 +314,12 @@ function bhela_bm_process_submission( $data ) {
 		return new WP_Error( 'missing', __( 'অনুগ্রহ করে নাম, মোবাইল নম্বর ও তারিখ পূরণ করুন।', 'bhela-booking' ) );
 	}
 
+	// Travel date must be a real Y-m-d — it is stored, invoiced, and echoed.
+	$d = DateTime::createFromFormat( 'Y-m-d', $date );
+	if ( ! $d || $d->format( 'Y-m-d' ) !== $date ) {
+		return new WP_Error( 'bad_date', __( 'ভ্রমণের তারিখ সঠিক ফরম্যাটে দিন।', 'bhela-booking' ) );
+	}
+
 	if ( $full_boat ) {
 		// Custom-quote request for the whole boat — no per-cabin pricing.
 		$price = array(
@@ -406,6 +415,21 @@ function bhela_bm_process_submission( $data ) {
 /** AJAX: submit booking. */
 function bhela_bm_ajax_submit() {
 	check_ajax_referer( 'bhela_bm_booking', 'nonce' );
+
+	// Honeypot: bots fill every field. Real users never see bhela_bm_hp.
+	if ( ! empty( $_POST['bhela_bm_hp'] ) ) {
+		wp_send_json_error( array( 'message' => __( 'দুঃখিত, রিকোয়েস্টটি গ্রহণ করা যায়নি।', 'bhela-booking' ) ) );
+	}
+
+	// Per-IP throttle: each submit publishes a post and sends up to 2 emails.
+	$ip   = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$key  = 'bhela_bm_submit_' . md5( $ip );
+	$hits = (int) get_transient( $key );
+	if ( $hits >= 10 ) {
+		wp_send_json_error( array( 'message' => __( 'অনেকবার চেষ্টা হয়েছে — কিছুক্ষণ পর আবার চেষ্টা করুন।', 'bhela-booking' ) ) );
+	}
+	set_transient( $key, $hits + 1, HOUR_IN_SECONDS );
+
 	$result = bhela_bm_process_submission( wp_unslash( $_POST ) );
 	if ( is_wp_error( $result ) ) {
 		wp_send_json_error( array( 'message' => $result->get_error_message() ) );
@@ -467,8 +491,11 @@ function bhela_bm_mask_name( $name ) {
 }
 
 /**
- * Find bookings by invoice number, phone, or email (exact match on the trimmed
- * input). Returns up to 5 booking IDs, newest first.
+ * Find bookings by phone or email (exact match on the trimmed input).
+ * Lookup by the sequential invoice number is deliberately NOT supported —
+ * those numbers are guessable (BH-2026-0001…) and would allow enumeration of
+ * every customer's booking. Phone/email are higher-entropy and known only to
+ * the customer. Returns up to 5 booking IDs, newest first.
  */
 function bhela_bm_find_bookings( $q ) {
 	$q = trim( (string) $q );
@@ -485,7 +512,6 @@ function bhela_bm_find_bookings( $q ) {
 		'order'          => 'DESC',
 		'meta_query'     => array(
 			'relation' => 'OR',
-			array( 'key' => '_bhela_invoice_no', 'value' => $q, 'compare' => '=' ),
 			array( 'key' => '_bhela_phone', 'value' => $q, 'compare' => '=' ),
 			array( 'key' => '_bhela_email', 'value' => $q, 'compare' => '=' ),
 		),
@@ -524,14 +550,14 @@ function bhela_bm_ajax_track() {
 	check_ajax_referer( 'bhela_bm_booking', 'nonce' );
 	$q = sanitize_text_field( wp_unslash( $_POST['q'] ?? '' ) );
 	if ( mb_strlen( trim( $q ) ) < 4 ) {
-		wp_send_json_error( array( 'message' => __( 'মোবাইল নম্বর, ইমেইল বা বুকিং নম্বর সঠিকভাবে দিন।', 'bhela-booking' ) ) );
+		wp_send_json_error( array( 'message' => __( 'মোবাইল নম্বর বা ইমেইল সঠিকভাবে দিন।', 'bhela-booking' ) ) );
 	}
 
-	// Light per-IP rate limit to blunt enumeration.
+	// Per-IP rate limit to blunt enumeration.
 	$ip  = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
 	$key = 'bhela_bm_track_' . md5( $ip );
 	$hits = (int) get_transient( $key );
-	if ( $hits >= 20 ) {
+	if ( $hits >= 8 ) {
 		wp_send_json_error( array( 'message' => __( 'অনেকবার চেষ্টা হয়েছে — কিছুক্ষণ পর আবার চেষ্টা করুন।', 'bhela-booking' ) ) );
 	}
 	set_transient( $key, $hits + 1, HOUR_IN_SECONDS );
@@ -541,7 +567,7 @@ function bhela_bm_ajax_track() {
 		$settings = bhela_bm_get_settings();
 		wp_send_json_success( array(
 			'found'    => false,
-			'message'  => __( 'এই তথ্যে কোনো বুকিং পাওয়া যায়নি। নম্বর/ইমেইল/বুকিং নম্বর যাচাই করুন অথবা WhatsApp-এ যোগাযোগ করুন।', 'bhela-booking' ),
+			'message'  => __( 'এই তথ্যে কোনো বুকিং পাওয়া যায়নি। মোবাইল নম্বর/ইমেইল যাচাই করুন অথবা WhatsApp-এ যোগাযোগ করুন।', 'bhela-booking' ),
 			'whatsapp' => preg_replace( '/[^0-9]/', '', $settings['whatsapp'] ),
 		) );
 	}
@@ -557,9 +583,9 @@ function bhela_bm_track_panel_html() {
 	ob_start();
 	?>
 	<div class="bm-track">
-		<p class="bm-track__lead">মোবাইল নম্বর, ইমেইল বা বুকিং নম্বর দিয়ে আপনার বুকিং-এর সর্বশেষ অবস্থা দেখুন।</p>
+		<p class="bm-track__lead">বুকিংয়ে দেওয়া মোবাইল নম্বর বা ইমেইল দিয়ে আপনার বুকিং-এর সর্বশেষ অবস্থা দেখুন।</p>
 		<div class="bm-track__form">
-			<input type="text" id="bm-track-q" placeholder="01XXXXXXXXX / you@email.com / BH-2026-0001" autocomplete="off">
+			<input type="text" id="bm-track-q" placeholder="01XXXXXXXXX / you@email.com" autocomplete="off">
 			<button type="button" class="bm-track__btn" id="bm-track-btn">🔍 ট্র্যাক করুন</button>
 		</div>
 		<div class="bm-track__result" id="bm-track-result" role="status" aria-live="polite"></div>

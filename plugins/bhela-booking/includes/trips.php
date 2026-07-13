@@ -67,7 +67,7 @@ function bhela_bm_trips_page() {
 		return;
 	}
 
-	if ( isset( $_POST['bhela_bm_trips_nonce'] ) && wp_verify_nonce( $_POST['bhela_bm_trips_nonce'], 'bhela_bm_trips' ) ) {
+	if ( isset( $_POST['bhela_bm_trips_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_trips_nonce'] ) ), 'bhela_bm_trips' ) ) {
 		$trips = array();
 		$dates    = (array) ( $_POST['trip_date'] ?? array() );
 		$labels   = (array) ( $_POST['trip_label'] ?? array() );

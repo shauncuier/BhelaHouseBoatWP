@@ -12,6 +12,14 @@
 
 		function fmt(n) { return '৳' + Number(n).toLocaleString('en-IN'); }
 
+		// HTML-escape any string before it is placed into innerHTML. Server values
+		// are sanitized today; this makes the client robust regardless.
+		function esc(s) {
+			return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+				return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+			});
+		}
+
 		function fetchTrack(q) {
 			var params = new URLSearchParams();
 			params.append('action', 'bhela_bm_track');
@@ -25,18 +33,18 @@
 		}
 
 		function trackChip(label, color) {
-			color = color || '#555d66';
-			return '<span class="bm-status-chip" style="background:' + color + '1a;color:' + color + ';border:1px solid ' + color + '55">' + (label || '—') + '</span>';
+			color = /^#[0-9a-fA-F]{3,8}$/.test(color) ? color : '#555d66';
+			return '<span class="bm-status-chip" style="background:' + color + '1a;color:' + color + ';border:1px solid ' + color + '55">' + esc(label || '—') + '</span>';
 		}
 
 		function trackCardHtml(b) {
 			var rows = [
-				['নাম', b.name], ['তারিখ', b.travel_date || '—'], ['কেবিন', b.cabin || '—'],
+				['নাম', esc(b.name)], ['তারিখ', esc(b.travel_date || '—')], ['কেবিন', esc(b.cabin || '—')],
 				['অতিথি', (b.guests || 0) + ' জন'], ['মোট', fmt(b.total)], ['অগ্রিম', fmt(b.advance)],
 				['পরিশোধিত', fmt(b.paid)], ['বাকি', fmt(b.due)]
 			].map(function (r) { return '<div class="bm-tc__row"><span>' + r[0] + '</span><strong>' + r[1] + '</strong></div>'; }).join('');
 			return '<div class="bm-trackcard">' +
-				'<div class="bm-trackcard__head"><strong>' + (b.invoice_no || '—') + '</strong>' + trackChip(b.status_label, b.status_color) + '</div>' +
+				'<div class="bm-trackcard__head"><strong>' + esc(b.invoice_no || '—') + '</strong>' + trackChip(b.status_label, b.status_color) + '</div>' +
 				'<div class="bm-trackcard__rows">' + rows + '</div></div>';
 		}
 
@@ -48,7 +56,7 @@
 			function run() {
 				var val = (qEl.value || '').trim();
 				if (val.length < 4) {
-					result.innerHTML = '<div class="bm-track__msg">মোবাইল নম্বর, ইমেইল বা বুকিং নম্বর সঠিকভাবে দিন।</div>';
+					result.innerHTML = '<div class="bm-track__msg">মোবাইল নম্বর বা ইমেইল সঠিকভাবে দিন।</div>';
 					return;
 				}
 				btn.disabled = true; btn.textContent = '⏳ খুঁজছি...';
@@ -57,8 +65,9 @@
 						result.innerHTML = res.data.bookings.map(trackCardHtml).join('');
 					} else {
 						var d = (res && res.data) || {};
-						var wa = d.whatsapp ? '<a class="bhela-bm-btn" href="https://wa.me/' + d.whatsapp + '" target="_blank" rel="noopener">💬 WhatsApp-এ জিজ্ঞেস করুন</a>' : '';
-						result.innerHTML = '<div class="bm-track__msg bm-track__msg--none">' + (d.message || 'কোনো বুকিং পাওয়া যায়নি।') + (wa ? '<br>' + wa : '') + '</div>';
+						var waNum = String(d.whatsapp || '').replace(/[^0-9]/g, '');
+						var wa = waNum ? '<a class="bhela-bm-btn" href="https://wa.me/' + waNum + '" target="_blank" rel="noopener">💬 WhatsApp-এ জিজ্ঞেস করুন</a>' : '';
+						result.innerHTML = '<div class="bm-track__msg bm-track__msg--none">' + esc(d.message || 'কোনো বুকিং পাওয়া যায়নি।') + (wa ? '<br>' + wa : '') + '</div>';
 					}
 				}).catch(function () {
 					result.innerHTML = '<div class="bm-track__msg">নেটওয়ার্ক সমস্যা — আবার চেষ্টা করুন।</div>';
@@ -593,9 +602,10 @@
 						if (data.success) {
 							var d = data.data;
 							var booked = d.status === 'booked';
-							var html = '<span class="bm-avail-chip" style="background:' + d.color + '1a;color:' + d.color + ';border:1px solid ' + d.color + '55">' + d.label + '</span>';
-							if (d.trip) html += ' <span class="bm-avail-trip">📅 ' + d.trip + '</span>';
-							if (d.note) html += '<div class="bm-avail-note">' + d.note + '</div>';
+							var color = /^#[0-9a-fA-F]{3,8}$/.test(d.color) ? d.color : '#996800';
+							var html = '<span class="bm-avail-chip" style="background:' + color + '1a;color:' + color + ';border:1px solid ' + color + '55">' + esc(d.label) + '</span>';
+							if (d.trip) html += ' <span class="bm-avail-trip">📅 ' + esc(d.trip) + '</span>';
+							if (d.note) html += '<div class="bm-avail-note">' + esc(d.note) + '</div>';
 							availBox.innerHTML = html;
 
 							if (booked) {
@@ -685,27 +695,32 @@
 			if (!doneBox) return;
 			var title = opts.recent ? '🛶 আপনার সর্বশেষ বুকিং' : '🎉 ' + (opts.message || 'বুকিং রিকোয়েস্ট জমা হয়েছে');
 			var btns = '';
-			if (opts.whatsapp_url) btns += '<a class="bhela-bm-btn" href="' + opts.whatsapp_url + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
-			if (opts.invoice_url) btns += '<a class="bhela-bm-btn bhela-bm-btn--invoice" href="' + opts.invoice_url + '" target="_blank" rel="noopener">🧾 ইনভয়েস</a>';
+			// invoice_url/whatsapp_url are server-built (add_query_arg + wa.me); encode defensively.
+			if (opts.whatsapp_url) btns += '<a class="bhela-bm-btn" href="' + encodeURI(opts.whatsapp_url) + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+			if (opts.invoice_url) btns += '<a class="bhela-bm-btn bhela-bm-btn--invoice" href="' + encodeURI(opts.invoice_url) + '" target="_blank" rel="noopener">🧾 ইনভয়েস</a>';
 			doneBox.innerHTML =
 				'<div class="bm-done__card">' +
-					'<div class="bm-done__title">' + title + '</div>' +
-					(opts.invoice_no ? '<div class="bm-done__inv">Booking No: <strong>' + opts.invoice_no + '</strong></div>' : '') +
+					'<div class="bm-done__title">' + esc(title) + '</div>' +
+					(opts.invoice_no ? '<div class="bm-done__inv">Booking No: <strong>' + esc(opts.invoice_no) + '</strong></div>' : '') +
 					'<div class="bm-done__status" id="bm-done-status">স্ট্যাটাস দেখা হচ্ছে…</div>' +
 					'<div class="bm-done__btns">' + btns + '</div>' +
 					'<button type="button" class="bm-newbooking" id="bm-newbooking">＋ নতুন বুকিং করুন</button>' +
 				'</div>';
 			var nb = document.getElementById('bm-newbooking');
 			if (nb) nb.addEventListener('click', function () { clearStored(); setTab('book'); });
-			if (opts.invoice_no) {
-				fetchTrack(opts.invoice_no).then(function (res) {
-					var el = document.getElementById('bm-done-status');
-					if (!el) return;
+			// Live status is looked up by the customer's OWN phone (tracking no longer
+			// accepts the guessable invoice number). No phone → show a static line.
+			var statusEl = document.getElementById('bm-done-status');
+			if (opts.phone) {
+				fetchTrack(opts.phone).then(function (res) {
+					if (!statusEl) return;
 					if (res.success && res.data && res.data.found && res.data.bookings[0]) {
 						var b = res.data.bookings[0];
-						el.innerHTML = trackChip(b.status_label, b.status_color) + ' <span class="bm-done__meta">' + (b.travel_date || '') + ' · বাকি ' + fmt(b.due) + '</span>';
-					} else { el.textContent = ''; }
-				}).catch(function () { var el = document.getElementById('bm-done-status'); if (el) el.textContent = ''; });
+						statusEl.innerHTML = trackChip(b.status_label, b.status_color) + ' <span class="bm-done__meta">' + esc(b.travel_date || '') + ' · বাকি ' + fmt(b.due) + '</span>';
+					} else { statusEl.textContent = ''; }
+				}).catch(function () { if (statusEl) statusEl.textContent = ''; });
+			} else if (statusEl) {
+				statusEl.textContent = 'রিকোয়েস্ট গৃহীত — আমরা শীঘ্রই যোগাযোগ করব।';
 			}
 		}
 
@@ -716,7 +731,7 @@
 		// On load: if a booking is remembered, show its card instead of the form.
 		var storedBooking = getStored();
 		if (storedBooking && storedBooking.invoice_no) {
-			renderDone({ invoice_no: storedBooking.invoice_no, invoice_url: storedBooking.invoice_url, whatsapp_url: storedBooking.whatsapp_url, recent: true });
+			renderDone({ invoice_no: storedBooking.invoice_no, invoice_url: storedBooking.invoice_url, whatsapp_url: storedBooking.whatsapp_url, phone: storedBooking.phone, recent: true });
 		}
 		setTab('book');
 
@@ -732,7 +747,7 @@
 			var params = new URLSearchParams();
 			params.append('action', 'bhela_bm_submit');
 			params.append('nonce', bhelaBM.nonce);
-			['name', 'phone', 'email', 'date', 'message'].forEach(function (f) {
+			['name', 'phone', 'email', 'date', 'message', 'bhela_bm_hp'].forEach(function (f) {
 				params.append(f, fd.get(f) || '');
 			});
 			params.append('cabins', JSON.stringify(fullBoat() ? [] : activeCabins()));
@@ -750,8 +765,8 @@
 					if (data.success) {
 						var d = data.data;
 						// Remember the booking and replace the form with a status card.
-						setStored({ invoice_no: d.invoice_no, invoice_url: d.invoice_url, whatsapp_url: d.whatsapp_url });
-						renderDone({ message: d.message, invoice_no: d.invoice_no, invoice_url: d.invoice_url, whatsapp_url: d.whatsapp_url, recent: false });
+						setStored({ invoice_no: d.invoice_no, invoice_url: d.invoice_url, whatsapp_url: d.whatsapp_url, phone: fd.get('phone') || '' });
+						renderDone({ message: d.message, invoice_no: d.invoice_no, invoice_url: d.invoice_url, whatsapp_url: d.whatsapp_url, phone: fd.get('phone') || '', recent: false });
 						response.innerHTML = '';
 						setTab('book');
 						try { window.scrollTo({ top: wrap.offsetTop - 12, behavior: 'smooth' }); } catch (e) {}
