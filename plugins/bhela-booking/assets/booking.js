@@ -501,14 +501,25 @@
 		/* ---------- Mobile step wizard ---------- */
 
 		var mq = window.matchMedia('(max-width: 860px)');
-		var mBar = null, mBarPrice = null;
+		var mBar = null, mBarPrice = null, mBarAction = null;
 
 		function buildMobileBar() {
 			if (mBar) return;
 			mBar = document.createElement('div');
 			mBar.className = 'bm-mobilebar';
-			mBar.innerHTML = '<div class="bm-mobilebar__price"><small>মোট</small><strong id="bm-mbar-total">—</strong></div>';
+			mBar.innerHTML = '<div class="bm-mobilebar__price"><small>মোট</small><strong id="bm-mbar-total">—</strong></div>' +
+				'<button type="button" class="bm-mobilebar__action" id="bm-mbar-action">পরবর্তী →</button>';
 			mBarPrice = mBar.querySelector('#bm-mbar-total');
+			mBarAction = mBar.querySelector('#bm-mbar-action');
+			mBarAction.addEventListener('click', function () {
+				var n = currentStep();
+				if (n < 3) {
+					var nx = form.querySelector('.bhela-bm-step[data-step="' + n + '"] .bm-next');
+					if (nx && !nx.disabled) { nx.click(); }
+				} else if (submitBtn && !submitBtn.disabled) {
+					submitBtn.click();
+				}
+			});
 			wrap.appendChild(mBar);
 		}
 
@@ -517,7 +528,7 @@
 			mBarPrice.textContent = text || '—';
 		}
 
-		function setStep(n) {
+		function setStep(n, noScroll) {
 			wrap.setAttribute('data-mstep', String(n));
 			var steps = form.querySelectorAll('.bhela-bm-step');
 			steps.forEach(function (s) {
@@ -529,8 +540,9 @@
 				dot.classList.toggle('is-done', d < n);
 			});
 			// Price panel only relevant from step 2 onward on mobile.
-			if (mBar) mBar.classList.toggle('is-shown', mq.matches && n >= 2);
-			try { window.scrollTo({ top: wrap.offsetTop - 12, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+			if (mBar) mBar.classList.toggle('is-shown', n >= 2);
+			if (mBarAction) mBarAction.textContent = n >= 3 ? 'রিকোয়েস্ট পাঠান →' : 'পরবর্তী →';
+			if (!noScroll) { try { window.scrollTo({ top: wrap.offsetTop - 12, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, 0); } }
 		}
 
 		function enableMobile() {
@@ -634,7 +646,7 @@
 					})
 					.finally(function () {
 						availBtn.disabled = false;
-						availBtn.textContent = '🔍 Availability চেক করুন';
+						availBtn.textContent = '🔄 আবার চেক করুন';
 					});
 			});
 		}
@@ -659,12 +671,54 @@
 		var urlDate = new URLSearchParams(window.location.search).get('date');
 		if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) dateEl.value = urlDate;
 
-		dateEl.addEventListener('change', function () { resetAvailability(); calc(); });
+		var availTimer = null;
+			dateEl.addEventListener('change', function () {
+				resetAvailability();
+				calc();
+				window.clearTimeout(availTimer);
+				if (dateEl.value && availBtn) { availTimer = window.setTimeout(function () { availBtn.click(); }, 300); }
+			});
+			var dateChips = document.getElementById('bm-datechips');
+			if (dateChips) {
+				dateChips.querySelectorAll('.bm-chip').forEach(function (chip) {
+					chip.addEventListener('click', function () {
+						dateChips.querySelectorAll('.bm-chip').forEach(function (c) { c.classList.remove('is-on'); });
+						chip.classList.add('is-on');
+						dateEl.value = chip.getAttribute('data-date');
+						dateEl.dispatchEvent(new Event('change', { bubbles: true }));
+					});
+				});
+			}
+			[gAdults, gC48, gC04].forEach(function (input) {
+				if (!input) { return; }
+				var field = input.closest('.bhela-bm-field');
+				if (!field) { return; }
+				var out = document.getElementById(input.getAttribute('data-out'));
+				var min = parseInt(input.getAttribute('data-min'), 10) || 0;
+				var max = parseInt(input.getAttribute('data-max'), 10) || 99;
+				var btns = field.querySelectorAll('.bm-stepper__btn');
+				function sync() {
+					if (out) { out.textContent = input.value; }
+					btns.forEach(function (b) {
+						var d = parseInt(b.getAttribute('data-delta'), 10);
+						b.disabled = (d < 0 && (+input.value) <= min) || (d > 0 && (+input.value) >= max);
+					});
+				}
+				btns.forEach(function (b) {
+					b.addEventListener('click', function () {
+						var d = parseInt(b.getAttribute('data-delta'), 10) || 0;
+						input.value = Math.max(min, Math.min(max, (parseInt(input.value, 10) || 0) + d));
+						sync();
+						input.dispatchEvent(new Event('change', { bubbles: true }));
+					});
+				});
+				sync();
+			});
 
 		wrap.setAttribute('data-mstep', '1');
 		resetAvailability();
 		calc();
-		syncMode();
+		buildMobileBar(); setStep(1, true);
 		if (mq.addEventListener) mq.addEventListener('change', syncMode);
 		else if (mq.addListener) mq.addListener(syncMode);
 
@@ -699,7 +753,8 @@
 			if (opts.whatsapp_url) btns += '<a class="bhela-bm-btn" href="' + encodeURI(opts.whatsapp_url) + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
 			if (opts.invoice_url) btns += '<a class="bhela-bm-btn bhela-bm-btn--invoice" href="' + encodeURI(opts.invoice_url) + '" target="_blank" rel="noopener">🧾 ইনভয়েস</a>';
 			doneBox.innerHTML =
-				'<div class="bm-done__card">' +
+				'<div class="bm-done__card bm-done">' +
+					'<div class="tick">✓</div>' +
 					'<div class="bm-done__title">' + esc(title) + '</div>' +
 					(opts.invoice_no ? '<div class="bm-done__inv">Booking No: <strong>' + esc(opts.invoice_no) + '</strong></div>' : '') +
 					'<div class="bm-done__status" id="bm-done-status">স্ট্যাটাস দেখা হচ্ছে…</div>' +

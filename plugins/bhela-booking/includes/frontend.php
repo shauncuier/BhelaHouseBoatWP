@@ -69,10 +69,10 @@ function bhela_bm_booking_form_shortcode() {
 		<div class="bm-panel" id="bm-track-panel" hidden><?php echo bhela_bm_track_panel_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></div>
 
 		<div class="bm-panel" id="bm-book-panel">
-		<div class="bhela-bm-steps" id="bm-stepbar" aria-hidden="true">
-			<span class="bm-stepdot is-active" data-dot="1">১<small>তারিখ</small></span>
-			<span class="bm-stepdot" data-dot="2">২<small>কেবিন</small></span>
-			<span class="bm-stepdot" data-dot="3">৩<small>তথ্য</small></span>
+		<div class="bhela-bm-steps" id="bm-stepbar">
+			<span class="bm-stepdot is-active" data-dot="1"><i class="bm-stepdot__pill">১</i><em class="bm-stepdot__label">তারিখ</em></span>
+			<span class="bm-stepdot" data-dot="2"><i class="bm-stepdot__pill">২</i><em class="bm-stepdot__label">অতিথি ও কেবিন</em></span>
+			<span class="bm-stepdot" data-dot="3"><i class="bm-stepdot__pill">৩</i><em class="bm-stepdot__label">আপনার তথ্য</em></span>
 		</div>
 		<form class="bhela-bm-form" id="bhela-bm-form" novalidate>
 			<div class="bhela-bm-hp" aria-hidden="true" style="position:absolute;left:-9999px;top:-9999px;height:0;width:0;overflow:hidden">
@@ -81,14 +81,42 @@ function bhela_bm_booking_form_shortcode() {
 			<div class="bhela-bm-layout">
 				<div class="bhela-bm-main">
 					<fieldset class="bhela-bm-step" id="bm-step-date" data-step="1">
-						<legend><span class="bhela-bm-step__num">১</span> তারিখ ও Availability</legend>
+						<legend><span class="bhela-bm-step__num">১</span> কবে যেতে চান?</legend>
+						<p class="bhela-bm-step__sub">আসন্ন গ্রুপ ট্রিপ থেকে বেছে নিন, অথবা নিজের তারিখ দিন — Availability সাথে সাথে দেখা যাবে।</p>
+						<?php
+						$bm_today    = date( 'Y-m-d' );
+						$bm_upcoming = array();
+						if ( function_exists( 'bhela_bm_get_trips' ) ) {
+							foreach ( bhela_bm_get_trips() as $bm_t ) {
+								if ( empty( $bm_t['date'] ) || $bm_t['date'] < $bm_today ) {
+									continue;
+								}
+								if ( isset( $bm_t['status'] ) && 'booked' === $bm_t['status'] ) {
+									continue;
+								}
+								$bm_upcoming[] = $bm_t;
+								if ( count( $bm_upcoming ) >= 5 ) {
+									break;
+								}
+							}
+						}
+						if ( $bm_upcoming ) :
+							$bm_daylabels = array( 'weekday' => 'Weekday −২০%', 'weekend' => 'Weekend', 'holiday' => 'ছুটি' );
+							?>
+							<div class="bm-datechips" id="bm-datechips">
+								<?php foreach ( $bm_upcoming as $bm_t ) : ?>
+									<?php $bm_dt = function_exists( 'bhela_bm_day_type' ) ? bhela_bm_day_type( $bm_t['date'] ) : 'weekday'; ?>
+									<button type="button" class="bm-chip" data-date="<?php echo esc_attr( $bm_t['date'] ); ?>"><span><?php echo esc_html( date_i18n( 'j M', strtotime( $bm_t['date'] ) ) ); ?></span><small><?php echo esc_html( isset( $bm_daylabels[ $bm_dt ] ) ? $bm_daylabels[ $bm_dt ] : $bm_dt ); ?></small></button>
+								<?php endforeach; ?>
+							</div>
+						<?php endif; ?>
 						<div class="bhela-bm-grid">
 							<p class="bhela-bm-field">
 								<label for="bm-date">ভ্রমণের তারিখ *</label>
 								<input type="date" id="bm-date" name="date" required min="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
 							</p>
 							<p class="bhela-bm-field" style="align-self:end">
-								<button type="button" class="bhela-bm-avail-btn" id="bm-check-avail">🔍 Availability চেক করুন</button>
+								<button type="button" class="bhela-bm-avail-btn" id="bm-check-avail">🔄 আবার চেক করুন</button>
 							</p>
 						</div>
 						<div class="bhela-bm-avail" id="bm-avail-result" hidden></div>
@@ -102,19 +130,20 @@ function bhela_bm_booking_form_shortcode() {
 					</fieldset>
 
 					<fieldset class="bhela-bm-step" id="bm-step-cabins" data-step="2">
-						<legend><span class="bhela-bm-step__num">২</span> অতিথি ও কেবিন</legend>
+						<legend><span class="bhela-bm-step__num">২</span> কতজন যাচ্ছেন?</legend>
+						<p class="bhela-bm-step__sub">শুধু সংখ্যা দিন — সেরা কেবিন প্ল্যান ও দাম আমরা বেছে দিচ্ছি।</p>
 						<div class="bm-guestpick">
 							<p class="bhela-bm-field">
 								<label for="bm-g-adults">বড় (৯+) *</label>
-								<select id="bm-g-adults"><?php for ( $i = 0; $i <= (int) bhela_bm_max_guests(); $i++ ) : ?><option value="<?php echo esc_attr( $i ); ?>" <?php selected( $i, 2 ); ?>><?php echo esc_html( $i ); ?></option><?php endfor; ?></select>
+								<span class="bm-stepper__ctl"><button type="button" class="bm-stepper__btn" data-delta="-1" aria-label="কমান">−</button><output class="bm-stepper__val" id="bm-out-adults" aria-live="polite">2</output><button type="button" class="bm-stepper__btn bm-stepper__btn--plus" data-delta="1" aria-label="বাড়ান">+</button></span><input type="hidden" id="bm-g-adults" value="2" data-min="0" data-max="<?php echo esc_attr( bhela_bm_max_guests() ); ?>" data-out="bm-out-adults">
 							</p>
 							<p class="bhela-bm-field">
 								<label for="bm-g-c48">শিশু ৪–৮ <span>(৫০%)</span></label>
-								<select id="bm-g-c48"><?php for ( $i = 0; $i <= 10; $i++ ) : ?><option value="<?php echo esc_attr( $i ); ?>"><?php echo esc_html( $i ); ?></option><?php endfor; ?></select>
+								<span class="bm-stepper__ctl"><button type="button" class="bm-stepper__btn" data-delta="-1" aria-label="কমান">−</button><output class="bm-stepper__val" id="bm-out-c48" aria-live="polite">0</output><button type="button" class="bm-stepper__btn bm-stepper__btn--plus" data-delta="1" aria-label="বাড়ান">+</button></span><input type="hidden" id="bm-g-c48" value="0" data-min="0" data-max="10" data-out="bm-out-c48">
 							</p>
 							<p class="bhela-bm-field">
 								<label for="bm-g-c04">শিশু ০–৪ <span>(ফ্রি)</span></label>
-								<select id="bm-g-c04"><?php for ( $i = 0; $i <= 10; $i++ ) : ?><option value="<?php echo esc_attr( $i ); ?>"><?php echo esc_html( $i ); ?></option><?php endfor; ?></select>
+								<span class="bm-stepper__ctl"><button type="button" class="bm-stepper__btn" data-delta="-1" aria-label="কমান">−</button><output class="bm-stepper__val" id="bm-out-c04" aria-live="polite">0</output><button type="button" class="bm-stepper__btn bm-stepper__btn--plus" data-delta="1" aria-label="বাড়ান">+</button></span><input type="hidden" id="bm-g-c04" value="0" data-min="0" data-max="10" data-out="bm-out-c04">
 							</p>
 						</div>
 						<p class="bm-guest-error" id="bm-guest-error" hidden>⚠️ শিশু (৪–৮) থাকলে অন্তত ১ জন বড় (৯+) থাকতে হবে।</p>
@@ -141,7 +170,8 @@ function bhela_bm_booking_form_shortcode() {
 					</fieldset>
 
 					<fieldset class="bhela-bm-step" id="bm-step-info" data-step="3">
-						<legend><span class="bhela-bm-step__num">৩</span> আপনার তথ্য</legend>
+						<legend><span class="bhela-bm-step__num">৩</span> প্রায় শেষ!</legend>
+						<p class="bhela-bm-step__sub">নাম ও নম্বর দিন — আমাদের টিম ফোন/WhatsApp-এ কনফার্ম করবে।</p>
 						<div class="bhela-bm-grid">
 							<p class="bhela-bm-field">
 								<label for="bm-name">আপনার নাম *</label>
@@ -191,7 +221,8 @@ function bhela_bm_booking_form_shortcode() {
 						</div>
 						<button type="submit" class="bhela-bm-submit" id="bhela-bm-submit"><span class="bhela-bm-submit__label">বুকিং রিকোয়েস্ট পাঠান →</span></button>
 						<p class="bhela-bm-note">অগ্রিম পাওয়ার পরই বুকিং Confirmed হয়। আমাদের টিম ফোন/WhatsApp-এ যোগাযোগ করবে।</p>
-						<ul class="bhela-bm-trust">
+						<p class="bhela-bm-reviews-line"><span class="stars">★★★★★</span> ৩০০+ পরিবার ঘুরে এসেছে</p>
+							<ul class="bhela-bm-trust">
 							<li>🛟 Life Jacket ও প্রশিক্ষিত ক্রু</li>
 							<li>🔒 তথ্য সম্পূর্ণ গোপনীয়</li>
 							<li>💳 bKash · Nagad · Bank</li>
@@ -553,17 +584,20 @@ function bhela_bm_ajax_track() {
 		wp_send_json_error( array( 'message' => __( 'মোবাইল নম্বর বা ইমেইল সঠিকভাবে দিন।', 'bhela-booking' ) ) );
 	}
 
-	// Per-IP rate limit to blunt enumeration.
+	// Per-IP throttle on FAILED lookups only. Lookup is by phone/email (high
+	// entropy, not the guessable invoice number), so this just blunts blind
+	// guessing/abuse. A customer re-checking their own real booking always
+	// succeeds and is never counted — important behind shared/CGNAT IPs.
 	$ip  = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
 	$key = 'bhela_bm_track_' . md5( $ip );
-	$hits = (int) get_transient( $key );
-	if ( $hits >= 8 ) {
+	if ( (int) get_transient( $key ) >= 30 ) {
 		wp_send_json_error( array( 'message' => __( 'অনেকবার চেষ্টা হয়েছে — কিছুক্ষণ পর আবার চেষ্টা করুন।', 'bhela-booking' ) ) );
 	}
-	set_transient( $key, $hits + 1, HOUR_IN_SECONDS );
 
 	$ids = bhela_bm_find_bookings( $q );
 	if ( ! $ids ) {
+		// Count only misses toward the limit.
+		set_transient( $key, (int) get_transient( $key ) + 1, HOUR_IN_SECONDS );
 		$settings = bhela_bm_get_settings();
 		wp_send_json_success( array(
 			'found'    => false,
