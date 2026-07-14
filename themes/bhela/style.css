@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.6.2
+Version: 2.6.4
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -308,7 +308,9 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 .sched-table th { background: var(--ink); color: #fff; text-align: left; padding: 1rem 1.2rem; font-family: var(--font-body); font-size: .88rem; letter-spacing: .06em; text-transform: uppercase; }
 .sched-table td { padding: 1rem 1.2rem; border-bottom: 1px solid var(--line); }
 .sched-table tr:last-child td { border-bottom: 0; }
-.tag { display: inline-block; padding: .22rem .85rem; border-radius: 999px; font-size: .8rem; font-weight: 700; }
+/* Scoped to a/span: WP puts class="tag" on <body> for tag archives — an
+   unscoped .tag selector would shrink-wrap the whole page. */
+a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 999px; font-size: .8rem; font-weight: 700; }
 .tag--weekend { background: rgba(19,122,116,.12); color: var(--primary); }
 .tag--weekday { background: rgba(26,127,55,.12); color: #1a7f37; }
 .tag--holiday { background: rgba(255,122,61,.15); color: var(--cta-dark); }
@@ -499,6 +501,13 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 /* Related posts */
 .related-posts { margin-top: 3.5rem; }
 .related-posts h2 { font-size: 1.5rem; margin-bottom: 1.4rem; }
+
+/* Category / tag archive hero */
+.page-hero .eyebrow { color: var(--aqua); }
+.page-hero .eyebrow::before { background: var(--gold); }
+.archive-back { margin-top: 1.2rem; }
+.archive-back a { color: var(--aqua); font-weight: 700; font-size: .92rem; }
+.archive-back a:hover { color: var(--gold); }
 
 /* Pagination pills */
 .bhela-pagination { margin-top: 2.6rem; }

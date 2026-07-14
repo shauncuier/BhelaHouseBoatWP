@@ -13,6 +13,21 @@ get_header();
 		<p>টাঙ্গুয়ার হাওর ভ্রমণের গাইড, টিপস আর ভেলার খবর — বুকিংয়ের আগে যা জানলে ট্রিপ আরও সুন্দর হয়।</p>
 	<?php elseif ( is_search() ) : ?>
 		<h1><?php printf( esc_html__( 'খোঁজার ফলাফল: %s', 'bhela' ), esc_html( get_search_query() ) ); ?></h1>
+	<?php elseif ( is_category() || is_tag() ) : ?>
+		<?php $bhela_term = get_queried_object(); ?>
+		<span class="eyebrow"><?php echo is_category() ? esc_html__( 'ক্যাটাগরি', 'bhela' ) : esc_html__( 'ট্যাগ', 'bhela' ); ?></span>
+		<h1><?php single_term_title(); ?></h1>
+		<p>
+			<?php
+			if ( $bhela_term && ! empty( $bhela_term->description ) ) {
+				echo esc_html( $bhela_term->description );
+			} elseif ( $bhela_term ) {
+				/* translators: %s: post count. */
+				printf( esc_html__( 'এই বিষয়ে %sটি লেখা', 'bhela' ), esc_html( number_format_i18n( (int) $bhela_term->count ) ) );
+			}
+			?>
+		</p>
+		<p class="archive-back"><a href="<?php echo esc_url( get_permalink( get_option( 'page_for_posts' ) ) ); ?>">← হাওর জার্নাল</a></p>
 	<?php else : ?>
 		<h1><?php echo wp_kses_post( get_the_archive_title() ); ?></h1>
 		<?php the_archive_description( '<p>', '</p>' ); ?>
