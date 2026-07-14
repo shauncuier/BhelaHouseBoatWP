@@ -296,9 +296,13 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 			$who .= ' + ' . $c04 . ' শিশু(০–৪ ফ্রি)';
 		}
 		$lines[] = array(
-			'label' => sprintf( __( 'কেবিন (%d জন)', 'bhela-booking' ), $occ ),
-			'who'   => $who,
-			'total' => $line,
+			'label'  => sprintf( __( 'কেবিন (%d জন)', 'bhela-booking' ), $occ ),
+			'who'    => $who,
+			'total'  => $line,
+			'rate'   => $rate,   // per-person rate for this cabin's tier
+			'occ'    => $occ,
+			'adults' => $adults,
+			'c48'    => $c48,
 		);
 	}
 
@@ -370,6 +374,16 @@ function bhela_bm_process_submission( $data ) {
 		if ( is_wp_error( $price ) ) {
 			return $price; // pass through the specific reason (no cabins / needs an adult)
 		}
+		// Inventory: never accept more cabins than are free on that date.
+		$avail = bhela_bm_trip_availability( $date );
+		if ( count( $price['lines'] ) > $avail['available'] ) {
+			return new WP_Error( 'no_cabins_left', sprintf(
+				/* translators: %d: free cabins. */
+				__( 'দুঃখিত — এই তারিখে মাত্র %dটি কেবিন খালি আছে। অতিথি সংখ্যা কমান বা অন্য তারিখ বাছাই করুন।', 'bhela-booking' ),
+				$avail['available']
+			) );
+		}
+
 		$summary_parts = array();
 		foreach ( $price['lines'] as $l ) {
 			$summary_parts[] = $l['label'] . ' (' . $l['who'] . ')';
@@ -393,6 +407,7 @@ function bhela_bm_process_submission( $data ) {
 	update_post_meta( $post_id, '_bhela_travel_date', $date );
 	update_post_meta( $post_id, '_bhela_cabin_type', $cabin_summary );
 	update_post_meta( $post_id, '_bhela_cabins_json', wp_json_encode( is_array( $cabins ) ? $cabins : array(), JSON_UNESCAPED_UNICODE ) );
+	update_post_meta( $post_id, '_bhela_lines', wp_json_encode( $price['lines'], JSON_UNESCAPED_UNICODE ) );
 	update_post_meta( $post_id, '_bhela_guests', $price['guests'] );
 	update_post_meta( $post_id, '_bhela_message', $message );
 	update_post_meta( $post_id, '_bhela_status', 'pending' );
@@ -481,26 +496,30 @@ function bhela_bm_ajax_availability() {
 	if ( ! $date ) {
 		wp_send_json_error( array( 'message' => 'আগে তারিখ বাছাই করুন।' ) );
 	}
-	$trips    = function_exists( 'bhela_bm_get_trips' ) ? bhela_bm_get_trips() : array();
 	$statuses = function_exists( 'bhela_bm_trip_statuses' ) ? bhela_bm_trip_statuses() : array();
-	foreach ( $trips as $t ) {
-		if ( $t['date'] === $date ) {
-			$st = $statuses[ $t['status'] ] ?? null;
-			wp_send_json_success( array(
-				'status' => $t['status'],
-				'label'  => $st ? $st['short'] : $t['status'],
-				'color'  => $st ? $st['color'] : '#1a7f37',
-				'trip'   => $t['label'],
-				'note'   => $t['note'],
-			) );
-		}
+	$avail    = bhela_bm_trip_availability( $date );
+	if ( $avail['trip'] ) {
+		$st = $statuses[ $avail['status'] ] ?? null;
+		wp_send_json_success( array(
+			'status'    => $avail['status'],
+			'label'     => $st ? $st['short'] : $avail['status'],
+			'color'     => $st ? $st['color'] : '#1a7f37',
+			'trip'      => $avail['trip']['label'],
+			'note'      => $avail['trip']['note'],
+			'total'     => $avail['total'],
+			'booked'    => $avail['booked'],
+			'available' => $avail['available'],
+		) );
 	}
 	wp_send_json_success( array(
-		'status' => 'unknown',
-		'label'  => 'এই তারিখে নির্ধারিত গ্রুপ ট্রিপ নেই',
-		'color'  => '#996800',
-		'trip'   => '',
-		'note'   => 'Full Boat/কাস্টম ট্রিপের জন্য WhatsApp-এ যোগাযোগ করুন — রিকোয়েস্ট পাঠালে আমরা কনফার্ম করব।',
+		'status'    => 'unknown',
+		'label'     => 'এই তারিখে নির্ধারিত গ্রুপ ট্রিপ নেই',
+		'color'     => '#996800',
+		'trip'      => '',
+		'note'      => 'Full Boat/কাস্টম ট্রিপের জন্য WhatsApp-এ যোগাযোগ করুন — রিকোয়েস্ট পাঠালে আমরা কনফার্ম করব।',
+		'total'     => $avail['total'],
+		'booked'    => 0,
+		'available' => $avail['total'],
 	) );
 }
 add_action( 'wp_ajax_bhela_bm_availability', 'bhela_bm_ajax_availability' );

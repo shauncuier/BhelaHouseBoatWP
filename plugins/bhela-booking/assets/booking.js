@@ -123,6 +123,8 @@
 		var MAX_CAP = OCC_SIZES[OCC_SIZES.length - 1] || 6;
 		var MAX_CABINS = bhelaBM.maxCabins || 7;
 		var MAX_GUESTS = bhelaBM.maxGuests || (MAX_CABINS * MAX_CAP);
+		var availableCabins = MAX_CABINS; // narrowed per-date by the availability check
+		function cabinCap() { return Math.max(0, Math.min(MAX_CABINS, availableCabins)); }
 
 		function money(n) { return '৳' + Number(n).toLocaleString('en-IN'); }
 
@@ -163,7 +165,7 @@
 			var out = [];
 			(function recurse(remaining, maxPart, current) {
 				if (remaining === 0) { out.push(current.slice()); return; }
-				if (current.length >= MAX_CABINS) return;
+				if (current.length >= cabinCap()) return;
 				var hi = Math.min(maxPart, remaining);
 				for (var p = hi; p >= MIN_CAP; p--) {
 					// leftover after taking p must be 0 or ≥ MIN_CAP (no lone remainder)
@@ -239,7 +241,7 @@
 		function optionCard(o, i, dt) {
 			var c = o.combo;
 			var detail = c.cabins.map(function (cb, n) {
-				return 'কেবিন ' + (n + 1) + ': ' + cb.size + '×' + money(occRate(cb.size, dt || 'weekend'));
+				return 'কেবিন ' + (n + 1) + ' (' + cb.size + ' জন): ' + money(occRate(cb.size, dt || 'weekend')) + '/জন';
 			}).join(' · ');
 			var badge = o.suggested
 				? '<span class="bm-opt__badge">✨ আমাদের সাজেশন</span>'
@@ -378,7 +380,9 @@
 			if (badCabin) msg = '⚠️ প্রতিটি কেবিনে ২–' + MAX_CAP + ' জন (শিশু ০–৪ বাদে) থাকতে হবে।';
 			else if (adults < 1) msg = '⚠️ অন্তত ১ জন বড় (৯+) থাকতে হবে।';
 			else if (occupants < 2) msg = '⚠️ অন্তত ২ জন প্রয়োজন।';
-			else if (cabins.length > MAX_CABINS) msg = '⚠️ সর্বোচ্চ ' + MAX_CABINS + 'টি কেবিন।';
+			else if (cabins.length > cabinCap()) msg = availableCabins < MAX_CABINS
+				? '⚠️ এই তারিখে মাত্র ' + availableCabins + 'টি কেবিন খালি।'
+				: '⚠️ সর্বোচ্চ ' + MAX_CABINS + 'টি কেবিন।';
 			else if (occupants > MAX_GUESTS) msg = '⚠️ সর্বোচ্চ ' + MAX_GUESTS + ' জন।';
 			var priced = null;
 			if (!msg && dt) {
@@ -457,6 +461,23 @@
 			if (selectedIndex >= currentOptions.length) selectedIndex = 0;
 			renderOptions(dt);
 
+			// No combination fits (e.g. group needs more cabins than are free
+			// on this date) — block progress instead of keeping stale options.
+			if (!currentOptions.length) {
+				if (guestError) {
+					guestError.hidden = false;
+					guestError.textContent = availableCabins < MAX_CABINS
+						? '⚠️ এই তারিখে মাত্র ' + availableCabins + 'টি কেবিন খালি — এত জনের জায়গা হবে না। অতিথি কমান বা অন্য তারিখ বাছাই করুন।'
+						: '⚠️ এই সংখ্যক অতিথির কম্বিনেশন সম্ভব নয়।';
+				}
+				if (next2) next2.disabled = true;
+				if (submitBtn) submitBtn.disabled = true;
+				priceBox.hidden = true;
+				if (emptyMsg) emptyMsg.hidden = false;
+				updateMobileBar('', dt);
+				return;
+			}
+
 			if (next2) next2.disabled = false;
 			if (submitBtn) submitBtn.disabled = false;
 			renderSummary(dt);
@@ -489,8 +510,9 @@
 				var who = cb.adults + ' বড়';
 				if (cb.c48) who += ' + ' + cb.c48 + ' শিশু(৪–৮)';
 				if (cb.c04) who += ' + ' + cb.c04 + ' শিশু(০–৪ ফ্রি)';
-				var line = cb.adults * occRate(cb.size, dt) + Math.ceil(cb.c48 * occRate(cb.size, dt) * (bhelaBM.childPercent / 100));
-				return '<div class="bm-bd-line"><span>কেবিন ' + (n + 1) + ' (' + cb.size + ' জন)<small>' + who + '</small></span><strong>' + money(line) + '</strong></div>';
+				var rate = occRate(cb.size, dt);
+				var line = cb.adults * rate + Math.ceil(cb.c48 * rate * (bhelaBM.childPercent / 100));
+				return '<div class="bm-bd-line"><span>কেবিন ' + (n + 1) + ' (' + cb.size + ' জন)<small>' + who + ' · ' + money(rate) + '/জন' + (cb.c48 ? ' · শিশু ৫০%' : '') + '</small></span><strong>' + money(line) + '</strong></div>';
 			}).join('');
 
 			priceBox.hidden = false;
@@ -586,6 +608,7 @@
 
 		function resetAvailability() {
 			availChecked = false;
+			availableCabins = MAX_CABINS;
 			if (next1) next1.disabled = true;
 			if (blockedBox) blockedBox.hidden = true;
 		}
@@ -614,8 +637,14 @@
 						if (data.success) {
 							var d = data.data;
 							var booked = d.status === 'booked';
+							availableCabins = booked ? 0
+								: (typeof d.available === 'number' ? d.available : MAX_CABINS);
 							var color = /^#[0-9a-fA-F]{3,8}$/.test(d.color) ? d.color : '#996800';
 							var html = '<span class="bm-avail-chip" style="background:' + color + '1a;color:' + color + ';border:1px solid ' + color + '55">' + esc(d.label) + '</span>';
+							if (!booked && typeof d.available === 'number' && d.trip) {
+								var cabColor = d.available > 2 ? '#1a7f37' : '#b45309';
+								html += ' <span class="bm-avail-chip" style="background:' + cabColor + '1a;color:' + cabColor + ';border:1px solid ' + cabColor + '55">🛏️ ' + d.total + 'টির মধ্যে ' + d.available + 'টি কেবিন খালি</span>';
+							}
 							if (d.trip) html += ' <span class="bm-avail-trip">📅 ' + esc(d.trip) + '</span>';
 							if (d.note) html += '<div class="bm-avail-note">' + esc(d.note) + '</div>';
 							availBox.innerHTML = html;

@@ -48,6 +48,58 @@ function bhela_bm_trip_statuses() {
 	);
 }
 
+/**
+ * Cabin availability for a date.
+ * 'booked' comes from the trip's admin-managed count; a full boat
+ * (booked >= total) forces effective status 'booked' regardless of the
+ * manual status dropdown.
+ *
+ * @return array{ total:int, booked:int, available:int, trip:array|null, status:string }
+ */
+function bhela_bm_trip_availability( $date ) {
+	$total = bhela_bm_max_cabins();
+	$trip  = null;
+	foreach ( bhela_bm_get_trips() as $t ) {
+		if ( $t['date'] === $date ) {
+			$trip = $t;
+			break;
+		}
+	}
+	$booked = $trip ? min( $total, max( 0, (int) ( $trip['booked'] ?? 0 ) ) ) : 0;
+	$status = $trip ? $trip['status'] : 'unknown';
+	if ( $booked >= $total ) {
+		$status = 'booked';
+	}
+	return array(
+		'total'     => $total,
+		'booked'    => $booked,
+		'available' => max( 0, $total - $booked ),
+		'trip'      => $trip,
+		'status'    => $status,
+	);
+}
+
+/** Cabins consumed by real bookings (advance_paid/confirmed) on a date — admin reconciliation hint. */
+function bhela_bm_counted_booked_cabins( $date ) {
+	$q = new WP_Query( array(
+		'post_type'      => 'bhela_booking',
+		'post_status'    => 'publish',
+		'posts_per_page' => 50,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'meta_query'     => array(
+			array( 'key' => '_bhela_travel_date', 'value' => $date, 'compare' => '=' ),
+			array( 'key' => '_bhela_status', 'value' => array( 'advance_paid', 'confirmed' ), 'compare' => 'IN' ),
+		),
+	) );
+	$cabins = 0;
+	foreach ( $q->posts as $id ) {
+		$rows    = json_decode( (string) get_post_meta( $id, '_bhela_cabins_json', true ), true );
+		$cabins += is_array( $rows ) && $rows ? count( $rows ) : 1;
+	}
+	return $cabins;
+}
+
 /* ---------- Admin page: Trip Calendar ---------- */
 
 function bhela_bm_trips_menu() {
@@ -74,6 +126,7 @@ function bhela_bm_trips_page() {
 		$days     = (array) ( $_POST['trip_days'] ?? array() );
 		$notes    = (array) ( $_POST['trip_note'] ?? array() );
 		$statuses = (array) ( $_POST['trip_status'] ?? array() );
+		$bookeds  = (array) ( $_POST['trip_booked'] ?? array() );
 		$deletes  = (array) ( $_POST['trip_delete'] ?? array() );
 		foreach ( $dates as $i => $date ) {
 			$date = sanitize_text_field( $date );
@@ -87,6 +140,7 @@ function bhela_bm_trips_page() {
 				'days'   => sanitize_text_field( $days[ $i ] ?? '' ),
 				'note'   => sanitize_text_field( $notes[ $i ] ?? '' ),
 				'status' => array_key_exists( $status, bhela_bm_trip_statuses() ) ? $status : 'available',
+				'booked' => min( bhela_bm_max_cabins(), max( 0, (int) ( $bookeds[ $i ] ?? 0 ) ) ),
 			);
 		}
 		update_option( 'bhela_bm_trips', $trips );
@@ -108,6 +162,7 @@ function bhela_bm_trips_page() {
 					<th><?php esc_html_e( 'Days (Bangla)', 'bhela-booking' ); ?></th>
 					<th><?php esc_html_e( 'Note', 'bhela-booking' ); ?></th>
 					<th style="width:170px"><?php esc_html_e( 'Status', 'bhela-booking' ); ?></th>
+					<th style="width:130px"><?php esc_html_e( 'Booked Cabins', 'bhela-booking' ); ?></th>
 					<th style="width:60px"><?php esc_html_e( 'Delete', 'bhela-booking' ); ?></th>
 				</tr></thead>
 				<tbody>
@@ -122,6 +177,10 @@ function bhela_bm_trips_page() {
 								<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $t['status'], $key ); ?>><?php echo esc_html( $st['label'] ); ?></option>
 							<?php endforeach; ?>
 						</select></td>
+						<td>
+							<input type="number" name="trip_booked[]" min="0" max="<?php echo esc_attr( bhela_bm_max_cabins() ); ?>" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" style="width:64px"> / <?php echo esc_html( bhela_bm_max_cabins() ); ?>
+							<br><small style="color:#666"><?php printf( esc_html__( 'বুকিং থেকে: %d', 'bhela-booking' ), (int) bhela_bm_counted_booked_cabins( $t['date'] ) ); ?></small>
+						</td>
 						<td style="text-align:center"><input type="checkbox" name="trip_delete[<?php echo esc_attr( $i ); ?>]" value="1"></td>
 					</tr>
 				<?php endforeach; ?>
@@ -142,6 +201,7 @@ function bhela_bm_trips_page() {
 			'<td><input type="text" style="width:100%" name="trip_days[]" placeholder="শুক্র – শনি"></td>' +
 			'<td><input type="text" style="width:100%" name="trip_note[]"></td>' +
 			'<td><select name="trip_status[]"><option value="available">Available</option><option value="filling">Filling Fast</option><option value="booked">Booked</option></select></td>' +
+			'<td><input type="number" name="trip_booked[]" min="0" max="6" value="0" style="width:64px"> / 6</td>' +
 			'<td style="text-align:center">—</td>';
 		tbody.appendChild(row);
 	});
@@ -164,6 +224,8 @@ function bhela_bm_trip_calendar_shortcode() {
 	ob_start();
 	echo '<div class="bhela-trips">';
 	foreach ( $trips as $t ) {
+		$avail = bhela_bm_trip_availability( $t['date'] );
+		$t['status'] = $avail['status']; // full boat forces 'booked'
 		$st       = $statuses[ $t['status'] ] ?? $statuses['available'];
 		$day_type = function_exists( 'bhela_bm_day_type' ) ? bhela_bm_day_type( $t['date'] ) : 'weekend';
 		$type_tag = ( 'weekday' === $day_type ) ? '<span class="bhela-trip__type bhela-trip__type--weekday">Weekday −20% 🔥</span>' : ( 'holiday' === $day_type ? '<span class="bhela-trip__type bhela-trip__type--holiday">ছুটির দিন</span>' : '<span class="bhela-trip__type">Weekend</span>' );
@@ -179,6 +241,10 @@ function bhela_bm_trip_calendar_shortcode() {
 		}
 		echo '</div>';
 		echo '<span class="bhela-trip__status" style="color:' . esc_attr( $st['color'] ) . '">' . esc_html( $st['short'] ) . '</span>';
+		if ( 'booked' !== $t['status'] ) {
+			$cab_color = $avail['available'] > 2 ? '#1a7f37' : '#b45309';
+			echo '<span class="bhela-trip__cabins" style="color:' . esc_attr( $cab_color ) . '">🛏️ ' . esc_html( sprintf( __( '%1$d/%2$dটি কেবিন খালি', 'bhela-booking' ), $avail['available'], $avail['total'] ) ) . '</span>';
+		}
 		if ( 'booked' === $t['status'] ) {
 			echo '<span class="bhela-trip__cta bhela-trip__cta--off">বুকড</span>';
 		} else {

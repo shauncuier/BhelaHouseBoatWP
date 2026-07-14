@@ -117,13 +117,28 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 			<table class="items">
 				<thead><tr><th>Description</th><th>Guests</th><th>Per Person</th><th>Amount</th></tr></thead>
 				<tbody>
-					<tr>
-						<td><strong><?php echo esc_html( $invoice['cabin'] ? $invoice['cabin'] : 'Houseboat Package' ); ?></strong><br>
-						<span style="font-size:12.5px;color:#5b6b6a">২ দিন ১ রাত — থাকা, সকল খাবার, হাওর ভ্রমণ, গাইড ও নিরাপত্তা</span></td>
-						<td><?php echo esc_html( $invoice['guests'] ); ?> জন</td>
-						<td><?php echo esc_html( $invoice['per_person'] ? bhela_bm_money( $invoice['per_person'] ) : '—' ); ?></td>
-						<td><?php echo esc_html( $invoice['total'] ? bhela_bm_money( $invoice['total'] ) : '—' ); ?></td>
-					</tr>
+					<?php if ( ! empty( $invoice['lines'] ) ) : ?>
+						<?php foreach ( $invoice['lines'] as $inv_line ) : ?>
+							<tr>
+								<td><strong><?php echo esc_html( $inv_line['label'] ); ?></strong><br>
+								<span style="font-size:12.5px;color:#5b6b6a"><?php echo esc_html( $inv_line['who'] ); ?></span></td>
+								<td><?php echo esc_html( (int) ( $inv_line['occ'] ?? 0 ) ); ?> জন</td>
+								<td><?php echo esc_html( isset( $inv_line['rate'] ) ? bhela_bm_money( $inv_line['rate'] ) : '—' ); ?><?php if ( ! empty( $inv_line['c48'] ) ) : ?><br><span style="font-size:12px;color:#5b6b6a">শিশু (৪–৮) ৫০%</span><?php endif; ?></td>
+								<td><?php echo esc_html( bhela_bm_money( (int) ( $inv_line['total'] ?? 0 ) ) ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+						<tr>
+							<td colspan="4" style="font-size:12.5px;color:#5b6b6a">২ দিন ১ রাত — থাকা, সকল খাবার, হাওর ভ্রমণ, গাইড ও নিরাপত্তা অন্তর্ভুক্ত</td>
+						</tr>
+					<?php else : ?>
+						<tr>
+							<td><strong><?php echo esc_html( $invoice['cabin'] ? $invoice['cabin'] : 'Houseboat Package' ); ?></strong><br>
+							<span style="font-size:12.5px;color:#5b6b6a">২ দিন ১ রাত — থাকা, সকল খাবার, হাওর ভ্রমণ, গাইড ও নিরাপত্তা</span></td>
+							<td><?php echo esc_html( $invoice['guests'] ); ?> জন</td>
+							<td><?php echo esc_html( $invoice['per_person'] ? bhela_bm_money( $invoice['per_person'] ) : '—' ); ?></td>
+							<td><?php echo esc_html( $invoice['total'] ? bhela_bm_money( $invoice['total'] ) : '—' ); ?></td>
+						</tr>
+					<?php endif; ?>
 				</tbody>
 			</table>
 
