@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.6.4
+Version: 2.6.5
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -396,31 +396,37 @@ a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 
    floating button would duplicate it and overlap the bar. Hide it there. */
 @media (max-width: 900px) { .wa-float { display: none; } }
 
+/* Primary-first pattern: one big booking CTA, quiet call/WhatsApp icon
+   buttons — a single clear action instead of three competing blocks. */
 .mobile-bar {
 	position: fixed; inset: auto 0 0 0; z-index: 950;
-	display: none; grid-template-columns: repeat(3, 1fr); align-items: stretch;
+	display: none; align-items: center; gap: .6rem;
 	background: rgba(10, 42, 47, .97); backdrop-filter: blur(10px);
 	-webkit-backdrop-filter: blur(10px);
 	border-top: 1px solid var(--line-inverse);
-	padding: .5rem .6rem calc(.5rem + env(safe-area-inset-bottom));
-	gap: .5rem;
+	padding: .6rem .8rem calc(.6rem + env(safe-area-inset-bottom));
 }
-.mobile-bar a {
-	display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-	padding: .45rem .3rem; border-radius: 12px; color: #fff; min-height: 52px; line-height: 1.1;
+.mobile-bar__icon {
+	flex: none; width: 48px; height: 48px; border-radius: 12px;
+	display: flex; align-items: center; justify-content: center;
+	transition: background .2s;
 }
-.mobile-bar__i { font-size: 1.2rem; }
-.mobile-bar__t { font-size: .78rem; font-weight: 700; white-space: nowrap; letter-spacing: .01em; }
-.mobile-bar a.call { background: rgba(255,255,255,.12); }
-.mobile-bar a.wa { background: #25D366; }
-.mobile-bar a.book { background: var(--cta); box-shadow: 0 4px 14px rgba(255,122,61,.4); }
-@media (max-width: 360px) {
-	.mobile-bar { gap: .4rem; padding-inline: .45rem; }
-	.mobile-bar__t { font-size: .72rem; }
-	.mobile-bar__i { font-size: 1.1rem; }
+.mobile-bar__icon svg { width: 22px; height: 22px; }
+.mobile-bar__icon--call { color: var(--text-inverse); border: 1px solid rgba(220,235,233,.28); }
+.mobile-bar__icon--call:active { background: rgba(220,235,233,.12); }
+.mobile-bar__icon--wa { color: #25D366; border: 1px solid rgba(37,211,102,.5); }
+.mobile-bar__icon--wa:active { background: rgba(37,211,102,.14); }
+.mobile-bar__book {
+	flex: 1; height: 48px; border-radius: 12px;
+	display: flex; align-items: center; justify-content: center;
+	background: var(--cta); color: #fff !important;
+	font-weight: 700; font-size: 1.02rem; letter-spacing: .01em;
+	box-shadow: 0 4px 16px rgba(255,122,61,.35);
+	transition: transform .12s, background .2s;
 }
+.mobile-bar__book:active { transform: scale(.97); background: var(--cta-dark); }
 @media (max-width: 900px) {
-	.mobile-bar { display: grid; }
+	.mobile-bar { display: flex; }
 	body { padding-bottom: 72px; }
 	/* Booking page owns its own sticky price/action bar — drop the generic one. */
 	body.bhela-book-page .mobile-bar { display: none; }
