@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.6.1
+ * Version: 2.6.2
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.6.1' );
+define( 'BHELA_BM_VERSION', '2.6.2' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -40,6 +40,15 @@ function bhela_bm_default_settings() {
 		'weekend_days'     => array( 5, 6 ), // date('w'): 5 = Friday, 6 = Saturday.
 		'holidays'         => "2026-08-05\n2026-08-12\n2026-08-26",
 		'invoice_note'     => "বুকিং নিশ্চিত করতে মোট মূল্যের ৫০% অগ্রিম প্রদান করতে হবে। বাকি ৫০% অনবোর্ড হওয়ার সময় পরিশোধযোগ্য। ২১+ দিন আগে বাতিলে অগ্রিমের ৫০% ফেরতযোগ্য; ৭ দিনের কম সময়ে কোনো রিফান্ড প্রযোজ্য নয়।",
+
+		// Email notifications.
+		'email_enabled'            => 1, // master switch for all emails
+		'email_admin_new'          => 1, // notify owner on a new booking
+		'email_customer_request'   => 1, // customer "request received" email
+		'email_customer_confirmed' => 1, // customer "confirmed" email
+		'notify_email'             => '', // admin recipient (blank → business email)
+		'email_from_name'          => '', // From name (blank → business_name)
+		'email_reply_to'           => '', // Reply-To (blank → business email)
 
 		// SMS notifications (provider-agnostic — configure any BD gateway).
 		'sms_enabled'        => 0,

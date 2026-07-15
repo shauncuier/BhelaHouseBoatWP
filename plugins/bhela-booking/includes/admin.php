@@ -433,6 +433,14 @@ function bhela_bm_settings_page() {
 		$s['bangla_qr']       = esc_url_raw( $_POST['bangla_qr'] ?? '' );
 		$s['holidays']        = sanitize_textarea_field( $_POST['holidays'] ?? '' );
 		$s['invoice_note']    = sanitize_textarea_field( $_POST['invoice_note'] ?? '' );
+
+		// Email notification settings.
+		foreach ( array( 'email_enabled', 'email_admin_new', 'email_customer_request', 'email_customer_confirmed' ) as $f ) {
+			$s[ $f ] = empty( $_POST[ $f ] ) ? 0 : 1;
+		}
+		$s['notify_email']    = sanitize_email( wp_unslash( $_POST['notify_email'] ?? '' ) );
+		$s['email_reply_to']  = sanitize_email( wp_unslash( $_POST['email_reply_to'] ?? '' ) );
+		$s['email_from_name'] = sanitize_text_field( wp_unslash( $_POST['email_from_name'] ?? '' ) );
 		$s['advance_percent'] = min( 100, max( 1, (int) ( $_POST['advance_percent'] ?? 50 ) ) );
 		$s['weekend_days']    = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
 
@@ -538,6 +546,33 @@ function bhela_bm_settings_page() {
 				</tbody>
 			</table>
 
+			<h2 id="bhela-email">📧 <?php esc_html_e( 'Email Notifications', 'bhela-booking' ); ?></h2>
+			<p class="description" style="max-width:900px"><?php esc_html_e( 'Emails go out on new bookings and status changes. The customer email uses your Business Email (above) as the From address.', 'bhela-booking' ); ?></p>
+			<table class="form-table">
+				<tr><th><?php esc_html_e( 'Enable emails', 'bhela-booking' ); ?></th><td><label><input type="checkbox" name="email_enabled" value="1" <?php checked( ! empty( $s['email_enabled'] ) ); ?>> <?php esc_html_e( 'Master switch — send booking emails', 'bhela-booking' ); ?></label></td></tr>
+				<tr><th><?php esc_html_e( 'Which emails', 'bhela-booking' ); ?></th><td>
+					<label style="display:block;margin-bottom:6px"><input type="checkbox" name="email_admin_new" value="1" <?php checked( ! empty( $s['email_admin_new'] ) ); ?>> <?php esc_html_e( 'New booking → notify you (owner)', 'bhela-booking' ); ?></label>
+					<label style="display:block;margin-bottom:6px"><input type="checkbox" name="email_customer_request" value="1" <?php checked( ! empty( $s['email_customer_request'] ) ); ?>> <?php esc_html_e( 'New booking → customer (request received)', 'bhela-booking' ); ?></label>
+					<label style="display:block"><input type="checkbox" name="email_customer_confirmed" value="1" <?php checked( ! empty( $s['email_customer_confirmed'] ) ); ?>> <?php esc_html_e( 'Status = Confirmed → customer (confirmation)', 'bhela-booking' ); ?></label>
+				</td></tr>
+				<tr><th><?php esc_html_e( 'Owner notification email', 'bhela-booking' ); ?></th><td><input type="email" class="regular-text" name="notify_email" value="<?php echo esc_attr( $s['notify_email'] ); ?>" placeholder="<?php echo esc_attr( $s['email'] ); ?>">
+					<p class="description"><?php esc_html_e( 'Where new-booking alerts go. Blank = Business Email.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th><?php esc_html_e( 'From name', 'bhela-booking' ); ?></th><td><input type="text" class="regular-text" name="email_from_name" value="<?php echo esc_attr( $s['email_from_name'] ); ?>" placeholder="<?php echo esc_attr( $s['business_name'] ); ?>"></td></tr>
+				<tr><th><?php esc_html_e( 'Reply-To', 'bhela-booking' ); ?></th><td><input type="email" class="regular-text" name="email_reply_to" value="<?php echo esc_attr( $s['email_reply_to'] ); ?>" placeholder="<?php echo esc_attr( $s['email'] ); ?>"></td></tr>
+			</table>
+			<?php
+			$email_last = get_transient( 'bhela_bm_email_test_result' );
+			if ( $email_last ) {
+				delete_transient( 'bhela_bm_email_test_result' );
+				printf(
+					'<div class="notice notice-%s inline"><p><strong>Test email → %s:</strong> %s</p></div>',
+					$email_last['ok'] ? 'success' : 'error',
+					esc_html( $email_last['to'] ),
+					$email_last['ok'] ? esc_html__( 'sent (check the inbox / Mailpit).', 'bhela-booking' ) : esc_html__( 'wp_mail() failed — check the site mail setup.', 'bhela-booking' )
+				);
+			}
+			?>
+
 			<h2 id="bhela-sms">📱 <?php esc_html_e( 'SMS Notifications', 'bhela-booking' ); ?></h2>
 			<p class="description" style="max-width:900px"><?php esc_html_e( 'Send an SMS on every new booking (to you + the customer) and when you change a booking status (to the customer). Works with any Bangladesh SMS gateway.', 'bhela-booking' ); ?></p>
 			<table class="form-table">
@@ -601,12 +636,19 @@ function bhela_bm_settings_page() {
 			</p>
 		</form>
 
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:-6px">
-			<?php wp_nonce_field( 'bhela_bm_sms_test' ); ?>
-			<input type="hidden" name="action" value="bhela_bm_sms_test">
-			<button type="submit" class="button">📲 <?php esc_html_e( 'Send Test SMS (to admin number)', 'bhela-booking' ); ?></button>
-			<span class="description"><?php esc_html_e( 'Save your gateway settings first.', 'bhela-booking' ); ?></span>
-		</form>
+		<p style="margin-top:-6px">
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline-block;margin-right:10px">
+				<?php wp_nonce_field( 'bhela_bm_email_test' ); ?>
+				<input type="hidden" name="action" value="bhela_bm_email_test">
+				<button type="submit" class="button">📧 <?php esc_html_e( 'Send Test Email', 'bhela-booking' ); ?></button>
+			</form>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline-block">
+				<?php wp_nonce_field( 'bhela_bm_sms_test' ); ?>
+				<input type="hidden" name="action" value="bhela_bm_sms_test">
+				<button type="submit" class="button">📲 <?php esc_html_e( 'Send Test SMS', 'bhela-booking' ); ?></button>
+			</form>
+			<span class="description"><?php esc_html_e( 'Save settings first.', 'bhela-booking' ); ?></span>
+		</p>
 	</div>
 	<?php
 }

@@ -45,10 +45,33 @@ function bhela_bm_booking_summary_text( $booking_id ) {
 	return implode( "\n", $lines );
 }
 
+/** Admin: send a test email to the owner notification address. */
+function bhela_bm_email_test_send() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'Permission denied.', 'bhela-booking' ) );
+	}
+	check_admin_referer( 'bhela_bm_email_test' );
+	$s   = bhela_bm_get_settings();
+	$to  = $s['notify_email'] ? $s['notify_email'] : ( $s['email'] ? $s['email'] : get_option( 'admin_email' ) );
+	$ok  = wp_mail(
+		$to,
+		'BHELA — Test Email ✅',
+		"This is a test from BHELA Booking settings.\nIf you received this, email notifications work.",
+		array( 'From: ' . ( $s['email_from_name'] ? $s['email_from_name'] : $s['business_name'] ) . ' <' . ( $s['email'] ? $s['email'] : get_option( 'admin_email' ) ) . '>' )
+	);
+	set_transient( 'bhela_bm_email_test_result', array( 'ok' => (bool) $ok, 'to' => $to ), 60 );
+	wp_safe_redirect( admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings#bhela-email' ) );
+	exit;
+}
+add_action( 'admin_post_bhela_bm_email_test', 'bhela_bm_email_test_send' );
+
 /** Notify site admin of a new booking request (plain text — functional). */
 function bhela_bm_email_admin_new( $booking_id ) {
 	$settings = bhela_bm_get_settings();
-	$to       = $settings['email'] ? $settings['email'] : get_option( 'admin_email' );
+	if ( empty( $settings['email_enabled'] ) || empty( $settings['email_admin_new'] ) ) {
+		return false;
+	}
+	$to = $settings['notify_email'] ? $settings['notify_email'] : ( $settings['email'] ? $settings['email'] : get_option( 'admin_email' ) );
 	$subject  = sprintf( 'BHELA: New Booking Request — %s (%s)', get_the_title( $booking_id ), get_post_meta( $booking_id, '_bhela_invoice_no', true ) );
 	$body     = "নতুন বুকিং রিকোয়েস্ট এসেছে:\n\n" . bhela_bm_booking_summary_text( $booking_id );
 	$body    .= "\n\nAdmin: " . admin_url( 'post.php?post=' . $booking_id . '&action=edit' );
@@ -184,19 +207,30 @@ function bhela_bm_email_customer( $booking_id, $type = 'request' ) {
 		return false;
 	}
 	$settings   = bhela_bm_get_settings();
+	if ( empty( $settings['email_enabled'] ) ) {
+		return false;
+	}
+	$type_key = ( 'confirmed' === $type ) ? 'email_customer_confirmed' : 'email_customer_request';
+	if ( empty( $settings[ $type_key ] ) ) {
+		return false;
+	}
 	$invoice_no = get_post_meta( $booking_id, '_bhela_invoice_no', true );
 
 	$subject = ( 'confirmed' === $type )
 		? sprintf( '✅ BHELA Booking Confirmed — %s', $invoice_no )
 		: sprintf( '🛶 BHELA Booking Request Received — %s', $invoice_no );
 
-	$body    = bhela_bm_email_customer_html( $booking_id, $type );
+	$body      = bhela_bm_email_customer_html( $booking_id, $type );
 	$from      = sanitize_email( $settings['email'] ? $settings['email'] : get_option( 'admin_email' ) );
-	$from_name = sanitize_text_field( $settings['business_name'] );
+	$from_name = sanitize_text_field( $settings['email_from_name'] ? $settings['email_from_name'] : $settings['business_name'] );
+	$reply_to  = sanitize_email( $settings['email_reply_to'] ? $settings['email_reply_to'] : $from );
 	$headers   = array(
 		'Content-Type: text/html; charset=UTF-8',
 		'From: ' . $from_name . ' <' . $from . '>',
 	);
+	if ( $reply_to ) {
+		$headers[] = 'Reply-To: ' . $reply_to;
+	}
 
 	return wp_mail( $email, $subject, $body, $headers );
 }
