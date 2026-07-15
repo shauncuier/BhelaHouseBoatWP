@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.6.6' );
+define( 'BHELA_VERSION', '2.6.7' );
 
 /* ---------- Setup ---------- */
 
@@ -386,7 +386,10 @@ add_action( 'after_switch_theme', 'bhela_auto_setup' );
  * the theme is not re-activated). Everything in bhela_auto_setup() is idempotent.
  */
 function bhela_maybe_provision() {
-	if ( ! is_admin() ) {
+	// admin_init also fires on admin-ajax.php (incl. unauthenticated nopriv
+	// AJAX) and cron — never run heavy provisioning in those contexts. Require
+	// a real, capable admin request.
+	if ( wp_doing_ajax() || wp_doing_cron() || ! is_admin() || ! current_user_can( 'manage_options' ) ) {
 		return;
 	}
 	if ( get_option( 'bhela_provisioned_version' ) === BHELA_VERSION ) {
