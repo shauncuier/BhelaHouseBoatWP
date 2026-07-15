@@ -781,9 +781,11 @@
 			if (!doneBox) return;
 			var title = opts.recent ? '🛶 আপনার সর্বশেষ বুকিং' : '🎉 ' + (opts.message || 'বুকিং রিকোয়েস্ট জমা হয়েছে');
 			var btns = '';
-			// invoice_url/whatsapp_url are server-built (add_query_arg + wa.me); encode defensively.
-			if (opts.whatsapp_url) btns += '<a class="bhela-bm-btn" href="' + encodeURI(opts.whatsapp_url) + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
-			if (opts.invoice_url) btns += '<a class="bhela-bm-btn bhela-bm-btn--invoice" href="' + encodeURI(opts.invoice_url) + '" target="_blank" rel="noopener">🧾 ইনভয়েস</a>';
+			// Both URLs are already fully URL-encoded server-side (rawurlencode /
+			// add_query_arg). Do NOT re-encode — encodeURI escapes '%' to '%25',
+			// double-encoding the Bangla message so WhatsApp shows garbage.
+			if (opts.whatsapp_url) btns += '<a class="bhela-bm-btn" href="' + esc(opts.whatsapp_url) + '" target="_blank" rel="noopener">💬 WhatsApp</a>';
+			if (opts.invoice_url) btns += '<a class="bhela-bm-btn bhela-bm-btn--invoice" href="' + esc(opts.invoice_url) + '" target="_blank" rel="noopener">🧾 ইনভয়েস</a>';
 			doneBox.innerHTML =
 				'<div class="bm-done__card bm-done">' +
 					'<div class="tick">✓</div>' +

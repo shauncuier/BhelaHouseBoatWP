@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.5.1
+ * Version: 2.6.1
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.5.1' );
+define( 'BHELA_BM_VERSION', '2.6.1' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -40,6 +40,24 @@ function bhela_bm_default_settings() {
 		'weekend_days'     => array( 5, 6 ), // date('w'): 5 = Friday, 6 = Saturday.
 		'holidays'         => "2026-08-05\n2026-08-12\n2026-08-26",
 		'invoice_note'     => "বুকিং নিশ্চিত করতে মোট মূল্যের ৫০% অগ্রিম প্রদান করতে হবে। বাকি ৫০% অনবোর্ড হওয়ার সময় পরিশোধযোগ্য। ২১+ দিন আগে বাতিলে অগ্রিমের ৫০% ফেরতযোগ্য; ৭ দিনের কম সময়ে কোনো রিফান্ড প্রযোজ্য নয়।",
+
+		// SMS notifications (provider-agnostic — configure any BD gateway).
+		'sms_enabled'        => 0,
+		'sms_provider'       => 'bulksmsbd', // 'bulksmsbd' | 'custom'
+		'sms_api_url'        => 'https://bulksmsbd.net/api/smsapi',
+		'sms_method'         => 'GET',       // GET | POST
+		'sms_json'           => 0,           // POST body as JSON instead of form
+		'sms_api_key'        => '',
+		'sms_sender_id'      => '',
+		'sms_param_number'   => 'number',
+		'sms_param_message'  => 'message',
+		'sms_param_key'      => 'api_key',
+		'sms_param_sender'   => 'senderid',
+		'sms_auth_header'    => '',           // optional "Authorization: Bearer …"
+		'sms_admin_number'   => '',           // blank → falls back to phone_1
+		'sms_tpl_admin'      => "নতুন বুকিং! {invoice} — {name}, {phone}, {date}, {guests} জন, মোট {total}।",
+		'sms_tpl_new'        => "প্রিয় {name}, ভেলা হাউসবোটে আপনার বুকিং রিকোয়েস্ট ({invoice}) পেয়েছি। তারিখ {date}। আমরা শীঘ্রই যোগাযোগ করব। — BHELA",
+		'sms_tpl_confirmed'  => "প্রিয় {name}, আপনার বুকিং {invoice} এখন: {status}। তারিখ {date}। বাকি {due}। ধন্যবাদ — BHELA",
 	);
 }
 
@@ -245,6 +263,7 @@ add_action( 'init', 'bhela_bm_register_cpt' );
 require_once BHELA_BM_PATH . 'includes/frontend.php';
 require_once BHELA_BM_PATH . 'includes/invoice.php';
 require_once BHELA_BM_PATH . 'includes/emails.php';
+require_once BHELA_BM_PATH . 'includes/sms.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';
 if ( is_admin() ) {

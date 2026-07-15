@@ -431,6 +431,9 @@ function bhela_bm_process_submission( $data ) {
 	if ( $email ) {
 		bhela_bm_email_customer( $post_id, 'request' );
 	}
+	if ( function_exists( 'bhela_bm_sms_on_new_booking' ) ) {
+		bhela_bm_sms_on_new_booking( $post_id );
+	}
 
 	$settings = bhela_bm_get_settings();
 	$wa_num   = preg_replace( '/[^0-9]/', '', $settings['whatsapp'] );

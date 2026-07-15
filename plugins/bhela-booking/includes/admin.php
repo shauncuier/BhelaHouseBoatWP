@@ -378,6 +378,9 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		if ( 'confirmed' === $new_status && 'confirmed' !== $old_status ) {
 			bhela_bm_email_customer( $post_id, 'confirmed' );
 		}
+		if ( function_exists( 'bhela_bm_sms_on_status_change' ) ) {
+			bhela_bm_sms_on_status_change( $post_id, $new_status, $old_status );
+		}
 	}
 
 	if ( ! empty( $_POST['bhela_send_email'] ) ) {
@@ -432,6 +435,34 @@ function bhela_bm_settings_page() {
 		$s['invoice_note']    = sanitize_textarea_field( $_POST['invoice_note'] ?? '' );
 		$s['advance_percent'] = min( 100, max( 1, (int) ( $_POST['advance_percent'] ?? 50 ) ) );
 		$s['weekend_days']    = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
+
+		// SMS notification settings.
+		$s['sms_enabled']  = empty( $_POST['sms_enabled'] ) ? 0 : 1;
+		$s['sms_json']     = empty( $_POST['sms_json'] ) ? 0 : 1;
+		$s['sms_provider'] = in_array( ( $_POST['sms_provider'] ?? '' ), array( 'bulksmsbd', 'custom' ), true ) ? $_POST['sms_provider'] : 'bulksmsbd';
+		$s['sms_method']   = ( 'POST' === strtoupper( $_POST['sms_method'] ?? '' ) ) ? 'POST' : 'GET';
+		$s['sms_api_url']  = esc_url_raw( wp_unslash( $_POST['sms_api_url'] ?? '' ) );
+		foreach ( array( 'sms_sender_id', 'sms_param_number', 'sms_param_message', 'sms_param_key', 'sms_param_sender', 'sms_auth_header', 'sms_admin_number' ) as $f ) {
+			$s[ $f ] = sanitize_text_field( wp_unslash( $_POST[ $f ] ?? '' ) );
+		}
+		// API key: keep the stored value if the field still shows the mask.
+		$posted_key = sanitize_text_field( wp_unslash( $_POST['sms_api_key'] ?? '' ) );
+		if ( '' !== $posted_key && $posted_key !== bhela_bm_mask( $s['sms_api_key'] ) ) {
+			$s['sms_api_key'] = $posted_key;
+		}
+		foreach ( array( 'sms_tpl_admin', 'sms_tpl_new', 'sms_tpl_confirmed' ) as $f ) {
+			$s[ $f ] = sanitize_textarea_field( wp_unslash( $_POST[ $f ] ?? '' ) );
+		}
+		// BulkSMSBD preset: lock the well-known endpoint + params.
+		if ( 'bulksmsbd' === $s['sms_provider'] ) {
+			$s['sms_api_url']       = 'https://bulksmsbd.net/api/smsapi';
+			$s['sms_method']        = 'GET';
+			$s['sms_param_number']  = 'number';
+			$s['sms_param_message'] = 'message';
+			$s['sms_param_key']     = 'api_key';
+			$s['sms_param_sender']  = 'senderid';
+		}
+
 		update_option( 'bhela_bm_settings', $s );
 
 		$rates = bhela_bm_get_rates();
@@ -507,10 +538,86 @@ function bhela_bm_settings_page() {
 				</tbody>
 			</table>
 
-			<p class="submit"><button type="submit" class="button button-primary"><?php esc_html_e( 'Save Settings', 'bhela-booking' ); ?></button></p>
+			<h2 id="bhela-sms">📱 <?php esc_html_e( 'SMS Notifications', 'bhela-booking' ); ?></h2>
+			<p class="description" style="max-width:900px"><?php esc_html_e( 'Send an SMS on every new booking (to you + the customer) and when you change a booking status (to the customer). Works with any Bangladesh SMS gateway.', 'bhela-booking' ); ?></p>
+			<table class="form-table">
+				<tr><th><?php esc_html_e( 'Enable SMS', 'bhela-booking' ); ?></th><td><label><input type="checkbox" name="sms_enabled" value="1" <?php checked( ! empty( $s['sms_enabled'] ) ); ?>> <?php esc_html_e( 'Send SMS notifications', 'bhela-booking' ); ?></label></td></tr>
+				<tr><th><?php esc_html_e( 'Gateway', 'bhela-booking' ); ?></th><td>
+					<select name="sms_provider">
+						<option value="bulksmsbd" <?php selected( $s['sms_provider'], 'bulksmsbd' ); ?>>BulkSMSBD (bulksmsbd.net)</option>
+						<option value="custom" <?php selected( $s['sms_provider'], 'custom' ); ?>><?php esc_html_e( 'Custom / other gateway', 'bhela-booking' ); ?></option>
+					</select>
+					<p class="description"><?php esc_html_e( 'Pick BulkSMSBD for a ready preset, or Custom to map any gateway’s API below.', 'bhela-booking' ); ?></p>
+				</td></tr>
+				<tr><th>API Key</th><td><input type="text" class="regular-text" name="sms_api_key" value="<?php echo esc_attr( bhela_bm_mask( $s['sms_api_key'] ) ); ?>" autocomplete="off">
+					<p class="description"><?php esc_html_e( 'Leave the masked value to keep the saved key; type a new key to change it.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th>Sender ID</th><td><input type="text" name="sms_sender_id" value="<?php echo esc_attr( $s['sms_sender_id'] ); ?>" placeholder="8809XXXXXXXXX / brand"></td></tr>
+				<tr><th><?php esc_html_e( 'Admin SMS number', 'bhela-booking' ); ?></th><td><input type="text" name="sms_admin_number" value="<?php echo esc_attr( $s['sms_admin_number'] ); ?>" placeholder="<?php echo esc_attr( $s['phone_1'] ); ?>">
+					<p class="description"><?php esc_html_e( 'Where new-booking alerts go. Blank = Phone 1.', 'bhela-booking' ); ?></p></td></tr>
+			</table>
+
+			<div style="border:1px solid #dcdcde;border-radius:6px;padding:4px 14px 14px;max-width:900px;background:#fbfbfc">
+				<h3><?php esc_html_e( 'Custom gateway mapping', 'bhela-booking' ); ?></h3>
+				<p class="description"><?php esc_html_e( 'Only needed for "Custom" — BulkSMSBD is auto-configured.', 'bhela-booking' ); ?></p>
+				<table class="form-table">
+					<tr><th>API URL</th><td><input type="url" class="large-text" name="sms_api_url" value="<?php echo esc_attr( $s['sms_api_url'] ); ?>"></td></tr>
+					<tr><th>Method</th><td>
+						<label style="margin-right:12px"><input type="radio" name="sms_method" value="GET" <?php checked( $s['sms_method'], 'GET' ); ?>> GET</label>
+						<label style="margin-right:12px"><input type="radio" name="sms_method" value="POST" <?php checked( $s['sms_method'], 'POST' ); ?>> POST</label>
+						<label><input type="checkbox" name="sms_json" value="1" <?php checked( ! empty( $s['sms_json'] ) ); ?>> <?php esc_html_e( 'POST body as JSON', 'bhela-booking' ); ?></label>
+					</td></tr>
+					<tr><th><?php esc_html_e( 'Param names', 'bhela-booking' ); ?></th><td>
+						number <input type="text" style="width:120px" name="sms_param_number" value="<?php echo esc_attr( $s['sms_param_number'] ); ?>">
+						message <input type="text" style="width:120px" name="sms_param_message" value="<?php echo esc_attr( $s['sms_param_message'] ); ?>">
+						api key <input type="text" style="width:120px" name="sms_param_key" value="<?php echo esc_attr( $s['sms_param_key'] ); ?>">
+						sender <input type="text" style="width:120px" name="sms_param_sender" value="<?php echo esc_attr( $s['sms_param_sender'] ); ?>">
+					</td></tr>
+					<tr><th><?php esc_html_e( 'Auth header (optional)', 'bhela-booking' ); ?></th><td><input type="text" class="regular-text" name="sms_auth_header" value="<?php echo esc_attr( $s['sms_auth_header'] ); ?>" placeholder="Authorization: Bearer xxxxx"></td></tr>
+				</table>
+			</div>
+
+			<table class="form-table">
+				<tr><th colspan="2"><em><?php esc_html_e( 'Placeholders:', 'bhela-booking' ); ?></em> <code>{name} {phone} {invoice} {date} {cabin} {guests} {total} {advance} {due} {status}</code></th></tr>
+				<tr><th><?php esc_html_e( 'New booking → you', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_admin" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_admin'] ); ?></textarea></td></tr>
+				<tr><th><?php esc_html_e( 'New booking → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_new" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_new'] ); ?></textarea></td></tr>
+				<tr><th><?php esc_html_e( 'Status change → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_confirmed" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_confirmed'] ); ?></textarea></td></tr>
+			</table>
+			<?php
+			$sms_last = get_transient( 'bhela_bm_sms_test_result' );
+			if ( $sms_last ) {
+				delete_transient( 'bhela_bm_sms_test_result' );
+				printf(
+					'<div class="notice notice-%s inline"><p><strong>Test SMS → %s:</strong> HTTP %d — %s</p></div>',
+					$sms_last['ok'] ? 'success' : 'error',
+					esc_html( $sms_last['to'] ),
+					(int) $sms_last['code'],
+					esc_html( $sms_last['body'] ? $sms_last['body'] : ( $sms_last['ok'] ? 'sent' : 'failed' ) )
+				);
+			}
+			?>
+
+			<p class="submit">
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'Save Settings', 'bhela-booking' ); ?></button>
+			</p>
+		</form>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:-6px">
+			<?php wp_nonce_field( 'bhela_bm_sms_test' ); ?>
+			<input type="hidden" name="action" value="bhela_bm_sms_test">
+			<button type="submit" class="button">📲 <?php esc_html_e( 'Send Test SMS (to admin number)', 'bhela-booking' ); ?></button>
+			<span class="description"><?php esc_html_e( 'Save your gateway settings first.', 'bhela-booking' ); ?></span>
 		</form>
 	</div>
 	<?php
+}
+
+/** Mask a secret for display (keep last 4). */
+function bhela_bm_mask( $value ) {
+	$value = (string) $value;
+	if ( strlen( $value ) <= 4 ) {
+		return $value ? str_repeat( '•', strlen( $value ) ) : '';
+	}
+	return str_repeat( '•', max( 4, strlen( $value ) - 4 ) ) . substr( $value, -4 );
 }
 
 /* ---------- Dashboard widget ---------- */
