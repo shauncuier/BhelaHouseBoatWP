@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.6.5' );
+define( 'BHELA_VERSION', '2.6.6' );
 
 /* ---------- Setup ---------- */
 
@@ -326,11 +326,17 @@ function bhela_auto_setup() {
 		update_option( 'page_for_posts', (int) $blog_id );
 		$menu_items['blog'] = (int) $blog_id;
 	}
+	$cat_ids = array();
 	foreach ( array( 'travel-guide' => 'ভ্রমণ গাইড', 'haor-news' => 'হাওরের খবর', 'tips' => 'টিপস' ) as $slug => $name ) {
-		if ( ! term_exists( $slug, 'category' ) ) {
-			wp_insert_term( $name, 'category', array( 'slug' => $slug ) );
+		$term = term_exists( $slug, 'category' );
+		if ( ! $term ) {
+			$term = wp_insert_term( $name, 'category', array( 'slug' => $slug ) );
 		}
+		$cat_ids[ $slug ] = is_array( $term ) ? (int) $term['term_id'] : (int) $term;
 	}
+
+	// 4c) Seed sample blog posts (idempotent — skips any that already exist).
+	bhela_seed_blog_posts( $cat_ids );
 
 	// 5) Primary menu.
 	$menu = wp_get_nav_menu_object( 'BHELA Primary' );
@@ -350,12 +356,132 @@ function bhela_auto_setup() {
 		$locations            = get_theme_mod( 'nav_menu_locations', array() );
 		$locations['primary'] = $menu_id;
 		set_theme_mod( 'nav_menu_locations', $locations );
+	} elseif ( isset( $menu_items['blog'] ) ) {
+		// Menu already exists (upgrade path): make sure ব্লগ is present.
+		$has_blog = false;
+		foreach ( (array) wp_get_nav_menu_items( $menu->term_id ) as $mi ) {
+			if ( (int) $mi->object_id === (int) $menu_items['blog'] ) {
+				$has_blog = true;
+				break;
+			}
+		}
+		if ( ! $has_blog ) {
+			wp_update_nav_menu_item( $menu->term_id, 0, array(
+				'menu-item-object-id' => (int) $menu_items['blog'],
+				'menu-item-object'    => 'page',
+				'menu-item-type'      => 'post_type',
+				'menu-item-status'    => 'publish',
+				'menu-item-title'     => 'ব্লগ',
+			) );
+		}
 	}
 
 	// 6) Flush rewrite rules.
 	flush_rewrite_rules();
 }
 add_action( 'after_switch_theme', 'bhela_auto_setup' );
+
+/**
+ * Re-run provisioning once per released version (covers file-only upgrades where
+ * the theme is not re-activated). Everything in bhela_auto_setup() is idempotent.
+ */
+function bhela_maybe_provision() {
+	if ( ! is_admin() ) {
+		return;
+	}
+	if ( get_option( 'bhela_provisioned_version' ) === BHELA_VERSION ) {
+		return;
+	}
+	bhela_auto_setup();
+	update_option( 'bhela_provisioned_version', BHELA_VERSION );
+}
+add_action( 'admin_init', 'bhela_maybe_provision' );
+
+/**
+ * Seed the sample blog posts (হাওর জার্নাল) so a fresh release ships with
+ * ready-to-read content. Idempotent: any post whose slug already exists is left
+ * untouched. Featured images are copied from bundled theme assets.
+ *
+ * @param array $cat_ids slug => term_id map from bhela_auto_setup().
+ */
+function bhela_seed_blog_posts( $cat_ids ) {
+	$posts = array(
+		array(
+			'slug'  => 'best-time-tanguar-haor',
+			'title' => 'টাঙ্গুয়ার হাওর ভ্রমণের সেরা সময় কখন?',
+			'cat'   => 'travel-guide',
+			'tags'  => array( 'টাঙ্গুয়ার হাওর', 'বর্ষাকাল', 'ভ্রমণ পরিকল্পনা' ),
+			'img'   => 'hero/hero-haor.jpg',
+			'body'  => "<p>টাঙ্গুয়ার হাওরের রূপ ঋতুভেদে সম্পূর্ণ বদলে যায়। কোন সময়ে গেলে কী পাবেন — এক নজরে দেখে নিন।</p>\n<h2>🌧️ বর্ষাকাল (জুন–সেপ্টেম্বর) — সেরা সময়</h2>\n<p>এ সময় পুরো হাওর অথৈ জলরাশিতে পরিণত হয়। জাদুকাটা নদীর স্বচ্ছ জল, নীলাদ্রি লেকের নীল আর মেঘালয়ের পাহাড় — সব সবচেয়ে সুন্দর রূপে ধরা দেয়। হাউসবোট ভ্রমণের জন্য এটিই আদর্শ মৌসুম।</p>\n<h2>🍂 শরৎ–হেমন্ত (অক্টোবর–নভেম্বর)</h2>\n<p>জল কমতে শুরু করে, তবে ভিড় কম থাকে। শান্ত পরিবেশে ঘুরতে চাইলে ভালো বিকল্প।</p>\n<h2>🌕 ফুল মুন ট্রিপ</h2>\n<p>পূর্ণিমার রাতে হাওরের জলে চাঁদের আলো — অনেকের কাছে এটিই হাওর ভ্রমণের সেরা অভিজ্ঞতা। ভেলায় প্রতি পূর্ণিমায় স্পেশাল ট্রিপ থাকে।</p>\n<h2>💡 টিপস</h2>\n<ul>\n<li>Weekday ট্রিপে ২০% পর্যন্ত ছাড় — ভিড়ও কম</li>\n<li>ছুটির দিনের ট্রিপ অন্তত ২–৩ সপ্তাহ আগে বুক করুন</li>\n<li>বর্ষায় রেইনকোট আর গ্রিপযুক্ত জুতা নিতে ভুলবেন না</li>\n</ul>",
+		),
+		array(
+			'slug'  => 'haor-packing-list',
+			'title' => 'হাওর ট্রিপে কী কী নেবেন — সম্পূর্ণ প্যাকিং লিস্ট',
+			'cat'   => 'tips',
+			'tags'  => array( 'প্যাকিং', 'টিপস', 'প্রস্তুতি' ),
+			'img'   => 'boat/rooftop-1.jpg',
+			'body'  => "<p>২ দিন ১ রাতের হাউসবোট ট্রিপে বেশি জিনিস লাগে না — কিন্তু কয়েকটা জিনিস না নিলে ভুগতে হয়। আমাদের অভিজ্ঞতা থেকে সাজানো লিস্ট।</p>\n<h2>📄 অবশ্যই নেবেন</h2>\n<ul>\n<li>NID / জন্মনিবন্ধনের কপি (প্রত্যেক অতিথির)</li>\n<li>প্রয়োজনীয় ওষুধ</li>\n<li>পাওয়ার ব্যাংক (বোটে চার্জিং আছে, তবুও)</li>\n</ul>\n<h2>👕 পোশাক</h2>\n<ul>\n<li>আরামদায়ক সুতির পোশাক ২–৩ সেট</li>\n<li>বর্ষায়: রেইনকোট বা ছাতা</li>\n<li>গ্রিপযুক্ত স্যান্ডেল/জুতা — ঘাট আর টিলায় কাজে দেবে</li>\n</ul>\n<h2>🕶️ রোদ-বৃষ্টির জন্য</h2>\n<ul>\n<li>সানস্ক্রিন, টুপি, সানগ্লাস</li>\n<li>মশা নিরোধক ক্রিম</li>\n</ul>\n<h2>📷 চাইলে</h2>\n<ul>\n<li>ক্যামেরা / ড্রোন (সীমান্ত বিধি মেনে)</li>\n<li>বাইনোকুলার — অতিথি পাখির মৌসুমে দারুণ</li>\n</ul>\n<p>বাকি সব — থাকা, ৬ বেলা খাবার, লাইফ জ্যাকেট, বিশুদ্ধ পানি — ভেলায় অন্তর্ভুক্ত।</p>",
+		),
+		array(
+			'slug'  => 'family-safety-houseboat',
+			'title' => 'পরিবার নিয়ে হাউসবোটে — নিরাপত্তার যত প্রশ্ন',
+			'cat'   => 'travel-guide',
+			'tags'  => array( 'ফ্যামিলি ট্রিপ', 'নিরাপত্তা', 'শিশু' ),
+			'img'   => 'cabins/cabin-3.jpg',
+			'body'  => "<p>\"বাচ্চা নিয়ে হাউসবোটে যাওয়া কি নিরাপদ?\" — এটাই আমাদের সবচেয়ে বেশি শোনা প্রশ্ন। সোজা উত্তর: হ্যাঁ, সঠিক ব্যবস্থা থাকলে।</p>\n<h2>🛟 লাইফ জ্যাকেট ও প্রশিক্ষিত ক্রু</h2>\n<p>ভেলায় প্রতিটি অতিথির জন্য লাইফ জ্যাকেট আছে, শিশুদের সাইজসহ। ক্রুরা প্রশিক্ষিত — বোট চলে নিরাপদ গতিতে, রাতেও।</p>\n<h2>👨‍👩‍👧‍👦 প্রাইভেসি</h2>\n<p>অপরিচিত কারও সাথে কেবিন শেয়ার করতে হয় না — শুধুমাত্র নিজের গ্রুপের মধ্যেই শেয়ারিং। ৬টি ফ্যামিলি কেবিনের প্রতিটিতে Attached Washroom।</p>\n<h2>👶 শিশুদের রেট</h2>\n<ul>\n<li>০–৪ বছর: সম্পূর্ণ ফ্রি</li>\n<li>৪–৮ বছর: ৫০% চার্জ</li>\n<li>৯+ বছর: পূর্ণ রেট</li>\n</ul>\n<h2>🍚 খাবার</h2>\n<p>দেশি খাবার — ভুনা খিচুড়ি, হাওরের তাজা মাছ, দেশি মুরগি। বাচ্চাদের উপযোগী কম-ঝাল ব্যবস্থাও আগে জানালে করা যায়।</p>\n<h2>⚕️ জরুরি অবস্থায়</h2>\n<p>টিম প্রাথমিক চিকিৎসা দিতে পারে; প্রয়োজনে নিকটস্থ স্বাস্থ্যকেন্দ্রে নেওয়ার ব্যবস্থা আছে।</p>",
+		),
+	);
+
+	foreach ( $posts as $p ) {
+		if ( get_page_by_path( $p['slug'], OBJECT, 'post' ) ) {
+			continue; // already seeded
+		}
+		$cat = isset( $cat_ids[ $p['cat'] ] ) ? array( (int) $cat_ids[ $p['cat'] ] ) : array();
+		$pid = wp_insert_post( array(
+			'post_title'    => $p['title'],
+			'post_name'     => $p['slug'],
+			'post_type'     => 'post',
+			'post_status'   => 'publish',
+			'post_content'  => $p['body'],
+			'post_category' => $cat,
+		) );
+		if ( ! $pid || is_wp_error( $pid ) ) {
+			continue;
+		}
+		wp_set_post_tags( $pid, $p['tags'] );
+		bhela_set_seed_thumbnail( $pid, $p['img'] );
+	}
+}
+
+/** Attach a bundled theme image as a post's featured image. */
+function bhela_set_seed_thumbnail( $post_id, $rel ) {
+	if ( has_post_thumbnail( $post_id ) ) {
+		return;
+	}
+	$src = get_template_directory() . '/assets/images/' . $rel;
+	if ( ! file_exists( $src ) ) {
+		return;
+	}
+	if ( ! function_exists( 'wp_generate_attachment_metadata' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+	}
+	$upload = wp_upload_dir();
+	$dest   = trailingslashit( $upload['path'] ) . 'bhela-seed-' . basename( $rel );
+	if ( ! @copy( $src, $dest ) ) {
+		return;
+	}
+	$type = wp_check_filetype( $dest );
+	$att  = wp_insert_attachment( array(
+		'post_mime_type' => $type['type'],
+		'post_title'     => sanitize_file_name( basename( $rel ) ),
+		'post_status'    => 'inherit',
+	), $dest, $post_id );
+	if ( is_wp_error( $att ) || ! $att ) {
+		return;
+	}
+	wp_update_attachment_metadata( $att, wp_generate_attachment_metadata( $att, $dest ) );
+	set_post_thumbnail( $post_id, $att );
+}
 
 /* ---------- Gutenberg content region for page templates ---------- */
 
