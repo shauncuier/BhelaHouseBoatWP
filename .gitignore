@@ -6,6 +6,13 @@
 !index.php
 !README.md
 !BHELA-SETUP-README.md
+!CLAUDE.md
+
+# Allow documentation directory
+!/docs/
+
+# Allow agent skills & rules (so they sync across machines)
+!/.agents/
 
 # Allow custom plugins directory, plugins/index.php, and custom plugin
 !/plugins/
