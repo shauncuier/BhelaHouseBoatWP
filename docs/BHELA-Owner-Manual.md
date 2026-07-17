@@ -113,13 +113,16 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 ## 11. Editing site text & images
 
-**Appearance → Customize** → three BHELA panels:
+**Appearance → Customize** → four BHELA panels:
 
 | Panel | Change |
 |---|---|
-| BHELA Contact | Phone, WhatsApp, email, Facebook, address (site-wide) |
+| BHELA Contact | Phone, WhatsApp, email, Facebook/Instagram/YouTube/TikTok, address (site-wide) |
 | BHELA Homepage | Hero headline, badge, subtitle |
 | BHELA Images | Hero, food, rooftop, cabin, spot photos (blank = defaults) |
+| BHELA Tracking | Google Analytics ID, Facebook Pixel ID, custom header code |
+
+**Tracking setup (one-time):** paste just the **ID** — GA4 Measurement ID (`G-…`) from Google Analytics and the Pixel ID (numbers) from Meta Events Manager. The code is added automatically. Other snippets (site verification, extra pixels) go in **Custom Header Code**. Your own admin visits are never counted.
 
 Cabin names, prices, payment details are in **Bookings → Settings**. Your contact info set there is the source of truth for the whole site (footer, buttons, invoice, emails).
 
