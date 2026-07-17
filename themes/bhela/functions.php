@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.6.8' );
+define( 'BHELA_VERSION', '2.7.0' );
 
 /* ---------- Setup ---------- */
 
@@ -37,6 +37,7 @@ function bhela_setup() {
 add_action( 'after_setup_theme', 'bhela_setup' );
 
 require_once get_template_directory() . '/inc/block-patterns.php';
+require_once get_template_directory() . '/inc/seo.php';
 
 /* ---------- Assets ---------- */
 
@@ -70,8 +71,11 @@ function bhela_contact( $key ) {
 		'phone_2'  => '01614-182769',
 		'whatsapp' => '+8801891562461',
 		'email'    => 'infobhela@gmail.com',
-		'facebook' => 'https://www.facebook.com/',
-		'address'  => 'Anwarpur Ghat, Tahirpur, Sunamganj',
+		'facebook'  => 'https://www.facebook.com/',
+		'instagram' => '',
+		'youtube'   => '',
+		'tiktok'    => '',
+		'address'   => 'Anwarpur Ghat, Tahirpur, Sunamganj',
 	);
 	if ( function_exists( 'bhela_bm_get_settings' ) ) {
 		$s = bhela_bm_get_settings();
@@ -98,12 +102,15 @@ function bhela_page_url( $slug ) {
 function bhela_customize_register( $wp_customize ) {
 	$wp_customize->add_section( 'bhela_contact', array( 'title' => 'BHELA Contact', 'priority' => 30 ) );
 	$fields = array(
-		'phone_1'  => 'Phone 1',
-		'phone_2'  => 'Phone 2',
-		'whatsapp' => 'WhatsApp Number',
-		'email'    => 'Email',
-		'facebook' => 'Facebook URL',
-		'address'  => 'Address',
+		'phone_1'   => 'Phone 1',
+		'phone_2'   => 'Phone 2',
+		'whatsapp'  => 'WhatsApp Number',
+		'email'     => 'Email',
+		'facebook'  => 'Facebook URL',
+		'instagram' => 'Instagram URL',
+		'youtube'   => 'YouTube URL',
+		'tiktok'    => 'TikTok URL',
+		'address'   => 'Address',
 	);
 	foreach ( $fields as $key => $label ) {
 		$wp_customize->add_setting( 'bhela_' . $key, array( 'sanitize_callback' => 'sanitize_text_field' ) );
@@ -184,29 +191,8 @@ function bhela_home_text( $key, $default = '' ) {
 }
 
 /* ---------- Schema ---------- */
-
-function bhela_schema() {
-	if ( ! is_front_page() ) {
-		return;
-	}
-	$schema = array(
-		'@context'    => 'https://schema.org',
-		'@type'       => 'TouristAttraction',
-		'name'        => 'BHELA – The Haor Exclusive',
-		'description' => 'Premium family & group friendly AC houseboat on Tanguar Haor, Sunamganj, Bangladesh. 2 days 1 night all-inclusive packages.',
-		'url'         => home_url( '/' ),
-		'telephone'   => bhela_contact( 'phone_1' ),
-		'email'       => bhela_contact( 'email' ),
-		'address'     => array(
-			'@type'          => 'PostalAddress',
-			'streetAddress'  => 'Anwarpur Ghat, Tahirpur',
-			'addressRegion'  => 'Sunamganj',
-			'addressCountry' => 'BD',
-		),
-	);
-	echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
-}
-add_action( 'wp_head', 'bhela_schema' );
+/* All JSON-LD (Organization, WebSite, LocalBusiness, Breadcrumb, BlogPosting)
+   lives in inc/seo.php as a single connected @graph. */
 
 /* ---------- Cabin data ---------- */
 
@@ -517,32 +503,7 @@ function bhela_reading_time( $post_id = 0 ) {
 }
 
 /** Article JSON-LD on single posts (mirrors bhela_schema()). */
-function bhela_article_schema() {
-	if ( ! is_singular( 'post' ) ) {
-		return;
-	}
-	$post_id = get_queried_object_id();
-	$schema  = array(
-		'@context'         => 'https://schema.org',
-		'@type'            => 'Article',
-		'headline'         => get_the_title( $post_id ),
-		'datePublished'    => get_the_date( 'c', $post_id ),
-		'dateModified'     => get_the_modified_date( 'c', $post_id ),
-		'mainEntityOfPage' => get_permalink( $post_id ),
-		'inLanguage'       => 'bn-BD',
-		'author'           => array( '@type' => 'Organization', 'name' => 'BHELA – The Haor Exclusive' ),
-		'publisher'        => array(
-			'@type' => 'Organization',
-			'name'  => 'BHELA – The Haor Exclusive',
-			'logo'  => array( '@type' => 'ImageObject', 'url' => get_template_directory_uri() . '/assets/images/logo.png' ),
-		),
-	);
-	if ( has_post_thumbnail( $post_id ) ) {
-		$schema['image'] = get_the_post_thumbnail_url( $post_id, 'bhela-wide' );
-	}
-	echo '<script type="application/ld+json">' . wp_json_encode( $schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES ) . '</script>' . "\n";
-}
-add_action( 'wp_head', 'bhela_article_schema' );
+/* Article JSON-LD moved into the @graph in inc/seo.php (BlogPosting node). */
 
 // Comments are intentionally disabled site-wide — the blog funnels readers to
 // WhatsApp/booking instead, and a small operator shouldn't moderate spam.
