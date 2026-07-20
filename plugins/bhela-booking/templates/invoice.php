@@ -122,7 +122,12 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 							<tr>
 								<td><strong><?php echo esc_html( $inv_line['label'] ); ?></strong><br>
 								<span style="font-size:12.5px;color:#5b6b6a"><?php echo esc_html( $inv_line['who'] ); ?></span></td>
-								<td><?php echo esc_html( (int) ( $inv_line['occ'] ?? 0 ) ); ?> জন</td>
+								<?php
+								// Guests = people in the cabin. Older records stored the rate
+								// tier in `occ`, so prefer `people` when it is present.
+								$inv_guests = (int) ( $inv_line['people'] ?? $inv_line['occ'] ?? 0 );
+								?>
+								<td><?php echo esc_html( $inv_guests ); ?> জন</td>
 								<td><?php echo esc_html( isset( $inv_line['rate'] ) ? bhela_bm_money( $inv_line['rate'] ) : '—' ); ?><?php if ( ! empty( $inv_line['c48'] ) ) : ?><br><span style="font-size:12px;color:#5b6b6a">শিশু (৪–৮) ৫০%</span><?php endif; ?></td>
 								<td><?php echo esc_html( bhela_bm_money( (int) ( $inv_line['total'] ?? 0 ) ) ); ?></td>
 							</tr>

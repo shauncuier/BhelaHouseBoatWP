@@ -312,13 +312,17 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 		if ( $c04 ) {
 			$who .= ' + ' . $c04 . ' শিশু(০–৪ ফ্রি)';
 		}
+		// `occ` is what the invoice and emails print as "Guests", so it must be the
+		// people actually in the cabin — the same count the guest saw when booking.
+		// `tier` records which cabin rate was applied (driven by the adults).
 		$lines[] = array(
-			'label'  => sprintf( __( 'কেবিন (%d জন)', 'bhela-booking' ), $tier ),
+			'label'  => sprintf( __( 'কেবিন (%d জন)', 'bhela-booking' ), $occ ),
 			'who'    => $who,
 			'total'  => $line,
-			'rate'   => $rate,   // per-person rate for this cabin's tier (adult-based)
-			'occ'    => $tier,   // cabin tier (adult-based); 4–8 children ride along
-			'people' => $occ,    // actual bodies in the cabin (adults + 4–8 children)
+			'rate'   => $rate,   // per-person rate charged (adult tier rate)
+			'occ'    => $occ,    // bodies in the cabin (adults + 4–8 children)
+			'people' => $occ,
+			'tier'   => $tier,   // cabin rate tier = adults in this cabin
 			'adults' => $adults,
 			'c48'    => $c48,
 		);
