@@ -68,7 +68,7 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 |---|---|
 | On-page SEO | Meta descriptions, Open Graph, Twitter cards, canonicals, Bangla language signals |
 | Structured data | JSON-LD graph: Organization, Website, LocalBusiness, TouristAttraction, Breadcrumbs, Articles, FAQ, aggregate rating |
-| Search visibility | XML sitemap and robots.txt ready for Google Search Console |
+| Search visibility | XML sitemap and robots.txt configured, Google Search Console set up and sitemap submitted |
 | Speed optimisation | Theme image payload reduced ~74%, font preconnect, lazy loading, layout-shift protection |
 | Lean codebase | Single stylesheet, no jQuery, no page-builder bloat |
 | Content blog | Categories, tags, related posts, reading time, booking CTA per article |
@@ -76,7 +76,7 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 ### 2.5 Analytics, Custom Code & Security
 | Capability | What it does |
 |---|---|
-| Analytics ready | GA4 and Meta Pixel by ID only; owner's admin visits excluded from stats |
+| Analytics installed | Google Analytics 4 set up and live; Meta Pixel by ID only; owner's admin visits excluded from stats |
 | Custom code panel | Inject code into head, after `<body>`, or footer — no theme file editing |
 | Form protection | Honeypot field and per-visitor rate limiting stop spam |
 | Request verification | Security tokens and capability checks on all form and admin actions |
@@ -107,7 +107,8 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 - **Owner's Manual** — plain-language, Bangla-friendly operating guide
 - **Project overview documentation**
 - **Production go-live checklist** — caching, HTTPS, email deliverability, Search Console, Google Business Profile
-- **All passwords and login credentials** — WordPress administrator account, hosting control panel, domain registrar, database and any service accounts created for this project, handed over in full
+- **Google Analytics 4 and Google Search Console** — both accounts created, verified and connected to the website, with the sitemap submitted to Google
+- **All passwords and login credentials** — WordPress administrator account, hosting control panel, domain registrar, database, Google Analytics, Search Console and any service accounts created for this project, handed over in full
 - **Full ownership** — client owns delivered code and all site data, no licence fee, no lock-in, no booking commission
 
 > **Credentials handover.** The client receives every username and password associated with the project. 3s-Soft retains no exclusive access, and the client can transfer the site to any other developer or host at any time.
@@ -121,12 +122,30 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 | Description | Amount |
 |---|---|
 | Design, development and delivery of the BHELA custom WordPress booking platform (theme and booking engine), including deployment support and one month of free service per section 6 | USD 200.00 |
-| Domain setup, hosting setup and WordPress installation and configuration | **No charge** |
+| Domain setup, hosting setup, WordPress installation and configuration, plus Google Analytics and Google Search Console setup — see 5.1 | **No charge** |
 | **Total project price** | **USD 200.00** |
 
 **Total project price: USD 200.00 (Two Hundred US Dollars).** Inclusive of everything in sections 2 and 4, and of the one month free service period in section 6.
 
-> **Provided free of charge.** Domain setup, hosting setup and the WordPress installation and configuration were carried out by 3s-Soft at no cost to the client and are not included in the price above. Only the design and development of the custom platform has been charged. Any third-party fees payable directly to providers (domain registration, hosting plan, SMS credits) remain the client's own cost.
+### 5.1 Additional Services Provided Free of Charge
+
+Carried out by 3s-Soft at no cost. **Not** included in the price above; listed at standard market value so the client can see the full scope delivered.
+
+| Provided free of charge | Standard value |
+|---|---|
+| Domain setup and DNS configuration | USD 15.00 |
+| Hosting setup and site deployment | USD 25.00 |
+| WordPress installation and full configuration | USD 35.00 |
+| Google Analytics 4 setup and verification | USD 20.00 |
+| Google Search Console setup and sitemap submission | USD 20.00 |
+| One month service and support period (section 6) | USD 50.00 |
+| **Total value received free** | **USD 165.00** |
+
+| Total value delivered | Amount charged | Client receives free |
+|---|---|---|
+| **USD 365.00** | **USD 200.00** | **USD 165.00** |
+
+Any third-party fees payable directly to providers — domain registration, hosting plan and SMS credits — remain the client's own cost and are not part of this document.
 
 ---
 

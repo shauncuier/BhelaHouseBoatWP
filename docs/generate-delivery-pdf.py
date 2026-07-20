@@ -287,7 +287,7 @@ st.append(Paragraph('2.4&nbsp;&nbsp;Search Engine Optimisation &amp; Performance
 st.append(feature_table([
     ('On-page SEO', 'Per-page meta descriptions, Open Graph and Twitter cards, canonical URLs and correct Bangla language signals.'),
     ('Structured data', 'A connected JSON-LD graph - Organization, Website, Local Business, Tourist Attraction, Breadcrumbs, Articles, FAQ and aggregate guest rating.'),
-    ('Search visibility', 'XML sitemap and robots.txt configured and ready for Google Search Console submission.'),
+    ('Search visibility', 'XML sitemap and robots.txt configured, with Google Search Console set up and the sitemap submitted.'),
     ('Speed optimisation', 'Theme image payload reduced by approximately 74%, font preconnect, lazy loading and layout-shift protection.'),
     ('Lean codebase', 'Single stylesheet, no jQuery and no page-builder bloat - fast by construction on mobile networks.'),
     ('Content blog', 'A ready travel blog with categories, tags, related posts, reading time and a booking call-to-action on every article.'),
@@ -330,7 +330,8 @@ st.extend(bullets([
     '<b>Owner\'s Manual</b> - a plain-language, Bangla-friendly guide covering every day-to-day task: bookings, invoices, rates, availability, blog, email, SMS, analytics and settings.',
     '<b>Project overview documentation</b> describing the platform, its value and its architecture.',
     '<b>Production go-live checklist</b> covering caching, HTTPS, email deliverability, Search Console and Google Business Profile.',
-    '<b>All passwords and login credentials</b> - WordPress administrator account, hosting control panel, domain registrar, database and any service accounts created for this project are handed over to the client in full.',
+    '<b>Google Analytics 4 and Google Search Console</b> - both accounts created, verified and connected to the website, with the sitemap submitted to Google.',
+    '<b>All passwords and login credentials</b> - WordPress administrator account, hosting control panel, domain registrar, database, Google Analytics, Search Console and any service accounts created for this project are handed over to the client in full.',
     '<b>Full ownership</b> - the client owns the delivered code and all site data outright, with no licence fee, no lock-in and no commission on bookings.',
 ]))
 st.append(Spacer(1, 2*mm))
@@ -354,7 +355,8 @@ pt = Table([
                '(theme and booking engine), including deployment support and one month of free '
                'service as set out in section 6.', S['cell']),
      Paragraph('USD 200.00', S['cellb'])],
-    [Paragraph('Domain setup, hosting setup and WordPress installation and configuration.', S['cell']),
+    [Paragraph('Domain setup, hosting setup, WordPress installation and configuration, plus '
+               'Google Analytics and Google Search Console setup - see section 5.1.', S['cell']),
      Paragraph('<font color="#137A74">No charge</font>', S['cellb'])],
     [Paragraph('<b>Total project price</b>', S['cellb']),
      Paragraph('<b>USD 200.00</b>', S['cellb'])],
@@ -380,13 +382,69 @@ st.append(KeepTogether([
     para('<b>Total project price: %s (Two Hundred US Dollars).</b> The price is inclusive of '
          'everything listed in sections 2 and 4 of this document, and of the one month free '
          'service period described in section 6.' % PRICE),
-    Spacer(1, 2*mm),
-    callout('<b>Provided free of charge.</b> Domain setup, hosting setup and the WordPress '
-            'installation and configuration were carried out by 3s-Soft at no cost to the client '
-            'and are not included in the price above. Only the design and development of the '
-            'custom platform has been charged. Any third-party fees payable directly to providers '
-            '(domain registration, hosting plan, SMS credits) remain the client\'s own cost.',
-            colors.HexColor('#EAF3F2'), PRIMARY),
+]))
+
+# ---- 5.1 free-of-charge value ----
+free_rows = [
+    ('Domain setup and DNS configuration', 'USD 15.00'),
+    ('Hosting setup and site deployment', 'USD 25.00'),
+    ('WordPress installation and full configuration', 'USD 35.00'),
+    ('Google Analytics 4 setup and verification', 'USD 20.00'),
+    ('Google Search Console setup and sitemap submission', 'USD 20.00'),
+    ('One month service and support period (section 6)', 'USD 50.00'),
+]
+fdata = [[Paragraph('<b>Provided free of charge</b>', S['cellw']),
+          Paragraph('<b>Standard value</b>', S['cellw'])]]
+for a, b in free_rows:
+    fdata.append([Paragraph(a, S['cell']), Paragraph('<font color="#5E7472">%s</font>' % b, S['cell'])])
+fdata.append([Paragraph('<b>Total value received free</b>', S['cellb']),
+              Paragraph('<b><font color="#137A74">USD 165.00</font></b>', S['cellb'])])
+ft = Table(fdata, colWidths=[128*mm, 40*mm])
+ft.setStyle(TableStyle([
+    ('BACKGROUND', (0, 0), (-1, 0), PRIMARY),
+    ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#EAF3F2')),
+    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ('ALIGN', (1, 0), (1, -1), 'RIGHT'),
+    ('TOPPADDING', (0, 0), (-1, -1), 5.5),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 5.5),
+    ('LEFTPADDING', (0, 0), (-1, -1), 7),
+    ('RIGHTPADDING', (0, 0), (-1, -1), 7),
+    ('BOX', (0, 0), (-1, -1), 0.5, LINE),
+    ('LINEBELOW', (0, 1), (-1, -2), 0.4, LINE),
+    ('LINEABOVE', (0, -1), (-1, -1), 0.9, PRIMARY),
+]))
+
+summary = Table([
+    [Paragraph('<font color="#5E7472" size=8>TOTAL VALUE DELIVERED</font><br/>'
+               '<b><font size=13 color="#0A2A2F">USD 365.00</font></b>', S['cell']),
+     Paragraph('<font color="#5E7472" size=8>AMOUNT CHARGED</font><br/>'
+               '<b><font size=13 color="#0A2A2F">USD 200.00</font></b>', S['cell']),
+     Paragraph('<font color="#5E7472" size=8>CLIENT RECEIVES FREE</font><br/>'
+               '<b><font size=13 color="#137A74">USD 165.00</font></b>', S['cell'])],
+], colWidths=[56*mm, 56*mm, 56*mm])
+summary.setStyle(TableStyle([
+    ('BACKGROUND', (0, 0), (-1, -1), SAND),
+    ('BOX', (0, 0), (-1, -1), 0.5, LINE),
+    ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.white),
+    ('TOPPADDING', (0, 0), (-1, -1), 8),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+    ('LEFTPADDING', (0, 0), (-1, -1), 9),
+    ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+]))
+
+st.append(Spacer(1, 6*mm))
+st.append(KeepTogether([
+    Paragraph('5.1&nbsp;&nbsp;Additional Services Provided Free of Charge', S['h2']),
+    para('The following work was carried out by 3s-Soft at no cost to the client. It is <b>not</b> '
+         'included in the price above and is listed here at its standard market value so the client '
+         'can see the full scope of what has been delivered.'),
+    ft,
+    Spacer(1, 4*mm),
+    summary,
+    Spacer(1, 3*mm),
+    para('Any third-party fees payable directly to providers - domain registration, hosting plan '
+         'and SMS credits - remain the client\'s own cost and are not part of this document.',
+         'small'),
 ]))
 
 st.append(PageBreak())
