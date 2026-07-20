@@ -1,7 +1,11 @@
-# BHELA — The Haor Exclusive · Project Overview
+# BHELA — The Haor Exclusive · Client Documentation
 
-> Client-facing overview of the BHELA houseboat booking platform.
+> Client-facing documentation site for the BHELA houseboat booking platform.
 > **Live page:** enable GitHub Pages on this branch → the site renders from `index.html`.
+
+**Pages**
+- `index.html` — **Overview**: project overview, what the client receives, business value, and why a custom theme + booking engine (vs templates/SaaS).
+- `manual.html` — **Owner's Manual**: plain-language, Bangla-friendly guide to running the site day to day (bookings, invoices, rates, availability, blog, email/SMS, settings).
 
 BHELA – The Haor Exclusive is a **custom WordPress booking platform** for a premium
 houseboat operating on Tanguar Haor, Sunamganj, Bangladesh. It is built from two

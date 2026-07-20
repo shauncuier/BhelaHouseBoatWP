@@ -125,18 +125,43 @@ footer{background:var(--ink);color:#9FBFBC;padding:2.5rem 0;text-align:center;fo
 footer a{color:var(--aqua)}
 footer .tag{font-family:var(--font-display);color:var(--gold);font-size:1.05rem;margin-bottom:.6rem;display:block}
 
+/* Top nav */
+.topbar{position:sticky;top:0;z-index:60;background:rgba(10,42,47,.96);
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border-bottom:1px solid rgba(255,255,255,.1)}
+.topbar__in{display:flex;align-items:center;justify-content:space-between;gap:1rem;
+  padding:.65rem 0;flex-wrap:wrap}
+.topbar .brand{color:#fff;font-family:var(--font-display);font-weight:600;font-size:1.05rem;
+  letter-spacing:.03em}
+.topbar .brand span{color:var(--aqua);font-size:.66rem;letter-spacing:.16em;
+  text-transform:uppercase;display:block;line-height:1}
+.topbar nav{display:flex;gap:1.1rem;align-items:center}
+.topbar nav a{color:#CFE3E1;font-weight:600;font-size:.9rem}
+.topbar nav a:hover{color:var(--aqua)}
+.topbar nav a.on{color:#fff;border-bottom:2px solid var(--cta);padding-bottom:2px}
+
 /* Theme toggle */
-.toggle{position:fixed;top:1rem;right:1rem;z-index:50;background:rgba(255,255,255,.12);
-  border:1px solid rgba(255,255,255,.25);color:#fff;width:42px;height:42px;border-radius:50%;
-  cursor:pointer;font-size:1.1rem;display:grid;place-items:center;backdrop-filter:blur(8px)}
-:root[data-theme="light"] .toggle{background:rgba(10,42,47,.08);border-color:var(--line);color:var(--ink)}
+.toggle{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;
+  width:38px;height:38px;border-radius:50%;cursor:pointer;font-size:1rem;display:grid;
+  place-items:center}
+:root[data-theme="light"] .topbar{background:rgba(10,42,47,.96)}
 
 .mt-tight{margin-top:.4rem}
 .muted{color:var(--text-soft)}
 </style>
 </head>
 <body>
-<button class="toggle" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);r.setAttribute('data-theme',d?'light':'dark');})()" aria-label="Toggle theme">◐</button>
+<div class="topbar">
+  <div class="wrap topbar__in">
+    <a class="brand" href="index.html">BHELA<span>Client Documentation</span></a>
+    <nav>
+      <a class="on" href="index.html">Overview</a>
+      <a href="manual.html">Owner’s Manual</a>
+      <a href="https://github.com/shauncuier/BhelaHouseBoatWP">GitHub</a>
+      <button class="toggle" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);r.setAttribute('data-theme',d?'light':'dark');})()" aria-label="Toggle theme">◐</button>
+    </nav>
+  </div>
+</div>
 
 <header class="hero">
   <div class="wrap">

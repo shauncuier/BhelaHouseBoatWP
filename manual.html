@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BHELA Website — Owner's Manual</title>
+
+<style>
+  :root{
+    --ink:#0A2A2F; --ink2:#0E3B41; --primary:#137A74; --aqua:#6FC7BF;
+    --cta:#FF7A3D; --cta-dark:#E5601F; --gold:#F5C97B; --sand:#F4EDE1;
+    --cream:#FBF8F2; --white:#fff;
+    --bg:#FBF8F2; --surface:#ffffff; --panel:#F4EDE1;
+    --text:#22403E; --soft:#5E7472; --head:#0A2A2F;
+    --line:rgba(10,42,47,.12); --line-soft:rgba(10,42,47,.07);
+    --shadow:0 14px 40px rgba(10,42,47,.10);
+    --serif:Georgia,'Noto Serif Bengali','Hind Siliguri',serif;
+    --sans:system-ui,-apple-system,'Segoe UI','Noto Sans Bengali','Hind Siliguri',sans-serif;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+    --maxw:themed;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#081E22; --surface:#0E2E33; --panel:#0C272C;
+      --text:#DCEBE9; --soft:#9FBDB9; --head:#F3F7F5;
+      --line:rgba(220,235,233,.15); --line-soft:rgba(220,235,233,.08);
+      --shadow:0 14px 40px rgba(0,0,0,.4);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#081E22; --surface:#0E2E33; --panel:#0C272C;
+    --text:#DCEBE9; --soft:#9FBDB9; --head:#F3F7F5;
+    --line:rgba(220,235,233,.15); --line-soft:rgba(220,235,233,.08);
+    --shadow:0 14px 40px rgba(0,0,0,.4);
+  }
+  :root[data-theme="light"]{
+    --bg:#FBF8F2; --surface:#ffffff; --panel:#F4EDE1;
+    --text:#22403E; --soft:#5E7472; --head:#0A2A2F;
+    --line:rgba(10,42,47,.12); --line-soft:rgba(10,42,47,.07);
+    --shadow:0 14px 40px rgba(10,42,47,.10);
+  }
+
+  *{box-sizing:border-box}
+  .doc{background:var(--bg);color:var(--text);font-family:var(--sans);line-height:1.7;
+    font-size:16px;padding:0 0 5rem;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:820px;margin:0 auto;padding:0 1.4rem}
+  .doc h1,.doc h2,.doc h3,.doc h4{font-family:var(--serif);color:var(--head);
+    line-height:1.25;text-wrap:balance;font-weight:600}
+  .doc a{color:var(--primary);text-decoration:none;border-bottom:1px solid transparent}
+  .doc a:hover{border-bottom-color:currentColor}
+  .doc code{font-family:var(--mono);font-size:.86em;background:var(--panel);
+    padding:.12em .45em;border-radius:6px;color:var(--head);border:1px solid var(--line-soft)}
+  :focus-visible{outline:3px solid var(--cta);outline-offset:3px;border-radius:6px}
+
+  /* Masthead */
+  .mast{background:linear-gradient(155deg,var(--ink) 0%,var(--ink2) 70%,var(--primary) 150%);
+    color:#fff;padding:3.4rem 0 2.6rem;position:relative;overflow:hidden}
+  .mast::after{content:"🛶";position:absolute;right:-.5rem;bottom:-2rem;font-size:9rem;opacity:.10}
+  .mast .wrap{position:relative}
+  .kicker{display:inline-flex;align-items:center;gap:.5rem;font-size:.72rem;font-weight:700;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--aqua);
+    border:1px solid rgba(111,199,191,.4);background:rgba(111,199,191,.12);
+    padding:.4rem .9rem;border-radius:999px;margin-bottom:1.3rem}
+  .mast h1{color:#fff;font-size:clamp(2rem,5vw,3rem);margin:.2rem 0 .6rem}
+  .mast p{color:var(--aqua);max-width:46ch;font-size:1.05rem;margin:0}
+  .mast .meta{margin-top:1.5rem;display:flex;flex-wrap:wrap;gap:.5rem}
+  .badge{font-size:.75rem;font-weight:600;color:#DCEBE9;background:rgba(220,235,233,.1);
+    border:1px solid rgba(220,235,233,.18);padding:.32rem .8rem;border-radius:999px}
+
+  /* TOC */
+  .toc{background:var(--surface);border:1px solid var(--line);border-radius:16px;
+    padding:1.4rem 1.6rem;margin:2.2rem auto;box-shadow:var(--shadow);max-width:820px}
+  .toc h2{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);
+    font-family:var(--sans);font-weight:700;margin:0 0 1rem}
+  .toc ol{list-style:none;margin:0;padding:0;counter-reset:toc;
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:.5rem 1.4rem}
+  .toc li{counter-increment:toc;position:relative;padding-left:2rem;font-size:.95rem;line-height:1.5}
+  .toc li::before{content:counter(toc,decimal-leading-zero);position:absolute;left:0;top:.05rem;
+    font-family:var(--mono);font-size:.78rem;color:var(--primary);font-weight:700}
+
+  /* Sections */
+  section{padding-top:2.6rem}
+  section > .wrap > h2{font-size:1.7rem;margin:0 0 .3rem;padding-top:1.4rem;
+    border-top:2px solid var(--line-soft);display:flex;align-items:baseline;gap:.7rem}
+  .secnum{font-family:var(--mono);font-size:.9rem;color:var(--cta);font-weight:700;flex:none}
+  .lede{color:var(--soft);font-size:1.05rem;margin:.4rem 0 1.4rem;max-width:62ch}
+  .doc h3{font-size:1.2rem;margin:1.8rem 0 .5rem}
+  .doc p{margin:.6rem 0;max-width:68ch}
+  .doc ul,.doc ol{margin:.6rem 0;padding-left:1.3rem;max-width:66ch}
+  .doc li{margin:.35rem 0}
+  .path{font-family:var(--mono);font-size:.82rem;background:var(--panel);color:var(--head);
+    border:1px solid var(--line);border-radius:8px;padding:.3rem .7rem;display:inline-block;
+    white-space:nowrap;max-width:100%;overflow-x:auto;vertical-align:middle}
+
+  /* Cards + callouts */
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:1.2rem 1.4rem;margin:1.2rem 0;box-shadow:var(--shadow)}
+  .callout{border-radius:12px;padding:1rem 1.2rem;margin:1.2rem 0;border:1px solid var(--line);
+    display:flex;gap:.8rem;align-items:flex-start;background:var(--surface)}
+  .callout .ic{flex:none;font-size:1.2rem;line-height:1.5}
+  .callout p{margin:.15rem 0}
+  .callout--tip{background:rgba(19,122,116,.08);border-color:rgba(19,122,116,.3)}
+  .callout--warn{background:rgba(255,122,61,.09);border-color:rgba(255,122,61,.35)}
+  .callout--key{background:rgba(245,201,123,.14);border-color:rgba(245,201,123,.5)}
+  .callout strong{color:var(--head)}
+
+  /* Tables */
+  .tbl-wrap{overflow-x:auto;margin:1.2rem 0;border:1px solid var(--line);border-radius:12px}
+  table{width:100%;border-collapse:collapse;font-size:.92rem;min-width:460px}
+  th,td{text-align:left;padding:.7rem .9rem;border-bottom:1px solid var(--line-soft);vertical-align:top}
+  thead th{background:var(--panel);color:var(--head);font-family:var(--sans);font-weight:700;
+    font-size:.78rem;letter-spacing:.03em;text-transform:uppercase}
+  tbody tr:last-child td{border-bottom:0}
+  td code{white-space:nowrap}
+
+  /* Status chips (match real admin colors) */
+  .chip{display:inline-block;font-size:.78rem;font-weight:700;padding:.18rem .7rem;border-radius:999px;
+    white-space:nowrap}
+  .chip.pending{background:rgba(153,104,0,.14);color:#7a5410}
+  .chip.advance{background:rgba(14,110,107,.14);color:#0b5450}
+  .chip.confirmed{background:rgba(26,127,55,.14);color:#1a6f30}
+  .chip.completed{background:rgba(85,93,102,.16);color:#4a4f57}
+  .chip.cancelled{background:rgba(179,45,46,.13);color:#992d2d}
+  @media (prefers-color-scheme:dark){
+    .chip.pending{color:#f0c56b} .chip.advance{color:#6fc7bf} .chip.confirmed{color:#7fd694}
+    .chip.completed{color:#b7c2c0} .chip.cancelled{color:#f0a0a0}
+  }
+  :root[data-theme="dark"] .chip.pending{color:#f0c56b}
+  :root[data-theme="dark"] .chip.advance{color:#6fc7bf}
+  :root[data-theme="dark"] .chip.confirmed{color:#7fd694}
+  :root[data-theme="dark"] .chip.completed{color:#b7c2c0}
+  :root[data-theme="dark"] .chip.cancelled{color:#f0a0a0}
+  :root[data-theme="light"] .chip.pending{color:#7a5410}
+  :root[data-theme="light"] .chip.confirmed{color:#1a6f30}
+
+  /* Steps */
+  .steps{counter-reset:step;list-style:none;padding:0;margin:1.2rem 0}
+  .steps li{counter-increment:step;position:relative;padding:.2rem 0 1.1rem 3rem;margin:0}
+  .steps li::before{content:counter(step);position:absolute;left:0;top:0;width:2rem;height:2rem;
+    background:var(--primary);color:#fff;border-radius:9px;font-family:var(--serif);font-weight:700;
+    display:flex;align-items:center;justify-content:center;font-size:.95rem}
+  .steps li:not(:last-child)::after{content:"";position:absolute;left:1rem;top:2.2rem;bottom:.2rem;
+    width:2px;background:var(--line)}
+  .steps strong{color:var(--head)}
+
+  footer.foot{margin-top:3.5rem;padding-top:1.6rem;border-top:1px solid var(--line);
+    color:var(--soft);font-size:.9rem}
+  .foot .tag{font-family:var(--serif);color:var(--primary);font-style:italic}
+  hr.soft{border:0;border-top:1px solid var(--line-soft);margin:2rem 0}
+
+/* Client-docs top nav */
+.topbar{position:sticky;top:0;z-index:60;background:rgba(10,42,47,.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.1)}
+.topbar__in{max-width:920px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.65rem clamp(1rem,4vw,2rem);flex-wrap:wrap}
+.topbar .brand{color:#fff;font-family:var(--serif);font-weight:600;font-size:1.05rem;letter-spacing:.03em;text-decoration:none}
+.topbar .brand span{color:var(--aqua);font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;display:block;line-height:1}
+.topbar nav{display:flex;gap:1.1rem;align-items:center}
+.topbar nav a{color:#CFE3E1;font-weight:600;font-size:.9rem;text-decoration:none}
+.topbar nav a:hover{color:var(--aqua)}
+.topbar nav a.on{color:#fff;border-bottom:2px solid var(--cta);padding-bottom:2px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <div class="topbar__in">
+    <a class="brand" href="index.html">BHELA<span>Client Documentation</span></a>
+    <nav>
+      <a href="index.html">Overview</a>
+      <a class="on" href="manual.html">Owner’s Manual</a>
+      <a href="https://github.com/shauncuier/BhelaHouseBoatWP">GitHub</a>
+    </nav>
+  </div>
+</div>
+<div class="doc">
+
+  <header class="mast">
+    <div class="wrap">
+      <span class="kicker">🛶 BHELA — The Haor Exclusive</span>
+      <h1>Website Owner's Manual</h1>
+      <p>ভেলা হাউসবোট ওয়েবসাইট চালানোর সম্পূর্ণ গাইড — বুকিং, ইনভয়েস, রেট, ব্লগ ও সেটিংস।</p>
+      <div class="meta">
+        <span class="badge">For the site owner / admin</span>
+        <span class="badge">No coding needed</span>
+        <span class="badge">Updated July 2026</span>
+      </div>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Contents">
+    <h2>What's inside</h2>
+    <ol>
+      <li><a href="#login">Logging in</a></li>
+      <li><a href="#bookings">Managing bookings</a></li>
+      <li><a href="#status">Booking status &amp; notifications</a></li>
+      <li><a href="#calendar">Trip calendar &amp; cabin availability</a></li>
+      <li><a href="#invoice">Invoices</a></li>
+      <li><a href="#rates">Cabin rates &amp; pricing days</a></li>
+      <li><a href="#email">Email notifications</a></li>
+      <li><a href="#sms">SMS notifications</a></li>
+      <li><a href="#reviews">Guest reviews</a></li>
+      <li><a href="#blog">Blog (হাওর জার্নাল)</a></li>
+      <li><a href="#content">Editing site text &amp; images</a></li>
+      <li><a href="#trouble">Troubleshooting</a></li>
+    </ol>
+  </nav>
+
+  <main>
+
+  <section id="login">
+    <div class="wrap">
+      <h2><span class="secnum">01</span> Logging in</h2>
+      <p class="lede">Everything is managed from the WordPress dashboard — the control panel behind your website.</p>
+      <ol class="steps">
+        <li>Open <span class="path">yourdomain.com/wp-admin</span> in your browser.</li>
+        <li>Enter your <strong>username and password</strong>. (Keep these private — anyone with them can change the site.)</li>
+        <li>You land on the <strong>Dashboard</strong>. On the left is the menu you'll use for everything below.</li>
+      </ol>
+      <div class="callout callout--tip"><span class="ic">💡</span><div>
+        <p>The one menu you'll use most is <strong>🛶 Bookings</strong>. It holds bookings, the trip calendar, reviews, and all settings.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="bookings">
+    <div class="wrap">
+      <h2><span class="secnum">02</span> Managing bookings</h2>
+      <p class="lede">Every booking request from the website is saved automatically. You never lose a lead.</p>
+      <p>Go to <span class="path">Bookings → All Bookings</span>. Each row is one request, showing the guest name, invoice number, travel date, and status. Click a booking to open it.</p>
+      <h3>Inside a booking you can:</h3>
+      <ul>
+        <li>See the guest's <strong>name, phone, email, travel date, cabins, guests, and price</strong>.</li>
+        <li>Record <strong>how much they've paid</strong> and the payment method / transaction ID.</li>
+        <li>Change the <strong>status</strong> as the booking progresses (next section).</li>
+        <li>Open the guest's <strong>invoice</strong>.</li>
+      </ul>
+      <div class="callout callout--tip"><span class="ic">➕</span><div>
+        <p>You can also add a booking yourself (phone/walk-in guests): <span class="path">Bookings → Add New Booking</span>.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="status">
+    <div class="wrap">
+      <h2><span class="secnum">03</span> Booking status &amp; notifications</h2>
+      <p class="lede">The status tells everyone where a booking stands. Changing it can automatically message the guest.</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Status</th><th>Meaning — use it when…</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip pending">Pending</span></td><td>A new request just came in. Nothing paid yet.</td></tr>
+          <tr><td><span class="chip advance">Advance Paid</span></td><td>Guest paid the 50% advance. Seat held.</td></tr>
+          <tr><td><span class="chip confirmed">Confirmed</span></td><td>Booking is locked in. This sends the guest a confirmation.</td></tr>
+          <tr><td><span class="chip completed">Completed</span></td><td>Trip is over.</td></tr>
+          <tr><td><span class="chip cancelled">Cancelled</span></td><td>Booking was called off.</td></tr>
+        </tbody>
+      </table></div>
+      <h3>What happens automatically</h3>
+      <ul>
+        <li>When you set a booking to <span class="chip confirmed">Confirmed</span>, the guest gets a <strong>confirmation email</strong> (if they gave an email).</li>
+        <li>If <strong>SMS is turned on</strong>, changing the status also <strong>texts the guest</strong> the new status.</li>
+        <li>You (the owner) get an email + SMS the moment <strong>any new booking</strong> arrives.</li>
+      </ul>
+      <div class="callout callout--tip"><span class="ic">✅</span><div>
+        <p>You control exactly which of these fire — see <a href="#email">Email notifications</a> and <a href="#sms">SMS notifications</a>.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="calendar">
+    <div class="wrap">
+      <h2><span class="secnum">04</span> Trip calendar &amp; cabin availability</h2>
+      <p class="lede">Set your departure dates and how many of the 6 cabins are already booked — the website updates itself.</p>
+      <p>Go to <span class="path">Bookings → Trip Calendar</span>. Each row is one departure. For every trip you set:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Column</th><th>What to put</th></tr></thead>
+        <tbody>
+          <tr><td>Start Date</td><td>The trip's departure date.</td></tr>
+          <tr><td>Display Label</td><td>How it reads on the site, e.g. <code>7 – 8 Aug 2026</code>.</td></tr>
+          <tr><td>Days</td><td>Bangla day names, e.g. <code>শুক্র – শনি</code>.</td></tr>
+          <tr><td>Status</td><td>Available / Filling Fast / Booked.</td></tr>
+          <tr><td><strong>Booked Cabins</strong></td><td>How many of the 6 cabins are already taken (0–6).</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout callout--key"><span class="ic">🛏️</span><div>
+        <p><strong>How availability works:</strong> if you set <em>Booked Cabins = 4</em>, the site shows "<strong>২টি কেবিন খালি</strong>" and won't let anyone book more than 2 cabins for that date. Set it to <strong>6</strong> and the date shows <strong>Full Booked</strong> automatically.</p>
+      </div></div>
+      <p>Under each row you'll see a small hint like "বুকিং থেকে: 3" — that's how many cabins your <em>real confirmed bookings</em> use for that date, so you can double-check your number.</p>
+    </div>
+  </section>
+
+  <section id="invoice">
+    <div class="wrap">
+      <h2><span class="secnum">05</span> Invoices</h2>
+      <p class="lede">Every booking has a branded invoice with a private link — safe to send to the guest.</p>
+      <ul>
+        <li>Open a booking → the invoice link is on the edit screen (and inside the confirmation email).</li>
+        <li>The invoice shows each cabin, the <strong>per-person rate</strong>, guests, total, advance, paid, and due.</li>
+        <li>Payment details (bKash, Nagad, bank, QR images) come from your Settings and appear on the invoice.</li>
+      </ul>
+      <div class="callout callout--tip"><span class="ic">🔒</span><div>
+        <p>Each invoice link has a private key, so only someone with the link can open it. It's safe to share on WhatsApp or email.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="rates">
+    <div class="wrap">
+      <h2><span class="secnum">06</span> Cabin rates &amp; pricing days</h2>
+      <p class="lede">Change prices, weekend days, and holidays yourself — no developer needed.</p>
+      <p>All in <span class="path">Bookings → Settings</span>:</p>
+      <h3>Cabin Rates</h3>
+      <p>Each cabin has a <strong>Regular/Holiday</strong> rate and a cheaper <strong>Weekday</strong> rate, per person. Edit the numbers and Save.</p>
+      <h3>Pricing Days</h3>
+      <ul>
+        <li><strong>Weekend Days</strong> — tick which days charge the Regular rate (default: Friday, Saturday).</li>
+        <li><strong>Holidays</strong> — one date per line (<code>YYYY-MM-DD</code>). These charge the Regular rate too.</li>
+        <li>Every other day automatically uses the discounted Weekday rate.</li>
+      </ul>
+      <div class="callout callout--warn"><span class="ic">⚠️</span><div>
+        <p>Children: <strong>0–4 years free</strong>, <strong>4–8 years pay 50%</strong>, <strong>9+ full rate</strong> — this is built in and applied automatically.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="email">
+    <div class="wrap">
+      <h2><span class="secnum">07</span> Email notifications</h2>
+      <p class="lede">Control which booking emails go out, and where your own alerts land.</p>
+      <p>In <span class="path">Bookings → Settings → 📧 Email Notifications</span>:</p>
+      <ul>
+        <li><strong>Enable emails</strong> — the master on/off switch.</li>
+        <li>Turn on/off each type: <em>new booking → you</em>, <em>new booking → customer</em>, <em>confirmed → customer</em>.</li>
+        <li><strong>Owner notification email</strong> — where your new-booking alerts go (blank = your business email).</li>
+        <li><strong>From name</strong> and <strong>Reply-To</strong> — how your emails appear to guests.</li>
+        <li><strong>Send Test Email</strong> — check it works right now.</li>
+      </ul>
+      <div class="callout callout--tip"><span class="ic">📮</span><div>
+        <p>Email delivery is handled by <strong>FluentSMTP</strong> (already set up). If emails ever stop, that's the plugin to check first.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="sms">
+    <div class="wrap">
+      <h2><span class="secnum">08</span> SMS notifications</h2>
+      <p class="lede">Optional — text the guest and yourself automatically. Works with any Bangladesh SMS gateway.</p>
+      <p>In <span class="path">Bookings → Settings → 📱 SMS Notifications</span>. It's <strong>off by default</strong>. To switch it on:</p>
+      <ol class="steps">
+        <li>Buy an SMS package from a gateway (e.g. <strong>BulkSMSBD</strong>) and get your <strong>API key</strong> + <strong>Sender ID</strong>.</li>
+        <li>Tick <strong>Enable SMS</strong>, choose <strong>BulkSMSBD</strong> as the gateway.</li>
+        <li>Paste your <strong>API Key</strong> and <strong>Sender ID</strong>.</li>
+        <li>Set the <strong>Admin SMS number</strong> (blank = Phone 1).</li>
+        <li>Save, then press <strong>Send Test SMS</strong> to confirm.</li>
+      </ol>
+      <p>You can edit the three Bangla message templates. Words in curly braces get filled in automatically — for example <code>{name}</code>, <code>{invoice}</code>, <code>{date}</code>, <code>{total}</code>, <code>{due}</code>, <code>{status}</code>.</p>
+      <div class="callout callout--tip"><span class="ic">🔁</span><div>
+        <p>Using a different provider? Pick <strong>Custom</strong> and paste that gateway's API URL and field names — no code change needed.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="reviews">
+    <div class="wrap">
+      <h2><span class="secnum">09</span> Guest reviews</h2>
+      <p class="lede">The reviews on your homepage are managed like posts.</p>
+      <p>Go to <span class="path">Bookings → All Reviews → Add New</span>. Put the guest's <strong>name as the Title</strong>, their words as the content, set a <strong>star rating</strong> and a trip type (e.g. "Family Trip · Dhaka"). Published reviews show on the site automatically.</p>
+    </div>
+  </section>
+
+  <section id="blog">
+    <div class="wrap">
+      <h2><span class="secnum">10</span> Blog — হাওর জার্নাল</h2>
+      <p class="lede">Publish travel guides and tips to attract visitors from Google. Three starter articles ship ready.</p>
+      <ol class="steps">
+        <li>Go to <span class="path">Posts → Add New</span>.</li>
+        <li>Write your <strong>title</strong> and <strong>content</strong>.</li>
+        <li>On the right, pick a <strong>Category</strong> (ভ্রমণ গাইড / হাওরের খবর / টিপস) and add <strong>Tags</strong>.</li>
+        <li>Set a <strong>Featured Image</strong> (the photo shown on the card).</li>
+        <li>Press <strong>Publish</strong>.</li>
+      </ol>
+      <p>The blog lives at <span class="path">yourdomain.com/blog</span>. Category and tag pages, "related posts", reading time, and a booking call-to-action on every article are all automatic.</p>
+      <div class="callout callout--tip"><span class="ic">✍️</span><div>
+        <p>Comments are turned off on purpose (to avoid spam) — guests are guided to WhatsApp/booking instead.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="content">
+    <div class="wrap">
+      <h2><span class="secnum">11</span> Editing site text &amp; images</h2>
+      <p class="lede">Change your phone numbers, homepage words, and photos without touching code.</p>
+      <p>Go to <span class="path">Appearance → Customize</span>. Three BHELA panels:</p>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>Panel</th><th>What you can change</th></tr></thead>
+        <tbody>
+          <tr><td>BHELA Contact</td><td>Phone numbers, WhatsApp, email, Facebook, address (used across the whole site).</td></tr>
+          <tr><td>BHELA Homepage</td><td>The big hero headline, badge, and subtitle on the front page.</td></tr>
+          <tr><td>BHELA Images</td><td>Swap the hero, food, rooftop, cabin, and spot photos. Leave blank to keep the defaults.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Cabin names, prices, and payment details are in <span class="path">Bookings → Settings</span> (not the Customizer).</p>
+      <div class="callout callout--warn"><span class="ic">📞</span><div>
+        <p>Your phone/WhatsApp/email set in <strong>Bookings → Settings</strong> is the source of truth — the whole site (footer, buttons, invoice, emails) reads from there.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="trouble">
+    <div class="wrap">
+      <h2><span class="secnum">12</span> Troubleshooting</h2>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>If this happens…</th><th>Do this</th></tr></thead>
+        <tbody>
+          <tr><td>Emails not arriving</td><td>Check <strong>FluentSMTP</strong> is connected, and that Email Notifications is enabled. Use <strong>Send Test Email</strong>.</td></tr>
+          <tr><td>SMS not sending</td><td>Confirm your gateway has balance, the API key + Sender ID are correct, SMS is enabled. Use <strong>Send Test SMS</strong>.</td></tr>
+          <tr><td>A date shows wrong availability</td><td>Update <strong>Booked Cabins</strong> for that trip in the Trip Calendar.</td></tr>
+          <tr><td>Prices look wrong</td><td>Check <strong>Cabin Rates</strong> and your <strong>Weekend Days / Holidays</strong> in Settings.</td></tr>
+          <tr><td>Something looks broken after an update</td><td>Refresh the page fully (Ctrl+Shift+R). If it persists, contact your developer.</td></tr>
+        </tbody>
+      </table></div>
+      <div class="callout callout--key"><span class="ic">🛟</span><div>
+        <p><strong>Golden rule:</strong> Settings, bookings, calendar, reviews, and blog posts are all safe to edit yourself. Avoid the <em>Plugins</em>, <em>Users</em>, and <em>Theme File Editor</em> screens — those are for your developer.</p>
+      </div></div>
+
+      <footer class="foot">
+        <p>BHELA – The Haor Exclusive · Website by 3s-Soft.<br>
+        <span class="tag">"ভেলার আকর্ষণ ভেলা নয়, হাওর!"</span></p>
+      </footer>
+    </div>
+  </section>
+
+  </main>
+</div>
+
+</body>
+</html>
