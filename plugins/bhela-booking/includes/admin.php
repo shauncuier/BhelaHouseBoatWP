@@ -371,12 +371,14 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		update_post_meta( $post_id, '_bhela_manual_price', '1' );
 	}
 
-	$old_status = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
-	$new_status = sanitize_key( $_POST['bhela_status'] ?? $old_status );
+	$old_status     = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
+	$new_status     = sanitize_key( $_POST['bhela_status'] ?? $old_status );
+	$sent_confirmed = false;
 	if ( array_key_exists( $new_status, bhela_bm_statuses() ) ) {
 		update_post_meta( $post_id, '_bhela_status', $new_status );
 		if ( 'confirmed' === $new_status && 'confirmed' !== $old_status ) {
 			bhela_bm_email_customer( $post_id, 'confirmed' );
+			$sent_confirmed = true;
 		}
 		if ( function_exists( 'bhela_bm_sms_on_status_change' ) ) {
 			bhela_bm_sms_on_status_change( $post_id, $new_status, $old_status );
@@ -384,7 +386,12 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	}
 
 	if ( ! empty( $_POST['bhela_send_email'] ) ) {
-		bhela_bm_email_customer( $post_id, 'confirmed' === $new_status ? 'confirmed' : 'request' );
+		$type = ( 'confirmed' === $new_status ) ? 'confirmed' : 'request';
+		// Don't double-send: the status→Confirmed change above may have already
+		// fired the same confirmation email this save.
+		if ( ! ( $sent_confirmed && 'confirmed' === $type ) ) {
+			bhela_bm_email_customer( $post_id, $type );
+		}
 	}
 }
 add_action( 'save_post', 'bhela_bm_save_booking', 10, 2 );

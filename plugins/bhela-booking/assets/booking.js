@@ -613,6 +613,19 @@
 			if (blockedBox) blockedBox.hidden = true;
 		}
 
+		// Availability could not be verified (expired nonce / server hiccup).
+		// Unblock the user with an amber advisory instead of a dead-end — the
+		// date is not known-booked, and custom dates are bookable regardless.
+		function softAllow(msg) {
+			availBox.hidden = false;
+			availableCabins = MAX_CABINS;
+			availChecked = true;
+			if (next1) next1.disabled = false;
+			if (blockedBox) blockedBox.hidden = true;
+			availBox.innerHTML = '<span class="bm-avail-chip" style="background:#FFF7ED;color:#b45309;border:1px solid #b4530955">⚠️ ' + esc(msg) + '</span>';
+			calc();
+		}
+
 		if (availBtn) {
 			availBtn.addEventListener('click', function () {
 				if (!dateEl.value) {
@@ -666,12 +679,17 @@
 								calc();
 							}
 						} else {
-							availBox.innerHTML = '<span class="bm-avail-chip" style="background:#FDF0E8;color:#7c2d12">' + ((data.data && data.data.message) || 'চেক করা যায়নি') + '</span>';
+							// A success:false here is only an infra failure (expired
+							// nonce / server hiccup) — never a real "full" signal, which
+							// arrives as success:true+status:booked. Don't trap the user:
+							// availability is advisory (custom dates are always bookable),
+							// so let them continue and confirm with the team.
+							softAllow((data.data && data.data.message) || 'এখন যাচাই করা যায়নি — পেজ রিফ্রেশ করে দেখুন, অথবা এগিয়ে যান, আমরা কনফার্ম করব।');
 						}
 					})
 					.catch(function () {
 						availBox.hidden = false;
-						availBox.innerHTML = '<span class="bm-avail-chip" style="background:#FDF0E8;color:#7c2d12">নেটওয়ার্ক সমস্যা — আবার চেষ্টা করুন</span>';
+						softAllow('এখন যাচাই করা যাচ্ছে না — এগিয়ে যান, আমরা তারিখ কনফার্ম করে জানাব।');
 					})
 					.finally(function () {
 						availBtn.disabled = false;

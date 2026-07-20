@@ -63,6 +63,7 @@ Theme `2.6.7 → 2.7.0` (feature). `graphify update .`
 ## Production go-live checklist (server-side — cannot be done in the theme)
 
 - [ ] **Page cache plugin** — install WP Super Cache / LiteSpeed Cache / W3TC on the live host. Biggest server-side speed win.
+  - ⚠️ **Exclude the Book Now page (`/book-now/`) from page cache.** It carries a WordPress nonce; a cached copy serves a stale nonce to every visitor, and once it expires (~12–24h) the availability check *and booking submission* start failing (`check_ajax_referer` → `-1`). Add `/book-now/` to the cache plugin's "never cache these pages" list. (`admin-ajax.php` is already never cached by these plugins.) The booking JS now degrades gracefully if an availability check can't be verified, but submission still needs a live nonce — so the exclusion is required, not optional.
 - [ ] **PHP OPcache** enabled on the host (most managed WP hosts have it on — verify).
 - [ ] **Brotli or GZIP** compression enabled at the web server (check response header `content-encoding`).
 - [ ] **HTTPS** with valid certificate; force-redirect http → https.
