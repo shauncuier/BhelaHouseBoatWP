@@ -375,25 +375,34 @@ footer strong{color:#DCEBE9}
         <tbody>
           <tr><td>Google Analytics 4</td><td>Measurement ID, যেমন <code>G-XXXXXXXXXX</code></td></tr>
           <tr><td>Facebook (Meta) Pixel</td><td>Pixel ID (শুধু সংখ্যা)</td></tr>
-          <tr><td>Custom Header Code</td><td>site verification meta বা অন্য স্ক্রিপ্ট</td></tr>
         </tbody>
       </table></div>
       <div class="callout callout--tip"><span class="ic">🕵️</span><p>আপনি (অ্যাডমিন) লগইন থাকা অবস্থায় আপনার নিজের ভিজিট গোনা হয় না — তাই স্ট্যাটিসটিক্স পরিষ্কার থাকে।</p></div>
+      <div class="callout callout--tip"><span class="ic">🧩</span><p>যেকোনো কাস্টম কোড (site verification meta, GTM, চ্যাট উইজেট, স্ক্রিপ্ট) যোগ করতে <span class="path"><b>Customize</b> › BHELA Custom Code</span> — নিচের §১২ দেখুন।</p></div>
     </section>
 
     <section class="sec" id="customize">
       <span class="sec__num">12</span>
       <h2>সাইটের লেখা ও ছবি বদলানো</h2>
-      <p><span class="path"><b>Appearance</b> › Customize</span> — চারটি BHELA প্যানেল:</p>
+      <p><span class="path"><b>Appearance</b> › Customize</span> — পাঁচটি BHELA প্যানেল:</p>
       <div class="tbl-scroll"><table>
         <thead><tr><th>প্যানেল</th><th>কী বদলাবেন</th></tr></thead>
         <tbody>
           <tr><td>BHELA Contact</td><td>ফোন, WhatsApp, ইমেইল, Facebook/Instagram/YouTube/TikTok, ঠিকানা (সাইটজুড়ে)</td></tr>
           <tr><td>BHELA Homepage</td><td>হিরো হেডলাইন, ব্যাজ, সাবটাইটেল</td></tr>
           <tr><td>BHELA Images</td><td>হিরো, খাবার, রুফটপ, কেবিন, স্পট ছবি (খালি = ডিফল্ট)</td></tr>
-          <tr><td>BHELA Tracking</td><td>Google Analytics ID, Facebook Pixel ID, কাস্টম হেডার কোড</td></tr>
+          <tr><td>BHELA Tracking</td><td>Google Analytics ID, Facebook Pixel ID</td></tr>
+          <tr><td>BHELA Custom Code</td><td>যেকোনো কোড <code>&lt;head&gt;</code>, <code>&lt;body&gt;</code> শুরু বা পেজের শেষে</td></tr>
         </tbody>
       </table></div>
+      <h3>BHELA Custom Code — কোড যোগ করা</h3>
+      <p>থিম ফাইল না ছুঁয়ে যেকোনো কোড সাইটে বসানোর সবচেয়ে সহজ উপায়। <span class="path"><b>Appearance</b> › Customize › BHELA Custom Code</span> — তিনটি বক্স:</p>
+      <div class="cards">
+        <div class="mini"><b>Header</b><span>&lt;head&gt;-এ বসে — site verification meta, ফন্ট, স্টাইল, pixel।</span></div>
+        <div class="mini"><b>Body Top</b><span>&lt;body&gt; শুরুতেই — GTM noscript, চ্যাট উইজেট।</span></div>
+        <div class="mini"><b>Footer</b><span>&lt;/body&gt;-এর আগে — সবার শেষে লোড হওয়া স্ক্রিপ্ট।</span></div>
+      </div>
+      <p class="muted">যা লিখবেন হুবহু সঠিক জায়গায় সব পেজে বসবে। নিরাপত্তার জন্য শুধু অ্যাডমিন এখানে সেভ করতে পারবেন।</p>
       <p class="muted">কেবিনের নাম, দাম, পেমেন্ট তথ্য থাকে <span class="path"><b>Bookings</b> › Settings</span>-এ। সেখানে দেওয়া যোগাযোগ তথ্যই পুরো সাইটের (ফুটার, বাটন, ইনভয়েস, ইমেইল) উৎস।</p>
     </section>
 
