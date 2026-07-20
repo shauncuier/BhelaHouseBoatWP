@@ -16,6 +16,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+/**
+ * Normalise a Bangladeshi mobile to 01XXXXXXXXX, or '' if it is not valid.
+ * Defers to the booking plugin when active so both forms behave identically;
+ * the fallback keeps the contact form working with the theme alone.
+ */
+function bhela_normalize_mobile( $raw ) {
+	if ( function_exists( 'bhela_bm_normalize_mobile' ) ) {
+		return bhela_bm_normalize_mobile( $raw );
+	}
+	$digits = preg_replace( '/[^0-9]/', '', (string) $raw );
+	if ( 0 === strpos( $digits, '880' ) ) {
+		$digits = substr( $digits, 3 );
+	} elseif ( 0 === strpos( $digits, '00880' ) ) {
+		$digits = substr( $digits, 5 );
+	}
+	if ( 10 === strlen( $digits ) && '1' === $digits[0] ) {
+		$digits = '0' . $digits;
+	}
+	return preg_match( '/^01[3-9][0-9]{8}$/', $digits ) ? $digits : '';
+}
+
 /** Where contact messages are delivered. */
 function bhela_contact_recipient() {
 	if ( function_exists( 'bhela_bm_get_settings' ) ) {
@@ -119,6 +140,14 @@ function bhela_contact_submit() {
 	if ( '' === $name || '' === $phone || '' === $message ) {
 		wp_send_json_error( array( 'message' => __( 'নাম, ফোন ও বার্তা লিখুন।', 'bhela' ) ) );
 	}
+
+	// Must be a real BD mobile — it is how we call the guest back.
+	$normalized = bhela_normalize_mobile( $phone );
+	if ( '' === $normalized ) {
+		wp_send_json_error( array( 'message' => __( 'সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যার, ০১ দিয়ে শুরু (যেমন ০১৭১২৩৪৫৬৭৮)।', 'bhela' ) ) );
+	}
+	$phone = $normalized;
+
 	if ( $email && ! is_email( $email ) ) {
 		wp_send_json_error( array( 'message' => __( 'ইমেইল ঠিকানাটি সঠিক নয়।', 'bhela' ) ) );
 	}

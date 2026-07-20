@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.10.1' );
+define( 'BHELA_VERSION', '2.10.2' );
 
 /* ---------- Setup ---------- */
 

@@ -121,11 +121,36 @@
 		msg.className = 'bhela-contact-form__msg is-' + (ok ? 'ok' : 'error');
 	}
 
+	// Mirrors bhela_bm_normalize_mobile() in PHP — keep the two in step.
+	function normalizeMobile(raw) {
+		var d = String(raw || '').replace(/[^0-9]/g, '');
+		if (d.indexOf('00880') === 0) d = d.slice(5);
+		else if (d.indexOf('880') === 0) d = d.slice(3);
+		if (d.length === 10 && d.charAt(0) === '1') d = '0' + d;
+		return /^01[3-9][0-9]{8}$/.test(d) ? d : '';
+	}
+
+	var phoneEl = document.getElementById('bc-phone');
+	if (phoneEl) {
+		phoneEl.addEventListener('blur', function () {
+			if (!phoneEl.value.trim()) { phoneEl.classList.remove('is-invalid'); return; }
+			phoneEl.classList.toggle('is-invalid', !normalizeMobile(phoneEl.value));
+		});
+		phoneEl.addEventListener('input', function () {
+			if (normalizeMobile(phoneEl.value)) phoneEl.classList.remove('is-invalid');
+		});
+	}
+
 	form.addEventListener('submit', function (e) {
 		e.preventDefault();
 		var data = new FormData(form);
 		if (!data.get('name') || !data.get('phone') || !data.get('message')) {
 			show('নাম, ফোন ও বার্তা লিখুন।', false);
+			return;
+		}
+		if (!normalizeMobile(data.get('phone'))) {
+			show('সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যার, ০১ দিয়ে শুরু (যেমন ০১৭১২৩৪৫৬৭৮)।', false);
+			if (phoneEl) { phoneEl.classList.add('is-invalid'); phoneEl.focus(); }
 			return;
 		}
 		var params = new URLSearchParams();

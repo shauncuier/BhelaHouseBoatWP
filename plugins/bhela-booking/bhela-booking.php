@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.6.7
+ * Version: 2.6.8
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.6.7' );
+define( 'BHELA_BM_VERSION', '2.6.8' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -158,6 +158,38 @@ function bhela_bm_day_type( $date ) {
 		return 'weekend';
 	}
 	return 'weekday';
+}
+
+/**
+ * Normalise a Bangladeshi mobile number to local 11-digit form (01XXXXXXXXX).
+ *
+ * Accepts what guests actually type: 01712345678, 8801712345678,
+ * +880 1712-345678, with spaces, dashes or brackets. Returns '' when the
+ * number is not a valid BD mobile, so callers can reject it — the phone is
+ * the only reliable way to reach a guest about their booking.
+ */
+function bhela_bm_normalize_mobile( $raw ) {
+	$digits = preg_replace( '/[^0-9]/', '', (string) $raw );
+	if ( '' === $digits ) {
+		return '';
+	}
+	// Strip the country code in either written form.
+	if ( 0 === strpos( $digits, '880' ) ) {
+		$digits = substr( $digits, 3 );
+	} elseif ( 0 === strpos( $digits, '00880' ) ) {
+		$digits = substr( $digits, 5 );
+	}
+	// Guests sometimes drop the leading zero (1712345678).
+	if ( 10 === strlen( $digits ) && '1' === $digits[0] ) {
+		$digits = '0' . $digits;
+	}
+	// Operators in use: 013–019.
+	return preg_match( '/^01[3-9][0-9]{8}$/', $digits ) ? $digits : '';
+}
+
+/** True when the value is a usable BD mobile number. */
+function bhela_bm_is_mobile( $raw ) {
+	return '' !== bhela_bm_normalize_mobile( $raw );
 }
 
 /** Match a cabin key or label text to a rates key. */

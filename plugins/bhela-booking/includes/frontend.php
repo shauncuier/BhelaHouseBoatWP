@@ -367,6 +367,17 @@ function bhela_bm_process_submission( $data ) {
 		return new WP_Error( 'missing', __( 'অনুগ্রহ করে নাম, মোবাইল নম্বর ও তারিখ পূরণ করুন।', 'bhela-booking' ) );
 	}
 
+	// The mobile number is how we reach the guest — it must be a real BD number.
+	$normalized = bhela_bm_normalize_mobile( $phone );
+	if ( '' === $normalized ) {
+		return new WP_Error( 'bad_phone', __( 'সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যার, ০১ দিয়ে শুরু (যেমন ০১৭১২৩৪৫৬৭৮)।', 'bhela-booking' ) );
+	}
+	$phone = $normalized;
+
+	if ( $email && ! is_email( $email ) ) {
+		return new WP_Error( 'bad_email', __( 'ইমেইল ঠিকানাটি সঠিক নয়।', 'bhela-booking' ) );
+	}
+
 	// Travel date must be a real Y-m-d — it is stored, invoiced, and echoed.
 	$d = DateTime::createFromFormat( 'Y-m-d', $date );
 	if ( ! $d || $d->format( 'Y-m-d' ) !== $date ) {

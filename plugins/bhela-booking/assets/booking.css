@@ -426,3 +426,11 @@
 }
 .bhela-review-card__who strong { display: block; line-height: 1.3; color: var(--ink, #0A2A2F); }
 .bhela-review-card__who span { font-size: .8rem; color: #5E7472; }
+
+/* Invalid field feedback (mobile number) */
+.bhela-bm-form input.is-invalid,
+.bhela-bm-form textarea.is-invalid {
+	border-color: #b45309 !important;
+	box-shadow: 0 0 0 3px rgba(180, 83, 9, .12);
+	background: #FFF7ED;
+}

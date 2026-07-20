@@ -148,6 +148,30 @@
 			return dt === 'weekday' ? r.weekday : r.regular;
 		}
 
+		/**
+		 * Normalise a BD mobile to 01XXXXXXXXX, or '' when it is not valid.
+		 * Mirrors bhela_bm_normalize_mobile() in PHP — keep the two in step.
+		 */
+		function normalizeMobile(raw) {
+			var d = String(raw || '').replace(/[^0-9]/g, '');
+			if (d.indexOf('00880') === 0) d = d.slice(5);
+			else if (d.indexOf('880') === 0) d = d.slice(3);
+			if (d.length === 10 && d.charAt(0) === '1') d = '0' + d;
+			return /^01[3-9][0-9]{8}$/.test(d) ? d : '';
+		}
+
+		// Live feedback on the phone field.
+		var phoneField = document.getElementById('bm-phone');
+		if (phoneField) {
+			phoneField.addEventListener('blur', function () {
+				if (!phoneField.value.trim()) { phoneField.classList.remove('is-invalid'); return; }
+				phoneField.classList.toggle('is-invalid', !normalizeMobile(phoneField.value));
+			});
+			phoneField.addEventListener('input', function () {
+				if (normalizeMobile(phoneField.value)) phoneField.classList.remove('is-invalid');
+			});
+		}
+
 		function guestTotals() {
 			return {
 				adults: parseInt(gAdults.value, 10) || 0,
@@ -893,6 +917,17 @@
 		form.addEventListener('submit', function (e) {
 			e.preventDefault();
 			response.innerHTML = '';
+
+			// Check the mobile number before spending a request on it — this is
+			// the only number the team has to call the guest back on.
+			var phoneEl = document.getElementById('bm-phone');
+			if (phoneEl && !normalizeMobile(phoneEl.value)) {
+				response.innerHTML = '<div class="bhela-bm-error">⚠️ সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যার, ০১ দিয়ে শুরু (যেমন ০১৭১২৩৪৫৬৭৮)।</div>';
+				phoneEl.classList.add('is-invalid');
+				phoneEl.focus();
+				return;
+			}
+
 			submitBtn.disabled = true;
 			submitBtn.classList.add('is-loading');
 
