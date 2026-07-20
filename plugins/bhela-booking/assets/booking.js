@@ -179,22 +179,26 @@
 		}
 
 		/**
-		 * Distribute adults→c48 across a size list (largest cabin first). Cabin
-		 * size = paying occupants (adults + 4–8 children). 0–4 infants are FREE
-		 * riders: attached to the first cabin, they do NOT change the size/rate.
+		 * Fill a size list. Cabin size = ADULTS only — that is what picks the rate
+		 * tier. 4–8 children then ride along in those cabins at 50% of the same
+		 * per-person rate without enlarging the tier (largest cabin first, because
+		 * that tier has the lowest per-person rate). 0–4 infants are FREE riders
+		 * attached to the first cabin and never change the size or rate.
 		 */
 		function fillCombo(sizes, adults, c48, c04) {
-			var pools = [{ k: 'adults', n: adults }, { k: 'c48', n: c48 }];
+			var leftA = adults, leftC = c48;
 			var cabins = sizes.map(function (size) {
-				var cab = { size: size, adults: 0, c48: 0, c04: 0 };
-				var space = size;
-				pools.forEach(function (pl) {
-					if (space <= 0 || pl.n <= 0) return;
-					var take = Math.min(space, pl.n);
-					cab[pl.k] += take; pl.n -= take; space -= take;
-				});
-				return cab;
+				var take = Math.min(size, leftA);
+				leftA -= take;
+				return { size: size, adults: take, c48: 0, c04: 0 };
 			});
+			cabins.forEach(function (cab) {
+				if (leftC <= 0) return;
+				var room = Math.max(0, MAX_CAP - cab.size); // keep bodies per cabin sane
+				var take = Math.min(room, leftC);
+				cab.c48 += take; leftC -= take;
+			});
+			if (leftC > 0 && cabins.length) cabins[0].c48 += leftC; // overflow safety
 			if (c04 > 0 && cabins.length) cabins[0].c04 = c04; // free ride-along, no seat used
 			return cabins;
 		}
@@ -217,8 +221,11 @@
 		 * (lowest total) is flagged as our suggestion; the guest may pick any.
 		 */
 		function buildOptions(g, dt) {
-			var occupants = g.adults + g.c48; // infants don't size cabins
-			var combos = genCombinations(occupants).map(function (sizes) {
+			var occupants = g.adults + g.c48; // real bodies aboard (infants excluded)
+			// Cabins are sized by ADULTS only; 4–8 children ride along at 50%.
+			// The smallest cabin is a couple cabin, so a lone adult still books MIN_CAP.
+			var tierBodies = Math.max(g.adults, MIN_CAP);
+			var combos = genCombinations(tierBodies).map(function (sizes) {
 				return priceCombo(fillCombo(sizes, g.adults, g.c48, g.c04), dt, occupants);
 			});
 			if (!combos.length) return [];
@@ -362,15 +369,17 @@
 			var cabins = builderCabins();
 			var adults = 0, occupants = 0, badCabin = false;
 			cabins.forEach(function (c, i) {
-				var occ = c.adults + c.c48;   // paying occupants = cabin size (infants free)
+				var occ = c.adults + c.c48;   // bodies sharing the cabin (infants free)
+				var tier = Math.max(c.adults, MIN_CAP); // rate tier = adults only
 				var infantOnly = occ === 0 && c.c04 > 0;
-				var over = (occ > 0 && (occ < 2 || occ > MAX_CAP)) || infantOnly;
+				var over = (occ > 0 && (occ < 2 || occ > MAX_CAP)) || infantOnly ||
+					(occ > 0 && c.adults < 1);
 				var rowEl = editRows.querySelectorAll('.bm-cabin-row')[i];
 				if (rowEl) {
 					rowEl.classList.toggle('is-over', over);
 					var tEl = rowEl.querySelector('.bm-row-total');
-					if (tEl) tEl.textContent = (occ >= 2 && occ <= MAX_CAP && dt)
-						? money(c.adults * occRate(occ, dt) + Math.ceil(c.c48 * occRate(occ, dt) * (bhelaBM.childPercent / 100)))
+					if (tEl) tEl.textContent = (!over && occ >= 2 && occ <= MAX_CAP && dt)
+						? money(c.adults * occRate(tier, dt) + Math.ceil(c.c48 * occRate(tier, dt) * (bhelaBM.childPercent / 100)))
 						: '—';
 				}
 				if (over) badCabin = true;
@@ -386,7 +395,10 @@
 			else if (occupants > MAX_GUESTS) msg = '⚠️ সর্বোচ্চ ' + MAX_GUESTS + ' জন।';
 			var priced = null;
 			if (!msg && dt) {
-				var filled = cabins.map(function (c) { return { size: c.adults + c.c48, adults: c.adults, c48: c.c48, c04: c.c04 }; });
+				// size = adults only: the rate tier never grows because of 4–8 children.
+				var filled = cabins.map(function (c) {
+					return { size: Math.max(c.adults, MIN_CAP), adults: c.adults, c48: c.c48, c04: c.c04 };
+				});
 				priced = priceCombo(filled, dt, occupants);
 			}
 			return { ok: !msg, msg: msg, priced: priced };

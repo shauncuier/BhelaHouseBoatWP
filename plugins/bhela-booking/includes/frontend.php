@@ -241,10 +241,16 @@ add_shortcode( 'bhela_booking_form', 'bhela_bm_booking_form_shortcode' );
 /* ---------- Multi-cabin price calculation (server-side, authoritative) ---------- */
 
 /**
- * Price a chosen cabin combination. Rate is decided by each cabin's paying
- * occupancy (adults + 4–8 children); adults pay full, 4–8 children 50%.
- * 0–4 infants are FREE ride-alongs — they do NOT affect the cabin size, rate
- * tier, guest count, or capacity.
+ * Price a chosen cabin combination.
+ *
+ * Cabin size / rate tier is decided by the ADULT count alone. 4–8 children ride
+ * in that cabin and pay 50% of the same per-person rate (after any discount) —
+ * they never push the booking into a bigger, cheaper-per-head tier. Example:
+ * 4 adults + one 5-year-old on a weekend is a 4-person cabin (4 × 10,000) plus
+ * 5,000 for the child = 45,000 — not a 5-person cabin at 9,000/head.
+ *
+ * 0–4 infants are FREE ride-alongs (shared food and bed with the parents) and
+ * do not affect the cabin size, rate tier, guest count, or capacity.
  *
  * $cabins: array of ['adults' => n, 'c48' => n, 'c04' => n].
  * Returns array|WP_Error.
@@ -265,9 +271,12 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 		$adults = max( 0, (int) ( $c['adults'] ?? 0 ) );
 		$c48    = max( 0, (int) ( $c['c48'] ?? 0 ) );
 		$c04    = max( 0, (int) ( $c['c04'] ?? 0 ) );
-		$occ    = $adults + $c48;          // cabin size / rate tier — 0–4 infants excluded
+		$occ    = $adults + $c48;          // people sharing the cabin — 0–4 infants excluded
 		if ( $occ + $c04 < 1 ) {
 			continue;
+		}
+		if ( $adults < 1 ) {
+			return new WP_Error( 'no_adult', __( 'প্রতিটি কেবিনে অন্তত ১ জন বড় (৯+) থাকতে হবে।', 'bhela-booking' ) );
 		}
 		if ( $occ < 2 ) {
 			return new WP_Error( 'lone_cabin', __( 'প্রতিটি কেবিনে অন্তত ২ জন অতিথি থাকতে হবে (শিশু ০–৪ বাদে)।', 'bhela-booking' ) );
@@ -276,7 +285,12 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 			return new WP_Error( 'over_cabin', sprintf( __( 'একটি কেবিনে সর্বোচ্চ %d জন (শিশু ০–৪ বাদে)।', 'bhela-booking' ), $max_cap ) );
 		}
 
-		$row     = bhela_bm_rate_for_occupancy( $occ );
+		// Rate tier follows the ADULT count only — 4–8 children ride along at 50%
+		// of this cabin's per-person rate without enlarging the tier. The smallest
+		// cabin is a couple cabin, so a lone adult still books that tier.
+		$min_cap = min( array_keys( bhela_bm_rates_by_occupancy() ) );
+		$tier    = max( $adults, $min_cap );
+		$row     = bhela_bm_rate_for_occupancy( $tier );
 		$rate    = ( 'weekday' === $day_type ) ? (int) $row['weekday'] : (int) $row['regular'];
 		$reg     = (int) $row['regular'];
 		$line    = $adults * $rate + (int) ceil( $c48 * $rate * 0.5 );
@@ -296,11 +310,12 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 			$who .= ' + ' . $c04 . ' শিশু(০–৪ ফ্রি)';
 		}
 		$lines[] = array(
-			'label'  => sprintf( __( 'কেবিন (%d জন)', 'bhela-booking' ), $occ ),
+			'label'  => sprintf( __( 'কেবিন (%d জন)', 'bhela-booking' ), $tier ),
 			'who'    => $who,
 			'total'  => $line,
-			'rate'   => $rate,   // per-person rate for this cabin's tier
-			'occ'    => $occ,
+			'rate'   => $rate,   // per-person rate for this cabin's tier (adult-based)
+			'occ'    => $tier,   // cabin tier (adult-based); 4–8 children ride along
+			'people' => $occ,    // actual bodies in the cabin (adults + 4–8 children)
 			'adults' => $adults,
 			'c48'    => $c48,
 		);
