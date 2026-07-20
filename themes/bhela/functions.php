@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.10.0' );
+define( 'BHELA_VERSION', '2.10.1' );
 
 /* ---------- Setup ---------- */
 
@@ -143,8 +143,13 @@ function bhela_social_links() {
 	$out = array();
 	foreach ( bhela_social_networks() as $key => $net ) {
 		$url = trim( (string) bhela_contact( $key ) );
-		// Skip empties and the bare facebook.com placeholder default.
-		if ( '' === $url || in_array( untrailingslashit( $url ), array( 'https://www.facebook.com', 'https://facebook.com' ), true ) ) {
+		// Must be a real link. Skips empties and placeholders like "#" or "-"
+		// so the footer never shows an icon that goes nowhere.
+		if ( ! preg_match( '#^https?://.+\..+#i', $url ) ) {
+			continue;
+		}
+		// Skip the bare facebook.com default (no page set yet).
+		if ( in_array( untrailingslashit( $url ), array( 'https://www.facebook.com', 'https://facebook.com' ), true ) ) {
 			continue;
 		}
 		$net['url']  = $url;
