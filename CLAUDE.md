@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-07-17 · Theme v2.6.8 · Plugin v2.6.2
+> Last updated: 2026-07-21 · Theme v2.11.1 · Plugin v2.7.1
 
 ---
 
@@ -13,8 +13,8 @@
 
 | Component | Path | Current Version | Purpose |
 |---|---|---|---|
-| **BHELA Theme** | `themes/bhela/` | v2.6.8 | Full custom theme — "Midnight Monsoon" dark-teal luxury design |
-| **BHELA Booking Engine** | `plugins/bhela-booking/` | v2.6.2 | Booking form, pricing engine, invoices, emails, SMS, trip calendar, reviews |
+| **BHELA Theme** | `themes/bhela/` | v2.11.1 | Full custom theme — "Midnight Monsoon" dark-teal luxury design |
+| **BHELA Booking Engine** | `plugins/bhela-booking/` | v2.7.1 | Booking form, pricing engine, invoices, emails, SMS, trip calendar, reviews |
 
 **GitHub:** https://github.com/shauncuier/BhelaHouseBoatWP
 **Branch:** `main`

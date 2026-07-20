@@ -160,7 +160,7 @@ function bhela_bm_booking_form_shortcode() {
 							<button type="button" class="bhela-bm-addcabin" id="bm-edit-add">➕ কেবিন যোগ করুন</button>
 							<p class="bm-edit__note" id="bm-edit-note"></p>
 						</div>
-						<p class="bhela-bm-childnote">👶 ০–৪ বছর ফ্রি · ৪–৮ বছর <?php echo esc_html( bhela_bm_money( $settings['child_fee'] ) ); ?> · ৯+ পূর্ণ রেট। ২–<?php echo esc_html( bhela_bm_max_guests() ); ?> জন (<?php echo esc_html( bhela_bm_max_cabins() ); ?>টি কেবিন) · যত বেশি জন, জনপ্রতি রেট তত কম।</p>
+						<p class="bhela-bm-childnote">👶 0–4 বছর ফ্রি · 4–8 বছর <?php echo esc_html( bhela_bm_money( $settings['child_fee'] ) ); ?> · 9+ পূর্ণ রেট। 2–<?php echo esc_html( bhela_bm_max_guests() ); ?> জন (<?php echo esc_html( bhela_bm_max_cabins() ); ?>টি কেবিন) · যত বেশি জন, জনপ্রতি রেট তত কম।</p>
 						<label class="bm-fullboat">
 							<input type="checkbox" id="bm-fullboat" name="full_boat" value="1">
 							<span>🚢 <strong>পুরো বোট রিজার্ভ</strong> করতে চাই — কাস্টম কোটের জন্য রিকোয়েস্ট পাঠাবো (<?php echo esc_html( bhela_bm_max_cabins() ); ?> কেবিন · <?php echo esc_html( bhela_bm_max_guests() ); ?> জন)</span>
