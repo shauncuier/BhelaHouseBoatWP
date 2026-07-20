@@ -185,7 +185,7 @@ cover_rows = [
     ['Developer', 'Client'],
     ['3s-Soft', 'KeyToBD'],
     ['Jashedul Islam Shaun<br/><font size=8 color="#6FC7BF">Founder</font>',
-     'Kaiser Hamid<br/><font size=8 color="#6FC7BF">Owner</font>'],
+     'Kaisar Hamid Apon<br/><font size=8 color="#6FC7BF">Owner</font>'],
     ['3s-soft.com', 'bhelahouseboat.com'],
 ]
 ct = Table([
@@ -194,7 +194,7 @@ ct = Table([
     [Paragraph('<b><font size=13 color="white">3s-Soft</font></b>', S['covermeta']),
      Paragraph('<b><font size=13 color="white">KeyToBD</font></b>', S['covermeta'])],
     [Paragraph('Jashedul Islam Shaun<br/><font size=8 color="#9FBFBC">Founder</font>', S['covermeta']),
-     Paragraph('Kaiser Hamid<br/><font size=8 color="#9FBFBC">Owner</font>', S['covermeta'])],
+     Paragraph('Kaisar Hamid Apon<br/><font size=8 color="#9FBFBC">Owner</font>', S['covermeta'])],
 ], colWidths=[75*mm, 75*mm])
 ct.setStyle(TableStyle([
     ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
@@ -230,7 +230,7 @@ st.append(info_table([
     ('Project', 'BHELA - The Haor Exclusive : Custom WordPress Booking Platform'),
     ('Live website', 'bhelahouseboat.com'),
     ('Developer', '3s-Soft - Jashedul Islam Shaun, Founder (3s-soft.com)'),
-    ('Client', 'KeyToBD - Kaiser Hamid, Owner'),
+    ('Client', 'KeyToBD - Kaisar Hamid Apon, Owner'),
     ('Delivery date', DEL_DATE),
     ('Components', 'BHELA Theme v2.8.0 &nbsp;|&nbsp; BHELA Booking Engine Plugin v2.6.3'),
     ('Document ref', DOC_REF),
@@ -330,8 +330,14 @@ st.extend(bullets([
     '<b>Owner\'s Manual</b> - a plain-language, Bangla-friendly guide covering every day-to-day task: bookings, invoices, rates, availability, blog, email, SMS, analytics and settings.',
     '<b>Project overview documentation</b> describing the platform, its value and its architecture.',
     '<b>Production go-live checklist</b> covering caching, HTTPS, email deliverability, Search Console and Google Business Profile.',
+    '<b>All passwords and login credentials</b> - WordPress administrator account, hosting control panel, domain registrar, database and any service accounts created for this project are handed over to the client in full.',
     '<b>Full ownership</b> - the client owns the delivered code and all site data outright, with no licence fee, no lock-in and no commission on bookings.',
 ]))
+st.append(Spacer(1, 2*mm))
+st.append(callout(
+    '<b>Credentials handover.</b> The client receives every username and password associated with '
+    'the project. 3s-Soft retains no exclusive access, and the client can transfer the site to any '
+    'other developer or host at any time.', colors.HexColor('#EAF3F2'), PRIMARY))
 st.append(Spacer(1, 2*mm))
 st.append(callout(
     '<b>No recurring cost to 3s-Soft.</b> Once delivered, the platform runs without any subscription '
@@ -348,6 +354,8 @@ pt = Table([
                '(theme and booking engine), including deployment support and one month of free '
                'service as set out in section 6.', S['cell']),
      Paragraph('USD 200.00', S['cellb'])],
+    [Paragraph('Domain setup, hosting setup and WordPress installation and configuration.', S['cell']),
+     Paragraph('<font color="#137A74">No charge</font>', S['cellb'])],
     [Paragraph('<b>Total project price</b>', S['cellb']),
      Paragraph('<b>USD 200.00</b>', S['cellb'])],
 ], colWidths=[128*mm, 40*mm])
@@ -361,7 +369,7 @@ pt.setStyle(TableStyle([
     ('LEFTPADDING', (0, 0), (-1, -1), 7),
     ('RIGHTPADDING', (0, 0), (-1, -1), 7),
     ('BOX', (0, 0), (-1, -1), 0.5, LINE),
-    ('LINEBELOW', (0, 1), (-1, 1), 0.4, LINE),
+    ('LINEBELOW', (0, 1), (-1, -2), 0.4, LINE),
     ('LINEABOVE', (0, -1), (-1, -1), 0.9, PRIMARY),
 ]))
 st = st[:-1]  # re-add section 5 heading inside the keep-together block
@@ -372,6 +380,13 @@ st.append(KeepTogether([
     para('<b>Total project price: %s (Two Hundred US Dollars).</b> The price is inclusive of '
          'everything listed in sections 2 and 4 of this document, and of the one month free '
          'service period described in section 6.' % PRICE),
+    Spacer(1, 2*mm),
+    callout('<b>Provided free of charge.</b> Domain setup, hosting setup and the WordPress '
+            'installation and configuration were carried out by 3s-Soft at no cost to the client '
+            'and are not included in the price above. Only the design and development of the '
+            'custom platform has been charged. Any third-party fees payable directly to providers '
+            '(domain registration, hosting plan, SMS credits) remain the client\'s own cost.',
+            colors.HexColor('#EAF3F2'), PRIMARY),
 ]))
 
 st.append(PageBreak())
@@ -433,7 +448,7 @@ sign = Table([
     [Paragraph('3s-Soft', S['cell']), '', Paragraph('KeyToBD', S['cell'])],
     [Spacer(1, 14*mm), '', Spacer(1, 14*mm)],
     [Paragraph('Jashedul Islam Shaun<br/><font size=8 color="#5E7472">Founder, 3s-Soft</font>', S['cell']), '',
-     Paragraph('Kaiser Hamid<br/><font size=8 color="#5E7472">Owner, KeyToBD</font>', S['cell'])],
+     Paragraph('Kaisar Hamid Apon<br/><font size=8 color="#5E7472">Owner, KeyToBD</font>', S['cell'])],
     [Paragraph('Date: ______________________', S['small']), '',
      Paragraph('Date: ______________________', S['small'])],
 ], colWidths=[75*mm, 18*mm, 75*mm])

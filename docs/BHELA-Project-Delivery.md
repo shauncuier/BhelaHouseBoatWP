@@ -9,7 +9,7 @@
 | **Project** | BHELA – The Haor Exclusive : Custom WordPress Booking Platform |
 | **Live website** | bhelahouseboat.com |
 | **Developer** | 3s-Soft — Jashedul Islam Shaun, Founder (3s-soft.com) |
-| **Client** | KeyToBD — Kaiser Hamid, Owner |
+| **Client** | KeyToBD — Kaisar Hamid Apon, Owner |
 | **Delivery date** | 21 July 2026 |
 | **Components** | BHELA Theme v2.8.0 · BHELA Booking Engine Plugin v2.6.3 |
 | **Project price** | **USD 200.00** (includes 1 month free service) |
@@ -107,7 +107,10 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 - **Owner's Manual** — plain-language, Bangla-friendly operating guide
 - **Project overview documentation**
 - **Production go-live checklist** — caching, HTTPS, email deliverability, Search Console, Google Business Profile
+- **All passwords and login credentials** — WordPress administrator account, hosting control panel, domain registrar, database and any service accounts created for this project, handed over in full
 - **Full ownership** — client owns delivered code and all site data, no licence fee, no lock-in, no booking commission
+
+> **Credentials handover.** The client receives every username and password associated with the project. 3s-Soft retains no exclusive access, and the client can transfer the site to any other developer or host at any time.
 
 > **No recurring cost to 3s-Soft.** Once delivered, the platform runs without any subscription or per-booking fee payable to the developer. The client is responsible only for hosting, domain, and optional third-party services such as SMS credits.
 
@@ -118,9 +121,12 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 | Description | Amount |
 |---|---|
 | Design, development and delivery of the BHELA custom WordPress booking platform (theme and booking engine), including deployment support and one month of free service per section 6 | USD 200.00 |
+| Domain setup, hosting setup and WordPress installation and configuration | **No charge** |
 | **Total project price** | **USD 200.00** |
 
 **Total project price: USD 200.00 (Two Hundred US Dollars).** Inclusive of everything in sections 2 and 4, and of the one month free service period in section 6.
+
+> **Provided free of charge.** Domain setup, hosting setup and the WordPress installation and configuration were carried out by 3s-Soft at no cost to the client and are not included in the price above. Only the design and development of the custom platform has been charged. Any third-party fees payable directly to providers (domain registration, hosting plan, SMS credits) remain the client's own cost.
 
 ---
 
@@ -159,7 +165,7 @@ Both parties confirm the platform described has been delivered and accepted, and
 | Developer | Client |
 |---|---|
 | **3s-Soft** | **KeyToBD** |
-| Jashedul Islam Shaun — Founder | Kaiser Hamid — Owner |
+| Jashedul Islam Shaun — Founder | Kaisar Hamid Apon — Owner |
 | Signature: ______________________ | Signature: ______________________ |
 | Date: ______________________ | Date: ______________________ |
 
