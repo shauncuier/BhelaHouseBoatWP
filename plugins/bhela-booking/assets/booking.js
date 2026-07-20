@@ -267,7 +267,9 @@
 		function optionCard(o, i, dt) {
 			var c = o.combo;
 			var detail = c.cabins.map(function (cb, n) {
-				return 'কেবিন ' + (n + 1) + ' (' + cb.size + ' জন): ' + money(occRate(cb.size, dt || 'weekend')) + '/জন';
+				// Rate comes from the cabin's adult tier, not from how many bodies it holds.
+				var tier = cb.tier || Math.max(cb.adults, MIN_CAP);
+				return 'কেবিন ' + (n + 1) + ' (' + cb.size + ' জন): ' + money(occRate(tier, dt || 'weekend')) + '/জন';
 			}).join(' · ');
 			var badge = o.suggested
 				? '<span class="bm-opt__badge">✨ আমাদের সাজেশন</span>'
@@ -545,7 +547,10 @@
 				var who = cb.adults + ' বড়';
 				if (cb.c48) who += ' + ' + cb.c48 + ' শিশু(৪–৮)';
 				if (cb.c04) who += ' + ' + cb.c04 + ' শিশু(০–৪ ফ্রি)';
-				var rate = occRate(cb.size, dt);
+				// Priced on the cabin's adult tier — must match priceCombo exactly,
+				// otherwise this line and the grand total disagree.
+				var tier = cb.tier || Math.max(cb.adults, MIN_CAP);
+				var rate = occRate(tier, dt);
 				var line = cb.adults * rate + Math.ceil(cb.c48 * rate * (bhelaBM.childPercent / 100));
 				return '<div class="bm-bd-line"><span>কেবিন ' + (n + 1) + ' (' + cb.size + ' জন)<small>' + who + ' · ' + money(rate) + '/জন' + (cb.c48 ? ' · শিশু ৫০%' : '') + '</small></span><strong>' + money(line) + '</strong></div>';
 			}).join('');
