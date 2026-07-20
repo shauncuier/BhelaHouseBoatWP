@@ -11,6 +11,7 @@
 | **Developer** | 3s-Soft — Jashedul Islam Shaun, Founder (3s-soft.com) |
 | **Client** | KeyToBD — Kaisar Hamid Apon, Owner |
 | **Delivery date** | 21 July 2026 |
+| **Free service until** | **21 August 2026** (see section 6) |
 | **Components** | BHELA Theme v2.8.0 · BHELA Booking Engine Plugin v2.6.3 |
 | **Project price** | **USD 200.00** (includes 1 month free service) |
 
@@ -159,6 +160,12 @@ A **one month free service and review period** is included at no additional cost
 | Cost | Free — included in the project price |
 | Raise an issue via | Direct contact with 3s-Soft (Jashedul Islam Shaun) |
 
+| PERIOD STARTS | **DEADLINE — FREE SERVICE PERIOD ENDS** |
+|---|---|
+| 21 July 2026 | ## 21 August 2026 |
+
+**Please report any issue on or before 21 August 2026.** Anything raised within the period is fixed free of charge. After this date the free service period expires and further work is chargeable or arranged by mutual agreement.
+
 ### 6.1 Covered
 - **Any bug or defect found in the delivered scope will be fixed free of charge.** If something in this document does not work as described, 3s-Soft will correct it at no cost.
 - Errors in booking calculation, invoices, notifications, availability, or any delivered feature
@@ -173,7 +180,7 @@ A **one month free service and review period** is included at no additional cost
 - Content writing, photography, translation
 - Problems caused by client/third-party code changes or conflicting plugins
 
-> **Commitment.** During the review period, if the client finds any issue in the delivered platform, 3s-Soft will fix it free of charge. After the period ends, continued support and new development can be arranged by mutual agreement.
+> **Commitment.** During the review period, if the client finds any issue in the delivered platform, 3s-Soft will fix it free of charge. The period ends on **21 August 2026**; after that date continued support and any new development can be arranged by mutual agreement.
 
 ---
 

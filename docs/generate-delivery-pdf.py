@@ -206,8 +206,9 @@ st.append(ct)
 st.append(Spacer(1, 16*mm))
 st.append(HRFlowable(width='40%', thickness=1, color=CTA, hAlign='CENTER'))
 st.append(Spacer(1, 6*mm))
-st.append(Paragraph('Delivery date: <b>%s</b><br/>Includes 1 month free service &amp; review period'
-                    % DEL_DATE, S['covermeta']))
+st.append(Paragraph('Delivery date: <b>%s</b><br/>Includes 1 month free service &amp; review period '
+                    '- valid until <b><font color="#F5C97B">%s</font></b>'
+                    % (DEL_DATE, END_DATE), S['covermeta']))
 
 st.append(NextPageTemplate('body'))  # every page after the cover uses the light template
 st.append(PageBreak())
@@ -232,6 +233,7 @@ st.append(info_table([
     ('Developer', '3s-Soft - Jashedul Islam Shaun, Founder (3s-soft.com)'),
     ('Client', 'KeyToBD - Kaisar Hamid Apon, Owner'),
     ('Delivery date', DEL_DATE),
+    ('Free service until', '%s (see section 6)' % END_DATE),
     ('Components', 'BHELA Theme v2.8.0 &nbsp;|&nbsp; BHELA Booking Engine Plugin v2.6.3'),
     ('Document ref', DOC_REF),
 ]))
@@ -464,6 +466,29 @@ st.append(info_table([
 ]))
 st.append(Spacer(1, 4*mm))
 
+# Prominent deadline strip
+deadline = Table([[
+    Paragraph('<font color="#9FBFBC" size=8>PERIOD STARTS</font><br/>'
+              '<b><font size=12 color="white">%s</font></b>' % DEL_DATE, S['cell']),
+    Paragraph('<font color="#F5C97B" size=8>DEADLINE - FREE SERVICE PERIOD ENDS</font><br/>'
+              '<b><font size=15 color="#FF7A3D">%s</font></b>' % END_DATE, S['cell']),
+]], colWidths=[56*mm, 112*mm])
+deadline.setStyle(TableStyle([
+    ('BACKGROUND', (0, 0), (-1, -1), INK),
+    ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+    ('TOPPADDING', (0, 0), (-1, -1), 10),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 10),
+    ('LEFTPADDING', (0, 0), (-1, -1), 11),
+    ('LINEAFTER', (0, 0), (0, -1), 0.7, colors.Color(1, 1, 1, alpha=0.22)),
+    ('BOX', (0, 0), (-1, -1), 0.5, INK),
+]))
+st.append(deadline)
+st.append(Spacer(1, 2*mm))
+st.append(para('<b>Please report any issue on or before %s.</b> Anything raised within the period '
+               'is fixed free of charge. After this date the free service period expires and '
+               'further work is chargeable or arranged by mutual agreement.' % END_DATE))
+st.append(Spacer(1, 3*mm))
+
 st.append(Paragraph('6.1&nbsp;&nbsp;What is covered', S['h2']))
 st.extend(bullets([
     '<b>Any bug or defect found in the delivered scope will be fixed free of charge.</b> If something '
@@ -488,8 +513,8 @@ st.extend(bullets([
 st.append(Spacer(1, 3*mm))
 st.append(callout(
     '<b>Commitment.</b> During the review period, if the client finds any issue in the delivered '
-    'platform, 3s-Soft will fix it free of charge. After the period ends, continued support and any '
-    'new development can be arranged by mutual agreement.', colors.HexColor('#FFF3E9'), CTA))
+    'platform, 3s-Soft will fix it free of charge. The period ends on <b>%s</b>; after that date '
+    'continued support and any new development can be arranged by mutual agreement.' % END_DATE, colors.HexColor('#FFF3E9'), CTA))
 
 # ============ 7. ACCEPTANCE ============
 st.append(Spacer(1, 8*mm))
