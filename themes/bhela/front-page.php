@@ -242,7 +242,7 @@ $img = get_template_directory_uri() . '/assets/images';
 			<details class="faq-item reveal"><summary>জনপ্রতি রেট কীভাবে নির্ধারণ হয়?</summary><div class="faq-item__body">এক কেবিনে কতজন থাকবেন তার ভিত্তিতে। যত বেশি সদস্য একই কেবিনে, জনপ্রতি খরচ তত কম। Weekday ট্রিপে ২০% পর্যন্ত ছাড়।</div></details>
 			<details class="faq-item reveal"><summary>বুকিং কনফার্ম করতে কত টাকা অগ্রিম দিতে হয়?</summary><div class="faq-item__body">মোট প্যাকেজ মূল্যের ৫০% অগ্রিম (bKash/Nagad/Bank)। বাকি ৫০% অনবোর্ড হওয়ার সময়। অগ্রিম পাওয়ার পরই বুকিং Confirmed হয়।</div></details>
 			<details class="faq-item reveal"><summary>অপরিচিত কারও সাথে কেবিন শেয়ার করতে হবে?</summary><div class="faq-item__body">না। Privacy, Security ও Family Comfort-এর জন্য শুধুমাত্র নিজের গ্রুপের মধ্যেই কেবিন শেয়ারিং হয়।</div></details>
-			<details class="faq-item reveal"><summary>শিশুদের জন্য চার্জ কত?</summary><div class="faq-item__body">০–৪ বছর সম্পূর্ণ ফ্রি, ৪–৮ বছর ৫০% চার্জ, ৯ বছর বা তার বেশি হলে পূর্ণ চার্জ।</div></details>
+			<details class="faq-item reveal"><summary>শিশুদের জন্য চার্জ কত?</summary><div class="faq-item__body">০–৪ বছর সম্পূর্ণ ফ্রি, ৪–৮ বছর ফিক্সড ৳৫,০০০ (Weekday ছাড় প্রযোজ্য নয়), ৯ বছর বা তার বেশি হলে পূর্ণ চার্জ।</div></details>
 		</div>
 		<p class="center" style="margin-top:1.6rem"><a class="btn btn--ghost-dark" href="<?php echo esc_url( bhela_page_url( 'faq' ) ); ?>">সবগুলো প্রশ্ন দেখুন (৬০+)</a></p>
 	</div>

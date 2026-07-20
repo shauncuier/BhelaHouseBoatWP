@@ -130,7 +130,7 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 - **Regular/Holiday rate:** Applied on weekend days (configurable, default Fri+Sat) and holiday dates
 - **Weekday rate:** 20% discount on non-weekend, non-holiday days
 - **A cabin is opened for adults only:** every cabin needs at least 2 adults, so children never justify an extra cabin (2 cabins require 4 adults). Cabin tier is the adult count in that cabin. 4–8 children ride along in that cabin and never push the booking into a larger (cheaper-per-head) tier.
-- **Children pricing:** 0–4 free (share food + bed with parents, excluded from cabin size), 4–8 pay 50% of that cabin's adult per-person rate (after any discount), 9+ full rate
+- **Children pricing:** 0–4 free (share food + bed with parents, excluded from cabin size), 4–8 pay a **flat fee** (`child_fee` setting, default ৳5,000) with **no weekday discount**, 9+ full rate
   - Example (weekend): 4 adults + one 5-year-old = 4-person cabin → 4 × ৳10,000 + ৳5,000 = **৳45,000** (not a 5-person cabin at ৳9,000/head)
 - **Per-cabin, per-person** calculation with multi-cabin support
 

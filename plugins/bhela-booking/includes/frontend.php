@@ -44,7 +44,7 @@ function bhela_bm_enqueue_assets() {
 		'weekendDays'    => array_map( 'intval', (array) $settings['weekend_days'] ),
 		'holidays'       => array_values( array_filter( array_map( 'trim', explode( "\n", (string) $settings['holidays'] ) ) ) ),
 		'advancePercent' => (int) $settings['advance_percent'],
-		'childPercent'   => 50,
+		'childFee'       => (int) $settings['child_fee'],
 		'whatsapp'       => preg_replace( '/[^0-9]/', '', $settings['whatsapp'] ),
 	) );
 }
@@ -55,6 +55,8 @@ add_action( 'wp_enqueue_scripts', 'bhela_bm_enqueue_assets', 20 );
 function bhela_bm_booking_form_shortcode() {
 	wp_enqueue_style( 'bhela-bm-booking' );
 	wp_enqueue_script( 'bhela-bm-booking' );
+
+	$settings = bhela_bm_get_settings();
 
 	ob_start();
 	?>
@@ -138,7 +140,7 @@ function bhela_bm_booking_form_shortcode() {
 								<span class="bm-stepper__ctl"><button type="button" class="bm-stepper__btn" data-delta="-1" aria-label="কমান">−</button><output class="bm-stepper__val" id="bm-out-adults" aria-live="polite">2</output><button type="button" class="bm-stepper__btn bm-stepper__btn--plus" data-delta="1" aria-label="বাড়ান">+</button></span><input type="hidden" id="bm-g-adults" value="2" data-min="0" data-max="<?php echo esc_attr( bhela_bm_max_guests() ); ?>" data-out="bm-out-adults">
 							</p>
 							<p class="bhela-bm-field">
-								<label for="bm-g-c48">শিশু ৪–৮ <span>(৫০%)</span></label>
+								<label for="bm-g-c48">শিশু ৪–৮ <span>(<?php echo esc_html( bhela_bm_money( $settings['child_fee'] ) ); ?>)</span></label>
 								<span class="bm-stepper__ctl"><button type="button" class="bm-stepper__btn" data-delta="-1" aria-label="কমান">−</button><output class="bm-stepper__val" id="bm-out-c48" aria-live="polite">0</output><button type="button" class="bm-stepper__btn bm-stepper__btn--plus" data-delta="1" aria-label="বাড়ান">+</button></span><input type="hidden" id="bm-g-c48" value="0" data-min="0" data-max="10" data-out="bm-out-c48">
 							</p>
 							<p class="bhela-bm-field">
@@ -158,7 +160,7 @@ function bhela_bm_booking_form_shortcode() {
 							<button type="button" class="bhela-bm-addcabin" id="bm-edit-add">➕ কেবিন যোগ করুন</button>
 							<p class="bm-edit__note" id="bm-edit-note"></p>
 						</div>
-						<p class="bhela-bm-childnote">👶 ০–৪ বছর ফ্রি · ৪–৮ বছর ৫০% · ৯+ পূর্ণ রেট। ২–<?php echo esc_html( bhela_bm_max_guests() ); ?> জন (<?php echo esc_html( bhela_bm_max_cabins() ); ?>টি কেবিন) · যত বেশি জন, জনপ্রতি রেট তত কম।</p>
+						<p class="bhela-bm-childnote">👶 ০–৪ বছর ফ্রি · ৪–৮ বছর <?php echo esc_html( bhela_bm_money( $settings['child_fee'] ) ); ?> · ৯+ পূর্ণ রেট। ২–<?php echo esc_html( bhela_bm_max_guests() ); ?> জন (<?php echo esc_html( bhela_bm_max_cabins() ); ?>টি কেবিন) · যত বেশি জন, জনপ্রতি রেট তত কম।</p>
 						<label class="bm-fullboat">
 							<input type="checkbox" id="bm-fullboat" name="full_boat" value="1">
 							<span>🚢 <strong>পুরো বোট রিজার্ভ</strong> করতে চাই — কাস্টম কোটের জন্য রিকোয়েস্ট পাঠাবো (<?php echo esc_html( bhela_bm_max_cabins() ); ?> কেবিন · <?php echo esc_html( bhela_bm_max_guests() ); ?> জন)</span>
@@ -244,7 +246,7 @@ add_shortcode( 'bhela_booking_form', 'bhela_bm_booking_form_shortcode' );
  * Price a chosen cabin combination.
  *
  * Cabin size / rate tier is decided by the ADULT count alone. 4–8 children ride
- * in that cabin and pay 50% of the same per-person rate (after any discount) —
+ * in that cabin and pay a flat child fee (settings: child_fee) —
  * they never push the booking into a bigger, cheaper-per-head tier. Example:
  * 4 adults + one 5-year-old on a weekend is a 4-person cabin (4 × 10,000) plus
  * 5,000 for the child = 45,000 — not a 5-person cabin at 9,000/head.
@@ -256,9 +258,10 @@ add_shortcode( 'bhela_booking_form', 'bhela_bm_booking_form_shortcode' );
  * Returns array|WP_Error.
  */
 function bhela_bm_calc_multi( $cabins, $date ) {
-	$settings = bhela_bm_get_settings();
-	$day_type = bhela_bm_day_type( $date );
-	$max_cap  = max( array_keys( bhela_bm_rates_by_occupancy() ) );
+	$settings  = bhela_bm_get_settings();
+	$day_type  = bhela_bm_day_type( $date );
+	$max_cap   = max( array_keys( bhela_bm_rates_by_occupancy() ) );
+	$child_fee = max( 0, (int) $settings['child_fee'] );
 
 	$total         = 0;
 	$regular_total = 0;
@@ -288,16 +291,17 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 			return new WP_Error( 'over_cabin', sprintf( __( 'একটি কেবিনে সর্বোচ্চ %d জন (শিশু ০–৪ বাদে)।', 'bhela-booking' ), $max_cap ) );
 		}
 
-		// Rate tier follows the ADULT count only — 4–8 children ride along at 50%
-		// of this cabin's per-person rate without enlarging the tier. The smallest
+		// Rate tier follows the ADULT count only — 4–8 children ride along on a
+		// flat per-child fee and never enlarge the tier. The smallest
 		// cabin is a couple cabin, so a lone adult still books that tier.
 		$min_cap = min( array_keys( bhela_bm_rates_by_occupancy() ) );
 		$tier    = max( $adults, $min_cap );
 		$row     = bhela_bm_rate_for_occupancy( $tier );
 		$rate    = ( 'weekday' === $day_type ) ? (int) $row['weekday'] : (int) $row['regular'];
 		$reg     = (int) $row['regular'];
-		$line    = $adults * $rate + (int) ceil( $c48 * $rate * 0.5 );
-		$line_rg = $adults * $reg + (int) ceil( $c48 * $reg * 0.5 );
+		// 4–8 children pay a flat fee, so it is the same on weekdays and weekends.
+		$line    = $adults * $rate + $c48 * $child_fee;
+		$line_rg = $adults * $reg + $c48 * $child_fee;
 
 		$total         += $line;
 		$regular_total += $line_rg;

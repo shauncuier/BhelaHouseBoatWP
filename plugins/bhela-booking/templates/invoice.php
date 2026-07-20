@@ -128,7 +128,7 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 								$inv_guests = (int) ( $inv_line['people'] ?? $inv_line['occ'] ?? 0 );
 								?>
 								<td><?php echo esc_html( $inv_guests ); ?> জন</td>
-								<td><?php echo esc_html( isset( $inv_line['rate'] ) ? bhela_bm_money( $inv_line['rate'] ) : '—' ); ?><?php if ( ! empty( $inv_line['c48'] ) ) : ?><br><span style="font-size:12px;color:#5b6b6a">শিশু (৪–৮) ৫০%</span><?php endif; ?></td>
+								<td><?php echo esc_html( isset( $inv_line['rate'] ) ? bhela_bm_money( $inv_line['rate'] ) : '—' ); ?><?php if ( ! empty( $inv_line['c48'] ) ) : ?><br><span style="font-size:12px;color:#5b6b6a">শিশু (৪–৮) <?php echo esc_html( bhela_bm_money( (int) bhela_bm_get_settings()['child_fee'] ) ); ?>/জন</span><?php endif; ?></td>
 								<td><?php echo esc_html( bhela_bm_money( (int) ( $inv_line['total'] ?? 0 ) ) ); ?></td>
 							</tr>
 						<?php endforeach; ?>

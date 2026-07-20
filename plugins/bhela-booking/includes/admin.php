@@ -449,6 +449,7 @@ function bhela_bm_settings_page() {
 		$s['email_reply_to']  = sanitize_email( wp_unslash( $_POST['email_reply_to'] ?? '' ) );
 		$s['email_from_name'] = sanitize_text_field( wp_unslash( $_POST['email_from_name'] ?? '' ) );
 		$s['advance_percent'] = min( 100, max( 1, (int) ( $_POST['advance_percent'] ?? 50 ) ) );
+		$s['child_fee']       = max( 0, (int) ( $_POST['child_fee'] ?? 5000 ) );
 		$s['weekend_days']    = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
 
 		// SMS notification settings.
@@ -522,6 +523,7 @@ function bhela_bm_settings_page() {
 					<p class="description"><?php esc_html_e( 'Shown on the invoice so guests can scan & pay. Media → Add New → copy File URL.', 'bhela-booking' ); ?></p></td></tr>
 				<tr><th>Bangla QR Image URL</th><td><input type="url" class="large-text" name="bangla_qr" value="<?php echo esc_attr( $s['bangla_qr'] ?? '' ); ?>" placeholder="Upload the Bangla QR photo in Media Library, paste its URL here"></td></tr>
 				<tr><th>Advance %</th><td><input type="number" name="advance_percent" min="1" max="100" value="<?php echo esc_attr( $s['advance_percent'] ); ?>"> %</td></tr>
+				<tr><th>শিশু (৪–৮) ফি</th><td><input type="number" name="child_fee" min="0" step="100" value="<?php echo esc_attr( $s['child_fee'] ); ?>"> ৳ প্রতি শিশু<br><span class="description">ফিক্সড চার্জ — কেবিনের রেট বা Weekday ছাড়ের সাথে বদলায় না। ০–৪ বছর সবসময় ফ্রি।</span></td></tr>
 				<tr><th>Invoice Prefix</th><td><input type="text" name="invoice_prefix" value="<?php echo esc_attr( $s['invoice_prefix'] ); ?>"></td></tr>
 				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="3" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea></td></tr>
 			</table>

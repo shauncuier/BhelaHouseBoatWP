@@ -206,7 +206,7 @@
 		 * Fill a size list with people. A 4–8 child gets a bed, so it takes a place
 		 * in the cabin exactly like an adult — the sizes here are bodies. What the
 		 * child does NOT do is raise the price tier: each cabin is rated on the
-		 * ADULTS inside it (`tier`), and the children then pay 50% of that rate.
+		 * ADULTS inside it (`tier`); children then pay a flat fee (bhelaBM.childFee).
 		 *
 		 * A cabin is only opened for ADULTS: every cabin needs at least MIN_CAP (2)
 		 * adults, so children can never justify an extra cabin — 2 adults + 3
@@ -255,8 +255,9 @@
 				var tier = c.tier || Math.max(c.adults, MIN_CAP);
 				var rate = occRate(tier, dt || 'weekend');
 				var reg = occRate(tier, 'weekend');
-				total += c.adults * rate + Math.ceil(c.c48 * rate * (bhelaBM.childPercent / 100));
-				regular += c.adults * reg + Math.ceil(c.c48 * reg * (bhelaBM.childPercent / 100));
+				// 4–8 children pay a flat fee — identical on weekdays and weekends.
+				total += c.adults * rate + c.c48 * bhelaBM.childFee;
+				regular += c.adults * reg + c.c48 * bhelaBM.childFee;
 			});
 			return { cabins: cabins, total: total, regular: regular, bodies: occupants,
 				perPerson: occupants ? Math.round(total / occupants) : 0 };
@@ -429,7 +430,7 @@
 					rowEl.classList.toggle('is-over', over);
 					var tEl = rowEl.querySelector('.bm-row-total');
 					if (tEl) tEl.textContent = (!over && occ >= 2 && occ <= MAX_CAP && dt)
-						? money(c.adults * occRate(tier, dt) + Math.ceil(c.c48 * occRate(tier, dt) * (bhelaBM.childPercent / 100)))
+						? money(c.adults * occRate(tier, dt) + c.c48 * bhelaBM.childFee)
 						: '—';
 				}
 				if (over) badCabin = true;
@@ -581,8 +582,8 @@
 				// otherwise this line and the grand total disagree.
 				var tier = cb.tier || Math.max(cb.adults, MIN_CAP);
 				var rate = occRate(tier, dt);
-				var line = cb.adults * rate + Math.ceil(cb.c48 * rate * (bhelaBM.childPercent / 100));
-				return '<div class="bm-bd-line"><span>কেবিন ' + (n + 1) + ' (' + cb.size + ' জন)<small>' + who + ' · ' + money(rate) + '/জন' + (cb.c48 ? ' · শিশু ৫০%' : '') + '</small></span><strong>' + money(line) + '</strong></div>';
+				var line = cb.adults * rate + cb.c48 * bhelaBM.childFee;
+				return '<div class="bm-bd-line"><span>কেবিন ' + (n + 1) + ' (' + cb.size + ' জন)<small>' + who + ' · ' + money(rate) + '/জন' + (cb.c48 ? ' · শিশু ' + money(bhelaBM.childFee) + '/জন' : '') + '</small></span><strong>' + money(line) + '</strong></div>';
 			}).join('');
 
 			priceBox.hidden = false;

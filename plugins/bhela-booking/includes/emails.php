@@ -122,7 +122,7 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	$booking_lines = json_decode( (string) $m( '_bhela_lines' ), true );
 	if ( is_array( $booking_lines ) && $booking_lines ) {
 		foreach ( $booking_lines as $bl ) {
-			$rate_txt = isset( $bl['rate'] ) ? bhela_bm_money( $bl['rate'] ) . '/জন' . ( ! empty( $bl['c48'] ) ? ' (শিশু ৪–৮: ৫০%)' : '' ) : '';
+			$rate_txt = isset( $bl['rate'] ) ? bhela_bm_money( $bl['rate'] ) . '/জন' . ( ! empty( $bl['c48'] ) ? ' (শিশু ৪–৮: ' . bhela_bm_money( (int) bhela_bm_get_settings()['child_fee'] ) . '/জন)' : '' ) : '';
 			$rows    .= bhela_bm_email_row( $bl['label'], $bl['who'] . ( $rate_txt ? ' — ' . $rate_txt : '' ) . ' = ' . bhela_bm_money( (int) ( $bl['total'] ?? 0 ) ) );
 		}
 	} else {

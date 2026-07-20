@@ -47,7 +47,7 @@ get_header();
 		<h2>❌ প্যাকেজের বাইরে</h2>
 		<p>কিছু স্পটের Entry Fee, ছোট নৌকার ভাড়া (যেখানে হাউসবোট যেতে পারে না), ব্যক্তিগত খরচ।</p>
 		<h2>👶 শিশু নীতিমালা</h2>
-		<p>০–৪ বছর: সম্পূর্ণ ফ্রি · ৪–৮ বছর: ৫০% চার্জ · ৯+ বছর: পূর্ণ চার্জ</p>
+		<p>০–৪ বছর: সম্পূর্ণ ফ্রি · ৪–৮ বছর: ফিক্সড ৳৫,০০০ · ৯+ বছর: পূর্ণ চার্জ</p>
 		<h2>🏢 Corporate ও Full Boat</h2>
 		<p>Full Boat Reservation-এ পুরো বোট (সর্বোচ্চ ৪০ জন) শুধু আপনার গ্রুপের। Custom Menu, Team Building, Meeting Setup — <a href="<?php echo esc_url( bhela_wa_link( 'Full Boat / Corporate বুকিং সম্পর্কে জানতে চাই।' ) ); ?>" target="_blank" rel="noopener">WhatsApp-এ কোটেশন নিন</a>।</p>
 	</div>
