@@ -179,26 +179,42 @@
 		}
 
 		/**
-		 * Fill a size list. Cabin size = ADULTS only — that is what picks the rate
-		 * tier. 4–8 children then ride along in those cabins at 50% of the same
-		 * per-person rate without enlarging the tier (largest cabin first, because
-		 * that tier has the lowest per-person rate). 0–4 infants are FREE riders
-		 * attached to the first cabin and never change the size or rate.
+		 * Fill a size list with people. A 4–8 child gets a bed, so it takes a place
+		 * in the cabin exactly like an adult — the sizes here are bodies. What the
+		 * child does NOT do is raise the price tier: each cabin is rated on the
+		 * ADULTS inside it (`tier`), and the children then pay 50% of that rate.
+		 *
+		 * Every cabin keeps at least one adult (children never travel alone); a
+		 * layout that cannot satisfy that is rejected by returning null. 0–4
+		 * infants share with their parents and take no place at all.
 		 */
 		function fillCombo(sizes, adults, c48, c04) {
 			var leftA = adults, leftC = c48;
 			var cabins = sizes.map(function (size) {
-				var take = Math.min(size, leftA);
-				leftA -= take;
-				return { size: size, adults: take, c48: 0, c04: 0 };
+				return { size: size, adults: 0, c48: 0, c04: 0 };
 			});
+			// One adult per cabin first, so no cabin ends up children-only.
 			cabins.forEach(function (cab) {
-				if (leftC <= 0) return;
-				var room = Math.max(0, MAX_CAP - cab.size); // keep bodies per cabin sane
-				var take = Math.min(room, leftC);
-				cab.c48 += take; leftC -= take;
+				if (leftA <= 0) return;
+				cab.adults = 1; leftA--;
 			});
-			if (leftC > 0 && cabins.length) cabins[0].c48 += leftC; // overflow safety
+			if (leftA > 0 || leftC > 0) {
+				cabins.forEach(function (cab) {
+					var space = cab.size - cab.adults - cab.c48;
+					if (space <= 0) return;
+					var takeA = Math.min(space, leftA);
+					cab.adults += takeA; leftA -= takeA; space -= takeA;
+					var takeC = Math.min(space, leftC);
+					cab.c48 += takeC; leftC -= takeC;
+				});
+			}
+			// Everyone must fit, and every cabin needs an adult.
+			if (leftA > 0 || leftC > 0) return null;
+			for (var i = 0; i < cabins.length; i++) {
+				if (cabins[i].adults < 1) return null;
+				// Rate tier = adults in this cabin (smallest cabin sold is MIN_CAP).
+				cabins[i].tier = Math.max(cabins[i].adults, MIN_CAP);
+			}
 			if (c04 > 0 && cabins.length) cabins[0].c04 = c04; // free ride-along, no seat used
 			return cabins;
 		}
@@ -207,8 +223,10 @@
 		function priceCombo(cabins, dt, occupants) {
 			var total = 0, regular = 0;
 			cabins.forEach(function (c) {
-				var rate = occRate(c.size, dt || 'weekend');
-				var reg = occRate(c.size, 'weekend');
+				// Priced on the adults in the cabin, not on how many bodies it holds.
+				var tier = c.tier || Math.max(c.adults, MIN_CAP);
+				var rate = occRate(tier, dt || 'weekend');
+				var reg = occRate(tier, 'weekend');
 				total += c.adults * rate + Math.ceil(c.c48 * rate * (bhelaBM.childPercent / 100));
 				regular += c.adults * reg + Math.ceil(c.c48 * reg * (bhelaBM.childPercent / 100));
 			});
@@ -221,12 +239,13 @@
 		 * (lowest total) is flagged as our suggestion; the guest may pick any.
 		 */
 		function buildOptions(g, dt) {
-			var occupants = g.adults + g.c48; // real bodies aboard (infants excluded)
-			// Cabins are sized by ADULTS only; 4–8 children ride along at 50%.
-			// The smallest cabin is a couple cabin, so a lone adult still books MIN_CAP.
-			var tierBodies = Math.max(g.adults, MIN_CAP);
-			var combos = genCombinations(tierBodies).map(function (sizes) {
-				return priceCombo(fillCombo(sizes, g.adults, g.c48, g.c04), dt, occupants);
+			// Cabins must hold every body (4–8 children get a bed too); the price
+			// tier of each cabin is then set by the adults inside it.
+			var occupants = Math.max(g.adults + g.c48, MIN_CAP);
+			var combos = [];
+			genCombinations(occupants).forEach(function (sizes) {
+				var filled = fillCombo(sizes, g.adults, g.c48, g.c04);
+				if (filled) combos.push(priceCombo(filled, dt, g.adults + g.c48));
 			});
 			if (!combos.length) return [];
 			combos.sort(function (a, b) { return a.total - b.total || a.cabins.length - b.cabins.length; });
@@ -395,9 +414,13 @@
 			else if (occupants > MAX_GUESTS) msg = '⚠️ সর্বোচ্চ ' + MAX_GUESTS + ' জন।';
 			var priced = null;
 			if (!msg && dt) {
-				// size = adults only: the rate tier never grows because of 4–8 children.
+				// Bodies fill the cabin; the tier is set by its adults only.
 				var filled = cabins.map(function (c) {
-					return { size: Math.max(c.adults, MIN_CAP), adults: c.adults, c48: c.c48, c04: c.c04 };
+					return {
+						size: c.adults + c.c48,
+						tier: Math.max(c.adults, MIN_CAP),
+						adults: c.adults, c48: c.c48, c04: c.c04
+					};
 				});
 				priced = priceCombo(filled, dt, occupants);
 			}
