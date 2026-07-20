@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BHELA – The Haor Exclusive · Custom Houseboat Booking Platform</title>
+<meta name="description" content="A custom-built WordPress booking platform for BHELA – The Haor Exclusive: what the client receives, the business value it delivers, and why a custom theme + booking engine beats templates and SaaS.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#0A2A2F; --ink-2:#0E3B41; --primary:#137A74; --primary-soft:#1B968F;
+  --aqua:#6FC7BF; --cta:#FF7A3D; --cta-dark:#E5601F; --gold:#F5C97B;
+  --sand:#F4EDE1; --cream:#FBF8F2; --white:#fff;
+  --text:#22403E; --text-soft:#5E7472; --line:rgba(10,42,47,.12);
+  --bg:var(--cream); --surface:#fff; --card:#fff;
+  --font-display:'Fraunces',Georgia,serif; --font-body:'Inter',system-ui,sans-serif;
+  --radius:20px; --radius-sm:12px; --shadow:0 18px 50px rgba(10,42,47,.14);
+  --shadow-sm:0 8px 24px rgba(10,42,47,.09); --container:1140px;
+}
+@media (prefers-color-scheme:dark){
+  :root{ --bg:#08181B; --surface:#0E272B; --card:#0E272B; --text:#DCEBE9;
+    --text-soft:#8FB0AD; --line:rgba(220,235,233,.14); --cream:#08181B; --sand:#0C2226; }
+}
+:root[data-theme="dark"]{ --bg:#08181B; --surface:#0E272B; --card:#0E272B; --text:#DCEBE9;
+  --text-soft:#8FB0AD; --line:rgba(220,235,233,.14); --cream:#08181B; --sand:#0C2226; }
+:root[data-theme="light"]{ --bg:#FBF8F2; --surface:#fff; --card:#fff; --text:#22403E;
+  --text-soft:#5E7472; --line:rgba(10,42,47,.12); --cream:#FBF8F2; --sand:#F4EDE1; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font-body);color:var(--text);background:var(--bg);line-height:1.7;
+  -webkit-font-smoothing:antialiased;font-size:16px}
+h1,h2,h3,h4{font-family:var(--font-display);font-weight:600;line-height:1.2;color:var(--text)}
+a{color:var(--primary);text-decoration:none}
+.wrap{max-width:var(--container);margin-inline:auto;padding-inline:clamp(1.1rem,4vw,2rem)}
+.eyebrow{display:inline-flex;align-items:center;gap:.6rem;font-size:.78rem;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:var(--primary);margin-bottom:1rem}
+.eyebrow::before{content:"";width:30px;height:2px;background:var(--cta)}
+
+/* Hero */
+.hero{background:linear-gradient(160deg,var(--ink) 0%,var(--ink-2) 100%);color:#fff;
+  padding:clamp(4rem,10vw,7rem) 0 clamp(3.5rem,8vw,6rem);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;inset:auto -10% -40% auto;width:60%;height:80%;
+  background:radial-gradient(circle,rgba(111,199,191,.16),transparent 70%);pointer-events:none}
+.hero .eyebrow{color:var(--aqua)}
+.hero h1{color:#fff;font-size:clamp(2.3rem,5.5vw,4rem);max-width:16ch;margin-bottom:1.2rem}
+.hero h1 em{color:var(--gold);font-style:normal}
+.hero p{color:#CFE3E1;font-size:clamp(1.05rem,2vw,1.25rem);max-width:60ch;margin-bottom:2rem}
+.hero__meta{display:flex;flex-wrap:wrap;gap:.7rem;margin-top:2.4rem}
+.chip{display:inline-flex;align-items:center;gap:.45rem;background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.16);color:#DCEBE9;padding:.5rem 1rem;border-radius:999px;
+  font-size:.86rem;font-weight:500}
+.btn{display:inline-flex;align-items:center;gap:.5rem;padding:.9rem 1.9rem;border-radius:999px;
+  font-weight:700;font-size:1rem;transition:transform .2s,background .2s}
+.btn--cta{background:var(--cta);color:#fff;box-shadow:0 10px 30px rgba(255,122,61,.35)}
+.btn--cta:hover{background:var(--cta-dark);transform:translateY(-2px)}
+.btn--ghost{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.5)}
+.btn--ghost:hover{border-color:var(--aqua);color:var(--aqua)}
+.hero__cta{display:flex;flex-wrap:wrap;gap:.9rem}
+
+/* Sections */
+section{padding-block:clamp(3.5rem,7vw,5.5rem)}
+.section--sand{background:var(--sand)}
+.section-head{max-width:70ch;margin-bottom:2.8rem}
+.section-head h2{font-size:clamp(1.7rem,3.5vw,2.5rem);margin-bottom:.9rem}
+.section-head p{color:var(--text-soft);font-size:1.08rem}
+.lead-lg{font-size:1.15rem}
+
+/* Value grid */
+.grid{display:grid;gap:1.3rem}
+.grid--3{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.grid--2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.7rem 1.6rem;box-shadow:var(--shadow-sm)}
+.card__icon{font-size:1.7rem;margin-bottom:.8rem;display:block}
+.card h3{font-size:1.2rem;margin-bottom:.5rem}
+.card p{color:var(--text-soft);font-size:.98rem}
+.card strong{color:var(--primary)}
+
+/* Deliverables list */
+.deliver{display:grid;gap:.9rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.deliver__item{display:flex;gap:.9rem;align-items:flex-start;background:var(--surface);
+  border:1px solid var(--line);border-radius:var(--radius-sm);padding:1.1rem 1.2rem}
+.deliver__item .tick{color:var(--primary);font-weight:800;flex:0 0 auto;margin-top:.1rem}
+.deliver__item b{display:block;margin-bottom:.15rem}
+.deliver__item span{color:var(--text-soft);font-size:.92rem;line-height:1.5}
+
+/* Comparison table */
+.table-scroll{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--line)}
+table{border-collapse:collapse;width:100%;min-width:640px;background:var(--surface)}
+th,td{text-align:left;padding:1rem 1.1rem;border-bottom:1px solid var(--line);font-size:.96rem;vertical-align:top}
+thead th{background:var(--ink);color:#fff;font-family:var(--font-display);font-weight:600}
+thead th:first-child{border-top-left-radius:var(--radius)}
+thead th:last-child{border-top-right-radius:var(--radius)}
+tbody tr:last-child td{border-bottom:0}
+td.feature{font-weight:600;color:var(--text)}
+.yes{color:#1a7f37;font-weight:700}
+.no{color:#b4530a;font-weight:600}
+:root[data-theme="dark"] .yes,@media(prefers-color-scheme:dark){.yes{color:#5fd08a}}
+.col-bhela{background:rgba(19,122,116,.06)}
+
+/* Why custom */
+.why{display:grid;gap:1.5rem;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.why__block{border-left:3px solid var(--cta);padding-left:1.2rem}
+.why__block h3{font-size:1.15rem;margin-bottom:.4rem}
+.why__block p{color:var(--text-soft);font-size:.98rem}
+
+/* Stats */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1.2rem;
+  margin-top:2rem}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);
+  padding:1.5rem 1.2rem;text-align:center;box-shadow:var(--shadow-sm)}
+.stat b{display:block;font-family:var(--font-display);font-size:2.1rem;color:var(--cta);line-height:1}
+.stat span{display:block;margin-top:.5rem;color:var(--text-soft);font-size:.9rem}
+
+/* CTA band */
+.band{background:linear-gradient(160deg,var(--ink),var(--ink-2));color:#fff;text-align:center;
+  border-radius:var(--radius);padding:clamp(2.5rem,6vw,4rem) 1.5rem}
+.band h2{color:#fff;font-size:clamp(1.6rem,3.5vw,2.3rem);margin-bottom:.8rem}
+.band p{color:#CFE3E1;max-width:52ch;margin:0 auto 1.8rem}
+
+/* Footer */
+footer{background:var(--ink);color:#9FBFBC;padding:2.5rem 0;text-align:center;font-size:.9rem}
+footer a{color:var(--aqua)}
+footer .tag{font-family:var(--font-display);color:var(--gold);font-size:1.05rem;margin-bottom:.6rem;display:block}
+
+/* Theme toggle */
+.toggle{position:fixed;top:1rem;right:1rem;z-index:50;background:rgba(255,255,255,.12);
+  border:1px solid rgba(255,255,255,.25);color:#fff;width:42px;height:42px;border-radius:50%;
+  cursor:pointer;font-size:1.1rem;display:grid;place-items:center;backdrop-filter:blur(8px)}
+:root[data-theme="light"] .toggle{background:rgba(10,42,47,.08);border-color:var(--line);color:var(--ink)}
+
+.mt-tight{margin-top:.4rem}
+.muted{color:var(--text-soft)}
+</style>
+</head>
+<body>
+<button class="toggle" onclick="(function(){var r=document.documentElement;var d=r.getAttribute('data-theme')==='dark'||(!r.getAttribute('data-theme')&&matchMedia('(prefers-color-scheme:dark)').matches);r.setAttribute('data-theme',d?'light':'dark');})()" aria-label="Toggle theme">◐</button>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="eyebrow">Project Overview · Custom WordPress Platform</span>
+    <h1>BHELA — <em>The Haor Exclusive</em> Booking Platform</h1>
+    <p>A purpose-built online booking website for a premium houseboat operating on Tanguar Haor, Sunamganj. Not a template, not a rented SaaS — a custom theme and booking engine the client fully owns.</p>
+    <div class="hero__cta">
+      <a class="btn btn--cta" href="#value">See the business value ↓</a>
+      <a class="btn btn--ghost" href="https://github.com/shauncuier/BhelaHouseBoatWP">View the repository</a>
+    </div>
+    <div class="hero__meta">
+      <span class="chip">🛶 6-cabin real-time availability</span>
+      <span class="chip">💳 0% booking commission</span>
+      <span class="chip">🇧🇩 Bangla-first UI</span>
+      <span class="chip">⚡ Optimised for speed &amp; SEO</span>
+    </div>
+  </div>
+</header>
+
+<!-- WHAT IT IS -->
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">1 · What this project is</span>
+      <h2>An online booking system built around one specific business</h2>
+      <p class="lead-lg">BHELA runs a premium houseboat with six family cabins on Tanguar Haor. The website lets guests check date availability, see live per-person pricing, and send a booking request in about two minutes — while the owner manages every booking, invoice, rate, and trip from one dashboard. It replaces phone-only and Facebook-only booking with a professional platform the owner controls end to end.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>2</b><span>components: custom theme + booking engine plugin</span></div>
+      <div class="stat"><b>8+</b><span>ready pages incl. blog, FAQ, gallery, policies</span></div>
+      <div class="stat"><b>6</b><span>cabins with occupancy-based pricing logic</span></div>
+      <div class="stat"><b>0%</b><span>commission paid to any third party</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- WHAT THE CLIENT GETS -->
+<section class="section--sand">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">2 · What the client receives</span>
+      <h2>Deliverables — everything handed over</h2>
+      <p>A complete, self-contained platform plus its source code and documentation. No hidden dependencies, no monthly licence to keep it running.</p>
+    </div>
+    <div class="deliver">
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Custom theme (“Midnight Monsoon”)</b><span>A bespoke dark-teal luxury design — homepage, cabins, schedule, food menu, gallery, FAQ, policies, blog — tuned for this brand, not a marketplace template.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Booking engine plugin</b><span>Multi-step booking wizard, live pricing, availability, invoices, guest reviews and trip calendar — written specifically for a 6-cabin houseboat.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Owner dashboard</b><span>Manage bookings, statuses, rates, holidays, cabin availability, reviews and all business settings from WordPress admin — no code needed.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Automated invoices</b><span>Every booking gets a branded, private-link invoice with per-person breakdown, advance, paid and due — safe to send on WhatsApp.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Email &amp; SMS notifications</b><span>Automatic emails to owner and guest, optional SMS on new booking and status change — all toggleable, provider-agnostic.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Blog — হাওর জার্নাল</b><span>A ready travel blog with categories, tags, related posts and booking call-to-actions to attract organic search traffic.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>SEO &amp; analytics ready</b><span>Meta tags, Open Graph/Twitter cards, structured data (JSON-LD), sitemap, plus one-paste Google Analytics &amp; Facebook Pixel setup.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Full source code + ownership</b><span>The complete codebase on GitHub, versioned and documented. The client owns it outright — free to host anywhere, edit, or extend.</span></div></div>
+      <div class="deliver__item"><span class="tick">✓</span><div><b>Documentation</b><span>A non-technical owner’s manual (Bangla-friendly) plus developer docs, so the site can be run day-to-day and maintained by anyone.</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- THE VALUE -->
+<section id="value">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">3 · The real value</span>
+      <h2>What this platform is actually worth to the business</h2>
+      <p>The design and features are the surface. The value is in what it changes for the operator, month after month.</p>
+    </div>
+    <div class="grid grid--3">
+      <div class="card"><span class="card__icon">🕒</span><h3>Books 24/7, unattended</h3><p>Guests reserve at midnight or during a busy trip without a single phone call. The site captures the booking, sends the invoice, and notifies the owner — <strong>revenue that was previously lost to missed calls.</strong></p></div>
+      <div class="card"><span class="card__icon">💸</span><h3>Zero commission</h3><p>Booking marketplaces and OTAs take a cut of every sale. Here the owner keeps <strong>100% of every taka</strong> — the platform pays for itself after a handful of direct bookings.</p></div>
+      <div class="card"><span class="card__icon">🔑</span><h3>Owns the platform &amp; the data</h3><p>No rented website builder that can raise prices or lock the account. The code, the customer data, and the domain are <strong>fully the client’s</strong> — a real business asset, not a subscription.</p></div>
+      <div class="card"><span class="card__icon">📈</span><h3>Found on Google</h3><p>Built-in SEO and a content blog target the exact searches guests make about Tanguar Haor trips — turning organic search into <strong>a steady booking channel</strong> instead of relying only on Facebook.</p></div>
+      <div class="card"><span class="card__icon">🤝</span><h3>Professional first impression</h3><p>A polished, fast, mobile-first site signals a serious operator. It <strong>builds trust before the guest ever pays</strong> — and trust is what closes a premium booking.</p></div>
+      <div class="card"><span class="card__icon">🧾</span><h3>Runs the back office too</h3><p>Pricing, invoices, availability, reminders and reviews are handled by the system. The owner spends <strong>less time on admin and more on hosting guests.</strong></p></div>
+    </div>
+  </div>
+</section>
+
+<!-- WHY CUSTOM -->
+<section class="section--sand">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">4 · Why custom theme + plugin</span>
+      <h2>Why not a template, page builder, or SaaS?</h2>
+      <p>It’s a fair question — those are cheaper up front. Here is why a custom build is the right call for a booking business, and where the money actually goes.</p>
+    </div>
+    <div class="why">
+      <div class="why__block"><h3>Booking logic no plugin sells</h3><p>Pricing here is per-cabin and per-person, with occupancy sharing, weekday discounts, holiday rates and child pricing (free / half / full). Off-the-shelf booking plugins can’t model six shared cabins on one boat — this engine was written for exactly that.</p></div>
+      <div class="why__block"><h3>Speed you can’t retrofit</h3><p>Page builders ship heavy, generic code that drags load time — and slow sites lose mobile bookings. This build is lean, single-stylesheet, no jQuery, with images optimised ~74% smaller. Fast by construction, not by plugin patch.</p></div>
+      <div class="why__block"><h3>No monthly rent</h3><p>SaaS builders and premium booking add-ons charge every month, forever. A custom build is paid once and owned. Over a couple of years that is the difference between an expense and an asset.</p></div>
+      <div class="why__block"><h3>Bangla-first, brand-first</h3><p>The whole experience is written in Bangla for local guests, in this brand’s voice and colours. A template forces the business to fit the tool; a custom build fits the tool to the business.</p></div>
+      <div class="why__block"><h3>Security &amp; data control</h3><p>Bookings are stored privately, invoices use signed private links, and every form is protected against spam and abuse. Guest data lives on the client’s own site — not on a third-party platform.</p></div>
+      <div class="why__block"><h3>Extensible &amp; future-proof</h3><p>Clean, documented WordPress code means any developer can extend it — add server-side conversion tracking, new pages, payment gateways — without being trapped in a proprietary builder.</p></div>
+    </div>
+
+    <h3 style="margin:2.6rem 0 1rem;font-size:1.25rem">Custom build vs the alternatives</h3>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>What matters for a booking business</th><th class="col-bhela">This custom build</th><th>Website builder / SaaS</th><th>Generic template + plugins</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="feature">6-cabin occupancy &amp; per-person pricing</td><td class="col-bhela"><span class="yes">Purpose-built</span></td><td><span class="no">Not possible</span></td><td><span class="no">Heavy workarounds</span></td></tr>
+          <tr><td class="feature">Booking commission</td><td class="col-bhela"><span class="yes">0%</span></td><td>Often per-booking fees</td><td><span class="yes">0%</span></td></tr>
+          <tr><td class="feature">Monthly cost to keep running</td><td class="col-bhela"><span class="yes">Hosting only</span></td><td><span class="no">Recurring subscription</span></td><td>Plugin licences add up</td></tr>
+          <tr><td class="feature">Ownership of code &amp; data</td><td class="col-bhela"><span class="yes">Full — on GitHub</span></td><td><span class="no">Locked to platform</span></td><td>Partial</td></tr>
+          <tr><td class="feature">Page speed on mobile</td><td class="col-bhela"><span class="yes">Lean &amp; optimised</span></td><td>Varies, often heavy</td><td><span class="no">Builder bloat</span></td></tr>
+          <tr><td class="feature">Bangla-first, on-brand design</td><td class="col-bhela"><span class="yes">Tailored</span></td><td>Template-limited</td><td>Template-limited</td></tr>
+          <tr><td class="feature">SEO &amp; structured data</td><td class="col-bhela"><span class="yes">Built in</span></td><td>Basic</td><td>Needs paid add-ons</td></tr>
+          <tr><td class="feature">Extend / customise later</td><td class="col-bhela"><span class="yes">Any developer</span></td><td><span class="no">Restricted</span></td><td>Plugin-dependent</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- QUALITY -->
+<section>
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">5 · Engineering quality</span>
+      <h2>Built to professional standards</h2>
+      <p>The parts a guest never sees are what keep the site fast, safe, and reliable.</p>
+    </div>
+    <div class="grid grid--2">
+      <div class="card"><span class="card__icon">⚡</span><h3>Performance</h3><p>Single stylesheet, no jQuery, lazy-loaded images, font preconnect, and a one-time image optimisation that cut theme image weight by about <strong>74%</strong> — faster loads mean more completed mobile bookings.</p></div>
+      <div class="card"><span class="card__icon">🔍</span><h3>SEO &amp; discoverability</h3><p>Per-page meta descriptions, Open Graph &amp; Twitter cards, a connected JSON-LD knowledge graph (Organization, LocalBusiness, reviews, breadcrumbs), XML sitemap and correct language signals.</p></div>
+      <div class="card"><span class="card__icon">🔒</span><h3>Security</h3><p>Nonce-verified forms, capability checks, honeypot &amp; rate-limiting against spam, private booking records with no public API exposure, and timing-safe signed invoice links.</p></div>
+      <div class="card"><span class="card__icon">📱</span><h3>Responsive &amp; accessible</h3><p>Mobile-first layout, a dedicated mobile action bar, readable Bangla typography, and reduced-motion support — a clean experience on any device.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- HANDOVER -->
+<section class="section--sand">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">6 · Handover &amp; independence</span>
+      <h2>The client is never locked in</h2>
+      <p>The whole point of a custom build is independence. Everything needed to run and maintain the site is handed over.</p>
+    </div>
+    <div class="grid grid--3">
+      <div class="card"><span class="card__icon">📘</span><h3>Owner’s manual</h3><p>A plain-language guide (Bangla-friendly) covering bookings, invoices, rates, availability, blog, email/SMS and settings — so the site runs without a developer for day-to-day work.</p></div>
+      <div class="card"><span class="card__icon">🗂️</span><h3>Versioned on GitHub</h3><p>Theme and plugin are versioned and released with changelogs. Any future developer can pick up the project with full history and documentation.</p></div>
+      <div class="card"><span class="card__icon">🚀</span><h3>Go-live checklist</h3><p>A documented production checklist — caching, HTTPS, email deliverability, Search Console, Google Business Profile — so launch is repeatable and complete.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section>
+  <div class="wrap">
+    <div class="band">
+      <h2>A platform the business owns — and grows with</h2>
+      <p>Built once, owned forever, and ready to keep filling cabins on Tanguar Haor.</p>
+      <a class="btn btn--cta" href="https://github.com/shauncuier/BhelaHouseBoatWP">Explore the project on GitHub →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span class="tag">“ভেলার আকর্ষণ ভেলা নয়, হাওর!”</span>
+    BHELA – The Haor Exclusive · Website &amp; booking platform by
+    <a href="https://3s-soft.com">3s-Soft</a><br>
+    <span class="muted">Custom WordPress theme &amp; booking engine · Tanguar Haor, Sunamganj, Bangladesh</span>
+  </div>
+</footer>
+</body>
+</html>
