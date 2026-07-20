@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.8.0
+Version: 2.9.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -373,6 +373,23 @@ a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 
 .footer-col ul { list-style: none; padding: 0; }
 .footer-col li { margin-bottom: .55rem; font-size: .95rem; }
 .footer-tagline { font-family: var(--font-display); color: var(--gold); font-size: 1.1rem; margin-top: 1rem; }
+/* Social icons — only the networks filled in under Customize → BHELA Contact */
+.footer-social { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; padding: 1.4rem 0 .2rem; border-top: 1px solid var(--line-inverse); }
+.footer-social__label { font-size: .85rem; color: var(--text-inverse); font-weight: 600; }
+.social-icons { display: flex; gap: .55rem; list-style: none; padding: 0; margin: 0; flex-wrap: wrap; }
+.social-icons__link {
+	display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%;
+	background: rgba(220, 235, 233, .08); border: 1px solid var(--line-inverse);
+	color: var(--text-inverse); transition: background .25s var(--ease), color .25s, transform .25s var(--ease), border-color .25s;
+}
+.social-icons__link:hover { transform: translateY(-3px); color: #fff; border-color: transparent; }
+.social-icons__link--facebook:hover  { background: #1877F2; }
+.social-icons__link--instagram:hover { background: linear-gradient(45deg, #F58529, #DD2A7B 55%, #8134AF); }
+.social-icons__link--tiktok:hover    { background: #000; }
+.social-icons__link--linkedin:hover  { background: #0A66C2; }
+.social-icons__link--youtube:hover   { background: #FF0000; }
+.social-icons__link--x:hover         { background: #000; }
+.social-icons__link--threads:hover   { background: #000; }
 .footer-bottom { border-top: 1px solid var(--line-inverse); padding: 1.4rem 0; display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; font-size: .85rem; }
 .footer-credit a { color: var(--gold); font-weight: 700; }
 .footer-credit a:hover { color: #fff; text-decoration: underline; text-underline-offset: 3px; }

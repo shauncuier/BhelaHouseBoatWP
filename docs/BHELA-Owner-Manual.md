@@ -117,7 +117,7 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 | Panel | Change |
 |---|---|
-| BHELA Contact | Phone, WhatsApp, email, Facebook/Instagram/YouTube/TikTok, address (site-wide) |
+| BHELA Contact | Phone, WhatsApp, email, address, and all social links — Facebook, Instagram, TikTok, LinkedIn, YouTube, X, Threads (icons appear in the footer; blank = hidden) |
 | BHELA Homepage | Hero headline, badge, subtitle |
 | BHELA Images | Hero, food, rooftop, cabin, spot photos (blank = defaults) |
 | BHELA Tracking | Google Analytics ID, Facebook Pixel ID |

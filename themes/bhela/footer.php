@@ -44,6 +44,12 @@
 				</ul>
 			</div>
 		</div>
+		<?php if ( bhela_social_links() ) : ?>
+			<div class="footer-social">
+				<span class="footer-social__label"><?php esc_html_e( 'আমাদের সাথে যুক্ত থাকুন', 'bhela' ); ?></span>
+				<?php bhela_social_icons(); ?>
+			</div>
+		<?php endif; ?>
 		<div class="footer-bottom">
 			<span>© <?php echo esc_html( date( 'Y' ) ); ?> BHELA – The Haor Exclusive. All rights reserved.</span>
 			<span>"Where Nature, Comfort &amp; Memories Meet"</span>

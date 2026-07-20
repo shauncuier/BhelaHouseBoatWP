@@ -128,11 +128,8 @@ add_filter( 'robots_txt', 'bhela_seo_robots' );
 /** Social profile URLs set in the Customizer (placeholder defaults excluded). */
 function bhela_seo_social_profiles() {
 	$out = array();
-	foreach ( array( 'facebook', 'instagram', 'youtube', 'tiktok' ) as $key ) {
-		$url = bhela_contact( $key );
-		if ( $url && ! in_array( untrailingslashit( $url ), array( 'https://www.facebook.com', 'https://facebook.com' ), true ) ) {
-			$out[] = esc_url_raw( $url );
-		}
+	foreach ( bhela_social_links() as $net ) {
+		$out[] = esc_url_raw( $net['url'] );
 	}
 	return $out;
 }
