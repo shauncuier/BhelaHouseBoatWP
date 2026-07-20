@@ -275,11 +275,14 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 		if ( $occ + $c04 < 1 ) {
 			continue;
 		}
-		if ( $adults < 1 ) {
-			return new WP_Error( 'no_adult', __( 'প্রতিটি কেবিনে অন্তত ১ জন বড় (৯+) থাকতে হবে।', 'bhela-booking' ) );
-		}
-		if ( $occ < 2 ) {
-			return new WP_Error( 'lone_cabin', __( 'প্রতিটি কেবিনে অন্তত ২ জন অতিথি থাকতে হবে (শিশু ০–৪ বাদে)।', 'bhela-booking' ) );
+		// A cabin is opened for adults only: children never justify an extra cabin,
+		// so two cabins need four adults, three cabins six, and so on.
+		$min_adults = min( array_keys( bhela_bm_rates_by_occupancy() ) );
+		if ( $adults < $min_adults ) {
+			return new WP_Error(
+				'few_adults',
+				sprintf( __( 'প্রতিটি কেবিনে অন্তত %d জন বড় (৯+) থাকতে হবে — শিশু দিয়ে আলাদা কেবিন নেওয়া যাবে না।', 'bhela-booking' ), $min_adults )
+			);
 		}
 		if ( $occ > $max_cap ) {
 			return new WP_Error( 'over_cabin', sprintf( __( 'একটি কেবিনে সর্বোচ্চ %d জন (শিশু ০–৪ বাদে)।', 'bhela-booking' ), $max_cap ) );

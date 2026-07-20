@@ -184,19 +184,23 @@
 		 * child does NOT do is raise the price tier: each cabin is rated on the
 		 * ADULTS inside it (`tier`), and the children then pay 50% of that rate.
 		 *
-		 * Every cabin keeps at least one adult (children never travel alone); a
-		 * layout that cannot satisfy that is rejected by returning null. 0–4
-		 * infants share with their parents and take no place at all.
+		 * A cabin is only opened for ADULTS: every cabin needs at least MIN_CAP (2)
+		 * adults, so children can never justify an extra cabin — 2 adults + 3
+		 * children is one cabin, and two cabins require four adults. Layouts that
+		 * break that rule are rejected by returning null. 0–4 infants share with
+		 * their parents and take no place at all.
 		 */
 		function fillCombo(sizes, adults, c48, c04) {
 			var leftA = adults, leftC = c48;
+			// Not enough adults to open this many cabins.
+			if (adults < sizes.length * MIN_CAP) return null;
 			var cabins = sizes.map(function (size) {
 				return { size: size, adults: 0, c48: 0, c04: 0 };
 			});
-			// One adult per cabin first, so no cabin ends up children-only.
+			// Seat the minimum adults in every cabin first.
 			cabins.forEach(function (cab) {
-				if (leftA <= 0) return;
-				cab.adults = 1; leftA--;
+				var take = Math.min(MIN_CAP, cab.size, leftA);
+				cab.adults = take; leftA -= take;
 			});
 			if (leftA > 0 || leftC > 0) {
 				cabins.forEach(function (cab) {
@@ -208,12 +212,12 @@
 					cab.c48 += takeC; leftC -= takeC;
 				});
 			}
-			// Everyone must fit, and every cabin needs an adult.
+			// Everyone must fit, and every cabin needs its minimum adults.
 			if (leftA > 0 || leftC > 0) return null;
 			for (var i = 0; i < cabins.length; i++) {
-				if (cabins[i].adults < 1) return null;
-				// Rate tier = adults in this cabin (smallest cabin sold is MIN_CAP).
-				cabins[i].tier = Math.max(cabins[i].adults, MIN_CAP);
+				if (cabins[i].adults < MIN_CAP) return null;
+				// Rate tier = adults in this cabin.
+				cabins[i].tier = cabins[i].adults;
 			}
 			if (c04 > 0 && cabins.length) cabins[0].c04 = c04; // free ride-along, no seat used
 			return cabins;
@@ -393,8 +397,9 @@
 				var occ = c.adults + c.c48;   // bodies sharing the cabin (infants free)
 				var tier = Math.max(c.adults, MIN_CAP); // rate tier = adults only
 				var infantOnly = occ === 0 && c.c04 > 0;
+				// Each cabin needs its minimum adults — children cannot open a cabin.
 				var over = (occ > 0 && (occ < 2 || occ > MAX_CAP)) || infantOnly ||
-					(occ > 0 && c.adults < 1);
+					(occ > 0 && c.adults < MIN_CAP);
 				var rowEl = editRows.querySelectorAll('.bm-cabin-row')[i];
 				if (rowEl) {
 					rowEl.classList.toggle('is-over', over);
@@ -407,8 +412,9 @@
 				adults += c.adults; occupants += occ;
 			});
 			var msg = '';
-			if (badCabin) msg = '⚠️ প্রতিটি কেবিনে ২–' + MAX_CAP + ' জন (শিশু ০–৪ বাদে) থাকতে হবে।';
-			else if (adults < 1) msg = '⚠️ অন্তত ১ জন বড় (৯+) থাকতে হবে।';
+			if (badCabin) msg = '⚠️ প্রতিটি কেবিনে অন্তত ' + MIN_CAP + ' জন বড় (৯+) এবং সর্বোচ্চ ' + MAX_CAP + ' জন (শিশু ০–৪ বাদে) থাকতে হবে।';
+			else if (adults < MIN_CAP) msg = '⚠️ অন্তত ' + MIN_CAP + ' জন বড় (৯+) থাকতে হবে।';
+			else if (cabins.length * MIN_CAP > adults) msg = '⚠️ ' + cabins.length + 'টি কেবিনের জন্য অন্তত ' + (cabins.length * MIN_CAP) + ' জন বড় (৯+) প্রয়োজন।';
 			else if (occupants < 2) msg = '⚠️ অন্তত ২ জন প্রয়োজন।';
 			else if (cabins.length > cabinCap()) msg = availableCabins < MAX_CABINS
 				? '⚠️ এই তারিখে মাত্র ' + availableCabins + 'টি কেবিন খালি।'
