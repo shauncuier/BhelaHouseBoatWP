@@ -357,19 +357,19 @@ function bhela_seo_schema() {
 }
 add_action( 'wp_head', 'bhela_seo_schema', 2 );
 
-/* ---------- Tracking & custom head code ---------- */
+/* ---------- Tracking (Analytics) ---------- */
 
 /**
  * Customizer: Appearance → Customize → BHELA Tracking.
  * GA4 + Facebook Pixel by ID (owner pastes just the ID, we render the
- * official snippet), plus a free-form head-code box for anything else
- * (site verification metas, other pixels) — no code edits ever needed.
+ * official snippet) — no code edits ever needed. Free-form head/body/footer
+ * code lives in the dedicated "BHELA Custom Code" panel (inc/custom-code.php).
  */
 function bhela_customize_tracking( $wp_customize ) {
 	$wp_customize->add_section( 'bhela_tracking', array(
 		'title'       => 'BHELA Tracking (Analytics)',
 		'priority'    => 33,
-		'description' => 'Google Analytics ও Facebook Pixel-এর শুধু ID বসান — কোড নিজে যুক্ত হবে। অন্য যেকোনো head কোড নিচের বক্সে।',
+		'description' => 'Google Analytics ও Facebook Pixel-এর শুধু ID বসান — কোড নিজে যুক্ত হবে।',
 	) );
 
 	$wp_customize->add_setting( 'bhela_ga4_id', array( 'sanitize_callback' => 'bhela_sanitize_ga4_id' ) );
@@ -387,14 +387,6 @@ function bhela_customize_tracking( $wp_customize ) {
 		'section'     => 'bhela_tracking',
 		'type'        => 'text',
 	) );
-
-	$wp_customize->add_setting( 'bhela_head_code', array( 'sanitize_callback' => 'bhela_sanitize_head_code' ) );
-	$wp_customize->add_control( 'bhela_head_code', array(
-		'label'       => 'Custom Header Code',
-		'description' => 'Site verification meta, অন্য pixel/স্ক্রিপ্ট — যা দেবেন হুবহু &lt;head&gt;-এ বসবে।',
-		'section'     => 'bhela_tracking',
-		'type'        => 'textarea',
-	) );
 }
 add_action( 'customize_register', 'bhela_customize_tracking' );
 
@@ -407,12 +399,7 @@ function bhela_sanitize_pixel_id( $value ) {
 	return preg_replace( '/[^0-9]/', '', $value );
 }
 
-/** Raw head code is script injection by definition — only unfiltered_html users may save it. */
-function bhela_sanitize_head_code( $value ) {
-	return current_user_can( 'unfiltered_html' ) ? $value : '';
-}
-
-/** Output GA4 + Pixel + custom code. Admins are excluded so their visits don't pollute stats. */
+/** Output GA4 + Pixel. Admins are excluded so their visits don't pollute stats. */
 function bhela_tracking_head() {
 	if ( is_user_logged_in() && current_user_can( 'manage_options' ) ) {
 		return;
@@ -446,10 +433,6 @@ fbq('track', 'PageView');
 <noscript><img height="1" width="1" style="display:none" alt=""
 src="https://www.facebook.com/tr?id=<?php echo esc_attr( $pixel ); ?>&ev=PageView&noscript=1"/></noscript>
 		<?php
-	}
-	$custom = get_theme_mod( 'bhela_head_code', '' );
-	if ( $custom ) {
-		echo "\n" . $custom . "\n"; // phpcs:ignore WordPress.Security.EscapeOutput -- intentional raw head code, gated to unfiltered_html on save.
 	}
 }
 add_action( 'wp_head', 'bhela_tracking_head', 20 );

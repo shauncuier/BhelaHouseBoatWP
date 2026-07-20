@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.7.0' );
+define( 'BHELA_VERSION', '2.8.0' );
 
 /* ---------- Setup ---------- */
 
@@ -38,6 +38,7 @@ add_action( 'after_setup_theme', 'bhela_setup' );
 
 require_once get_template_directory() . '/inc/block-patterns.php';
 require_once get_template_directory() . '/inc/seo.php';
+require_once get_template_directory() . '/inc/custom-code.php';
 
 /* ---------- Assets ---------- */
 

@@ -113,16 +113,19 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 ## 11. Editing site text & images
 
-**Appearance → Customize** → four BHELA panels:
+**Appearance → Customize** → five BHELA panels:
 
 | Panel | Change |
 |---|---|
 | BHELA Contact | Phone, WhatsApp, email, Facebook/Instagram/YouTube/TikTok, address (site-wide) |
 | BHELA Homepage | Hero headline, badge, subtitle |
 | BHELA Images | Hero, food, rooftop, cabin, spot photos (blank = defaults) |
-| BHELA Tracking | Google Analytics ID, Facebook Pixel ID, custom header code |
+| BHELA Tracking | Google Analytics ID, Facebook Pixel ID |
+| BHELA Custom Code | Paste code into `<head>`, after `<body>`, or before `</body>` |
 
-**Tracking setup (one-time):** paste just the **ID** — GA4 Measurement ID (`G-…`) from Google Analytics and the Pixel ID (numbers) from Meta Events Manager. The code is added automatically. Other snippets (site verification, extra pixels) go in **Custom Header Code**. Your own admin visits are never counted.
+**Tracking setup (one-time):** paste just the **ID** — GA4 Measurement ID (`G-…`) from Google Analytics and the Pixel ID (numbers) from Meta Events Manager. The code is added automatically. Your own admin visits are never counted.
+
+**Custom Code (advanced):** the **BHELA Custom Code** panel has three boxes — **Header** (`<head>`), **Body Top** (right after `<body>`), and **Footer** (before `</body>`). Paste any snippet — site-verification meta tags, Google Tag Manager, chat widgets, extra scripts — and it appears in the right place site-wide, no theme editing. Only administrators can save here.
 
 Cabin names, prices, payment details are in **Bookings → Settings**. Your contact info set there is the source of truth for the whole site (footer, buttons, invoice, emails).
 
