@@ -45,4 +45,5 @@ purpose-made components the client fully owns:
 Main project: <https://github.com/shauncuier/BhelaHouseBoatWP>
 
 ---
-*Website & booking platform by [3s-Soft](https://3s-soft.com) · "ভেলার আকর্ষণ ভেলা নয়, হাওর!"*
+*Designed & developed by [**3s-Soft**](https://3s-soft.com) · [3s-soft.com](https://3s-soft.com)*
+*© 2026 3s-Soft. All rights reserved. · "ভেলার আকর্ষণ ভেলা নয়, হাওর!"*
