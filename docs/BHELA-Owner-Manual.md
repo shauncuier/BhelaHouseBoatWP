@@ -117,7 +117,7 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 | Panel | Change |
 |---|---|
-| BHELA Contact | Phone, WhatsApp, email, address, and all social links — Facebook, Instagram, TikTok, LinkedIn, YouTube, X, Threads (icons appear in the footer; blank = hidden) |
+| BHELA Contact | Phone, WhatsApp, Messenger, email, address, and all social links — Facebook, Instagram, TikTok, LinkedIn, YouTube, X, Threads (icons appear in the footer; blank = hidden) |
 | BHELA Homepage | Hero headline, badge, subtitle |
 | BHELA Images | Hero, food, rooftop, cabin, spot photos (blank = defaults) |
 | BHELA Tracking | Google Analytics ID, Facebook Pixel ID |
@@ -129,7 +129,15 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 Cabin names, prices, payment details are in **Bookings → Settings**. Your contact info set there is the source of truth for the whole site (footer, buttons, invoice, emails).
 
-## 12. Troubleshooting
+## 12. Contact page — যোগাযোগ
+
+The **যোগাযোগ** page (`/contact/`) is created automatically and added to the menu. It shows quick-contact cards (phone, WhatsApp, Messenger, email), your address and hours, social icons, plus a **contact form**.
+
+Form messages are **emailed to you** — the address from *Bookings → Settings → Owner notification email* (or your business email). Nothing is stored in the database. You can reply directly to the guest, because their email is set as Reply-To.
+
+> 💡 To show the **Messenger** card, paste your `m.me/yourpage` link in **Customize → BHELA Contact → Messenger link**. Leave blank to hide that card.
+
+## 13. Troubleshooting
 
 | Problem | Fix |
 |---|---|

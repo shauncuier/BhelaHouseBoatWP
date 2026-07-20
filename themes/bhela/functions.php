@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.9.0' );
+define( 'BHELA_VERSION', '2.10.0' );
 
 /* ---------- Setup ---------- */
 
@@ -39,6 +39,7 @@ add_action( 'after_setup_theme', 'bhela_setup' );
 require_once get_template_directory() . '/inc/block-patterns.php';
 require_once get_template_directory() . '/inc/seo.php';
 require_once get_template_directory() . '/inc/custom-code.php';
+require_once get_template_directory() . '/inc/contact.php';
 
 /* ---------- Assets ---------- */
 
@@ -79,6 +80,7 @@ function bhela_contact( $key ) {
 		'youtube'   => '',
 		'x'         => '',
 		'threads'   => '',
+		'messenger' => '',
 		'address'   => 'Anwarpur Ghat, Tahirpur, Sunamganj',
 	);
 	if ( function_exists( 'bhela_bm_get_settings' ) ) {
@@ -191,6 +193,7 @@ function bhela_customize_register( $wp_customize ) {
 		'youtube'   => 'YouTube URL',
 		'x'         => 'X (Twitter) URL',
 		'threads'   => 'Threads URL',
+		'messenger' => 'Messenger link (m.me/yourpage)',
 		'address'   => 'Address',
 	);
 	foreach ( $fields as $key => $label ) {
@@ -338,6 +341,7 @@ function bhela_auto_setup() {
 		'faq'      => array( 'title' => 'সাধারণ প্রশ্ন (FAQ)', 'template' => 'page-templates/template-faq.php' ),
 		'book-now' => array( 'title' => 'বুক করুন', 'template' => 'page-templates/template-booking.php' ),
 		'policies' => array( 'title' => 'বুকিং নীতিমালা', 'template' => 'page-templates/template-policy.php' ),
+		'contact'  => array( 'title' => 'যোগাযোগ', 'template' => 'page-templates/template-contact.php' ),
 	);
 
 	$menu_items = array();
@@ -409,7 +413,7 @@ function bhela_auto_setup() {
 	$menu = wp_get_nav_menu_object( 'BHELA Primary' );
 	if ( ! $menu ) {
 		$menu_id = wp_create_nav_menu( 'BHELA Primary' );
-		$order   = array( 'cabins', 'schedule', 'food', 'gallery', 'faq', 'blog' );
+		$order   = array( 'cabins', 'schedule', 'food', 'gallery', 'faq', 'blog', 'contact' );
 		foreach ( $order as $slug ) {
 			if ( isset( $menu_items[ $slug ] ) ) {
 				wp_update_nav_menu_item( $menu_id, 0, array(
@@ -423,22 +427,24 @@ function bhela_auto_setup() {
 		$locations            = get_theme_mod( 'nav_menu_locations', array() );
 		$locations['primary'] = $menu_id;
 		set_theme_mod( 'nav_menu_locations', $locations );
-	} elseif ( isset( $menu_items['blog'] ) ) {
-		// Menu already exists (upgrade path): make sure ব্লগ is present.
-		$has_blog = false;
+	} else {
+		// Menu already exists (upgrade path): append any page added in a later
+		// release that is not in the menu yet.
+		$ensure   = array( 'blog' => 'ব্লগ', 'contact' => 'যোগাযোগ' );
+		$existing = array();
 		foreach ( (array) wp_get_nav_menu_items( $menu->term_id ) as $mi ) {
-			if ( (int) $mi->object_id === (int) $menu_items['blog'] ) {
-				$has_blog = true;
-				break;
-			}
+			$existing[] = (int) $mi->object_id;
 		}
-		if ( ! $has_blog ) {
+		foreach ( $ensure as $slug => $title ) {
+			if ( ! isset( $menu_items[ $slug ] ) || in_array( (int) $menu_items[ $slug ], $existing, true ) ) {
+				continue;
+			}
 			wp_update_nav_menu_item( $menu->term_id, 0, array(
-				'menu-item-object-id' => (int) $menu_items['blog'],
+				'menu-item-object-id' => (int) $menu_items[ $slug ],
 				'menu-item-object'    => 'page',
 				'menu-item-type'      => 'post_type',
 				'menu-item-status'    => 'publish',
-				'menu-item-title'     => 'ব্লগ',
+				'menu-item-title'     => $title,
 			) );
 		}
 	}

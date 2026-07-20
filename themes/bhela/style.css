@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.9.0
+Version: 2.10.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -842,3 +842,66 @@ input, select, textarea { font-family: inherit; }
 .cabin-card__price .now, .sched-table td, .bhela-bm-price__row strong { font-variant-numeric: tabular-nums; }
 /* Bolder Bangla display weight for better presence */
 .hero__title, .section-title { font-weight: 700; }
+
+/* ==========================================================
+   CONTACT PAGE
+   ========================================================== */
+.contact-channels { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.2rem; margin-bottom: 3.5rem; }
+.contact-card {
+	background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
+	padding: 1.6rem 1.5rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: .25rem;
+	transition: transform .25s var(--ease), box-shadow .25s, border-color .25s; color: var(--text);
+}
+.contact-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--primary); color: var(--text); }
+.contact-card__icon { font-size: 1.7rem; margin-bottom: .4rem; }
+.contact-card strong { font-family: var(--font-display); font-size: 1.15rem; color: var(--ink); }
+.contact-card__value { color: var(--primary); font-weight: 600; word-break: break-word; }
+.contact-card em { color: var(--text-soft); font-size: .85rem; font-style: normal; margin-top: .3rem; }
+.contact-card--wa:hover { border-color: #25D366; }
+.contact-card--msgr:hover { border-color: #0084FF; }
+
+.contact-layout { display: grid; grid-template-columns: 1.55fr 1fr; gap: 2.4rem; align-items: start; }
+.contact-formbox { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(1.4rem, 3vw, 2.4rem); box-shadow: var(--shadow-sm); }
+.contact-formbox .section-title { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: .5rem; }
+.contact-formbox .section-lead { margin-bottom: 1.8rem; }
+
+.bhela-contact-form__hp { position: absolute; left: -9999px; top: -9999px; height: 0; width: 0; overflow: hidden; }
+.bhela-contact-form__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.1rem; }
+.bhela-contact-form__field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1.1rem; }
+.bhela-contact-form__field label { font-weight: 600; font-size: .93rem; color: var(--ink); }
+.bhela-contact-form__field label span { color: var(--text-soft); font-weight: 400; }
+.bhela-contact-form__field input,
+.bhela-contact-form__field select,
+.bhela-contact-form__field textarea {
+	font-family: var(--font-body); font-size: 1rem; color: var(--text);
+	padding: .8rem 1rem; border: 1.5px solid var(--line); border-radius: var(--radius-sm);
+	background: var(--cream); transition: border-color .2s, box-shadow .2s; width: 100%;
+}
+.bhela-contact-form__field input:focus,
+.bhela-contact-form__field select:focus,
+.bhela-contact-form__field textarea:focus {
+	outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px rgba(19, 122, 116, .12); background: var(--white);
+}
+.bhela-contact-form__field textarea { resize: vertical; min-height: 130px; }
+.bhela-contact-form__foot { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .3rem; }
+.bhela-contact-form__note { color: var(--text-soft); font-size: .87rem; }
+.bhela-contact-form__msg { margin-top: 1.1rem; padding: .9rem 1.1rem; border-radius: var(--radius-sm); font-weight: 600; font-size: .95rem; }
+.bhela-contact-form__msg.is-ok { background: rgba(26, 127, 55, .1); color: #1a7f37; border: 1px solid rgba(26, 127, 55, .3); }
+.bhela-contact-form__msg.is-error { background: #FDF0E8; color: #7c2d12; border: 1px solid rgba(180, 83, 9, .3); }
+
+.contact-side { display: flex; flex-direction: column; gap: 1.2rem; }
+.contact-side__box { background: var(--sand); border-radius: var(--radius); padding: 1.5rem 1.6rem; }
+.contact-side__box h3 { font-size: 1.1rem; margin-bottom: .7rem; }
+.contact-side__box p { color: var(--text-soft); font-size: .95rem; }
+.contact-side__box .muted { font-size: .87rem; margin-top: .5rem; }
+.contact-hours { list-style: none; padding: 0; }
+.contact-hours li { display: flex; justify-content: space-between; gap: 1rem; padding: .5rem 0; border-bottom: 1px solid var(--line); font-size: .92rem; }
+.contact-hours li:last-child { border-bottom: 0; }
+.contact-hours strong { color: var(--ink); }
+.contact-side__box--cta { background: linear-gradient(160deg, var(--ink), var(--ink-2)); color: var(--text-inverse); text-align: center; }
+.contact-side__box--cta h3 { color: #fff; }
+.contact-side__box--cta p { color: var(--text-inverse); margin-bottom: 1.1rem; }
+.social-icons--dark .social-icons__link { background: rgba(10, 42, 47, .06); border-color: var(--line); color: var(--ink); }
+.social-icons--dark .social-icons__link:hover { color: #fff; }
+
+@media (max-width: 900px) { .contact-layout { grid-template-columns: 1fr; } }

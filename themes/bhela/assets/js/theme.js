@@ -106,3 +106,59 @@
 		}
 	});
 })();
+
+/* ---------- Contact form (AJAX) ---------- */
+(function () {
+	var form = document.getElementById('bhela-contact-form');
+	if (!form || typeof bhelaContact === 'undefined') return;
+
+	var btn = document.getElementById('bc-submit');
+	var msg = document.getElementById('bc-msg');
+
+	function show(text, ok) {
+		msg.hidden = false;
+		msg.textContent = text;
+		msg.className = 'bhela-contact-form__msg is-' + (ok ? 'ok' : 'error');
+	}
+
+	form.addEventListener('submit', function (e) {
+		e.preventDefault();
+		var data = new FormData(form);
+		if (!data.get('name') || !data.get('phone') || !data.get('message')) {
+			show('নাম, ফোন ও বার্তা লিখুন।', false);
+			return;
+		}
+		var params = new URLSearchParams();
+		params.append('action', 'bhela_contact_submit');
+		params.append('nonce', bhelaContact.nonce);
+		['name', 'phone', 'email', 'subject', 'message', 'bhela_hp'].forEach(function (k) {
+			params.append(k, data.get(k) || '');
+		});
+
+		btn.disabled = true;
+		var label = btn.textContent;
+		btn.textContent = 'পাঠানো হচ্ছে…';
+
+		fetch(bhelaContact.ajaxUrl, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: params.toString()
+		})
+			.then(function (r) { return r.json(); })
+			.then(function (res) {
+				if (res && res.success) {
+					show((res.data && res.data.message) || 'ধন্যবাদ! বার্তা পৌঁছেছে।', true);
+					form.reset();
+				} else {
+					show((res && res.data && res.data.message) || 'পাঠানো যায়নি — ফোন বা WhatsApp-এ যোগাযোগ করুন।', false);
+				}
+			})
+			.catch(function () {
+				show('নেটওয়ার্ক সমস্যা — আবার চেষ্টা করুন।', false);
+			})
+			.finally(function () {
+				btn.disabled = false;
+				btn.textContent = label;
+			});
+	});
+})();
