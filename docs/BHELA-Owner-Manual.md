@@ -77,7 +77,7 @@ All in **Bookings → Settings**:
 - **Holidays** — one date per line (`YYYY-MM-DD`); charge Regular rate.
 - Every other day uses the discounted Weekday rate.
 
-> ⚠️ Children: 0–4 free, 4–8 pay 50%, 9+ full rate — automatic.
+> ⚠️ Children: 0–4 free, 4–8 pay a flat **৳5,000** each (no weekday discount), 9+ full rate — automatic. The amount is editable at **Settings → শিশু (৪–৮) ফি**.
 
 ## 7. Email notifications
 
@@ -107,11 +107,30 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 **Bookings → All Reviews → Add New**. Guest name = Title, their words = content, set a star rating + trip type. Published reviews appear on the homepage.
 
-## 10. Blog — হাওর জার্নাল
+## 10. Gallery — গ্যালারি ছবি
+
+Photos are managed from **Bookings → 🖼️ গ্যালারি**.
+
+**Add a photo:** *নতুন ছবি* → set the **Featured Image** (this is the photo itself) → type a **caption** in the title box → tick a **ক্যাটাগরি** → **Publish**.
+
+| Field | What it does |
+|---|---|
+| Featured Image | The photo. Uses your normal media library |
+| Title | The caption shown on hover and in the lightbox |
+| ক্যাটাগরি | Groups the photo. Categories become the filter tabs on the page |
+| Order | Lower numbers come first |
+
+**First-time setup:** if the gallery is empty, an “ইমপোর্ট করুন” button appears offering the photos bundled with the theme. Click it once and all of them become editable items. Clicking again adds nothing — it never creates duplicates.
+
+Add your own categories any time under **গ্যালারি → ক্যাটাগরি**; a tab appears automatically once a category has at least one photo.
+
+> 💡 The page uses a masonry layout, so photos keep their real shape (tall photos stay tall). Because columns fill top-to-bottom, the **Order** number controls sequence rather than strict left-to-right position.
+
+## 11. Blog — হাওর জার্নাল
 
 **Posts → Add New** → write title + content → pick a **Category** (ভ্রমণ গাইড / হাওরের খবর / টিপস) + **Tags** → set a **Featured Image** → **Publish**. Blog is at `yourdomain.com/blog`. Category/tag pages, related posts, reading time, and a booking CTA per article are automatic. Comments are off by design (guides guests to WhatsApp instead).
 
-## 11. Editing site text & images
+## 12. Editing site text & images
 
 **Appearance → Customize** → five BHELA panels:
 
@@ -129,7 +148,7 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 Cabin names, prices, payment details are in **Bookings → Settings**. Your contact info set there is the source of truth for the whole site (footer, buttons, invoice, emails).
 
-## 12. Contact page — যোগাযোগ
+## 13. Contact page — যোগাযোগ
 
 The **যোগাযোগ** page (`/contact/`) is created automatically and added to the menu. It shows quick-contact cards (phone, WhatsApp, Messenger, email), your address and hours, social icons, plus a **contact form**.
 
@@ -137,7 +156,7 @@ Form messages are **emailed to you** — the address from *Bookings → Settings
 
 > 💡 To show the **Messenger** card, paste your `m.me/yourpage` link in **Customize → BHELA Contact → Messenger link**. Leave blank to hide that card.
 
-## 13. Troubleshooting
+## 14. Troubleshooting
 
 | Problem | Fix |
 |---|---|

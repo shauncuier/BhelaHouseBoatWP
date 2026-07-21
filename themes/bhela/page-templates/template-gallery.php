@@ -7,12 +7,19 @@
 
 get_header();
 
-$dir  = get_template_directory() . '/assets/images';
-$uri  = get_template_directory_uri() . '/assets/images';
+// Owner-managed gallery (booking plugin). Returns '' when the plugin is
+// inactive or no photos are published — then we fall back to the images
+// bundled with the theme so the page is never empty.
+$bhela_gallery_html = shortcode_exists( 'bhela_gallery' ) ? do_shortcode( '[bhela_gallery]' ) : '';
+
 $imgs = array();
-foreach ( array( 'hero', 'boat', 'cabins', 'spots', 'food' ) as $folder ) {
-	foreach ( (array) glob( $dir . '/' . $folder . '/*.{jpg,jpeg,png,webp}', GLOB_BRACE ) as $file ) {
-		$imgs[] = $uri . '/' . $folder . '/' . basename( $file );
+if ( '' === trim( $bhela_gallery_html ) ) {
+	$dir = get_template_directory() . '/assets/images';
+	$uri = get_template_directory_uri() . '/assets/images';
+	foreach ( array( 'hero', 'boat', 'cabins', 'spots', 'food' ) as $folder ) {
+		foreach ( (array) glob( $dir . '/' . $folder . '/*.{jpg,jpeg,png,webp}', GLOB_BRACE ) as $file ) {
+			$imgs[] = $uri . '/' . $folder . '/' . basename( $file );
+		}
 	}
 }
 ?>
@@ -25,7 +32,9 @@ foreach ( array( 'hero', 'boat', 'cabins', 'spots', 'food' ) as $folder ) {
 
 
 <section class="section"><div class="container">
-	<?php if ( $imgs ) : ?>
+	<?php if ( '' !== trim( $bhela_gallery_html ) ) : ?>
+		<?php echo $bhela_gallery_html; // phpcs:ignore WordPress.Security.EscapeOutput -- shortcode output, escaped at source. ?>
+	<?php elseif ( $imgs ) : ?>
 		<div class="gallery-grid">
 			<?php foreach ( $imgs as $src ) : ?>
 				<a href="<?php echo esc_url( $src ); ?>"><img src="<?php echo esc_url( $src ); ?>" alt="BHELA হাউসবোট ও টাঙ্গুয়ার হাওর" loading="lazy"></a>

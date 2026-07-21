@@ -81,27 +81,159 @@
 			});
 		}
 
-		/* ----- Gallery lightbox ----- */
-		var gallery = document.querySelector('.gallery-grid');
-		if (gallery) {
+		/* ----- Gallery: category filter + lightbox -----
+		 * Driven entirely by data attributes on the anchors, so the plugin's
+		 * markup and the theme's bundled fallback markup take the same path.
+		 * Legacy anchors simply carry no data-cats, so they get the lightbox
+		 * with no filtering. */
+		initGallery(document.querySelector('.bhela-gallery, .gallery-grid'));
+
+		function initGallery(container) {
+			if (!container) return;
+
+			var items = [].slice.call(container.querySelectorAll('a')).map(function (a) {
+				var img = a.querySelector('img');
+				return {
+					el: a,
+					full: a.getAttribute('href'),
+					caption: a.dataset.caption || (img && img.alt) || '',
+					cats: (a.dataset.cats || '').split(/\s+/).filter(Boolean)
+				};
+			});
+			if (!items.length) return;
+
+			var visible = items.slice();   // recomputed on every filter change
+			var index = 0;                 // indexes `visible`, never `items`
+			var lastFocus = null;
+
+			/* --- Lightbox --- */
 			var lb = document.createElement('div');
 			lb.className = 'lightbox';
-			lb.innerHTML = '<button class="lightbox__close" aria-label="Close">×</button><img src="" alt="">';
+			lb.setAttribute('role', 'dialog');
+			lb.setAttribute('aria-modal', 'true');
+			lb.setAttribute('aria-label', 'ছবি প্রদর্শন');
+			lb.innerHTML =
+				'<button class="lightbox__close" type="button" aria-label="বন্ধ করুন">×</button>' +
+				'<button class="lightbox__nav lightbox__nav--prev" type="button" aria-label="আগের ছবি">‹</button>' +
+				'<figure class="lightbox__figure"><img src="" alt=""></figure>' +
+				'<button class="lightbox__nav lightbox__nav--next" type="button" aria-label="পরের ছবি">›</button>' +
+				'<div class="lightbox__bar" aria-live="polite">' +
+					'<span class="lightbox__caption"></span>' +
+					'<span class="lightbox__count"></span>' +
+				'</div>';
 			document.body.appendChild(lb);
-			var lbImg = lb.querySelector('img');
 
-			gallery.addEventListener('click', function (e) {
-				var a = e.target.closest('a');
-				if (!a) return;
-				e.preventDefault();
-				lbImg.src = a.getAttribute('href');
+			var lbImg = lb.querySelector('img');
+			var lbCap = lb.querySelector('.lightbox__caption');
+			var lbCount = lb.querySelector('.lightbox__count');
+			var btnClose = lb.querySelector('.lightbox__close');
+			var btnPrev = lb.querySelector('.lightbox__nav--prev');
+			var btnNext = lb.querySelector('.lightbox__nav--next');
+
+			function bn(n) {
+				try { return Number(n).toLocaleString('bn-BD'); } catch (e) { return String(n); }
+			}
+
+			function render() {
+				var item = visible[index];
+				if (!item) return;
+				lbImg.src = item.full;
+				lbImg.alt = item.caption;
+				lbCap.textContent = item.caption;
+				lbCount.textContent = bn(index + 1) + ' / ' + bn(visible.length);
+				var solo = visible.length < 2;
+				btnPrev.hidden = solo;
+				btnNext.hidden = solo;
+				// Preloading the neighbour makes navigation feel instant.
+				if (!solo) new Image().src = visible[(index + 1) % visible.length].full;
+			}
+
+			function open(el) {
+				var i = visible.findIndex(function (it) { return it.el === el; });
+				if (i < 0) return;
+				lastFocus = document.activeElement;
+				index = i;
+				render();
 				lb.classList.add('is-open');
+				document.body.style.overflow = 'hidden';
+				btnClose.focus();
+			}
+
+			function close() {
+				if (!lb.classList.contains('is-open')) return;
+				lb.classList.remove('is-open');
+				document.body.style.overflow = '';
+				lbImg.src = '';
+				if (lastFocus && lastFocus.focus) lastFocus.focus();
+			}
+
+			function go(delta) {
+				if (visible.length < 2) return;
+				index = (index + delta + visible.length) % visible.length;
+				render();
+			}
+
+			container.addEventListener('click', function (e) {
+				var a = e.target.closest('a');
+				if (!a || !container.contains(a)) return;
+				e.preventDefault();
+				open(a);
 			});
+			btnClose.addEventListener('click', close);
+			btnPrev.addEventListener('click', function () { go(-1); });
+			btnNext.addEventListener('click', function () { go(1); });
 			lb.addEventListener('click', function (e) {
-				if (e.target !== lbImg) lb.classList.remove('is-open');
+				// Backdrop only — never the image or the controls.
+				if (e.target === lb || e.target.classList.contains('lightbox__figure')) close();
 			});
+
 			document.addEventListener('keydown', function (e) {
-				if (e.key === 'Escape') lb.classList.remove('is-open');
+				if (!lb.classList.contains('is-open')) return;
+				if (e.key === 'Escape') { close(); return; }
+				if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); return; }
+				if (e.key === 'ArrowRight') { e.preventDefault(); go(1); return; }
+				if (e.key === 'Tab') {
+					// Only three controls, so cycling them is a sufficient trap.
+					var f = [].slice.call(lb.querySelectorAll('button')).filter(function (b) { return !b.hidden; });
+					if (!f.length) return;
+					var first = f[0], last = f[f.length - 1];
+					if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+					else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+				}
+			});
+
+			// Swipe: horizontal dominance guard keeps page scrolling from navigating.
+			var sx = 0, sy = 0;
+			lb.addEventListener('touchstart', function (e) {
+				sx = e.changedTouches[0].clientX; sy = e.changedTouches[0].clientY;
+			}, { passive: true });
+			lb.addEventListener('touchend', function (e) {
+				var dx = e.changedTouches[0].clientX - sx;
+				var dy = e.changedTouches[0].clientY - sy;
+				if (Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.5) go(dx < 0 ? 1 : -1);
+			}, { passive: true });
+
+			/* --- Category filter --- */
+			var tabs = document.querySelector('.bhela-gallery-filter');
+			if (!tabs) return;
+
+			tabs.addEventListener('click', function (e) {
+				var btn = e.target.closest('.bhela-gallery-filter__btn');
+				if (!btn) return;
+				close(); // never leave the lightbox pointing at a filtered-out image
+				var slug = btn.dataset.filter;
+
+				[].forEach.call(tabs.querySelectorAll('.bhela-gallery-filter__btn'), function (b) {
+					var on = b === btn;
+					b.classList.toggle('is-active', on);
+					b.setAttribute('aria-pressed', on ? 'true' : 'false');
+				});
+
+				items.forEach(function (it) {
+					it.el.hidden = !('*' === slug || it.cats.indexOf(slug) !== -1);
+				});
+				visible = items.filter(function (it) { return !it.el.hidden; });
+				index = 0;
 			});
 		}
 	});

@@ -211,47 +211,158 @@ function bhela_bm_trips_page() {
 
 /* ---------- Shortcode: [bhela_trip_calendar] ---------- */
 
+/**
+ * The cheapest per-person rate for a day type — the largest sharing tier is
+ * always the lowest per head, so it is the honest "from" price.
+ * Returns array( 'now' => int, 'was' => int|0 ); 'was' is set only when the
+ * day is discounted, so the saving can be shown struck through.
+ */
+function bhela_bm_trip_from_price( $day_type ) {
+	if ( ! function_exists( 'bhela_bm_rates_by_occupancy' ) ) {
+		return array( 'now' => 0, 'was' => 0 );
+	}
+	$map = bhela_bm_rates_by_occupancy();
+	if ( ! $map ) {
+		return array( 'now' => 0, 'was' => 0 );
+	}
+	$row = $map[ max( array_keys( $map ) ) ]; // biggest cabin = cheapest per head
+	if ( 'weekday' === $day_type ) {
+		return array( 'now' => (int) $row['weekday'], 'was' => (int) $row['regular'] );
+	}
+	return array( 'now' => (int) $row['regular'], 'was' => 0 );
+}
+
+/** Styled "nothing to show" card, shared by the empty and all-past cases. */
+function bhela_bm_trips_empty_html() {
+	$wa = function_exists( 'bhela_wa_link' ) ? bhela_wa_link() : '';
+	ob_start();
+	?>
+	<div class="bhela-trips-empty">
+		<p><strong><?php esc_html_e( 'শীঘ্রই নতুন ট্রিপ ঘোষণা করা হবে।', 'bhela-booking' ); ?></strong></p>
+		<p><?php esc_html_e( 'আপনার পছন্দের তারিখ বলুন — আমরা জানিয়ে দেব কখন যাওয়া যাবে।', 'bhela-booking' ); ?></p>
+		<?php if ( $wa ) : ?>
+			<a class="bhela-trip__cta" href="<?php echo esc_url( $wa ); ?>" target="_blank" rel="noopener">💬 <?php esc_html_e( 'WhatsApp-এ জিজ্ঞেস করুন', 'bhela-booking' ); ?></a>
+		<?php endif; ?>
+	</div>
+	<?php
+	return ob_get_clean();
+}
+
 function bhela_bm_trip_calendar_shortcode() {
 	wp_enqueue_style( 'bhela-bm-booking' );
 	$trips    = bhela_bm_get_trips();
 	$statuses = bhela_bm_trip_statuses();
 	if ( ! $trips ) {
-		return '<p>শীঘ্রই নতুন ট্রিপ ঘোষণা করা হবে।</p>';
+		return bhela_bm_trips_empty_html();
 	}
 	$book_page = get_page_by_path( 'book-now' );
 	$book_url  = $book_page ? get_permalink( $book_page ) : home_url( '/' );
 
+	// Departed trips must not be bookable — the booking form already filters
+	// them the same way (includes/frontend.php).
+	$today    = current_time( 'Y-m-d' );
+	$upcoming = array();
+	foreach ( $trips as $t ) {
+		if ( empty( $t['date'] ) || $t['date'] < $today ) {
+			continue;
+		}
+		$upcoming[] = $t;
+	}
+	if ( ! $upcoming ) {
+		return bhela_bm_trips_empty_html();
+	}
+
 	ob_start();
 	echo '<div class="bhela-trips">';
-	foreach ( $trips as $t ) {
-		$avail = bhela_bm_trip_availability( $t['date'] );
+
+	$current_month = '';
+	$first         = true;
+	foreach ( $upcoming as $t ) {
+		$ts    = strtotime( $t['date'] );
+		$month = date( 'Y-m', $ts );
+		if ( $month !== $current_month ) {
+			$current_month = $month;
+			echo '<h3 class="bhela-trips__month">' . esc_html( date_i18n( 'F Y', $ts ) ) . '</h3>';
+		}
+
+		$avail       = bhela_bm_trip_availability( $t['date'] );
 		$t['status'] = $avail['status']; // full boat forces 'booked'
-		$st       = $statuses[ $t['status'] ] ?? $statuses['available'];
-		$day_type = function_exists( 'bhela_bm_day_type' ) ? bhela_bm_day_type( $t['date'] ) : 'weekend';
-		$type_tag = ( 'weekday' === $day_type ) ? '<span class="bhela-trip__type bhela-trip__type--weekday">Weekday −20% 🔥</span>' : ( 'holiday' === $day_type ? '<span class="bhela-trip__type bhela-trip__type--holiday">ছুটির দিন</span>' : '<span class="bhela-trip__type">Weekend</span>' );
-		echo '<div class="bhela-trip bhela-trip--' . esc_attr( $t['status'] ) . '">';
-		echo '<div class="bhela-trip__date"><strong>' . esc_html( $t['label'] ? $t['label'] : $t['date'] ) . '</strong>';
-		if ( $t['days'] ) {
-			echo '<span>' . esc_html( $t['days'] ) . '</span>';
+		$st          = $statuses[ $t['status'] ] ?? $statuses['available'];
+		$day_type    = function_exists( 'bhela_bm_day_type' ) ? bhela_bm_day_type( $t['date'] ) : 'weekend';
+		$low         = 'booked' !== $t['status'] && $avail['available'] > 0 && $avail['available'] <= 2;
+
+		$classes = array( 'bhela-trip', 'bhela-trip--' . $t['status'] );
+		if ( $first && 'booked' !== $t['status'] ) {
+			$classes[] = 'bhela-trip--next';
 		}
-		echo '</div>';
-		echo '<div class="bhela-trip__meta">' . $type_tag;
-		if ( $t['note'] ) {
-			echo '<span class="bhela-trip__note">' . esc_html( $t['note'] ) . '</span>';
+		if ( $low ) {
+			$classes[] = 'bhela-trip--low';
 		}
-		echo '</div>';
-		echo '<span class="bhela-trip__status" style="color:' . esc_attr( $st['color'] ) . '">' . esc_html( $st['short'] ) . '</span>';
-		if ( 'booked' !== $t['status'] ) {
-			$cab_color = $avail['available'] > 2 ? '#1a7f37' : '#b45309';
-			echo '<span class="bhela-trip__cabins" style="color:' . esc_attr( $cab_color ) . '">🛏️ ' . esc_html( sprintf( __( '%1$d/%2$dটি কেবিন খালি', 'bhela-booking' ), $avail['available'], $avail['total'] ) ) . '</span>';
-		}
-		if ( 'booked' === $t['status'] ) {
-			echo '<span class="bhela-trip__cta bhela-trip__cta--off">বুকড</span>';
-		} else {
-			echo '<a class="bhela-trip__cta" href="' . esc_url( add_query_arg( 'date', $t['date'], $book_url ) ) . '">বুক করুন →</a>';
-		}
-		echo '</div>';
+		?>
+		<div class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>">
+			<?php if ( $first && 'booked' !== $t['status'] ) : ?>
+				<span class="bhela-trip__ribbon"><?php esc_html_e( 'পরবর্তী ট্রিপ', 'bhela-booking' ); ?></span>
+			<?php endif; ?>
+
+			<div class="bhela-trip__date">
+				<strong><?php echo esc_html( $t['label'] ? $t['label'] : $t['date'] ); ?></strong>
+				<?php if ( $t['days'] ) : ?>
+					<span><?php echo esc_html( $t['days'] ); ?></span>
+				<?php endif; ?>
+			</div>
+
+			<div class="bhela-trip__meta">
+				<?php if ( 'weekday' === $day_type ) : ?>
+					<span class="bhela-trip__type bhela-trip__type--weekday"><?php esc_html_e( 'Weekday −20% 🔥', 'bhela-booking' ); ?></span>
+				<?php elseif ( 'holiday' === $day_type ) : ?>
+					<span class="bhela-trip__type bhela-trip__type--holiday"><?php esc_html_e( 'ছুটির দিন', 'bhela-booking' ); ?></span>
+				<?php else : ?>
+					<span class="bhela-trip__type"><?php esc_html_e( 'Weekend', 'bhela-booking' ); ?></span>
+				<?php endif; ?>
+				<?php if ( $t['note'] ) : ?>
+					<span class="bhela-trip__note"><?php echo esc_html( $t['note'] ); ?></span>
+				<?php endif; ?>
+			</div>
+
+			<?php
+			$price = bhela_bm_trip_from_price( $day_type );
+			if ( $price['now'] ) :
+				?>
+				<div class="bhela-trip__price">
+					<span class="bhela-trip__price-label"><?php esc_html_e( 'জনপ্রতি', 'bhela-booking' ); ?></span>
+					<strong><?php echo esc_html( bhela_bm_money( $price['now'] ) ); ?></strong>
+					<?php if ( $price['was'] ) : ?>
+						<s><?php echo esc_html( bhela_bm_money( $price['was'] ) ); ?></s>
+					<?php endif; ?>
+					<span class="bhela-trip__price-from"><?php esc_html_e( 'থেকে', 'bhela-booking' ); ?></span>
+				</div>
+			<?php endif; ?>
+
+			<div class="bhela-trip__foot">
+				<div class="bhela-trip__avail">
+					<span class="bhela-trip__status bhela-trip__status--<?php echo esc_attr( $t['status'] ); ?>"><?php echo esc_html( $st['short'] ); ?></span>
+					<?php if ( 'booked' !== $t['status'] ) : ?>
+						<span class="bhela-trip__cabins<?php echo $low ? ' bhela-trip__cabins--low' : ''; ?>">
+							<?php
+							echo esc_html( $low
+								? sprintf( __( '🔥 শেষ %dটি কেবিন!', 'bhela-booking' ), $avail['available'] )
+								: sprintf( __( '🛏️ %1$d/%2$dটি কেবিন খালি', 'bhela-booking' ), $avail['available'], $avail['total'] )
+							);
+							?>
+						</span>
+					<?php endif; ?>
+				</div>
+				<?php if ( 'booked' === $t['status'] ) : ?>
+					<span class="bhela-trip__cta bhela-trip__cta--off"><?php esc_html_e( 'বুকড', 'bhela-booking' ); ?></span>
+				<?php else : ?>
+					<a class="bhela-trip__cta" href="<?php echo esc_url( add_query_arg( 'date', $t['date'], $book_url ) ); ?>"><?php esc_html_e( 'বুক করুন →', 'bhela-booking' ); ?></a>
+				<?php endif; ?>
+			</div>
+		</div>
+		<?php
+		$first = false;
 	}
+
 	echo '</div>';
 	return ob_get_clean();
 }

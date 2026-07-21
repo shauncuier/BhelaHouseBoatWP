@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.11.2
+Version: 2.12.1
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -472,13 +472,81 @@ a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 
 .gallery-grid a { border-radius: var(--radius-sm); overflow: hidden; display: block; aspect-ratio: 1; }
 .gallery-grid img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s var(--ease); }
 .gallery-grid a:hover img { transform: scale(1.08); }
+/* Owner-managed gallery — CSS multi-column masonry.
+   Columns reflow natively when items are hidden by the filter and as lazy
+   images load, so no measuring JS is involved. */
+.bhela-gallery { column-count: 3; column-gap: 1rem; }
+@media (max-width: 900px) { .bhela-gallery { column-count: 2; } }
+@media (max-width: 560px) { .bhela-gallery { column-count: 1; } }
+
+.bhela-gallery__item {
+	break-inside: avoid; -webkit-column-break-inside: avoid; page-break-inside: avoid;
+	/* display:block + width:100% also stops WebKit/Blink splitting an item
+	   across two columns. */
+	display: block; width: 100%; margin: 0 0 1rem;
+	position: relative; border-radius: var(--radius-sm); overflow: hidden;
+	box-shadow: var(--shadow-sm);
+}
+/* Required: the UA sheet's [hidden]{display:none} loses to display:block
+   above, so without this the filter would silently do nothing. */
+.bhela-gallery__item[hidden] { display: none; }
+.bhela-gallery__item img { width: 100%; height: auto; display: block; transition: transform .5s var(--ease); }
+.bhela-gallery__item:hover img { transform: scale(1.06); }
+.bhela-gallery__caption {
+	position: absolute; inset: auto 0 0 0; padding: 1.6rem .9rem .7rem;
+	background: linear-gradient(180deg, transparent, rgba(10, 42, 47, .88));
+	color: #fff; font-size: .9rem; line-height: 1.5;
+	opacity: 0; transform: translateY(8px); transition: opacity .3s var(--ease), transform .3s var(--ease);
+}
+.bhela-gallery__item:hover .bhela-gallery__caption,
+.bhela-gallery__item:focus-visible .bhela-gallery__caption { opacity: 1; transform: none; }
+
+/* Filter tabs */
+.bhela-gallery-filter { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.8rem; }
+.bhela-gallery-filter__btn {
+	font-family: var(--font-body); font-size: .92rem; font-weight: 600; cursor: pointer;
+	padding: .5rem 1.2rem; border-radius: 999px; min-height: 42px;
+	background: var(--white); color: var(--text); border: 1.5px solid var(--line);
+	transition: background .25s, color .25s, border-color .25s;
+}
+.bhela-gallery-filter__btn:hover { border-color: var(--primary); color: var(--primary); }
+.bhela-gallery-filter__btn.is-active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
 .lightbox {
 	position: fixed; inset: 0; z-index: 2000; background: rgba(5, 20, 23, .95);
 	display: none; align-items: center; justify-content: center; padding: 2rem;
 }
 .lightbox.is-open { display: flex; }
-.lightbox img { max-width: 92vw; max-height: 88vh; border-radius: 12px; }
-.lightbox__close { position: absolute; top: 1.2rem; right: 1.6rem; background: none; border: 0; color: #fff; font-size: 2.4rem; cursor: pointer; }
+.lightbox img { max-width: 92vw; max-height: 82vh; border-radius: 12px; }
+.lightbox__figure { margin: 0; display: flex; align-items: center; justify-content: center; }
+.lightbox__close { position: absolute; top: 1.2rem; right: 1.6rem; background: none; border: 0; color: #fff; font-size: 2.4rem; cursor: pointer; line-height: 1; }
+.lightbox__nav {
+	position: absolute; top: 50%; transform: translateY(-50%);
+	background: rgba(255, 255, 255, .12); border: 1px solid rgba(255, 255, 255, .25);
+	color: #fff; width: 52px; height: 52px; border-radius: 50%;
+	font-size: 2rem; line-height: 1; cursor: pointer; display: grid; place-items: center;
+	transition: background .25s;
+}
+.lightbox__nav:hover { background: rgba(255, 255, 255, .25); }
+.lightbox__nav--prev { left: 1.2rem; }
+.lightbox__nav--next { right: 1.2rem; }
+.lightbox__nav[hidden] { display: none; }
+.lightbox__bar {
+	position: absolute; inset: auto 0 1.4rem 0; text-align: center; padding-inline: 4.5rem;
+	color: #DCEBE9; font-size: .95rem; line-height: 1.6;
+}
+.lightbox__count { display: block; color: var(--aqua); font-size: .85rem; margin-top: .3rem; }
+@media (max-width: 560px) {
+	.lightbox { padding: 1rem; }
+	.lightbox__nav { width: 44px; height: 44px; font-size: 1.6rem; }
+	.lightbox__nav--prev { left: .4rem; }
+	.lightbox__nav--next { right: .4rem; }
+	.lightbox__bar { padding-inline: 1rem; font-size: .88rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+	.bhela-gallery__item img, .bhela-gallery__caption { transition: none; }
+	.bhela-gallery__item:hover img { transform: none; }
+}
 
 /* Food menu */
 .menu-day { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow-sm); border: 1px solid var(--line); padding: 2rem; margin-bottom: 1.8rem; }
@@ -913,3 +981,13 @@ input, select, textarea { font-family: inherit; }
 	box-shadow: 0 0 0 3px rgba(180, 83, 9, .12);
 	background: #FFF7ED;
 }
+
+/* Schedule page — closing CTA card */
+.sched-cta {
+	display: flex; align-items: center; justify-content: space-between; gap: 1.4rem; flex-wrap: wrap;
+	margin-top: 2.6rem; padding: 1.8rem 2rem;
+	background: var(--sand); border-radius: var(--radius); border: 1px solid var(--line);
+}
+.sched-cta h3 { font-size: 1.25rem; margin-bottom: .3rem; }
+.sched-cta p { color: var(--text-soft); font-size: .95rem; max-width: 52ch; }
+@media (max-width: 640px) { .sched-cta { padding: 1.4rem; } .sched-cta .btn { width: 100%; } }

@@ -786,9 +786,6 @@
 			discountToggle.classList.toggle('is-on', !discountBody.hidden);
 		});
 
-		var urlDate = new URLSearchParams(window.location.search).get('date');
-		if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate)) dateEl.value = urlDate;
-
 		var availTimer = null;
 			dateEl.addEventListener('change', function () {
 				resetAvailability();
@@ -806,6 +803,21 @@
 						dateEl.dispatchEvent(new Event('change', { bubbles: true }));
 					});
 				});
+			}
+
+			/* Deep link from the schedule page: /book-now/?date=YYYY-MM-DD.
+			   Assigning .value does NOT fire 'change', so the availability check
+			   has to be dispatched explicitly — otherwise the date is filled in
+			   but never checked and the guest is stuck on step 1. Runs here,
+			   after the change handler above is bound. */
+			var urlDate = new URLSearchParams(window.location.search).get('date');
+			if (urlDate && /^\d{4}-\d{2}-\d{2}$/.test(urlDate) && (!dateEl.min || urlDate >= dateEl.min)) {
+				dateEl.value = urlDate;
+				if (dateChips) {
+					var urlChip = dateChips.querySelector('.bm-chip[data-date="' + urlDate + '"]');
+					if (urlChip) { urlChip.classList.add('is-on'); }
+				}
+				dateEl.dispatchEvent(new Event('change', { bubbles: true }));
 			}
 			[gAdults, gC48, gC04].forEach(function (input) {
 				if (!input) { return; }
