@@ -11,7 +11,7 @@ description: >
 This skill automates the full end-to-end release process for the **BHELA – The Haor Exclusive** WordPress project at:
 
 ```
-c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\
+c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\
 ```
 
 The repo contains two releasable components managed in one monorepo:
@@ -30,8 +30,8 @@ The repo contains two releasable components managed in one monorepo:
 ### 0. Pre-flight checks
 
 ```powershell
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" status
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" log --oneline -5
+git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" status
+git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" log --oneline -5
 ```
 
 - If **working tree is clean** and no new commits since last tag → tell the user there is nothing new to release and stop.
@@ -68,9 +68,9 @@ Set the **same** `X.Y.Z` in all five fields:
 ### 3. Stage and commit all changes
 
 ```powershell
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" add -A
+git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" add -A
 
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" commit -m "release: vVERSION (theme + plugin)
+git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" commit -m "release: vVERSION (theme + plugin)
 
 - <summary of theme changes>
 - <summary of plugin changes>"
@@ -85,7 +85,7 @@ git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" commit -
 One tag for the whole release:
 
 ```powershell
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" tag -a "vVERSION" -m "Release vVERSION — <one-line summary>"
+git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" tag -a "vVERSION" -m "Release vVERSION — <one-line summary>"
 ```
 
 ---
@@ -93,7 +93,7 @@ git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" tag -a "
 ### 5. Push commits and tag to GitHub
 
 ```powershell
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" push origin main --tags
+git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" push origin main --tags
 ```
 
 ---
@@ -124,8 +124,8 @@ function Should-Skip($rel) {
 }
 
 # === THEME ZIP ===  (keeps style.css, screenshot.png, theme.json, php, assets)
-$themePath = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\themes\bhela"
-$themeZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-theme-vVERSION.zip"
+$themePath = "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\themes\bhela"
+$themeZip  = "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\bhela-theme-vVERSION.zip"
 if (Test-Path $themeZip) { Remove-Item $themeZip }
 $zip = [System.IO.Compression.ZipFile]::Open($themeZip, [System.IO.Compression.ZipArchiveMode]::Create)
 Get-ChildItem -Path $themePath -Recurse -File | ForEach-Object {
@@ -136,8 +136,8 @@ Get-ChildItem -Path $themePath -Recurse -File | ForEach-Object {
 $zip.Dispose()
 
 # === PLUGIN ZIP ===
-$pluginPath = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\plugins\bhela-booking"
-$pluginZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-booking-vVERSION.zip"
+$pluginPath = "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\plugins\bhela-booking"
+$pluginZip  = "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\bhela-booking-vVERSION.zip"
 if (Test-Path $pluginZip) { Remove-Item $pluginZip }
 $zip = [System.IO.Compression.ZipFile]::Open($pluginZip, [System.IO.Compression.ZipArchiveMode]::Create)
 Get-ChildItem -Path $pluginPath -Recurse -File | ForEach-Object {
@@ -220,7 +220,7 @@ All five carry the **same** number.
 
 ## Project Info
 
-- **Monorepo root:** `c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\`
+- **Monorepo root:** `c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\`
 - **GitHub remote:** `https://github.com/shauncuier/BhelaHouseBoatWP.git`
 - **Branch:** `main`
 - **Release tool:** `gh` CLI (already authenticated)
