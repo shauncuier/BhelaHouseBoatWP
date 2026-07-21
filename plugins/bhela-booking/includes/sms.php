@@ -112,7 +112,20 @@ function bhela_bm_send_sms( $number, $message ) {
 		'body'   => is_string( $body ) ? mb_substr( wp_strip_all_tags( $body ), 0, 300 ) : '',
 	), false );
 
-	return $code >= 200 && $code < 300;
+	$ok = $code >= 200 && $code < 300;
+	if ( function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log(
+			$ok ? 'sms' : 'error',
+			sprintf( 'SMS %s — %s (HTTP %d)%s',
+				$ok ? 'পাঠানো হয়েছে' : 'পাঠানো যায়নি',
+				$to,
+				$code,
+				$ok ? '' : ' — ' . mb_substr( wp_strip_all_tags( (string) $body ), 0, 120 )
+			),
+			$ok
+		);
+	}
+	return $ok;
 }
 
 /** Admin recipient — explicit SMS number, else business Phone 1. */

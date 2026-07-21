@@ -232,5 +232,14 @@ function bhela_bm_email_customer( $booking_id, $type = 'request' ) {
 		$headers[] = 'Reply-To: ' . $reply_to;
 	}
 
-	return wp_mail( $email, $subject, $body, $headers );
+	$sent = wp_mail( $email, $subject, $body, $headers );
+	if ( function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log(
+			$sent ? 'email' : 'error',
+			sprintf( '%s ইমেইল %s — %s (%s)', 'confirmed' === $type ? 'কনফার্মেশন' : 'রিকোয়েস্ট',
+				$sent ? 'পাঠানো হয়েছে' : 'পাঠানো যায়নি', $email, $invoice_no ),
+			$sent
+		);
+	}
+	return $sent;
 }

@@ -28,11 +28,76 @@ function bhela_bm_default_trips() {
 	);
 }
 
-/** Get trips sorted by date. */
+/** Bangla weekday names, indexed by date('w') — 0 = Sunday. */
+function bhela_bm_bn_weekdays() {
+	return array( 'রবি', 'সোম', 'মঙ্গল', 'বুধ', 'বৃহস্পতি', 'শুক্র', 'শনি' );
+}
+
+/**
+ * Trip end date. Trips are 2 days 1 night, so the default is the day after
+ * the start; an explicitly stored end always wins.
+ */
+function bhela_bm_trip_end( $trip ) {
+	if ( ! empty( $trip['end'] ) ) {
+		return $trip['end'];
+	}
+	$ts = strtotime( $trip['date'] ?? '' );
+	return $ts ? gmdate( 'Y-m-d', strtotime( '+1 day', $ts ) ) : '';
+}
+
+/**
+ * Display label built from the two dates, collapsing whatever the dates share:
+ *   same month  → "2 – 3 Aug 2026"
+ *   same year   → "31 Jul – 1 Aug 2026"
+ *   crosses year→ "31 Dec 2026 – 1 Jan 2027"
+ */
+function bhela_bm_trip_label( $start, $end ) {
+	$s = strtotime( $start );
+	$e = strtotime( $end );
+	if ( ! $s ) {
+		return '';
+	}
+	if ( ! $e || $e <= $s ) {
+		return gmdate( 'j M Y', $s );
+	}
+	if ( gmdate( 'Y', $s ) !== gmdate( 'Y', $e ) ) {
+		return gmdate( 'j M Y', $s ) . ' – ' . gmdate( 'j M Y', $e );
+	}
+	if ( gmdate( 'm', $s ) !== gmdate( 'm', $e ) ) {
+		return gmdate( 'j M', $s ) . ' – ' . gmdate( 'j M Y', $e );
+	}
+	return gmdate( 'j', $s ) . ' – ' . gmdate( 'j M Y', $e );
+}
+
+/** Bangla day pair for the trip, e.g. "শুক্র – শনি". */
+function bhela_bm_trip_days( $start, $end ) {
+	$s = strtotime( $start );
+	$e = strtotime( $end );
+	if ( ! $s ) {
+		return '';
+	}
+	$names = bhela_bm_bn_weekdays();
+	$from  = $names[ (int) gmdate( 'w', $s ) ];
+	if ( ! $e || $e <= $s ) {
+		return $from;
+	}
+	return $from . ' – ' . $names[ (int) gmdate( 'w', $e ) ];
+}
+
+/** Get trips sorted by date, with end/label/days filled in for older rows. */
 function bhela_bm_get_trips() {
 	$trips = get_option( 'bhela_bm_trips', null );
 	if ( ! is_array( $trips ) ) {
 		$trips = bhela_bm_default_trips();
+	}
+	foreach ( $trips as $i => $t ) {
+		$trips[ $i ]['end'] = bhela_bm_trip_end( $t );
+		if ( empty( $t['label'] ) ) {
+			$trips[ $i ]['label'] = bhela_bm_trip_label( $t['date'] ?? '', $trips[ $i ]['end'] );
+		}
+		if ( empty( $t['days'] ) ) {
+			$trips[ $i ]['days'] = bhela_bm_trip_days( $t['date'] ?? '', $trips[ $i ]['end'] );
+		}
 	}
 	usort( $trips, function ( $a, $b ) {
 		return strcmp( $a['date'], $b['date'] );
@@ -122,6 +187,7 @@ function bhela_bm_trips_page() {
 	if ( isset( $_POST['bhela_bm_trips_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_trips_nonce'] ) ), 'bhela_bm_trips' ) ) {
 		$trips = array();
 		$dates    = (array) ( $_POST['trip_date'] ?? array() );
+		$ends     = (array) ( $_POST['trip_end'] ?? array() );
 		$labels   = (array) ( $_POST['trip_label'] ?? array() );
 		$days     = (array) ( $_POST['trip_days'] ?? array() );
 		$notes    = (array) ( $_POST['trip_note'] ?? array() );
@@ -134,17 +200,83 @@ function bhela_bm_trips_page() {
 				continue;
 			}
 			$status = sanitize_key( $statuses[ $i ] ?? 'available' );
+
+			// End date defaults to the night after the start (2D1N).
+			$end = sanitize_text_field( $ends[ $i ] ?? '' );
+			if ( ! $end || $end < $date ) {
+				$end = gmdate( 'Y-m-d', strtotime( '+1 day', strtotime( $date ) ) );
+			}
+			// Label and days are generated from the dates unless the owner typed
+			// something of their own — a blank field always means "regenerate".
+			$label = sanitize_text_field( $labels[ $i ] ?? '' );
+			$daybn = sanitize_text_field( $days[ $i ] ?? '' );
+			if ( '' === $label ) {
+				$label = bhela_bm_trip_label( $date, $end );
+			}
+			if ( '' === $daybn ) {
+				$daybn = bhela_bm_trip_days( $date, $end );
+			}
+
 			$trips[] = array(
 				'date'   => $date,
-				'label'  => sanitize_text_field( $labels[ $i ] ?? '' ),
-				'days'   => sanitize_text_field( $days[ $i ] ?? '' ),
+				'end'    => $end,
+				'label'  => $label,
+				'days'   => $daybn,
 				'note'   => sanitize_text_field( $notes[ $i ] ?? '' ),
 				'status' => array_key_exists( $status, bhela_bm_trip_statuses() ) ? $status : 'available',
 				'booked' => min( bhela_bm_max_cabins(), max( 0, (int) ( $bookeds[ $i ] ?? 0 ) ) ),
 			);
 		}
+		// Record what changed before writing, so a departure date that disappears
+		// can always be traced back to the save that removed it. Report the
+		// human labels the owner actually sees, not raw ISO dates.
+		$before       = bhela_bm_get_trips();
+		$before_dates = wp_list_pluck( $before, 'date' );
+		$after_dates  = wp_list_pluck( $trips, 'date' );
+		$removed      = array_values( array_diff( $before_dates, $after_dates ) );
+		$added        = array_values( array_diff( $after_dates, $before_dates ) );
+
+		$label_of = array();
+		foreach ( array_merge( $before, $trips ) as $row ) {
+			$label_of[ $row['date'] ] = $row['label'] ? $row['label'] : $row['date'];
+		}
+		$names = function ( $dates ) use ( $label_of ) {
+			$out = array();
+			foreach ( $dates as $d ) {
+				$out[] = $label_of[ $d ] ?? $d;
+			}
+			return implode( ', ', $out );
+		};
+
 		update_option( 'bhela_bm_trips', $trips );
+
+		if ( function_exists( 'bhela_bm_log' ) ) {
+			$total = bhela_bm_bn_num( count( $after_dates ) );
+			if ( $removed && $added ) {
+				$msg = sprintf( '%sটি তারিখ মুছে ফেলা হয়েছে (%s), %sটি যোগ হয়েছে (%s)। এখন মোট %sটি ট্রিপ।',
+					bhela_bm_bn_num( count( $removed ) ), $names( $removed ),
+					bhela_bm_bn_num( count( $added ) ), $names( $added ), $total );
+			} elseif ( $removed ) {
+				$msg = sprintf( '%sটি তারিখ মুছে ফেলা হয়েছে — %s। এখন মোট %sটি ট্রিপ।',
+					bhela_bm_bn_num( count( $removed ) ), $names( $removed ), $total );
+			} elseif ( $added ) {
+				$msg = sprintf( '%sটি নতুন তারিখ যোগ হয়েছে — %s। এখন মোট %sটি ট্রিপ।',
+					bhela_bm_bn_num( count( $added ) ), $names( $added ), $total );
+			} else {
+				$msg = sprintf( 'ক্যালেন্ডার আপডেট করা হয়েছে — মোট %sটি ট্রিপ (তারিখ অপরিবর্তিত)।', $total );
+			}
+			bhela_bm_log( 'trips', $msg );
+		}
+
 		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Trip calendar saved.', 'bhela-booking' ) . '</p></div>';
+		if ( $removed ) {
+			echo '<div class="notice notice-warning"><p>' . esc_html( sprintf(
+				/* translators: 1: number of removed dates, 2: comma separated trip labels */
+				__( '⚠️ %1$sটি তারিখ মুছে ফেলা হয়েছে: %2$s', 'bhela-booking' ),
+				bhela_bm_bn_num( count( $removed ) ),
+				$names( $removed )
+			) ) . '</p></div>';
+		}
 	}
 
 	$trips    = bhela_bm_get_trips();
@@ -155,22 +287,45 @@ function bhela_bm_trips_page() {
 		<p><?php esc_html_e( 'Manage departure dates here — the website schedule page and booking calendar update automatically. Empty date = row ignored.', 'bhela-booking' ); ?></p>
 		<form method="post">
 			<?php wp_nonce_field( 'bhela_bm_trips', 'bhela_bm_trips_nonce' ); ?>
-			<table class="widefat striped" id="bhela-trips-table" style="max-width:1100px">
+			<style>
+				/* The label/days fields hold long Bangla strings — give them room and
+				   let the table scroll instead of squeezing the text out of sight. */
+				#bhela-trips-wrap { overflow-x: auto; }
+				#bhela-trips-table { min-width: 1220px; }
+				#bhela-trips-table input[type="text"] { width: 100%; min-width: 150px; }
+				#bhela-trips-table tr.is-past { opacity: .6; }
+				#bhela-trips-table .bhela-past-tag {
+					display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
+					background: #f0f0f1; color: #646970; font-size: 11px; white-space: nowrap;
+				}
+			</style>
+			<div id="bhela-trips-wrap">
+			<table class="widefat striped" id="bhela-trips-table">
 				<thead><tr>
 					<th style="width:140px"><?php esc_html_e( 'Start Date', 'bhela-booking' ); ?></th>
-					<th><?php esc_html_e( 'Display Label', 'bhela-booking' ); ?></th>
-					<th><?php esc_html_e( 'Days (Bangla)', 'bhela-booking' ); ?></th>
-					<th><?php esc_html_e( 'Note', 'bhela-booking' ); ?></th>
+					<th style="width:140px"><?php esc_html_e( 'End Date', 'bhela-booking' ); ?></th>
+					<th style="width:20%"><?php esc_html_e( 'Display Label', 'bhela-booking' ); ?></th>
+					<th style="width:20%"><?php esc_html_e( 'Days (Bangla)', 'bhela-booking' ); ?></th>
+					<th style="width:18%"><?php esc_html_e( 'Note', 'bhela-booking' ); ?></th>
 					<th style="width:170px"><?php esc_html_e( 'Status', 'bhela-booking' ); ?></th>
 					<th style="width:130px"><?php esc_html_e( 'Booked Cabins', 'bhela-booking' ); ?></th>
 					<th style="width:60px"><?php esc_html_e( 'Delete', 'bhela-booking' ); ?></th>
 				</tr></thead>
 				<tbody>
-				<?php foreach ( $trips as $i => $t ) : ?>
-					<tr>
-						<td><input type="date" name="trip_date[]" value="<?php echo esc_attr( $t['date'] ); ?>"></td>
-						<td><input type="text" style="width:100%" name="trip_label[]" value="<?php echo esc_attr( $t['label'] ); ?>"></td>
-						<td><input type="text" style="width:100%" name="trip_days[]" value="<?php echo esc_attr( $t['days'] ); ?>"></td>
+				<?php
+				$bm_today_admin = current_time( 'Y-m-d' );
+				foreach ( $trips as $i => $t ) :
+					$bm_is_past = ! empty( $t['date'] ) && $t['date'] < $bm_today_admin;
+					?>
+					<tr class="<?php echo $bm_is_past ? 'is-past' : ''; ?>">
+						<td><input type="date" class="bhela-trip-start" name="trip_date[]" value="<?php echo esc_attr( $t['date'] ); ?>">
+							<?php if ( $bm_is_past ) : ?>
+								<span class="bhela-past-tag"><?php esc_html_e( 'চলে গেছে — সাইটে দেখাচ্ছে না', 'bhela-booking' ); ?></span>
+							<?php endif; ?>
+						</td>
+						<td><input type="date" class="bhela-trip-end" name="trip_end[]" value="<?php echo esc_attr( bhela_bm_trip_end( $t ) ); ?>"></td>
+						<td><input type="text" style="width:100%" class="bhela-trip-label" name="trip_label[]" value="<?php echo esc_attr( $t['label'] ); ?>"></td>
+						<td><input type="text" style="width:100%" class="bhela-trip-days" name="trip_days[]" value="<?php echo esc_attr( $t['days'] ); ?>"></td>
 						<td><input type="text" style="width:100%" name="trip_note[]" value="<?php echo esc_attr( $t['note'] ); ?>"></td>
 						<td><select name="trip_status[]">
 							<?php foreach ( $statuses as $key => $st ) : ?>
@@ -186,6 +341,7 @@ function bhela_bm_trips_page() {
 				<?php endforeach; ?>
 				</tbody>
 			</table>
+			</div>
 			<p>
 				<button type="button" class="button" id="bhela-add-trip">➕ <?php esc_html_e( 'Add Trip', 'bhela-booking' ); ?></button>
 				<button type="submit" class="button button-primary"><?php esc_html_e( 'Save Trip Calendar', 'bhela-booking' ); ?></button>

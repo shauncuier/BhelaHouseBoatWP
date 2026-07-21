@@ -86,9 +86,12 @@ function bhela_bm_booking_form_shortcode() {
 						<legend><span class="bhela-bm-step__num">১</span> কবে যেতে চান?</legend>
 						<p class="bhela-bm-step__sub">আসন্ন গ্রুপ ট্রিপ থেকে বেছে নিন, অথবা নিজের তারিখ দিন — Availability সাথে সাথে দেখা যাবে।</p>
 						<?php
-						$bm_today    = date( 'Y-m-d' );
+						// Quick-pick chips come straight from the Trip Calendar. How many
+						// are shown is an owner setting — 0 hides the row entirely.
+						$bm_today    = current_time( 'Y-m-d' );
+						$bm_limit    = (int) $settings['date_chips'];
 						$bm_upcoming = array();
-						if ( function_exists( 'bhela_bm_get_trips' ) ) {
+						if ( $bm_limit > 0 && function_exists( 'bhela_bm_get_trips' ) ) {
 							foreach ( bhela_bm_get_trips() as $bm_t ) {
 								if ( empty( $bm_t['date'] ) || $bm_t['date'] < $bm_today ) {
 									continue;
@@ -97,7 +100,7 @@ function bhela_bm_booking_form_shortcode() {
 									continue;
 								}
 								$bm_upcoming[] = $bm_t;
-								if ( count( $bm_upcoming ) >= 5 ) {
+								if ( count( $bm_upcoming ) >= $bm_limit ) {
 									break;
 								}
 							}
@@ -445,6 +448,10 @@ function bhela_bm_process_submission( $data ) {
 	update_post_meta( $post_id, '_bhela_cabin_type', $cabin_summary );
 	update_post_meta( $post_id, '_bhela_cabins_json', wp_json_encode( is_array( $cabins ) ? $cabins : array(), JSON_UNESCAPED_UNICODE ) );
 	update_post_meta( $post_id, '_bhela_lines', wp_json_encode( $price['lines'], JSON_UNESCAPED_UNICODE ) );
+	if ( function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'booking', sprintf( 'নতুন বুকিং %s — %s, %s, %s জন, মোট %s',
+			$invoice_no, $name, $date, bhela_bm_bn_num( (int) $price['guests'] ), bhela_bm_money( $price['total'] ) ) );
+	}
 	update_post_meta( $post_id, '_bhela_guests', $price['guests'] );
 	update_post_meta( $post_id, '_bhela_message', $message );
 	update_post_meta( $post_id, '_bhela_status', 'pending' );

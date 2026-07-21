@@ -376,6 +376,13 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	$sent_confirmed = false;
 	if ( array_key_exists( $new_status, bhela_bm_statuses() ) ) {
 		update_post_meta( $post_id, '_bhela_status', $new_status );
+		if ( $new_status !== $old_status && function_exists( 'bhela_bm_log' ) ) {
+			$st_labels = bhela_bm_statuses();
+			bhela_bm_log( 'status', sprintf( 'বুকিং %s — %s → %s',
+				get_post_meta( $post_id, '_bhela_invoice_no', true ),
+				$st_labels[ $old_status ] ?? $old_status,
+				$st_labels[ $new_status ] ?? $new_status ) );
+		}
 		if ( 'confirmed' === $new_status && 'confirmed' !== $old_status ) {
 			bhela_bm_email_customer( $post_id, 'confirmed' );
 			$sent_confirmed = true;
@@ -450,6 +457,7 @@ function bhela_bm_settings_page() {
 		$s['email_from_name'] = sanitize_text_field( wp_unslash( $_POST['email_from_name'] ?? '' ) );
 		$s['advance_percent'] = min( 100, max( 1, (int) ( $_POST['advance_percent'] ?? 50 ) ) );
 		$s['child_fee']       = max( 0, (int) ( $_POST['child_fee'] ?? 5000 ) );
+		$s['date_chips']      = min( 20, max( 0, (int) ( $_POST['date_chips'] ?? 5 ) ) );
 		$s['weekend_days']    = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
 
 		// SMS notification settings.
@@ -480,6 +488,9 @@ function bhela_bm_settings_page() {
 		}
 
 		update_option( 'bhela_bm_settings', $s );
+		if ( function_exists( 'bhela_bm_log' ) ) {
+			bhela_bm_log( 'settings', 'বুকিং সেটিংস সেভ করা হয়েছে' );
+		}
 
 		$rates = bhela_bm_get_rates();
 		foreach ( $rates as $key => $row ) {
@@ -523,6 +534,7 @@ function bhela_bm_settings_page() {
 					<p class="description"><?php esc_html_e( 'Shown on the invoice so guests can scan & pay. Media → Add New → copy File URL.', 'bhela-booking' ); ?></p></td></tr>
 				<tr><th>Bangla QR Image URL</th><td><input type="url" class="large-text" name="bangla_qr" value="<?php echo esc_attr( $s['bangla_qr'] ?? '' ); ?>" placeholder="Upload the Bangla QR photo in Media Library, paste its URL here"></td></tr>
 				<tr><th>Advance %</th><td><input type="number" name="advance_percent" min="1" max="100" value="<?php echo esc_attr( $s['advance_percent'] ); ?>"> %</td></tr>
+				<tr><th>তারিখ চিপ সংখ্যা</th><td><input type="number" name="date_chips" min="0" max="20" value="<?php echo esc_attr( $s['date_chips'] ); ?>"> টি<br><span class="description">বুকিং ফর্মে Trip Calendar থেকে কতগুলো আসন্ন তারিখ কুইক-পিক হিসেবে দেখাবে। ০ দিলে চিপ লুকানো থাকবে।</span></td></tr>
 				<tr><th>শিশু (৪–৮) ফি</th><td><input type="number" name="child_fee" min="0" step="100" value="<?php echo esc_attr( $s['child_fee'] ); ?>"> ৳ প্রতি শিশু<br><span class="description">ফিক্সড চার্জ — কেবিনের রেট বা Weekday ছাড়ের সাথে বদলায় না। ০–৪ বছর সবসময় ফ্রি।</span></td></tr>
 				<tr><th>Invoice Prefix</th><td><input type="text" name="invoice_prefix" value="<?php echo esc_attr( $s['invoice_prefix'] ); ?>"></td></tr>
 				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="3" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea></td></tr>

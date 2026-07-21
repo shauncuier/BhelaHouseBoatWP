@@ -363,6 +363,9 @@ function bhela_bm_gallery_import() {
 		$added++;
 	}
 
+	if ( function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'gallery', sprintf( 'থিমের ছবি ইমপোর্ট — %d টি নতুন ছবি যোগ হয়েছে', $added ) );
+	}
 	wp_safe_redirect( add_query_arg(
 		array( 'post_type' => 'bhela_gallery', 'bhela_imported' => $added ),
 		admin_url( 'edit.php' )
