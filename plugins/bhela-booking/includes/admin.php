@@ -445,7 +445,7 @@ function bhela_bm_settings_page() {
 		$s['bank_details']    = sanitize_textarea_field( $_POST['bank_details'] ?? '' );
 		$s['nagad_qr']        = esc_url_raw( $_POST['nagad_qr'] ?? '' );
 		$s['bangla_qr']       = esc_url_raw( $_POST['bangla_qr'] ?? '' );
-		$s['holidays']        = sanitize_textarea_field( $_POST['holidays'] ?? '' );
+		unset( $s['holidays'] ); // holidays now live on the Trip Calendar rows
 		$s['invoice_note']    = sanitize_textarea_field( $_POST['invoice_note'] ?? '' );
 
 		// Email notification settings.
@@ -547,9 +547,9 @@ function bhela_bm_settings_page() {
 						<label style="margin-right:14px"><input type="checkbox" name="weekend_days[]" value="<?php echo esc_attr( $num ); ?>" <?php checked( in_array( $num, array_map( 'intval', (array) $s['weekend_days'] ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
 					<?php endforeach; ?>
 				</td></tr>
-				<tr><th><?php esc_html_e( 'Holidays (one per line, YYYY-MM-DD)', 'bhela-booking' ); ?></th>
-					<td><textarea name="holidays" rows="5" class="regular-text"><?php echo esc_textarea( $s['holidays'] ); ?></textarea>
-					<p class="description"><?php esc_html_e( 'Holiday & weekend dates use the Regular rate; other days use the Weekday rate.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th><?php esc_html_e( 'Holidays', 'bhela-booking' ); ?></th>
+					<td><p class="description"><?php esc_html_e( 'ছুটির তারিখ এখন ট্রিপ ক্যালেন্ডারে ঠিক করা হয় — যে ট্রিপে “ছুটি” টিক দেওয়া থাকবে সেটিতে রেগুলার রেট বসবে (২০% উইকডে ছাড় থাকবে না)। ছুটি ও উইকএন্ড ছাড়া বাকি দিনে উইকডে রেট।', 'bhela-booking' ); ?></p>
+					<p><a class="button" href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-trips' ), admin_url( 'edit.php' ) ) ); ?>">📅 <?php esc_html_e( 'ট্রিপ ক্যালেন্ডার খুলুন', 'bhela-booking' ); ?></a></p></td></tr>
 			</table>
 
 			<h2><?php esc_html_e( 'Cabin Rates (per person, 2D1N)', 'bhela-booking' ); ?></h2>

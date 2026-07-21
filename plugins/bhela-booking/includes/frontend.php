@@ -42,7 +42,7 @@ function bhela_bm_enqueue_assets() {
 		'maxCabins'      => bhela_bm_max_cabins(),
 		'maxGuests'      => bhela_bm_max_guests(),
 		'weekendDays'    => array_map( 'intval', (array) $settings['weekend_days'] ),
-		'holidays'       => array_values( array_filter( array_map( 'trim', explode( "\n", (string) $settings['holidays'] ) ) ) ),
+		'holidays'       => bhela_bm_holiday_dates(),
 		'advancePercent' => (int) $settings['advance_percent'],
 		'childFee'       => (int) $settings['child_fee'],
 		'whatsapp'       => preg_replace( '/[^0-9]/', '', $settings['whatsapp'] ),

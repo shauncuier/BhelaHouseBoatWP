@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.12.1' );
+define( 'BHELA_VERSION', '2.12.3' );
 
 /* ---------- Setup ---------- */
 
@@ -58,7 +58,7 @@ function bhela_assets() {
 	wp_localize_script( 'bhela-theme', 'bhelaTheme', array(
 		'rates'       => $rates,
 		'weekendDays' => isset( $set['weekend_days'] ) ? array_map( 'intval', (array) $set['weekend_days'] ) : array( 5, 6 ),
-		'holidays'    => isset( $set['holidays'] ) ? array_values( array_filter( array_map( 'trim', explode( "\n", $set['holidays'] ) ) ) ) : array(),
+		'holidays'    => function_exists( 'bhela_bm_holiday_dates' ) ? bhela_bm_holiday_dates() : array(),
 		'whatsapp'    => preg_replace( '/[^0-9]/', '', bhela_contact( 'whatsapp' ) ),
 		'bookingUrl'  => bhela_page_url( 'book-now' ),
 	) );

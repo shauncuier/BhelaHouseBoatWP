@@ -497,3 +497,4 @@
 	box-shadow: 0 0 0 3px rgba(180, 83, 9, .12);
 	background: #FFF7ED;
 }
+.bhela-trip__type--long { background: rgba(19,122,116,.14); color: var(--primary, #137A74); }

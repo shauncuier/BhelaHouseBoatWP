@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.9.0
+ * Version: 2.11.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.9.0' );
+define( 'BHELA_BM_VERSION', '2.11.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -40,7 +40,6 @@ function bhela_bm_default_settings() {
 		'child_fee'        => 5000, // flat charge per 4–8 year old, any day type
 		'date_chips'       => 5,    // how many upcoming trips show as quick-pick chips (0 = hide)
 		'weekend_days'     => array( 5, 6 ), // date('w'): 5 = Friday, 6 = Saturday.
-		'holidays'         => "2026-08-05\n2026-08-12\n2026-08-26",
 		'invoice_note'     => "বুকিং নিশ্চিত করতে মোট মূল্যের ৫০% অগ্রিম প্রদান করতে হবে। বাকি ৫০% অনবোর্ড হওয়ার সময় পরিশোধযোগ্য। ২১+ দিন আগে বাতিলে অগ্রিমের ৫০% ফেরতযোগ্য; ৭ দিনের কম সময়ে কোনো রিফান্ড প্রযোজ্য নয়।",
 
 		// Email notifications.
@@ -145,6 +144,67 @@ function bhela_bm_rate_for_occupancy( $occ ) {
  * PRICING ENGINE
  * ========================================================= */
 
+/**
+ * Holiday dates, as a Y-m-d list.
+ *
+ * The Trip Calendar's "ছুটি" checkbox is the single source of truth. A holiday
+ * only matters for a date the boat actually sails on, so a second list in
+ * Settings only gave the owner two places to forget. This also feeds the
+ * client-side price preview, keeping JS and PHP on the same day type.
+ */
+function bhela_bm_holiday_dates() {
+	if ( ! function_exists( 'bhela_bm_get_trips' ) ) {
+		return array();
+	}
+	$dates = array();
+	foreach ( bhela_bm_get_trips() as $t ) {
+		if ( ! empty( $t['holiday'] ) && ! empty( $t['date'] ) ) {
+			$dates[] = $t['date'];
+		}
+	}
+	return $dates;
+}
+
+/**
+ * One-time move of the old Settings holidays textarea onto the trip rows.
+ *
+ * Any listed date that matches a departure gets its "ছুটি" box ticked, so
+ * pricing does not silently change under the owner; dates with no trip never
+ * affected a booking, so they are simply dropped with the setting.
+ */
+function bhela_bm_migrate_holidays() {
+	$settings = get_option( 'bhela_bm_settings', array() );
+	if ( ! is_array( $settings ) || ! array_key_exists( 'holidays', $settings ) ) {
+		return;
+	}
+	$old = array_filter( array_map( 'trim', explode( "\n", (string) $settings['holidays'] ) ) );
+
+	$trips  = get_option( 'bhela_bm_trips', null );
+	$moved  = 0;
+	if ( is_array( $trips ) && $old ) {
+		foreach ( $trips as $i => $t ) {
+			if ( empty( $t['holiday'] ) && in_array( $t['date'] ?? '', $old, true ) ) {
+				$trips[ $i ]['holiday'] = true;
+				$moved++;
+			}
+		}
+		if ( $moved ) {
+			update_option( 'bhela_bm_trips', $trips );
+		}
+	}
+
+	unset( $settings['holidays'] );
+	update_option( 'bhela_bm_settings', $settings );
+
+	if ( function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'settings', sprintf(
+			'ছুটির তালিকা সেটিংস থেকে ট্রিপ ক্যালেন্ডারে সরানো হয়েছে — %sটি ট্রিপে “ছুটি” টিক বসেছে।',
+			function_exists( 'bhela_bm_bn_num' ) ? bhela_bm_bn_num( $moved ) : $moved
+		) );
+	}
+}
+add_action( 'admin_init', 'bhela_bm_migrate_holidays' );
+
 /** Day type for a Y-m-d date: 'holiday' | 'weekend' | 'weekday'. */
 function bhela_bm_day_type( $date ) {
 	$settings = bhela_bm_get_settings();
@@ -152,8 +212,7 @@ function bhela_bm_day_type( $date ) {
 	if ( ! $ts ) {
 		return 'weekend';
 	}
-	$holidays = array_filter( array_map( 'trim', explode( "\n", (string) $settings['holidays'] ) ) );
-	if ( in_array( date( 'Y-m-d', $ts ), $holidays, true ) ) {
+	if ( in_array( date( 'Y-m-d', $ts ), bhela_bm_holiday_dates(), true ) ) {
 		return 'holiday';
 	}
 	if ( in_array( (int) date( 'w', $ts ), array_map( 'intval', (array) $settings['weekend_days'] ), true ) ) {
