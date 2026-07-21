@@ -23,12 +23,12 @@ function bhela_bm_register_gallery_cpt() {
 		'labels' => array(
 			'name'          => 'Gallery',
 			'singular_name' => 'Photo',
-			'menu_name'     => '🖼️ গ্যালারি',
-			'add_new'       => 'নতুন ছবি',
-			'add_new_item'  => 'নতুন ছবি যোগ করুন',
-			'edit_item'     => 'ছবি এডিট করুন',
-			'all_items'     => 'সব ছবি',
-			'not_found'     => 'এখনো কোনো ছবি যোগ করা হয়নি।',
+			'menu_name'     => '🖼️ Gallery',
+			'add_new'       => 'Add Photo',
+			'add_new_item'  => 'Add New Photo',
+			'edit_item'     => 'Edit Photo',
+			'all_items'     => '🖼️ Gallery',
+			'not_found'     => 'No photos added yet.',
 		),
 		'public'             => false,
 		'publicly_queryable' => false,
@@ -374,6 +374,183 @@ function bhela_bm_gallery_import() {
 }
 add_action( 'admin_post_bhela_bm_gallery_import', 'bhela_bm_gallery_import' );
 
+/* ---------- Bulk upload (native media picker, multi-select) ---------- */
+
+/**
+ * Adding photos one row at a time is the slow path. This page opens the
+ * WordPress media frame in multi-select mode — the owner drags a whole trip's
+ * worth of photos in, picks them all, and each becomes its own gallery post
+ * with the chosen category, in the picked order, after the current last photo.
+ */
+function bhela_bm_gallery_bulk_menu() {
+	add_submenu_page(
+		'edit.php?post_type=bhela_booking',
+		__( 'Bulk Photo Upload', 'bhela-booking' ),
+		__( '🖼️ Bulk Upload', 'bhela-booking' ),
+		'manage_options',
+		'bhela-bm-gallery-bulk',
+		'bhela_bm_gallery_bulk_page'
+	);
+}
+add_action( 'admin_menu', 'bhela_bm_gallery_bulk_menu' );
+
+function bhela_bm_gallery_bulk_page() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return;
+	}
+	// The media frame lives on this screen, so it must have the media JS.
+	wp_enqueue_media();
+
+	$terms   = get_terms( array( 'taxonomy' => 'bhela_gallery_cat', 'hide_empty' => false, 'orderby' => 'term_id' ) );
+	$terms   = is_wp_error( $terms ) ? array() : $terms;
+	$added   = isset( $_GET['bhela_bulk_added'] ) ? (int) $_GET['bhela_bulk_added'] : -1;
+	$gallery = add_query_arg( array( 'post_type' => 'bhela_gallery' ), admin_url( 'edit.php' ) );
+	?>
+	<div class="wrap">
+		<h1>🖼️ <?php esc_html_e( 'ছবি একসাথে যোগ করুন', 'bhela-booking' ); ?></h1>
+		<p><?php esc_html_e( 'একসাথে অনেকগুলো ছবি বাছাই করুন — প্রতিটি ছবি আলাদা করে গ্যালারিতে যোগ হবে। ক্যাপশন ও ক্রম পরে গ্যালারি থেকে বদলানো যাবে।', 'bhela-booking' ); ?></p>
+
+		<?php if ( $added >= 0 ) : ?>
+			<div class="notice notice-success is-dismissible"><p>
+				<?php echo esc_html( sprintf( __( '✅ %s টি ছবি গ্যালারিতে যোগ হয়েছে।', 'bhela-booking' ), function_exists( 'bhela_bm_bn_num' ) ? bhela_bm_bn_num( $added ) : $added ) ); ?>
+				&nbsp;<a href="<?php echo esc_url( $gallery ); ?>"><?php esc_html_e( 'গ্যালারি দেখুন →', 'bhela-booking' ); ?></a>
+			</p></div>
+		<?php endif; ?>
+
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="bhela-bulk-form">
+			<input type="hidden" name="action" value="bhela_bm_gallery_bulk">
+			<?php wp_nonce_field( 'bhela_bm_gallery_bulk' ); ?>
+			<input type="hidden" name="attachment_ids" id="bhela-bulk-ids" value="">
+
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><?php esc_html_e( 'ক্যাটাগরি', 'bhela-booking' ); ?></th>
+					<td>
+						<?php if ( $terms ) : ?>
+							<?php foreach ( $terms as $term ) : ?>
+								<label style="margin-right:16px;display:inline-block"><input type="checkbox" name="bulk_cats[]" value="<?php echo esc_attr( $term->term_id ); ?>"> <?php echo esc_html( $term->name ); ?></label>
+							<?php endforeach; ?>
+							<p class="description"><?php esc_html_e( 'বাছাই করা সব ছবিতে এই ক্যাটাগরি বসবে (ইচ্ছা হলে খালি রাখুন)।', 'bhela-booking' ); ?></p>
+						<?php else : ?>
+							<em><?php esc_html_e( 'এখনো কোনো ক্যাটাগরি নেই।', 'bhela-booking' ); ?></em>
+						<?php endif; ?>
+					</td>
+				</tr>
+			</table>
+
+			<p>
+				<button type="button" class="button button-secondary" id="bhela-bulk-pick"><?php esc_html_e( '📁 ছবি বাছাই করুন', 'bhela-booking' ); ?></button>
+				<span id="bhela-bulk-count" style="margin-left:10px;color:#646970"></span>
+			</p>
+
+			<div id="bhela-bulk-preview" style="display:flex;flex-wrap:wrap;gap:8px;margin:8px 0"></div>
+
+			<p>
+				<button type="submit" class="button button-primary" id="bhela-bulk-submit" disabled><?php esc_html_e( 'গ্যালারিতে যোগ করুন', 'bhela-booking' ); ?></button>
+			</p>
+		</form>
+
+		<script>
+		( function () {
+			var pick    = document.getElementById( 'bhela-bulk-pick' );
+			var idsEl   = document.getElementById( 'bhela-bulk-ids' );
+			var countEl = document.getElementById( 'bhela-bulk-count' );
+			var preview = document.getElementById( 'bhela-bulk-preview' );
+			var submit  = document.getElementById( 'bhela-bulk-submit' );
+			var frame;
+
+			pick.addEventListener( 'click', function ( e ) {
+				e.preventDefault();
+				if ( ! window.wp || ! wp.media ) { return; }
+				if ( frame ) { frame.open(); return; }
+				frame = wp.media( {
+					title:    <?php echo wp_json_encode( __( 'গ্যালারির জন্য ছবি বাছাই করুন', 'bhela-booking' ) ); ?>,
+					button:   { text: <?php echo wp_json_encode( __( 'এইগুলো ব্যবহার করুন', 'bhela-booking' ) ); ?> },
+					library:  { type: 'image' },
+					multiple: 'add'
+				} );
+				frame.on( 'select', function () {
+					var items = frame.state().get( 'selection' ).toJSON();
+					var ids   = [];
+					preview.innerHTML = '';
+					items.forEach( function ( a ) {
+						ids.push( a.id );
+						var src = ( a.sizes && a.sizes.thumbnail ) ? a.sizes.thumbnail.url : a.url;
+						var img = document.createElement( 'img' );
+						img.src = src;
+						img.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #dcdcde';
+						preview.appendChild( img );
+					} );
+					idsEl.value    = ids.join( ',' );
+					countEl.textContent = ids.length ? ( <?php echo wp_json_encode( __( 'বাছাই হয়েছে: ', 'bhela-booking' ) ); ?> + ids.length ) : '';
+					submit.disabled = ids.length === 0;
+				} );
+				frame.open();
+			} );
+		} )();
+		</script>
+	</div>
+	<?php
+}
+
+/** Create one gallery post per picked attachment, in order, after the last. */
+function bhela_bm_gallery_bulk_handler() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'অনুমতি নেই।', 'bhela-booking' ) );
+	}
+	check_admin_referer( 'bhela_bm_gallery_bulk' );
+
+	$ids = array_filter( array_map( 'absint', explode( ',', (string) ( $_POST['attachment_ids'] ?? '' ) ) ) );
+	$cats = array_filter( array_map( 'absint', (array) ( $_POST['bulk_cats'] ?? array() ) ) );
+
+	// Continue the order after the current last photo, so bulk adds append.
+	$last  = get_posts( array(
+		'post_type'      => 'bhela_gallery',
+		'post_status'    => 'any',
+		'posts_per_page' => 1,
+		'orderby'        => 'menu_order',
+		'order'          => 'DESC',
+		'fields'         => 'ids',
+	) );
+	$order = $last ? (int) get_post_field( 'menu_order', $last[0] ) : 0;
+
+	$added = 0;
+	foreach ( $ids as $att_id ) {
+		if ( 'attachment' !== get_post_type( $att_id ) || 0 !== strpos( (string) get_post_mime_type( $att_id ), 'image/' ) ) {
+			continue; // only real image attachments
+		}
+		$order++;
+		$title   = get_the_title( $att_id );
+		$post_id = wp_insert_post( array(
+			'post_type'   => 'bhela_gallery',
+			'post_status' => 'publish',
+			'post_title'  => $title ? $title : __( 'ভেলা', 'bhela-booking' ),
+			'menu_order'  => $order,
+		) );
+		if ( is_wp_error( $post_id ) || ! $post_id ) {
+			continue;
+		}
+		set_post_thumbnail( $post_id, $att_id );
+		if ( $cats ) {
+			wp_set_object_terms( $post_id, $cats, 'bhela_gallery_cat' );
+		}
+		$added++;
+	}
+
+	if ( function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'gallery', sprintf(
+			'বাল্ক আপলোড — %s টি ছবি গ্যালারিতে যোগ হয়েছে।',
+			function_exists( 'bhela_bm_bn_num' ) ? bhela_bm_bn_num( $added ) : $added
+		) );
+	}
+	wp_safe_redirect( add_query_arg(
+		array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-gallery-bulk', 'bhela_bulk_added' => $added ),
+		admin_url( 'edit.php' )
+	) );
+	exit;
+}
+add_action( 'admin_post_bhela_bm_gallery_bulk', 'bhela_bm_gallery_bulk_handler' );
+
 /** Offer the import on the gallery list while it is still empty. */
 function bhela_bm_gallery_import_notice() {
 	$screen = get_current_screen();
@@ -390,6 +567,14 @@ function bhela_bm_gallery_import_notice() {
 				: esc_html__( 'সব ছবি আগে থেকেই ইমপোর্ট করা আছে — নতুন কিছু যোগ হয়নি।', 'bhela-booking' )
 		);
 	}
+
+	// Always surface the fast path: bulk-add many photos at once.
+	printf(
+		'<div class="notice notice-info"><p>%s <a class="button button-primary" href="%s" style="margin-left:6px">%s</a></p></div>',
+		esc_html__( 'একসাথে অনেকগুলো ছবি যোগ করতে চান?', 'bhela-booking' ),
+		esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-gallery-bulk' ), admin_url( 'edit.php' ) ) ),
+		esc_html__( '🖼️ ছবি একসাথে যোগ', 'bhela-booking' )
+	);
 
 	$count = wp_count_posts( 'bhela_gallery' );
 	if ( ( (int) $count->publish + (int) $count->draft ) > 0 ) {

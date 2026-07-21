@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.11.0
+ * Version: 2.13.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.11.0' );
+define( 'BHELA_BM_VERSION', '2.13.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -375,6 +375,7 @@ if ( is_admin() ) {
 }
 if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/admin.php';
+	require_once BHELA_BM_PATH . 'includes/dashboard.php';
 }
 
 /* =========================================================
