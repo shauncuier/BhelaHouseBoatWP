@@ -114,6 +114,108 @@ function bhela_contact_form_shortcode() {
 }
 add_shortcode( 'bhela_contact_form', 'bhela_contact_form_shortcode' );
 
+/** One label/value row of the summary table. */
+function bhela_contact_email_row( $label, $value, $is_link = '' ) {
+	$val = $is_link
+		? '<a href="' . esc_url( $is_link ) . '" style="color:#137A74;text-decoration:none;font-weight:700;">' . esc_html( $value ) . '</a>'
+		: esc_html( $value );
+	return '<tr>'
+		. '<td style="padding:10px 0;font-size:13.5px;color:#5E7472;border-bottom:1px solid #EEF2F1;white-space:nowrap;">' . esc_html( $label ) . '</td>'
+		. '<td style="padding:10px 0;text-align:right;font-size:14.5px;color:#0A2A2F;border-bottom:1px solid #EEF2F1;">' . $val . '</td>'
+		. '</tr>';
+}
+
+/** Email-safe pill button. */
+function bhela_contact_email_btn( $url, $text, $bg ) {
+	return '<a href="' . esc_url( $url ) . '" target="_blank" style="display:inline-block;background:' . esc_attr( $bg )
+		. ';color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;padding:12px 24px;border-radius:999px;margin:4px 5px 4px 0;">'
+		. $text . '</a>';
+}
+
+/**
+ * Branded HTML notification for the owner. Matches the booking engine's email
+ * design so every message from the site looks like one family, and leads with
+ * the actions the owner actually takes: call, WhatsApp, or reply.
+ */
+function bhela_contact_email_html( $name, $phone, $email, $subj_label, $message ) {
+	$site   = get_bloginfo( 'name' );
+	$wa_num = '880' . substr( $phone, 1 ); // phone is already normalised to 01XXXXXXXXX
+	$when   = date_i18n( 'j M Y · g:i a', current_time( 'timestamp' ) );
+
+	$rows  = bhela_contact_email_row( 'নাম', $name );
+	$rows .= bhela_contact_email_row( 'মোবাইল', $phone, 'tel:' . $phone );
+	if ( $email ) {
+		$rows .= bhela_contact_email_row( 'ইমেইল', $email, 'mailto:' . $email );
+	}
+	$rows .= bhela_contact_email_row( 'বিষয়', $subj_label );
+	$rows .= bhela_contact_email_row( 'সময়', $when );
+
+	$buttons  = bhela_contact_email_btn( 'tel:' . $phone, '📞 কল করুন', '#137A74' );
+	$buttons .= bhela_contact_email_btn( 'https://wa.me/' . $wa_num, '💬 WhatsApp', '#25D366' );
+	if ( $email ) {
+		$buttons .= bhela_contact_email_btn( 'mailto:' . $email, '✉️ রিপ্লাই', '#FF7A3D' );
+	}
+
+	ob_start();
+	?>
+<!DOCTYPE html>
+<html lang="bn">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#EEF2F1;font-family:'Noto Sans Bengali','Hind Siliguri','Segoe UI',Tahoma,sans-serif;">
+	<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#EEF2F1;padding:24px 12px;">
+		<tr><td align="center">
+			<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;">
+
+				<tr><td style="background:#0A2A2F;padding:26px 32px;text-align:center;">
+					<div style="font-size:26px;font-weight:700;color:#ffffff;letter-spacing:1px;">🛶 BHELA</div>
+					<div style="font-size:12px;color:#6FC7BF;letter-spacing:2px;text-transform:uppercase;margin-top:4px;">The Haor Exclusive</div>
+				</td></tr>
+
+				<tr><td style="background:#137A74;padding:12px;text-align:center;color:#ffffff;font-weight:700;font-size:16px;">
+					📨 নতুন যোগাযোগ বার্তা — <?php echo esc_html( $subj_label ); ?>
+				</td></tr>
+
+				<tr><td style="padding:26px 32px;">
+					<p style="margin:0 0 18px;font-size:14.5px;color:#22403E;line-height:1.9;">
+						ওয়েবসাইটের যোগাযোগ ফর্ম থেকে <strong><?php echo esc_html( $name ); ?></strong> একটি বার্তা পাঠিয়েছেন।
+					</p>
+
+					<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#FBF8F2;border-radius:12px;padding:4px 18px;">
+						<?php echo $rows; // phpcs:ignore WordPress.Security.EscapeOutput -- rows are escaped in the row helper. ?>
+					</table>
+
+					<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:20px;background:#F4F7F6;border-radius:12px;border-left:4px solid #FF7A3D;">
+						<tr><td style="padding:16px 20px;">
+							<div style="font-size:12.5px;color:#5E7472;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">বার্তা</div>
+							<div style="font-size:14.5px;color:#22403E;line-height:1.9;"><?php echo nl2br( esc_html( $message ) ); ?></div>
+						</td></tr>
+					</table>
+
+					<div style="text-align:center;margin:24px 0 4px;">
+						<?php echo $buttons; // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped helpers. ?>
+					</div>
+					<p style="margin:14px 0 0;text-align:center;font-size:12.5px;color:#5E7472;">
+						এই ইমেইলে সরাসরি Reply করলে বার্তাটি অতিথির কাছে যাবে।
+					</p>
+				</td></tr>
+
+				<tr><td style="background:#0A2A2F;padding:18px 32px;text-align:center;">
+					<div style="font-size:12.5px;color:#DCEBE9;line-height:1.9;">
+						<?php echo esc_html( $site ); ?><br>
+						<a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="color:#6FC7BF;text-decoration:none;"><?php echo esc_html( wp_parse_url( home_url(), PHP_URL_HOST ) ); ?></a>
+					</div>
+				</td></tr>
+
+			</table>
+			<div style="font-size:11px;color:#8aa19f;margin-top:14px;">© <?php echo esc_html( date( 'Y' ) ); ?> <?php echo esc_html( $site ); ?></div>
+		</td></tr>
+	</table>
+</body>
+</html>
+	<?php
+	return ob_get_clean();
+}
+
 /** AJAX: handle a contact submission. */
 function bhela_contact_submit() {
 	check_ajax_referer( 'bhela_contact', 'nonce' );
@@ -156,15 +258,7 @@ function bhela_contact_submit() {
 
 	$subjects   = bhela_contact_subjects();
 	$subj_label = $subjects[ $subject ] ?? $subjects['other'];
-
-	$body  = '<h2>নতুন বার্তা — ' . esc_html( $subj_label ) . '</h2>';
-	$body .= '<p><strong>নাম:</strong> ' . esc_html( $name ) . '</p>';
-	$body .= '<p><strong>ফোন:</strong> ' . esc_html( $phone ) . '</p>';
-	if ( $email ) {
-		$body .= '<p><strong>ইমেইল:</strong> ' . esc_html( $email ) . '</p>';
-	}
-	$body .= '<p><strong>বার্তা:</strong><br>' . nl2br( esc_html( $message ) ) . '</p>';
-	$body .= '<hr><p style="color:#5E7472;font-size:12px">' . esc_html( get_bloginfo( 'name' ) ) . ' — ' . esc_html( home_url( '/' ) ) . '</p>';
+	$body       = bhela_contact_email_html( $name, $phone, $email, $subj_label, $message );
 
 	$headers = array( 'Content-Type: text/html; charset=UTF-8' );
 	if ( $email ) {
@@ -173,7 +267,7 @@ function bhela_contact_submit() {
 
 	$sent = wp_mail(
 		bhela_contact_recipient(),
-		sprintf( '[যোগাযোগ] %s — %s', $subj_label, $name ),
+		sprintf( '📨 %s — %s (%s)', $subj_label, $name, $phone ),
 		$body,
 		$headers
 	);
