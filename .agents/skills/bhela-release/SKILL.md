@@ -16,10 +16,12 @@ c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\
 
 The repo contains two releasable components managed in one monorepo:
 
+**Theme and plugin share ONE version number.** Every release bumps all five version fields below to the same `X.Y.Z`, even when only one component changed.
+
 | Component | Path | Version file(s) |
 |---|---|---|
-| **Theme** `bhela` | `themes/bhela/` | `themes/bhela/style.css` (line 7: `Version: X.Y.Z`) and `themes/bhela/README.md` (line 1 heading) |
-| **Plugin** `bhela-booking` | `plugins/bhela-booking/` | `plugins/bhela-booking/bhela-booking.php` (header line 5 AND constant line 16) |
+| **Theme** `bhela` | `themes/bhela/` | `style.css` (line 7 `Version:`), `README.md` (line 1 heading), `functions.php` (line 12 `BHELA_VERSION`) |
+| **Plugin** `bhela-booking` | `plugins/bhela-booking/` | `bhela-booking.php` (header line 5 AND constant line 16) |
 
 ---
 
@@ -45,24 +47,21 @@ Ask the user (or infer from changes):
 - **Minor bump** (X.Y.0): new features, new templates, new shortcodes
 - **Patch bump** (X.Y.Z): bug fixes, small style tweaks, copy changes
 
-Theme and Plugin are versioned **independently**. Only bump the component that has changes.
+Theme and Plugin share **one** version number — pick a single `VERSION` and apply it to all five fields below. Do not version the components separately.
 
 ---
 
 ### 2. Bump version numbers in files
 
-#### Theme — `themes/bhela/style.css`
-Update line 7: `Version: X.Y.Z`
+Set the **same** `X.Y.Z` in all five fields:
 
-#### Theme — `themes/bhela/README.md`
-Update line 1 heading: `# 🎨 BHELA WordPress Theme (vX.Y.Z)`
+- `themes/bhela/style.css` line 7: `Version: X.Y.Z`
+- `themes/bhela/README.md` line 1: `# 🎨 BHELA WordPress Theme (vX.Y.Z)`
+- `themes/bhela/functions.php` line 12: `define( 'BHELA_VERSION', 'X.Y.Z' );`
+- `plugins/bhela-booking/bhela-booking.php` line 5: ` * Version: X.Y.Z`
+- `plugins/bhela-booking/bhela-booking.php` line 16: `define( 'BHELA_BM_VERSION', 'X.Y.Z' );`
 
-#### Plugin — `plugins/bhela-booking/bhela-booking.php`
-Update **two** places — they must always match:
-- Line 5 (plugin header): ` * Version: X.Y.Z`
-- Line 16 (PHP constant): `define( 'BHELA_BM_VERSION', 'X.Y.Z' );`
-
-> **WARNING**: Always keep the plugin header version and the `BHELA_BM_VERSION` constant in sync.
+> **WARNING**: All five must match. The two constants (`BHELA_VERSION`, `BHELA_BM_VERSION`) are asset cache-busters — a lagging constant ships stale CSS/JS while the header looks correct.
 
 ---
 
@@ -71,23 +70,22 @@ Update **two** places — they must always match:
 ```powershell
 git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" add -A
 
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" commit -m "release: vTHEME_VERSION theme / vPLUGIN_VERSION plugin
+git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" commit -m "release: vVERSION (theme + plugin)
 
-Theme (vTHEME_VERSION):
 - <summary of theme changes>
-
-Plugin (vPLUGIN_VERSION):
 - <summary of plugin changes>"
 ```
+
+> Do **not** add a `Co-Authored-By: Claude` trailer (or any AI co-author) to release commits.
 
 ---
 
 ### 4. Create an annotated git tag
 
-Use the theme version as the umbrella release tag:
+One tag for the whole release:
 
 ```powershell
-git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" tag -a "vTHEME_VERSION" -m "Release vTHEME_VERSION — <one-line summary>"
+git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" tag -a "vVERSION" -m "Release vVERSION — <one-line summary>"
 ```
 
 ---
@@ -106,31 +104,46 @@ git -C "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content" push ori
 >
 > Always use .NET's `ZipFile` API directly, which lets us write Unix-style forward-slash paths.
 
+Ship **runtime files only**. Skip dev-only files (`.gitignore`, `README.md`) and anything the WordPress runtime never loads (VCS/editor/build/backup artifacts). The shared filter below excludes by path pattern; adjust the list, not the loop.
+
 ```powershell
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-# === THEME ZIP ===
+# Path fragments (forward-slash, lowercased) that must NEVER enter a release ZIP.
+$exclude = @(
+    '/.gitignore', '/.gitattributes', '/readme.md',      # dev docs / VCS
+    '/.git/', '/node_modules/', '/vendor/', '/dist/',     # build / deps
+    '/.ds_store', '/thumbs.db', '/.vscode/', '/.idea/',   # OS / editor
+    '.log', '.sql', '.backup', '.map', '.zip'             # logs / dumps / maps
+)
+function Should-Skip($rel) {
+    $r = ('/' + $rel).ToLower()
+    foreach ($p in $exclude) { if ($r.Contains($p)) { return $true } }
+    return $false
+}
+
+# === THEME ZIP ===  (keeps style.css, screenshot.png, theme.json, php, assets)
 $themePath = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\themes\bhela"
-$themeZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-theme-vTHEME_VERSION.zip"
+$themeZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-theme-vVERSION.zip"
 if (Test-Path $themeZip) { Remove-Item $themeZip }
 $zip = [System.IO.Compression.ZipFile]::Open($themeZip, [System.IO.Compression.ZipArchiveMode]::Create)
 Get-ChildItem -Path $themePath -Recurse -File | ForEach-Object {
-    $rel   = $_.FullName.Substring($themePath.Length + 1).Replace('\', '/')
-    $entry = "bhela/" + $rel
-    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entry, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+    $rel = $_.FullName.Substring($themePath.Length + 1).Replace('\', '/')
+    if (Should-Skip $rel) { return }
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, "bhela/" + $rel, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
 }
 $zip.Dispose()
 
 # === PLUGIN ZIP ===
 $pluginPath = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\plugins\bhela-booking"
-$pluginZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-booking-vPLUGIN_VERSION.zip"
+$pluginZip  = "c:\Users\User\Local Sites\bhelahoureboat\app\public\wp-content\bhela-booking-vVERSION.zip"
 if (Test-Path $pluginZip) { Remove-Item $pluginZip }
 $zip = [System.IO.Compression.ZipFile]::Open($pluginZip, [System.IO.Compression.ZipArchiveMode]::Create)
 Get-ChildItem -Path $pluginPath -Recurse -File | ForEach-Object {
-    $rel   = $_.FullName.Substring($pluginPath.Length + 1).Replace('\', '/')
-    $entry = "bhela-booking/" + $rel
-    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, $entry, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
+    $rel = $_.FullName.Substring($pluginPath.Length + 1).Replace('\', '/')
+    if (Should-Skip $rel) { return }
+    [System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile($zip, $_.FullName, "bhela-booking/" + $rel, [System.IO.Compression.CompressionLevel]::Optimal) | Out-Null
 }
 $zip.Dispose()
 ```
@@ -151,14 +164,14 @@ $zip.Dispose()
 **Always use `gh` CLI — never the browser.**
 
 ```powershell
-gh release create vTHEME_VERSION `
-  --title "vTHEME_VERSION — <short description>" `
-  --notes "## What's New in vTHEME_VERSION
+gh release create vVERSION `
+  --title "vVERSION — <short description>" `
+  --notes "## What's New in vVERSION
 
-### Theme (vTHEME_VERSION) — bhela
+### Theme (vVERSION) — bhela
 - <bullet point changes>
 
-### Plugin (vPLUGIN_VERSION) — bhela-booking
+### Plugin (vVERSION) — bhela-booking
 - <bullet point changes>
 
 ---
@@ -169,9 +182,9 @@ gh release create vTHEME_VERSION `
 Then upload the ZIP assets:
 
 ```powershell
-gh release upload vTHEME_VERSION `
-  "bhela-theme-vTHEME_VERSION.zip" `
-  "bhela-booking-vPLUGIN_VERSION.zip" `
+gh release upload vVERSION `
+  "bhela-theme-vVERSION.zip" `
+  "bhela-booking-vVERSION.zip" `
   --clobber
 ```
 
@@ -199,8 +212,11 @@ Assets:
 |---|---|---|
 | `themes/bhela/style.css` | 7 | `Version: X.Y.Z` |
 | `themes/bhela/README.md` | 1 | `# 🎨 BHELA WordPress Theme (vX.Y.Z)` |
+| `themes/bhela/functions.php` | 12 | `define( 'BHELA_VERSION', 'X.Y.Z' );` |
 | `plugins/bhela-booking/bhela-booking.php` | 5 | ` * Version: X.Y.Z` |
 | `plugins/bhela-booking/bhela-booking.php` | 16 | `define( 'BHELA_BM_VERSION', 'X.Y.Z' );` |
+
+All five carry the **same** number.
 
 ## Project Info
 

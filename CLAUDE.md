@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-07-21 · Theme v2.11.2 · Plugin v2.7.1
+> Last updated: 2026-07-22 · Theme & Plugin v2.14.0 (single shared version)
 
 ---
 
@@ -258,23 +258,24 @@ wp-content:   c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\
 
 ## 7. Version Management
 
-### Version File Locations
+### Version File Locations — **all five move together**
 
 | File | Line | What to update |
 |---|---|---|
 | `themes/bhela/style.css` | 7 | `Version: X.Y.Z` |
 | `themes/bhela/README.md` | 1 | `# 🎨 BHELA WordPress Theme (vX.Y.Z)` |
+| `themes/bhela/functions.php` | 12 | `define( 'BHELA_VERSION', 'X.Y.Z' );` — **theme asset cache-buster; forgetting this ships stale CSS/JS** |
 | `plugins/bhela-booking/bhela-booking.php` | 5 | ` * Version: X.Y.Z` |
 | `plugins/bhela-booking/bhela-booking.php` | 16 | `define( 'BHELA_BM_VERSION', 'X.Y.Z' );` |
 
 ### Versioning Rules
 
-- Theme and Plugin are versioned **independently**
+- **Theme and Plugin share ONE version number.** A release bumps all five fields above to the same `X.Y.Z`, even if only one component changed. (History: they used to be versioned independently — that caused `BHELA_VERSION` to lag `style.css` and serve stale assets. Never again.)
 - **Major** (X.0.0): breaking changes, full redesign
 - **Minor** (X.Y.0): new features, templates, shortcodes
 - **Patch** (X.Y.Z): bug fixes, style tweaks, copy changes
 
-> ⚠️ **CRITICAL:** Plugin header version (line 5) and `BHELA_BM_VERSION` constant (line 16) MUST always match.
+> ⚠️ **CRITICAL:** All five version fields MUST always match. The two theme constants (`BHELA_VERSION` in `functions.php`, `BHELA_BM_VERSION` in the plugin) are asset cache-busters — a mismatch is invisible in the header but breaks browser caching.
 
 ---
 
