@@ -234,7 +234,7 @@ st.append(info_table([
     ('Client', 'KeyToBD - Kaisar Hamid Apon, Owner'),
     ('Delivery date', DEL_DATE),
     ('Free service until', '%s (see section 6)' % END_DATE),
-    ('Components', 'BHELA Theme v2.8.0 &nbsp;|&nbsp; BHELA Booking Engine Plugin v2.6.3'),
+    ('Components', 'BHELA Theme v2.15.0 &nbsp;|&nbsp; BHELA Booking Engine Plugin v2.15.0'),
     ('Document ref', DOC_REF),
 ]))
 
@@ -246,27 +246,31 @@ st.append(para('The following capabilities are complete, tested and live.'))
 st.append(Paragraph('2.1&nbsp;&nbsp;Website &amp; Design', S['h2']))
 st.append(feature_table([
     ('Custom design', 'Bespoke "Midnight Monsoon" dark-teal luxury design system built for this brand - not a purchased template.'),
-    ('Complete page set', 'Home, Cabins &amp; Rates, Trip Schedule, Food Menu, Gallery, FAQ, Booking Policies, Book Now, and Blog - created automatically on activation.'),
+    ('Complete page set', 'Home, Cabins &amp; Rates, Trip Schedule, Food Menu, Gallery, FAQ, Booking Policies, Book Now, Contact and Blog - created automatically on activation.'),
     ('Bangla-first content', 'The entire guest-facing experience is written in Bangla, with English keywords where useful.'),
     ('Mobile-first', 'Fully responsive with a dedicated mobile action bar, touch-friendly navigation and optimised mobile booking flow.'),
     ('Editable content', 'Five Customizer panels let the owner change contact details, homepage text, all photos, tracking IDs and custom code - without a developer.'),
+    ('Contact page &amp; form', 'A ready contact page with quick-contact cards, address and hours, social icons and a contact form that emails the owner.'),
     ('Page-builder ready', 'Elementor-compatible: any page can be rebuilt visually later without breaking the theme.'),
 ]))
 
 st.append(Spacer(1, 4*mm))
 st.append(Paragraph('2.2&nbsp;&nbsp;Booking Engine', S['h2']))
 st.append(feature_table([
+    ('Owner dashboard', 'A single overview screen: bookings by status, revenue and money collected, upcoming trips, recent activity, a setup checklist and one-click actions.'),
     ('Booking wizard', 'Guided multi-step form with live price calculation as the guest selects dates, cabins and guests.'),
     ('Six-cabin inventory', 'Five cabin types across six cabins, each with its own per-person rate and sharing capacity.'),
     ('Smart pricing', 'Automatic weekday, weekend and holiday rates with a weekday discount of up to 20%.'),
-    ('Children pricing', 'Applied automatically: ages 9+ full rate, ages 4-8 half rate, ages 0-4 free.'),
-    ('Live availability', 'Real-time date availability that shows remaining cabins and prevents overbooking.'),
+    ('Children pricing', 'Applied automatically: ages 9+ full rate; ages 4-8 a flat per-child fee (default Tk 5,000, no weekday discount); ages 0-4 free.'),
+    ('Live availability', 'Availability updates itself the moment a booking is confirmed - every manager and the public schedule see the same live count, which prevents overbooking.'),
     ('Booking management', 'Full admin screen for every booking, plus manual entry for phone and walk-in guests.'),
     ('Status workflow', 'Pending, Advance Paid, Confirmed, Completed and Cancelled - with automatic guest notification on confirmation.'),
     ('Guest self-service', 'Guests can track their own booking status using their phone number or email address.'),
     ('Discount panel', 'Percentage, flat or custom counter-offer pricing for negotiated bookings.'),
-    ('Trip calendar', 'Departure schedule with per-trip booked-cabin counts and automatic "Full Booked" status.'),
+    ('Trip calendar', 'Departure schedule with automatic start/end dates, labels and duration, a per-trip holiday toggle, booked-cabin counts and automatic "Full Booked" status.'),
+    ('Photo gallery', 'Category-filtered gallery with one-click bulk upload of many photos at once.'),
     ('Guest reviews', 'Star-rated reviews managed from the dashboard and displayed on the website.'),
+    ('Activity log', 'A plain-language record of bookings, emails, SMS, trip and settings changes so the owner can confirm everything worked.'),
     ('WhatsApp integration', 'One-tap WhatsApp contact with the booking details pre-filled.'),
 ]))
 
@@ -314,8 +318,8 @@ st.append(section(3, 'Technical Specification'))
 st.append(info_table([
     ('Platform', 'WordPress (custom theme and custom plugin)'),
     ('Requirements', 'WordPress 6.0 or newer, PHP 8.0 or newer'),
-    ('BHELA Theme', 'Version 2.8.0 - design, pages, blog, SEO, analytics, custom code'),
-    ('Booking Engine', 'Version 2.6.3 - bookings, pricing, invoices, trips, reviews, email and SMS'),
+    ('BHELA Theme', 'Version 2.15.0 - design, pages, blog, SEO, analytics, custom code, contact page'),
+    ('Booking Engine', 'Version 2.15.0 - dashboard, bookings, pricing, invoices, trips, gallery, reviews, activity log, email and SMS'),
     ('Front-end', 'Vanilla JavaScript and CSS - no jQuery, no build step, no external framework'),
     ('Source control', 'Full Git history hosted on GitHub, released with version tags'),
     ('Third-party services', 'FluentSMTP for email delivery; SMS gateway optional'),

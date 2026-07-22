@@ -12,7 +12,7 @@
 | **Client** | KeyToBD — Kaisar Hamid Apon, Owner |
 | **Delivery date** | 21 July 2026 |
 | **Free service until** | **21 August 2026** (see section 6) |
-| **Components** | BHELA Theme v2.8.0 · BHELA Booking Engine Plugin v2.6.3 |
+| **Components** | BHELA Theme v2.15.0 · BHELA Booking Engine Plugin v2.15.0 (single shared version) |
 | **Project price** | **USD 200.00** (includes 1 month free service) |
 
 ---
@@ -31,26 +31,30 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 | Capability | What it does |
 |---|---|
 | Custom design | Bespoke "Midnight Monsoon" dark-teal luxury design system built for this brand — not a purchased template |
-| Complete page set | Home, Cabins & Rates, Trip Schedule, Food Menu, Gallery, FAQ, Booking Policies, Book Now, Blog — created automatically on activation |
+| Complete page set | Home, Cabins & Rates, Trip Schedule, Food Menu, Gallery, FAQ, Booking Policies, Book Now, Contact, Blog — created automatically on activation |
 | Bangla-first content | Entire guest-facing experience written in Bangla, with English keywords where useful |
 | Mobile-first | Fully responsive with dedicated mobile action bar and optimised mobile booking flow |
 | Editable content | Five Customizer panels: contact details, homepage text, photos, tracking IDs, custom code |
+| Contact page & form | Quick-contact cards, address/hours, social icons and a contact form that emails the owner |
 | Page-builder ready | Elementor-compatible — any page can be rebuilt visually later |
 
 ### 2.2 Booking Engine
 | Capability | What it does |
 |---|---|
+| Owner dashboard | A single overview screen — bookings by status, revenue and money collected, upcoming trips, recent activity, a setup checklist and one-click actions |
 | Booking wizard | Guided multi-step form with live price calculation |
 | Six-cabin inventory | Five cabin types across six cabins, each with per-person rate and sharing capacity |
 | Smart pricing | Automatic weekday / weekend / holiday rates, weekday discount up to 20% |
-| Children pricing | Ages 9+ full rate, 4–8 half rate, 0–4 free — applied automatically |
-| Live availability | Real-time availability showing remaining cabins; prevents overbooking |
+| Children pricing | Ages 9+ full rate; 4–8 a flat per-child fee (default ৳5,000, no weekday discount); 0–4 free — applied automatically |
+| Live availability | Real-time availability that updates itself the moment a booking is confirmed — every manager and the public schedule see the same live count; prevents overbooking |
 | Booking management | Full admin screen per booking, plus manual entry for phone/walk-in guests |
 | Status workflow | Pending → Advance Paid → Confirmed → Completed / Cancelled, with auto guest notification |
 | Guest self-service | Guests track their own booking by phone number or email |
 | Discount panel | Percentage, flat, or custom counter-offer pricing |
-| Trip calendar | Departure schedule with per-trip booked-cabin counts and automatic "Full Booked" |
+| Trip calendar | Departure schedule with auto start/end dates, labels and duration, a per-trip holiday toggle, booked-cabin counts and automatic "Full Booked" |
+| Photo gallery | Category-filtered gallery with one-click bulk upload of many photos at once |
 | Guest reviews | Star-rated reviews managed from the dashboard, shown on the website |
+| Activity log | Plain-language record of bookings, emails, SMS, trip and settings changes so the owner can confirm everything worked |
 | WhatsApp integration | One-tap WhatsApp contact with booking details pre-filled |
 
 ### 2.3 Invoicing & Notifications
@@ -92,8 +96,8 @@ The system is delivered as two purpose-built components — a bespoke theme and 
 |---|---|
 | Platform | WordPress (custom theme + custom plugin) |
 | Requirements | WordPress 6.0+, PHP 8.0+ |
-| BHELA Theme | v2.8.0 — design, pages, blog, SEO, analytics, custom code |
-| Booking Engine | v2.6.3 — bookings, pricing, invoices, trips, reviews, email, SMS |
+| BHELA Theme | v2.15.0 — design, pages, blog, SEO, analytics, custom code, contact page |
+| Booking Engine | v2.15.0 — dashboard, bookings, pricing, invoices, trips, gallery, reviews, activity log, email, SMS |
 | Front-end | Vanilla JavaScript and CSS — no jQuery, no build step |
 | Source control | Full Git history on GitHub, released with version tags |
 | Third-party | FluentSMTP for email delivery; SMS gateway optional |

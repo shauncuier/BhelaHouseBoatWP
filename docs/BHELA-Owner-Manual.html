@@ -161,7 +161,7 @@
       <div class="meta">
         <span class="badge">For the site owner / admin</span>
         <span class="badge">No coding needed</span>
-        <span class="badge">Updated July 2026</span>
+        <span class="badge">Updated August 2026 · v2.15.0</span>
       </div>
     </div>
   </header>
@@ -180,6 +180,9 @@
       <li><a href="#reviews">Guest reviews</a></li>
       <li><a href="#blog">Blog (হাওর জার্নাল)</a></li>
       <li><a href="#content">Editing site text &amp; images</a></li>
+      <li><a href="#gallery">Gallery photos</a></li>
+      <li><a href="#contact">Contact page</a></li>
+      <li><a href="#activity">Activity log</a></li>
       <li><a href="#trouble">Troubleshooting</a></li>
     </ol>
   </nav>
@@ -196,7 +199,7 @@
         <li>You land on the <strong>Dashboard</strong>. On the left is the menu you'll use for everything below.</li>
       </ol>
       <div class="callout callout--tip"><span class="ic">💡</span><div>
-        <p>The one menu you'll use most is <strong>🛶 Bookings</strong>. It holds bookings, the trip calendar, reviews, and all settings.</p>
+        <p>The one menu you'll use most is <strong>🛶 Bookings</strong>. Its first item, <strong>📊 Dashboard</strong>, is your control centre — booking counts, money in, upcoming trips, recent activity, a setup checklist, and one-click buttons for every task. Open it first each day. The trip calendar, gallery, reviews, settings and guide all live in the same menu.</p>
       </div></div>
     </div>
   </section>
@@ -249,21 +252,28 @@
     <div class="wrap">
       <h2><span class="secnum">04</span> Trip calendar &amp; cabin availability</h2>
       <p class="lede">Set your departure dates and how many of the 6 cabins are already booked — the website updates itself.</p>
-      <p>Go to <span class="path">Bookings → Trip Calendar</span>. Each row is one departure. For every trip you set:</p>
+      <p>Go to <span class="path">Bookings → Trip Calendar</span> and press <strong>Add Trip</strong> for a new row. For every trip you set:</p>
       <div class="tbl-wrap"><table>
         <thead><tr><th>Column</th><th>What to put</th></tr></thead>
         <tbody>
           <tr><td>Start Date</td><td>The trip's departure date.</td></tr>
-          <tr><td>Display Label</td><td>How it reads on the site, e.g. <code>7 – 8 Aug 2026</code>.</td></tr>
-          <tr><td>Days</td><td>Bangla day names, e.g. <code>শুক্র – শনি</code>.</td></tr>
+          <tr><td>End Date</td><td>Leave blank for a standard 2-day 1-night trip. For a <strong>Full Boat</strong> or longer charter, set the real return date.</td></tr>
+          <tr><td>Display Label</td><td>Fills in automatically from the dates (e.g. <code>7 – 8 Aug 2026</code>) — override only if you want.</td></tr>
+          <tr><td>Days</td><td>Bangla day names, fill in automatically (e.g. <code>শুক্র – শনি</code>).</td></tr>
+          <tr><td><strong>ছুটি</strong></td><td>Tick if this departure is a <strong>holiday</strong>. It then charges the Regular rate (no 20% weekday discount) and shows "ছুটির দিন" on the site.</td></tr>
           <tr><td>Status</td><td>Available / Filling Fast / Booked.</td></tr>
           <tr><td><strong>Booked Cabins</strong></td><td>How many of the 6 cabins are already taken (0–6).</td></tr>
+          <tr><td>Delete</td><td>Tick to remove the row, then Save.</td></tr>
         </tbody>
       </table></div>
+      <p>Fill the Start Date and the label, days and duration set themselves. Press <strong>Save</strong> and the website updates instantly.</p>
       <div class="callout callout--key"><span class="ic">🛏️</span><div>
-        <p><strong>How availability works:</strong> if you set <em>Booked Cabins = 4</em>, the site shows "<strong>২টি কেবিন খালি</strong>" and won't let anyone book more than 2 cabins for that date. Set it to <strong>6</strong> and the date shows <strong>Full Booked</strong> automatically.</p>
+        <p><strong>Availability is now automatic:</strong> the moment a booking is <em>Advance Paid</em> or <em>Confirmed</em>, its cabins come out of that date's availability by themselves — you don't touch the calendar, and every manager plus the website sees the same live number. The <strong>Booked Cabins</strong> field is just a <em>manual hold (minimum)</em> — use it to block cabins for a phone booking or a full-boat charter. Set it to <strong>6</strong> for <strong>Full Booked</strong>.</p>
       </div></div>
-      <p>Under each row you'll see a small hint like "বুকিং থেকে: 3" — that's how many cabins your <em>real confirmed bookings</em> use for that date, so you can double-check your number.</p>
+      <p>Each row shows the live count — <em>এখন বুকড x/6 · খালি y (অটো)</em> — so you always see the real remaining cabins at a glance.</p>
+      <div class="callout callout--tip"><span class="ic">🎉</span><div>
+        <p><strong>Holidays live here now.</strong> Ticking a trip's <strong>ছুটি</strong> box is the only place you set holiday pricing — there is no separate holiday list in Settings anymore.</p>
+      </div></div>
     </div>
   </section>
 
@@ -292,11 +302,13 @@
       <h3>Pricing Days</h3>
       <ul>
         <li><strong>Weekend Days</strong> — tick which days charge the Regular rate (default: Friday, Saturday).</li>
-        <li><strong>Holidays</strong> — one date per line (<code>YYYY-MM-DD</code>). These charge the Regular rate too.</li>
         <li>Every other day automatically uses the discounted Weekday rate.</li>
       </ul>
+      <div class="callout callout--tip"><span class="ic">🗓️</span><div>
+        <p><strong>Holidays</strong> are no longer a list here. Mark a departure as a holiday by ticking its <strong>ছুটি</strong> box in the <a href="#calendar">Trip Calendar</a> — it then charges the Regular rate with no weekday discount.</p>
+      </div></div>
       <div class="callout callout--warn"><span class="ic">⚠️</span><div>
-        <p>Children: <strong>0–4 years free</strong>, <strong>4–8 years pay 50%</strong>, <strong>9+ full rate</strong> — this is built in and applied automatically.</p>
+        <p>Children: <strong>0–4 years free</strong>; <strong>4–8 years pay a flat ৳5,000 each</strong> (no weekday discount); <strong>9+ full rate</strong> — built in and applied automatically. The amount is editable at <span class="path">Settings → শিশু (৪–৮) ফি</span>.</p>
       </div></div>
     </div>
   </section>
@@ -368,13 +380,15 @@
     <div class="wrap">
       <h2><span class="secnum">11</span> Editing site text &amp; images</h2>
       <p class="lede">Change your phone numbers, homepage words, and photos without touching code.</p>
-      <p>Go to <span class="path">Appearance → Customize</span>. Three BHELA panels:</p>
+      <p>Go to <span class="path">Appearance → Customize</span>. Five BHELA panels:</p>
       <div class="tbl-wrap"><table>
         <thead><tr><th>Panel</th><th>What you can change</th></tr></thead>
         <tbody>
-          <tr><td>BHELA Contact</td><td>Phone numbers, WhatsApp, email, Facebook, address (used across the whole site).</td></tr>
+          <tr><td>BHELA Contact</td><td>Phone, WhatsApp, Messenger, email, address, and all social links — Facebook, Instagram, TikTok, LinkedIn, YouTube, X, Threads (icons appear in the footer; blank = hidden).</td></tr>
           <tr><td>BHELA Homepage</td><td>The big hero headline, badge, and subtitle on the front page.</td></tr>
           <tr><td>BHELA Images</td><td>Swap the hero, food, rooftop, cabin, and spot photos. Leave blank to keep the defaults.</td></tr>
+          <tr><td>BHELA Tracking</td><td>Paste your Google Analytics ID (<code>G-…</code>) and Facebook Pixel ID — the tracking code is added automatically; your own admin visits are never counted.</td></tr>
+          <tr><td>BHELA Custom Code</td><td>Paste any snippet into <code>&lt;head&gt;</code>, right after <code>&lt;body&gt;</code>, or before <code>&lt;/body&gt;</code> — site-wide, no theme editing.</td></tr>
         </tbody>
       </table></div>
       <p>Cabin names, prices, and payment details are in <span class="path">Bookings → Settings</span> (not the Customizer).</p>
@@ -384,16 +398,55 @@
     </div>
   </section>
 
+  <section id="gallery">
+    <div class="wrap">
+      <h2><span class="secnum">12</span> Gallery photos — গ্যালারি</h2>
+      <p class="lede">Manage the photo gallery, and add many photos at once.</p>
+      <p>Photos live under <span class="path">Bookings → 🖼️ Gallery</span>.</p>
+      <div class="callout callout--key"><span class="ic">⚡</span><div>
+        <p><strong>Add many at once (fastest):</strong> <span class="path">Bookings → 🖼️ Bulk Upload</span> → <strong>ছবি বাছাই করুন</strong> → select a whole batch from the media library (drag new files in and pick them all) → optionally tick a category → <strong>যোগ করুন</strong>. Each photo becomes its own gallery item, added after the current last one.</p>
+      </div></div>
+      <p><strong>Add one photo:</strong> 🖼️ Gallery → <em>নতুন ছবি</em> → set the <strong>Featured Image</strong> (the photo itself) → type a <strong>caption</strong> in the title box → tick a <strong>ক্যাটাগরি</strong> → <strong>Publish</strong>.</p>
+      <p>Categories become the filter tabs on the public gallery page; a tab appears once a category has at least one photo. The <strong>Order</strong> number controls sequence. First-time setup offers a one-click import of the theme's bundled photos.</p>
+    </div>
+  </section>
+
+  <section id="contact">
+    <div class="wrap">
+      <h2><span class="secnum">13</span> Contact page — যোগাযোগ</h2>
+      <p class="lede">A ready contact page with quick-contact cards and a form that emails you.</p>
+      <p>The <strong>যোগাযোগ</strong> page (<span class="path">/contact/</span>) is created automatically and added to the menu. It shows quick-contact cards (phone, WhatsApp, Messenger, email), your address and hours, social icons, plus a <strong>contact form</strong>.</p>
+      <p>Form messages are <strong>emailed to you</strong> — the address from <span class="path">Bookings → Settings → Owner notification email</span> (or your business email). Nothing is stored in the database, and you can reply directly to the guest (their email is set as Reply-To).</p>
+      <div class="callout callout--tip"><span class="ic">💬</span><div>
+        <p>To show the <strong>Messenger</strong> card, paste your <code>m.me/yourpage</code> link in <span class="path">Customize → BHELA Contact → Messenger link</span>. Leave blank to hide that card.</p>
+      </div></div>
+    </div>
+  </section>
+
+  <section id="activity">
+    <div class="wrap">
+      <h2><span class="secnum">14</span> Activity log — কী কী হচ্ছে</h2>
+      <p class="lede">A plain record of what the plugin actually did — so you can answer "did that work?" without a developer.</p>
+      <p>Go to <span class="path">Bookings → Activity Log</span>. Newest first, it records:</p>
+      <ul>
+        <li>New bookings received, and emails / SMS sent or failed.</li>
+        <li>Status changes, settings saved, gallery imports and bulk uploads.</li>
+        <li>Every trip-calendar save, including which dates were removed — so a disappearing departure can always be traced.</li>
+      </ul>
+      <p>Each line is ✅ (worked) or ❌ (problem). Filter by type with the buttons at the top; the latest 300 events are kept.</p>
+    </div>
+  </section>
+
   <section id="trouble">
     <div class="wrap">
-      <h2><span class="secnum">12</span> Troubleshooting</h2>
+      <h2><span class="secnum">15</span> Troubleshooting</h2>
       <div class="tbl-wrap"><table>
         <thead><tr><th>If this happens…</th><th>Do this</th></tr></thead>
         <tbody>
           <tr><td>Emails not arriving</td><td>Check <strong>FluentSMTP</strong> is connected, and that Email Notifications is enabled. Use <strong>Send Test Email</strong>.</td></tr>
           <tr><td>SMS not sending</td><td>Confirm your gateway has balance, the API key + Sender ID are correct, SMS is enabled. Use <strong>Send Test SMS</strong>.</td></tr>
           <tr><td>A date shows wrong availability</td><td>Update <strong>Booked Cabins</strong> for that trip in the Trip Calendar.</td></tr>
-          <tr><td>Prices look wrong</td><td>Check <strong>Cabin Rates</strong> and your <strong>Weekend Days / Holidays</strong> in Settings.</td></tr>
+          <tr><td>Prices look wrong</td><td>Check <strong>Cabin Rates</strong> and <strong>Weekend Days</strong> in Settings, and the trip's <strong>ছুটি</strong> holiday tick in the Trip Calendar.</td></tr>
           <tr><td>Something looks broken after an update</td><td>Refresh the page fully (Ctrl+Shift+R). If it persists, contact your developer.</td></tr>
         </tbody>
       </table></div>

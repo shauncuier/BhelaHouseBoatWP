@@ -1,7 +1,7 @@
 # BHELA — Website Owner's Manual
 
 *ভেলা হাউসবোট ওয়েবসাইট চালানোর সম্পূর্ণ গাইড — বুকিং, ইনভয়েস, রেট, ব্লগ ও সেটিংস।*
-For the site owner / admin · No coding needed · Updated July 2026
+For the site owner / admin · No coding needed · Updated August 2026 · Theme &amp; Plugin v2.15.0
 
 A styled, shareable version of this manual is published as an Artifact:
 **https://claude.ai/code/artifact/2aa5e859-c88b-4952-828d-d14fbbb9ba24**
@@ -14,9 +14,9 @@ Everything is managed from the WordPress dashboard.
 
 1. Open `yourdomain.com/wp-admin`.
 2. Enter your **username and password** (keep these private).
-3. You land on the **Dashboard**. The left menu holds everything below.
+3. You land on the WordPress home screen. The left menu holds everything below.
 
-> 💡 The menu you'll use most is **🛶 Bookings** — bookings, trip calendar, reviews, and all settings live there.
+> 💡 The menu you'll use most is **🛶 Bookings**. Its first item, **📊 Dashboard**, is your control centre — booking counts, money in, upcoming trips, recent activity, a setup checklist, and one-click buttons for every task. Open it first each day. Everything else (trip calendar, gallery, reviews, settings, guide) lives in the same menu.
 
 ## 2. Managing bookings
 
@@ -49,17 +49,24 @@ You control which of these fire — see §7 (Email) and §8 (SMS).
 
 ## 4. Trip calendar & cabin availability
 
-**Bookings → Trip Calendar**. Each row is a departure:
+**Bookings → Trip Calendar**. Press **Add Trip** for a new row; each row is a departure:
 
 | Column | What to put |
 |---|---|
 | Start Date | The departure date |
-| Display Label | e.g. `7 – 8 Aug 2026` |
-| Days | Bangla day names, e.g. `শুক্র – শনি` |
+| End Date | Leave blank for a standard 2-day 1-night trip. For a **Full Boat** or longer charter, set the real return date |
+| Display Label | Fills in automatically from the dates (e.g. `7 – 8 Aug 2026`) — override only if you want |
+| Days | Bangla day names, fill in automatically (e.g. `শুক্র – শনি`) |
+| **ছুটি** | Tick if this departure is a **holiday**. It then charges the Regular rate (no 20% weekday discount) and shows "ছুটির দিন" on the site |
 | Status | Available / Filling Fast / Booked |
 | **Booked Cabins** | How many of the 6 cabins are taken (0–6) |
+| Delete | Tick to remove the row, then Save |
 
-**How availability works:** set *Booked Cabins = 4* → site shows "২টি কেবিন খালি" and blocks booking more than 2 cabins that date. Set **6** → shows **Full Booked** automatically. The hint "বুকিং থেকে: N" under each row shows how many cabins your real confirmed bookings use, to double-check.
+Fill Start Date and the label, days and duration set themselves. Press **Save** and the website updates instantly.
+
+**How availability works — now automatic:** the moment a booking is **Advance Paid** or **Confirmed**, its cabins come out of that date's availability by themselves — you don't have to touch the calendar, and every manager plus the website sees the same live number. The **Booked Cabins** field is just a *manual hold (minimum)* — use it to block cabins for a phone booking or a full-boat charter. Setting it to **6** shows **Full Booked**. Each row shows the live count: *এখন বুকড x/6 · খালি y (অটো)*.
+
+> 🎉 **Holidays live here now.** Marking a trip's **ছুটি** box is the only place you set holiday pricing — there is no separate holiday list in Settings anymore.
 
 ## 5. Invoices
 
@@ -74,8 +81,9 @@ Every booking has a branded invoice with a **private link** — safe to send.
 All in **Bookings → Settings**:
 - **Cabin Rates** — each cabin has a Regular/Holiday rate and a cheaper Weekday rate (per person). Edit + Save.
 - **Weekend Days** — tick days that charge the Regular rate (default Fri, Sat).
-- **Holidays** — one date per line (`YYYY-MM-DD`); charge Regular rate.
 - Every other day uses the discounted Weekday rate.
+
+> 🗓️ **Holidays** are no longer a list in Settings. Mark a departure as a holiday by ticking its **ছুটি** box in the **Trip Calendar** (§4) — it then charges the Regular rate with no weekday discount.
 
 > ⚠️ Children: 0–4 free, 4–8 pay a flat **৳5,000** each (no weekday discount), 9+ full rate — automatic. The amount is editable at **Settings → শিশু (৪–৮) ফি**.
 
@@ -109,9 +117,11 @@ Different provider? Pick **Custom** and paste its API URL + field names — no c
 
 ## 10. Gallery — গ্যালারি ছবি
 
-Photos are managed from **Bookings → 🖼️ গ্যালারি**.
+Photos are managed from **Bookings → 🖼️ Gallery**.
 
-**Add a photo:** *নতুন ছবি* → set the **Featured Image** (this is the photo itself) → type a **caption** in the title box → tick a **ক্যাটাগরি** → **Publish**.
+**Add many photos at once (fastest):** **Bookings → 🖼️ Bulk Upload** → **ছবি বাছাই করুন** → select a whole batch from the media library (drag-drop new files in and pick them all) → optionally tick a category → **যোগ করুন**. Each photo becomes its own gallery item, added after the current last one. Caption and order can be refined later.
+
+**Add one photo:** 🖼️ Gallery → *নতুন ছবি* → set the **Featured Image** (this is the photo itself) → type a **caption** in the title box → tick a **ক্যাটাগরি** → **Publish**.
 
 | Field | What it does |
 |---|---|
@@ -156,7 +166,17 @@ Form messages are **emailed to you** — the address from *Bookings → Settings
 
 > 💡 To show the **Messenger** card, paste your `m.me/yourpage` link in **Customize → BHELA Contact → Messenger link**. Leave blank to hide that card.
 
-## 14. Troubleshooting
+## 14. Activity log — কী কী হচ্ছে
+
+**Bookings → Activity Log** records what the plugin actually did, newest first — so you can answer "did that work?" without a developer.
+
+- New bookings received, and emails / SMS sent or failed
+- Status changes, settings saved, gallery imports and bulk uploads
+- Every trip-calendar save, including which dates were removed — so a disappearing departure can always be traced
+
+Each line is ✅ (worked) or ❌ (problem). Filter by type with the buttons at the top. Use **লগ মুছুন** to clear it; the latest 300 events are kept.
+
+## 15. Troubleshooting
 
 | Problem | Fix |
 |---|---|
