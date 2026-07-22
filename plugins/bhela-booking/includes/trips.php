@@ -145,11 +145,15 @@ function bhela_bm_trip_statuses() {
 
 /**
  * Cabin availability for a date.
- * 'booked' comes from the trip's admin-managed count; a full boat
- * (booked >= total) forces effective status 'booked' regardless of the
- * manual status dropdown.
  *
- * @return array{ total:int, booked:int, available:int, trip:array|null, status:string }
+ * Effective booked = the larger of the owner's manual hold (the calendar's
+ * "Booked Cabins" field) and the live count of real bookings that hold a seat
+ * (advance paid / confirmed). So confirming a booking reduces availability
+ * automatically — nobody has to edit the calendar — which keeps every manager
+ * and the public schedule on the same live number, while an owner's manual
+ * full-boat hold is still honoured. A full boat forces status 'booked'.
+ *
+ * @return array{ total:int, booked:int, manual:int, counted:int, available:int, trip:array|null, status:string }
  */
 function bhela_bm_trip_availability( $date ) {
 	$total = bhela_bm_max_cabins();
@@ -160,22 +164,34 @@ function bhela_bm_trip_availability( $date ) {
 			break;
 		}
 	}
-	$booked = $trip ? min( $total, max( 0, (int) ( $trip['booked'] ?? 0 ) ) ) : 0;
-	$status = $trip ? $trip['status'] : 'unknown';
+	$manual  = $trip ? max( 0, (int) ( $trip['booked'] ?? 0 ) ) : 0;
+	$counted = min( $total, (int) bhela_bm_counted_booked_cabins( $date ) );
+	$booked  = min( $total, max( $manual, $counted ) );
+	$status  = $trip ? $trip['status'] : 'unknown';
 	if ( $booked >= $total ) {
 		$status = 'booked';
 	}
 	return array(
 		'total'     => $total,
 		'booked'    => $booked,
+		'manual'    => $manual,
+		'counted'   => $counted,
 		'available' => max( 0, $total - $booked ),
 		'trip'      => $trip,
 		'status'    => $status,
 	);
 }
 
-/** Cabins consumed by real bookings (advance_paid/confirmed) on a date — admin reconciliation hint. */
+/**
+ * Cabins consumed by real bookings (advance_paid/confirmed) on a date.
+ * Memoised per request — availability is asked for the same date several
+ * times while rendering the schedule, and this saves the repeat queries.
+ */
 function bhela_bm_counted_booked_cabins( $date ) {
+	static $cache = array();
+	if ( array_key_exists( $date, $cache ) ) {
+		return $cache[ $date ];
+	}
 	$q = new WP_Query( array(
 		'post_type'      => 'bhela_booking',
 		'post_status'    => 'publish',
@@ -192,6 +208,7 @@ function bhela_bm_counted_booked_cabins( $date ) {
 		$rows    = json_decode( (string) get_post_meta( $id, '_bhela_cabins_json', true ), true );
 		$cabins += is_array( $rows ) && $rows ? count( $rows ) : 1;
 	}
+	$cache[ $date ] = $cabins;
 	return $cabins;
 }
 
@@ -317,7 +334,8 @@ function bhela_bm_trips_page() {
 	<div class="wrap">
 		<h1>📅 <?php esc_html_e( 'BHELA Trip Calendar', 'bhela-booking' ); ?></h1>
 		<p><?php esc_html_e( 'Manage departure dates here — the website schedule page and booking calendar update automatically. Empty date = row ignored.', 'bhela-booking' ); ?></p>
-		<p class="description"><?php esc_html_e( '“ছুটি” টিক দিলে ওই ট্রিপে ২০% উইকডে ছাড় থাকবে না — রেগুলার রেট ধরা হবে এবং সাইটে “ছুটির দিন” দেখাবে। সেটিংসের Holidays তালিকা শুধু ক্যালেন্ডারে নেই এমন তারিখের জন্য।', 'bhela-booking' ); ?></p>
+		<p class="description"><?php esc_html_e( '“ছুটি” টিক দিলে ওই ট্রিপে ২০% উইকডে ছাড় থাকবে না — রেগুলার রেট ধরা হবে এবং সাইটে “ছুটির দিন” দেখাবে।', 'bhela-booking' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Booked Cabins স্বয়ংক্রিয়: কোনো বুকিং Advance Paid বা Confirmed হলে ওই তারিখের খালি কেবিন নিজে থেকেই কমে যায় — আলাদা করে এখানে বসাতে হয় না, সব ম্যানেজার ও ওয়েবসাইট একই লাইভ সংখ্যা দেখে। Booked Cabins ঘরটি শুধু ম্যানুয়াল হোল্ড (সর্বনিম্ন) — যেমন ফোন বুকিং বা পুরো বোট ব্লক করতে।', 'bhela-booking' ); ?></p>
 		<p class="description"><?php esc_html_e( 'End Date খালি রাখলে ২ দিন ১ রাত ধরা হয়। Full Boat বা লম্বা ট্রিপে End Date বাড়িয়ে দিন — লেবেল, দিন ও সময়কাল নিজে থেকেই ঠিক হবে। Start Date বদলালে ট্রিপের দৈর্ঘ্য ঠিক থাকে।', 'bhela-booking' ); ?></p>
 		<form method="post">
 			<?php wp_nonce_field( 'bhela_bm_trips', 'bhela_bm_trips_nonce' ); ?>
@@ -336,6 +354,17 @@ function bhela_bm_trips_page() {
 					display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
 					background: #f0f0f1; color: #646970; font-size: 11px; white-space: nowrap;
 				}
+					#bhela-trips-table .bhela-avail-cell { white-space: nowrap; }
+					#bhela-trips-table .bhela-hold { display: flex; align-items: center; gap: 6px; }
+					#bhela-trips-table .bhela-hold input[type="number"] { width: 56px; min-width: 56px; text-align: center; }
+					#bhela-trips-table .bhela-hold__cap { font-size: 11px; color: #787c82; }
+					#bhela-trips-table .bhela-avail-pill {
+						display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 999px;
+						font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap;
+					}
+					#bhela-trips-table .bhela-avail-pill.is-open { background: #1a7f37; }
+					#bhela-trips-table .bhela-avail-pill.is-full { background: #b32d2e; }
+					#bhela-trips-table .bhela-avail-note { display: block; margin-top: 3px; font-size: 11px; color: #787c82; }
 			</style>
 			<div id="bhela-trips-wrap">
 			<table class="widefat striped" id="bhela-trips-table">
@@ -376,9 +405,23 @@ function bhela_bm_trips_page() {
 								<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $t['status'], $key ); ?>><?php echo esc_html( $st['label'] ); ?></option>
 							<?php endforeach; ?>
 						</select></td>
-						<td>
-							<input type="number" name="trip_booked[<?php echo esc_attr( $i ); ?>]" min="0" max="<?php echo esc_attr( bhela_bm_max_cabins() ); ?>" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" style="width:64px"> / <?php echo esc_html( bhela_bm_max_cabins() ); ?>
-							<br><small style="color:#666"><?php printf( esc_html__( 'বুকিং থেকে: %d', 'bhela-booking' ), (int) bhela_bm_counted_booked_cabins( $t['date'] ) ); ?></small>
+						<td class="bhela-avail-cell">
+							<?php
+							$bm_av   = bhela_bm_trip_availability( $t['date'] );
+							$bm_full = (int) $bm_av['available'] <= 0;
+							?>
+							<div class="bhela-hold">
+								<input type="number" name="trip_booked[<?php echo esc_attr( $i ); ?>]" min="0" max="<?php echo esc_attr( bhela_bm_max_cabins() ); ?>" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" title="<?php esc_attr_e( 'ম্যানুয়াল হোল্ড (সর্বনিম্ন) — যেমন ফোন/ফুল বোট বুকিং', 'bhela-booking' ); ?>">
+								<span class="bhela-hold__cap"><?php esc_html_e( 'হোল্ড', 'bhela-booking' ); ?></span>
+							</div>
+							<span class="bhela-avail-pill <?php echo $bm_full ? 'is-full' : 'is-open'; ?>">
+								<?php echo $bm_full
+									? sprintf( esc_html__( 'বুকড %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['booked'], (int) $bm_av['total'] )
+									: sprintf( esc_html__( 'খালি %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['available'], (int) $bm_av['total'] ); ?>
+							</span>
+							<?php if ( (int) $bm_av['counted'] > 0 ) : ?>
+								<span class="bhela-avail-note"><?php printf( esc_html__( 'বুকিং: %d', 'bhela-booking' ), (int) $bm_av['counted'] ); ?></span>
+							<?php endif; ?>
 						</td>
 						<td style="text-align:center"><input type="checkbox" name="trip_delete[<?php echo esc_attr( $i ); ?>]" value="1"></td>
 					</tr>
