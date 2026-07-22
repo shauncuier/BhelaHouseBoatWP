@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.15.0' );
+define( 'BHELA_VERSION', '2.15.1' );
 
 /* ---------- Setup ---------- */
 
@@ -224,10 +224,39 @@ function bhela_customize_homepage( $wp_customize ) {
 add_action( 'customize_register', 'bhela_customize_homepage' );
 
 /** Theme image: Customizer upload wins, else bundled theme asset. */
-function bhela_img( $key, $fallback_relpath ) {
+/**
+ * URL for a theme image slot.
+ *
+ * The Customizer stores the ORIGINAL upload's URL. Owners upload phone/AI
+ * images of several megabytes (the live hero was a 3 MB PNG), so echoing that
+ * URL is the single biggest performance cost on the site. Resolve the upload
+ * back to its attachment and serve the requested registered size instead —
+ * the original is only used when no smaller rendition exists.
+ */
+function bhela_img( $key, $fallback_relpath, $size = 'bhela-wide' ) {
 	$custom = get_theme_mod( 'bhela_img_' . $key, '' );
 	if ( $custom ) {
-		return $custom;
+		static $resolved = array();
+		$ck = $custom . '|' . $size;
+		if ( ! isset( $resolved[ $ck ] ) ) {
+			$url = $custom;
+			$id  = attachment_url_to_postid( $custom );
+			if ( $id ) {
+				// WP returns the FULL url when a size has no rendition (an
+				// upload smaller than the crop), so walk down until a real,
+				// different rendition exists. Tiny uploads keep the original.
+				$full = wp_get_attachment_image_url( $id, 'full' );
+				foreach ( array( $size, 'large', 'medium_large' ) as $try ) {
+					$sized = wp_get_attachment_image_url( $id, $try );
+					if ( $sized && $sized !== $full ) {
+						$url = $sized;
+						break;
+					}
+				}
+			}
+			$resolved[ $ck ] = $url;
+		}
+		return $resolved[ $ck ];
 	}
 	return get_template_directory_uri() . '/assets/images/' . $fallback_relpath;
 }
@@ -311,7 +340,7 @@ function bhela_cabins() {
 	foreach ( $rates as $key => $row ) {
 		$extra              = isset( $names[ $key ] ) ? $names[ $key ] : array( 'name' => $row['label'], 'bn' => '', 'badge' => '' );
 		$out[ $key ]        = array_merge( $row, $extra );
-		$out[ $key ]['img'] = bhela_img( 'cabin_' . $key, isset( $images[ $key ] ) ? $images[ $key ] : 'hero/hero-haor.jpg' );
+		$out[ $key ]['img'] = bhela_img( 'cabin_' . $key, isset( $images[ $key ] ) ? $images[ $key ] : 'hero/hero-haor.jpg', 'bhela-card' );
 	}
 	return $out;
 }

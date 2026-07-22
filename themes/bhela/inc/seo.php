@@ -443,3 +443,36 @@ function bhela_seo_resource_hints( $urls, $relation_type ) {
 	return $urls;
 }
 add_filter( 'wp_resource_hints', 'bhela_seo_resource_hints', 10, 2 );
+
+/* ---------- Performance ---------- */
+
+/**
+ * Preload the hero — it is the homepage LCP. Cache/optimiser plugins on the
+ * host lazy-load every <img> including the hero; the preload makes the
+ * browser fetch it immediately anyway, so LCP never waits on their JS.
+ */
+function bhela_perf_preload_hero() {
+	if ( ! is_front_page() ) {
+		return;
+	}
+	printf(
+		'<link rel="preload" as="image" href="%s" fetchpriority="high">' . "\n",
+		esc_url( bhela_img( 'hero', 'hero/hero-haor.jpg' ) )
+	);
+}
+add_action( 'wp_head', 'bhela_perf_preload_hero', 2 );
+
+/**
+ * Drop the emoji polyfill — 20 KB+ of JS and an extra request for emoji every
+ * modern device already renders natively.
+ */
+function bhela_perf_disable_emoji() {
+	remove_action( 'wp_head', 'print_emoji_detection_script', 7 );
+	remove_action( 'wp_print_styles', 'print_emoji_styles' );
+	remove_action( 'admin_print_scripts', 'print_emoji_detection_script' );
+	remove_action( 'admin_print_styles', 'print_emoji_styles' );
+	remove_filter( 'the_content_feed', 'wp_staticize_emoji' );
+	remove_filter( 'comment_text_rss', 'wp_staticize_emoji' );
+	remove_filter( 'wp_mail', 'wp_staticize_emoji_for_email' );
+}
+add_action( 'init', 'bhela_perf_disable_emoji' );

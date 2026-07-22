@@ -35,7 +35,7 @@ $img = get_template_directory_uri() . '/assets/images';
 
 <!-- HERO -->
 <section class="hero">
-	<div class="hero__bg"><img src="<?php echo esc_url( bhela_img( 'hero', 'hero/hero-haor.jpg' ) ); ?>" alt="টাঙ্গুয়ার হাওরে ভেলা হাউসবোট" fetchpriority="high"></div>
+	<div class="hero__bg"><img src="<?php echo esc_url( bhela_img( 'hero', 'hero/hero-haor.jpg' ) ); ?>" alt="টাঙ্গুয়ার হাওরে ভেলা হাউসবোট" fetchpriority="high" decoding="async" class="skip-lazy" data-no-lazy="1"></div>
 	<div class="container hero__inner">
 		<div>
 			<span class="hero__kicker"><?php echo bhela_home_text( 'hero_kicker', '🌧️ টাঙ্গুয়ার হাওর · প্রিমিয়াম হাউসবোট' ); ?></span>
@@ -126,7 +126,7 @@ $img = get_template_directory_uri() . '/assets/images';
 <section class="section section--sand" id="food">
 	<div class="container split">
 		<div class="split__media reveal">
-			<img src="<?php echo esc_url( bhela_img( 'food', 'food/food-spread.jpg' ) ); ?>" alt="ভেলার দেশি খাবার" loading="lazy">
+			<img src="<?php echo esc_url( bhela_img( 'food', 'food/food-spread.jpg', 'bhela-card' ) ); ?>" alt="ভেলার দেশি খাবার" loading="lazy">
 		</div>
 		<div class="reveal">
 			<span class="eyebrow">খাবারের আয়োজন</span>
@@ -165,7 +165,7 @@ $img = get_template_directory_uri() . '/assets/images';
 			foreach ( $spots as $sn => $s ) :
 				?>
 				<a class="spot reveal" href="<?php echo esc_url( bhela_page_url( 'gallery' ) ); ?>">
-					<img src="<?php echo esc_url( bhela_img( 'spot_' . ( $sn + 1 ), $s[2] ) ); ?>" alt="<?php echo esc_attr( $s[0] ); ?>" loading="lazy">
+					<img src="<?php echo esc_url( bhela_img( 'spot_' . ( $sn + 1 ), $s[2], 'bhela-card' ) ); ?>" alt="<?php echo esc_attr( $s[0] ); ?>" loading="lazy">
 					<span class="spot__label"><strong><?php echo esc_html( $s[0] ); ?></strong><span><?php echo esc_html( $s[1] ); ?></span></span>
 				</a>
 			<?php endforeach; ?>
@@ -194,7 +194,7 @@ $img = get_template_directory_uri() . '/assets/images';
 			</div>
 		</div>
 		<div class="split__media reveal">
-			<img src="<?php echo esc_url( bhela_img( 'rooftop', 'boat/rooftop-1.jpg' ) ); ?>" alt="ভেলার রুফটপ লাউঞ্জ" loading="lazy">
+			<img src="<?php echo esc_url( bhela_img( 'rooftop', 'boat/rooftop-1.jpg', 'bhela-card' ) ); ?>" alt="ভেলার রুফটপ লাউঞ্জ" loading="lazy">
 		</div>
 	</div>
 </section>
