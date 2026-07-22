@@ -212,6 +212,8 @@ footer strong{color:#DCEBE9}
       <li><a href="#tracking">অ্যানালিটিক্স ও ট্র্যাকিং</a></li>
       <li><a href="#customize">সাইটের লেখা ও ছবি</a></li>
       <li><a href="#tracker">গেস্ট বুকিং ট্র্যাকার</a></li>
+      <li><a href="#gallery">গ্যালারির ছবি</a></li>
+      <li><a href="#activity">অ্যাক্টিভিটি লগ</a></li>
       <li><a href="#troubleshoot">সমস্যা সমাধান</a></li>
       <li><a href="#safe">নিরাপদ vs ডেভেলপার</a></li>
     </ol>
@@ -231,7 +233,7 @@ footer strong{color:#DCEBE9}
         <li>আপনার <strong>ইউজারনেম ও পাসওয়ার্ড</strong> দিন (গোপন রাখুন)।</li>
         <li>বাঁ পাশের মেনুতে সব অপশন পাবেন। সবচেয়ে বেশি ব্যবহার করবেন <span class="path">🛶 <b>Bookings</b></span> মেনু।</li>
       </ol>
-      <div class="callout callout--tip"><span class="ic">💡</span><p><strong>Bookings</strong> মেনুর ভেতরেই সব — বুকিং, ট্রিপ ক্যালেন্ডার, রিভিউ আর সব সেটিংস।</p></div>
+      <div class="callout callout--tip"><span class="ic">💡</span><p><strong>Bookings</strong> মেনুর প্রথম আইটেম <strong>📊 Dashboard</strong> আপনার কন্ট্রোল সেন্টার — বুকিং সংখ্যা, আয়, আসন্ন ট্রিপ, সাম্প্রতিক কাজ, সেটআপ চেকলিস্ট আর প্রতিটি কাজের এক-ক্লিক বাটন। প্রতিদিন এটি আগে খুলুন। ট্রিপ ক্যালেন্ডার, গ্যালারি, রিভিউ, সেটিংস আর গাইড সব একই মেনুতে।</p></div>
     </section>
 
     <section class="sec" id="bookings">
@@ -274,18 +276,23 @@ footer strong{color:#DCEBE9}
     <section class="sec" id="calendar">
       <span class="sec__num">4</span>
       <h2>ট্রিপ ক্যালেন্ডার ও কেবিন খালি</h2>
-      <p><span class="path"><b>Bookings</b> › Trip Calendar</span> — প্রতিটি সারি একটি ডিপারচার।</p>
+      <p><span class="path"><b>Bookings</b> › Trip Calendar</span> — নতুন সারির জন্য <strong>Add Trip</strong> চাপুন। প্রতিটি সারি একটি ডিপারচার।</p>
       <div class="tbl-scroll"><table>
         <thead><tr><th>কলাম</th><th>কী দেবেন</th></tr></thead>
         <tbody>
           <tr><td>Start Date</td><td>ডিপারচারের তারিখ</td></tr>
-          <tr><td>Display Label</td><td>যেমন <code>7 – 8 Aug 2026</code></td></tr>
-          <tr><td>Days</td><td>বাংলা দিন, যেমন <code>শুক্র – শনি</code></td></tr>
+          <tr><td>End Date</td><td>খালি রাখলে ২ দিন ১ রাত ধরা হয়। <strong>Full Boat</strong> বা লম্বা ট্রিপে আসল ফেরার তারিখ দিন।</td></tr>
+          <tr><td>Display Label</td><td>তারিখ থেকে নিজে বসে যায় (যেমন <code>7 – 8 Aug 2026</code>) — ইচ্ছা হলে বদলান।</td></tr>
+          <tr><td>Days</td><td>বাংলা দিন নিজে বসে যায় (যেমন <code>শুক্র – শনি</code>)।</td></tr>
+          <tr><td><strong>ছুটি</strong></td><td>ছুটির দিন হলে টিক দিন — Regular রেট বসবে (২০% Weekday ছাড় থাকবে না) এবং সাইটে “ছুটির দিন” দেখাবে।</td></tr>
           <tr><td>Status</td><td>Available / Filling Fast / Booked</td></tr>
           <tr><td>Booked Cabins</td><td>৬টির মধ্যে কয়টি কেবিন বুকড (০–৬)</td></tr>
+          <tr><td>Delete</td><td>সারি মুছতে টিক দিয়ে Save করুন।</td></tr>
         </tbody>
       </table></div>
+      <p>শুধু Start Date দিলে লেবেল, দিন ও সময়কাল নিজে বসে যায়। <strong>Save</strong> চাপলেই সাইট সাথে সাথে আপডেট।</p>
       <div class="callout callout--tip"><span class="ic">🛏️</span><p><strong>যেভাবে খালি হিসাব হয়:</strong> Booked Cabins = ৪ দিলে সাইটে দেখাবে “২টি কেবিন খালি” এবং ওই তারিখে ২টির বেশি কেবিন বুক করা ব্লক হবে। <strong>৬</strong> দিলে স্বয়ংক্রিয়ভাবে <strong>Full Booked</strong>। প্রতিটি সারির নিচে “বুকিং থেকে: N” দেখায় আপনার আসল কনফার্মড বুকিং কয়টি কেবিন নিচ্ছে — ক্রস-চেকের জন্য।</p></div>
+      <div class="callout callout--key"><span class="ic">🎉</span><p><strong>ছুটি এখন এখানেই।</strong> ট্রিপের <strong>ছুটি</strong> বক্সে টিক দেওয়াই হলো হলিডে প্রাইসিং সেট করার একমাত্র জায়গা — Settings-এ আলাদা কোনো হলিডে তালিকা আর নেই।</p></div>
     </section>
 
     <section class="sec" id="pricing">
@@ -295,16 +302,16 @@ footer strong{color:#DCEBE9}
       <ul>
         <li><strong>Cabin Rates</strong> — প্রতিটি কেবিনের একটি Regular/Holiday রেট আর একটি সস্তা Weekday রেট (জনপ্রতি)। এডিট করে Save।</li>
         <li><strong>Weekend Days</strong> — যেসব দিন Regular রেট নেবে টিক দিন (ডিফল্ট শুক্র, শনি)।</li>
-        <li><strong>Holidays</strong> — প্রতি লাইনে একটি তারিখ (<code>YYYY-MM-DD</code>); Regular রেট নেবে।</li>
         <li>বাকি সব দিন <strong>ছাড়যুক্ত Weekday রেট</strong> (Regular থেকে প্রায় ২০% কম)।</li>
       </ul>
+      <div class="callout callout--tip"><span class="ic">🗓️</span><p><strong>ছুটির দিন</strong> এখন আর Settings-এ তালিকা নয়। <span class="path"><b>Trip Calendar</b></span>-এ ট্রিপের <strong>ছুটি</strong> বক্সে টিক দিন — তখন ওই দিন Regular রেট নেবে, Weekday ছাড় থাকবে না।</p></div>
       <h3>শিশুদের মূল্য (স্বয়ংক্রিয়)</h3>
       <div class="cards">
         <div class="mini"><b>বড় · ৯+ বছর</b><span>পূর্ণ রেট</span></div>
-        <div class="mini"><b>শিশু · ৪–৮ বছর</b><span>৫০% রেট</span></div>
+        <div class="mini"><b>শিশু · ৪–৮ বছর</b><span>ফিক্সড ৳৫,০০০ (Weekday ছাড় নেই)</span></div>
         <div class="mini"><b>শিশু · ০–৪ বছর</b><span>বিনামূল্যে</span></div>
       </div>
-      <p class="muted">প্রতিটি কেবিনে অন্তত ১ জন বড় (৯+) থাকতে হবে; ০–৪ বছরের শিশু কেবিন-ধারণক্ষমতার হিসাবে ধরা হয় না।</p>
+      <p class="muted">প্রতিটি কেবিনে অন্তত ১ জন বড় (৯+) থাকতে হবে; ০–৪ বছরের শিশু কেবিন-ধারণক্ষমতার হিসাবে ধরা হয় না। শিশু (৪–৮) ফি <span class="path">Settings › শিশু (৪–৮) ফি</span>-তে পরিবর্তনযোগ্য।</p>
       <div class="callout callout--key"><span class="ic">💰</span><p>অগ্রিম ডিফল্ট <strong>৫০%</strong> — সেটিংসে পরিবর্তনযোগ্য। বুকিং Confirmed করতে মোট মূল্যের ৫০% অগ্রিম, বাকি ৫০% অনবোর্ডে।</p></div>
     </section>
 
@@ -413,8 +420,29 @@ footer strong{color:#DCEBE9}
       <div class="callout callout--tip"><span class="ic">📅</span><p>তারিখ দিয়ে <strong>Availability</strong> চেক করলে সাথে সাথে ওই তারিখে কেবিন খালি আছে কিনা দেখায়। কোনো কারণে যাচাই না হলে গেস্ট এগিয়ে যেতে পারে — আপনি পরে তারিখ কনফার্ম করবেন।</p></div>
     </section>
 
-    <section class="sec" id="troubleshoot">
+    <section class="sec" id="gallery">
       <span class="sec__num">14</span>
+      <h2>গ্যালারির ছবি</h2>
+      <p>ছবি পরিচালনা <span class="path"><b>Bookings</b> › 🖼️ Gallery</span> থেকে।</p>
+      <div class="callout callout--key"><span class="ic">⚡</span><p><strong>একসাথে অনেক ছবি (দ্রুততম):</strong> <span class="path"><b>Bookings</b> › 🖼️ Bulk Upload</span> → <strong>ছবি বাছাই করুন</strong> → মিডিয়া লাইব্রেরি থেকে একসাথে অনেকগুলো বাছুন (নতুন ফাইল টেনে এনে সব সিলেক্ট করুন) → ইচ্ছা হলে ক্যাটাগরি টিক → <strong>যোগ করুন</strong>। প্রতিটি ছবি আলাদা গ্যালারি আইটেম হয়ে শেষের পরে যোগ হয়।</p></div>
+      <p><strong>একটি করে ছবি:</strong> 🖼️ Gallery → <em>নতুন ছবি</em> → <strong>Featured Image</strong> দিন (এটাই ছবি) → টাইটেল বক্সে <strong>ক্যাপশন</strong> লিখুন → একটি <strong>ক্যাটাগরি</strong> টিক দিন → <strong>Publish</strong>।</p>
+      <p class="muted">ক্যাটাগরিগুলো পাবলিক গ্যালারি পেজে ফিল্টার ট্যাব হয়; কোনো ক্যাটাগরিতে অন্তত একটি ছবি থাকলে সেই ট্যাব দেখায়। <strong>Order</strong> নম্বর ক্রম ঠিক করে। গ্যালারি খালি থাকলে থিমের সাথে দেওয়া ছবি এক-ক্লিকে ইমপোর্টের অপশন আসে।</p>
+    </section>
+
+    <section class="sec" id="activity">
+      <span class="sec__num">15</span>
+      <h2>অ্যাক্টিভিটি লগ — কী কী হচ্ছে</h2>
+      <p>প্লাগইন আসলে কী কী করল তার সরল রেকর্ড — ডেভেলপার ছাড়াই “ঠিকমতো হলো কিনা” জানার জন্য। <span class="path"><b>Bookings</b> › Activity Log</span>, নতুনটা সবার উপরে।</p>
+      <ul>
+        <li>নতুন বুকিং, আর ইমেইল / SMS গেল কিনা বা ব্যর্থ হলো।</li>
+        <li>স্ট্যাটাস পরিবর্তন, সেটিংস সেভ, গ্যালারি ইমপোর্ট ও বাল্ক আপলোড।</li>
+        <li>প্রতিটি ট্রিপ-ক্যালেন্ডার সেভ, কোন তারিখ মুছল সহ — তাই কোনো ডিপারচার হারালে খুঁজে বের করা যায়।</li>
+      </ul>
+      <p class="muted">প্রতিটি লাইন ✅ (সফল) বা ❌ (সমস্যা)। উপরের বাটন দিয়ে ধরন অনুযায়ী ফিল্টার; সর্বশেষ ৩০০টি রেকর্ড রাখা হয়।</p>
+    </section>
+
+    <section class="sec" id="troubleshoot">
+      <span class="sec__num">16</span>
       <h2>সমস্যা সমাধান</h2>
       <div class="tbl-scroll"><table>
         <thead><tr><th>সমস্যা</th><th>সমাধান</th></tr></thead>
@@ -422,14 +450,14 @@ footer strong{color:#DCEBE9}
           <tr><td>ইমেইল আসছে না</td><td>FluentSMTP কানেক্টেড? Email Notifications চালু? Send Test Email দিন।</td></tr>
           <tr><td>SMS যাচ্ছে না</td><td>গেটওয়েতে ব্যালান্স আছে? API Key/Sender ID ঠিক? SMS চালু? Send Test SMS।</td></tr>
           <tr><td>ভুল Availability</td><td>ওই ট্রিপের <strong>Booked Cabins</strong> আপডেট করুন।</td></tr>
-          <tr><td>দাম ভুল</td><td>Cabin Rates + Weekend Days/Holidays দেখুন।</td></tr>
+          <tr><td>দাম ভুল</td><td>Cabin Rates + Weekend Days দেখুন; ছুটির দিন হলে Trip Calendar-এ ট্রিপের <strong>ছুটি</strong> টিক দেখুন।</td></tr>
           <tr><td>আপডেটের পর ভাঙা দেখাচ্ছে</td><td>ফুল রিফ্রেশ (Ctrl+Shift+R); না হলে ডেভেলপারকে জানান।</td></tr>
         </tbody>
       </table></div>
     </section>
 
     <section class="sec" id="safe">
-      <span class="sec__num">15</span>
+      <span class="sec__num">17</span>
       <h2>নিরাপদ vs ডেভেলপার-only</h2>
       <div class="callout callout--key"><span class="ic">🛟</span><p><strong>গোল্ডেন রুল:</strong> Settings, bookings, calendar, reviews আর blog posts নিজে এডিট করা নিরাপদ। <strong>Plugins</strong>, <strong>Users</strong> আর <strong>Theme File Editor</strong> স্ক্রিন এড়িয়ে চলুন — ওগুলো ডেভেলপারের জন্য।</p></div>
     </section>
