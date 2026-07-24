@@ -54,19 +54,44 @@ $img = get_template_directory_uri() . '/assets/images';
 		</div>
 
 		<div class="hero-card" id="quick-estimate">
-			<h3>⚡ 2 মিনিটে Available ট্রিপ ডেট ও রেট দেখে হাওর ট্রিপ বুক করুন</h3>
-			<label for="qe-date">ভ্রমণের তারিখ</label>
-			<input type="date" id="qe-date" min="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
-			<label for="qe-guests">মোট অতিথি</label>
-			<select id="qe-guests">
-				<?php for ( $i = 1; $i <= 36; $i++ ) : ?>
-					<option value="<?php echo esc_attr( $i ); ?>" <?php selected( $i, 4 ); ?>><?php echo esc_html( $i ); ?> জন</option>
-				<?php endfor; ?>
-			</select>
-			<div class="hero-card__result" id="qe-result" hidden>
-				<span id="qe-meta">—</span>
-				<strong id="qe-total">—</strong>
+			<div class="hero-card__head">
+				<span class="hero-card__badge" aria-hidden="true">⚡</span>
+				<div>
+					<h3>ইনস্ট্যান্ট রেট</h3>
+					<p class="hero-card__subtitle">তারিখ ও অতিথি দিন — সাথে সাথে দাম ও Availability</p>
+				</div>
 			</div>
+
+			<div class="qe-chips" id="qe-chips"></div>
+
+			<div class="qe-fields">
+				<div class="qe-field">
+					<label for="qe-date">ভ্রমণের তারিখ</label>
+					<input type="date" id="qe-date" min="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
+				</div>
+				<div class="qe-field">
+					<label for="qe-guests">মোট অতিথি</label>
+					<select id="qe-guests">
+						<?php for ( $i = 2; $i <= 36; $i++ ) : // booking needs at least 2 people ?>
+							<option value="<?php echo esc_attr( $i ); ?>" <?php selected( $i, 4 ); ?>><?php echo esc_html( $i ); ?> জন</option>
+						<?php endfor; ?>
+					</select>
+				</div>
+			</div>
+
+			<div class="qe-avail" id="qe-avail" role="status" aria-live="polite" hidden></div>
+
+			<div class="qe-quote" id="qe-result" hidden>
+				<div class="qe-quote__info">
+					<span class="qe-quote__label">আনুমানিক মোট</span>
+					<span class="qe-quote__meta" id="qe-meta">—</span>
+				</div>
+				<div class="qe-quote__price">
+					<strong id="qe-total">—</strong>
+					<span class="qe-quote__from">থেকে</span>
+				</div>
+			</div>
+
 			<p class="hero-card__note" id="qe-note">আনুমানিক মূল্য — তারিখ ও অতিথি অনুযায়ী চূড়ান্ত দাম বুকিং পেজে দেখুন।</p>
 			<a class="btn btn--cta" id="qe-book" href="<?php echo esc_url( bhela_page_url( 'book-now' ) ); ?>">বুকিং করুন →</a>
 		</div>

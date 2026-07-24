@@ -97,7 +97,6 @@
 		var savingsRow = document.getElementById('bm-savings-row');
 		var response = document.getElementById('bhela-bm-response');
 		var submitBtn = document.getElementById('bhela-bm-submit');
-		var availBtn = document.getElementById('bm-check-avail');
 		var availBox = document.getElementById('bm-avail-result');
 		var blockedBox = document.getElementById('bm-blocked');
 		var blockedWa = document.getElementById('bm-blocked-wa');
@@ -697,15 +696,17 @@
 			calc();
 		}
 
-		if (availBtn) {
-			availBtn.addEventListener('click', function () {
-				if (!dateEl.value) {
-					availBox.hidden = false;
-					availBox.innerHTML = '<span class="bm-avail-chip" style="background:#FDF0E8;color:#7c2d12">আগে তারিখ বাছাই করুন</span>';
-					return;
-				}
-				availBtn.disabled = true;
-				availBtn.textContent = '⏳ চেক হচ্ছে...';
+		// Availability is checked automatically the moment a date is picked —
+		// there is no manual button. Shows a live message in the result box.
+		function runAvailCheck() {
+			if (!dateEl.value) {
+				availBox.hidden = false;
+				availBox.innerHTML = '<span class="bm-avail-chip" style="background:#FDF0E8;color:#7c2d12">আগে তারিখ বাছাই করুন</span>';
+				return;
+			}
+			availBox.hidden = false;
+			availBox.innerHTML = '<span class="bm-avail-chip" style="background:#eef2f1;color:#5E7472">⏳ তারিখ চেক হচ্ছে...</span>';
+			{
 				var params = new URLSearchParams();
 				params.append('action', 'bhela_bm_availability');
 				params.append('nonce', bhelaBM.nonce);
@@ -721,11 +722,17 @@
 						if (data.success) {
 							var d = data.data;
 							var booked = d.status === 'booked';
-							availableCabins = booked ? 0
-								: (typeof d.available === 'number' ? d.available : MAX_CABINS);
+							// A date with no scheduled group trip (status 'unknown',
+							// empty trip) is not bookable online — it needs a Full
+							// Boat / custom request over WhatsApp. Only a real trip
+							// that is not full lets the booking proceed.
+							var noTrip = !d.trip;
+							var bookable = !booked && !noTrip;
+							availableCabins = bookable
+								? (typeof d.available === 'number' ? d.available : MAX_CABINS) : 0;
 							var color = /^#[0-9a-fA-F]{3,8}$/.test(d.color) ? d.color : '#996800';
 							var html = '<span class="bm-avail-chip" style="background:' + color + '1a;color:' + color + ';border:1px solid ' + color + '55">' + esc(d.label) + '</span>';
-							if (!booked && typeof d.available === 'number' && d.trip) {
+							if (bookable && typeof d.available === 'number') {
 								var cabColor = d.available > 2 ? '#1a7f37' : '#b45309';
 								html += ' <span class="bm-avail-chip" style="background:' + cabColor + '1a;color:' + cabColor + ';border:1px solid ' + cabColor + '55">🛏️ ' + d.total + 'টির মধ্যে ' + d.available + 'টি কেবিন খালি</span>';
 							}
@@ -733,15 +740,17 @@
 							if (d.note) html += '<div class="bm-avail-note">' + esc(d.note) + '</div>';
 							availBox.innerHTML = html;
 
-							if (booked) {
+							if (!bookable) {
 								availChecked = false;
 								if (next1) next1.disabled = true;
 								if (blockedBox) {
 									blockedBox.hidden = false;
-									if (blockedWa && bhelaBM.whatsapp) {
-										blockedWa.href = 'https://wa.me/' + bhelaBM.whatsapp +
-											'?text=' + encodeURIComponent('আসসালামু আলাইকুম, ' + dateEl.value + ' তারিখে বুকিং সম্পর্কে জানতে চাই।');
-									}
+									var wa = bhelaBM.whatsapp
+										? 'https://wa.me/' + bhelaBM.whatsapp + '?text=' + encodeURIComponent('আসসালামু আলাইকুম, ' + dateEl.value + ' তারিখে বুকিং সম্পর্কে জানতে চাই।')
+										: '#';
+									blockedBox.innerHTML = noTrip
+										? '📅 <strong>এই তারিখে নির্ধারিত গ্রুপ ট্রিপ নেই।</strong> Full Boat বা কাস্টম ট্রিপের জন্য <a href="' + wa + '" target="_blank" rel="noopener">WhatsApp-এ যোগাযোগ করুন</a> — আমরা কনফার্ম করব।'
+										: '❌ <strong>এই তারিখে বুকড।</strong> অন্য তারিখ বাছাই করুন, অথবা <a href="' + wa + '" target="_blank" rel="noopener">WhatsApp-এ জিজ্ঞেস করুন</a>।';
 								}
 							} else {
 								availChecked = true;
@@ -761,12 +770,8 @@
 					.catch(function () {
 						availBox.hidden = false;
 						softAllow('এখন যাচাই করা যাচ্ছে না — এগিয়ে যান, আমরা তারিখ কনফার্ম করে জানাব।');
-					})
-					.finally(function () {
-						availBtn.disabled = false;
-						availBtn.textContent = '🔄 আবার চেক করুন';
 					});
-			});
+			}
 		}
 
 		/* ---------- Init ---------- */
@@ -791,7 +796,7 @@
 				resetAvailability();
 				calc();
 				window.clearTimeout(availTimer);
-				if (dateEl.value && availBtn) { availTimer = window.setTimeout(function () { availBtn.click(); }, 300); }
+				if (dateEl.value) { availTimer = window.setTimeout(runAvailCheck, 250); }
 			});
 			var dateChips = document.getElementById('bm-datechips');
 			if (dateChips) {

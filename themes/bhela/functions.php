@@ -55,10 +55,31 @@ function bhela_assets() {
 
 	$rates = function_exists( 'bhela_bm_get_rates' ) ? bhela_bm_get_rates() : array();
 	$set   = function_exists( 'bhela_bm_get_settings' ) ? bhela_bm_get_settings() : array();
+
+	// Upcoming trips + live availability, so the homepage estimator can check a
+	// date the same way the booking page does (scheduled? cabins free?).
+	$trips_out = array();
+	if ( function_exists( 'bhela_bm_get_trips' ) && function_exists( 'bhela_bm_trip_availability' ) ) {
+		$today = current_time( 'Y-m-d' );
+		foreach ( bhela_bm_get_trips() as $t ) {
+			if ( empty( $t['date'] ) || $t['date'] < $today ) {
+				continue;
+			}
+			$av = bhela_bm_trip_availability( $t['date'] );
+			$trips_out[ $t['date'] ] = array(
+				'label'     => $t['label'],
+				'status'    => $av['status'],
+				'available' => (int) $av['available'],
+				'total'     => (int) $av['total'],
+			);
+		}
+	}
+
 	wp_localize_script( 'bhela-theme', 'bhelaTheme', array(
 		'rates'       => $rates,
 		'weekendDays' => isset( $set['weekend_days'] ) ? array_map( 'intval', (array) $set['weekend_days'] ) : array( 5, 6 ),
 		'holidays'    => function_exists( 'bhela_bm_holiday_dates' ) ? bhela_bm_holiday_dates() : array(),
+		'trips'       => $trips_out,
 		'whatsapp'    => preg_replace( '/[^0-9]/', '', bhela_contact( 'whatsapp' ) ),
 		'bookingUrl'  => bhela_page_url( 'book-now' ),
 	) );

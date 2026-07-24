@@ -59,6 +59,69 @@
 			var totalEl = document.getElementById('qe-total');
 			var qeBook = document.getElementById('qe-book');
 			var bookBase = (qeBook && qeBook.getAttribute('href')) || bhelaTheme.bookingUrl || '';
+			var availEl = document.getElementById('qe-avail');
+			var chipsEl = document.getElementById('qe-chips');
+			var trips = bhelaTheme.trips || {};
+
+			// Quick-pick chips for the upcoming scheduled trips (soonest first).
+			if (chipsEl) {
+				Object.keys(trips).sort().slice(0, 4).forEach(function (dstr) {
+					var b = document.createElement('button');
+					b.type = 'button';
+					b.className = 'qe-chip';
+					b.setAttribute('data-date', dstr);
+					b.textContent = trips[dstr].label || dstr;
+					b.addEventListener('click', function () {
+						qeDate.value = dstr;
+						qeDate.dispatchEvent(new Event('change'));
+					});
+					chipsEl.appendChild(b);
+				});
+			}
+
+			// Enable/disable the book button. A disabled anchor is styled + its
+			// click is swallowed, so a date with no trip (or a full one) can't
+			// start an online booking — it belongs on WhatsApp.
+			function setBook(enabled) {
+				if (!qeBook) { return; }
+				qeBook.classList.toggle('is-disabled', !enabled);
+				qeBook.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+			}
+			if (qeBook) {
+				qeBook.addEventListener('click', function (e) {
+					if (qeBook.classList.contains('is-disabled')) { e.preventDefault(); }
+				});
+			}
+
+			// Live availability for the picked date, same source the booking page
+			// uses. A date with no scheduled trip is a Full Boat / custom request.
+			function syncChips(ds) {
+				if (!chipsEl) { return; }
+				chipsEl.querySelectorAll('.qe-chip').forEach(function (c) {
+					c.classList.toggle('is-active', c.getAttribute('data-date') === ds);
+				});
+			}
+
+			function showAvail() {
+				if (!availEl) { return; }
+				var ds = qeDate.value;
+				syncChips(ds);
+				if (!ds) { availEl.hidden = true; setBook(true); return; } // no date → generic booking
+				var t = trips[ds];
+				availEl.hidden = false;
+				if (!t) {
+					availEl.className = 'qe-avail is-none';
+					availEl.textContent = 'এই তারিখে গ্রুপ ট্রিপ নেই — Full Boat/কাস্টম WhatsApp-এ';
+					setBook(false);
+					return;
+				}
+				var full = t.status === 'booked' || t.available <= 0;
+				availEl.className = 'qe-avail ' + (full ? 'is-full' : 'is-open');
+				availEl.textContent = full
+					? 'এই তারিখে বুকড — অন্য তারিখ দেখুন'
+					: t.total + 'টির মধ্যে ' + t.available + 'টি কেবিন খালি';
+				setBook(!full);
+			}
 
 			function dayType(str) {
 				if (!str) return 'weekend';
@@ -124,15 +187,15 @@
 			function calc() {
 				var g = parseInt(qeGuests.value, 10) || 0;
 				updateBookLink(g);
+				showAvail();
 				if (!g) { result.hidden = true; return; }
 				// A booking needs at least 2 adults in a cabin, so 1 guest is
 				// estimated at the 2-person minimum.
 				var weekday = dayType(qeDate.value) === 'weekday';
 				var est = cheapest(Math.max(g, 2), weekday);
 				if (!est) { result.hidden = true; return; }
-				meta.textContent = (weekday ? 'Weekday −20% 🔥 · ' : '')
-					+ 'আনুমানিক · ' + est.cabins + ' কেবিন';
-				totalEl.textContent = '৳' + Number(est.sum).toLocaleString('en-IN') + ' থেকে';
+				meta.textContent = (weekday ? 'Weekday −20% 🔥 · ' : '') + est.cabins + ' কেবিন';
+				totalEl.textContent = '৳' + Number(est.sum).toLocaleString('en-IN');
 				result.hidden = false;
 			}
 			[qeGuests, qeDate].forEach(function (el) {

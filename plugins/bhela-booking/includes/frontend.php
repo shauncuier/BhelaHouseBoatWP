@@ -115,15 +115,10 @@ function bhela_bm_booking_form_shortcode() {
 								<?php endforeach; ?>
 							</div>
 						<?php endif; ?>
-						<div class="bhela-bm-grid">
-							<p class="bhela-bm-field">
+						<p class="bhela-bm-field">
 								<label for="bm-date">ভ্রমণের তারিখ *</label>
 								<input type="date" id="bm-date" name="date" required min="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
 							</p>
-							<p class="bhela-bm-field" style="align-self:end">
-								<button type="button" class="bhela-bm-avail-btn" id="bm-check-avail">🔄 আবার চেক করুন</button>
-							</p>
-						</div>
 						<div class="bhela-bm-avail" id="bm-avail-result" hidden></div>
 						<div class="bhela-bm-blocked" id="bm-blocked" hidden>
 							❌ <strong>এই তারিখে বুকড</strong> — অন্য তারিখ বাছাই করুন, অথবা
