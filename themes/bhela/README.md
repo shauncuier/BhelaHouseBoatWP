@@ -1,4 +1,4 @@
-# 🎨 BHELA WordPress Theme (v2.15.2)
+# 🎨 BHELA WordPress Theme (v2.15.3)
 
 This is the custom theme for **BHELA – The Haor Exclusive** houseboat experience. It is designed to render a premium, immersive, and fast experience tailored for travelers exploring Tanguar Haor, Sunamganj.
 

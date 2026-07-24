@@ -57,7 +57,7 @@
 		if (qeCabin && typeof bhelaTheme !== 'undefined' && bhelaTheme.rates) {
 			var result = document.getElementById('qe-result');
 			var meta = document.getElementById('qe-meta');
-			var total = document.getElementById('qe-total');
+			var totalEl = document.getElementById('qe-total');
 
 			function dayType(str) {
 				if (!str) return 'weekend';
@@ -67,22 +67,54 @@
 				return (bhelaTheme.weekendDays || [5, 6]).indexOf(d.getDay()) !== -1 ? 'weekend' : 'weekday';
 			}
 
+			// Rates keyed by cabin occupancy (people sharing) — the per-person
+			// rate is decided by how many share a cabin, exactly like the server
+			// engine (bhela_bm_rate_for_occupancy). Multiplying a chosen cabin's
+			// headline rate by total guests under-quoted (4 guests in a 6-share
+			// cabin is a 4-share tier, not a 6-share one).
+			var occRates = {};
+			Object.keys(bhelaTheme.rates).forEach(function (k) {
+				var r = bhelaTheme.rates[k];
+				occRates[parseInt(r.sharing, 10)] = r;
+			});
+			var occKeys = Object.keys(occRates).map(Number).sort(function (a, b) { return a - b; });
+			var maxShare = occKeys.length ? occKeys[occKeys.length - 1] : 6;
+			function rateForOcc(o) {
+				if (occRates[o]) { return occRates[o]; }
+				for (var i = 0; i < occKeys.length; i++) { if (occKeys[i] >= o) { return occRates[occKeys[i]]; } }
+				return occRates[maxShare];
+			}
+
 			function calc() {
-				var key = qeCabin.value;
 				var g = parseInt(qeGuests.value, 10) || 0;
-				var rate = bhelaTheme.rates[key];
-				if (!rate || !g) { result.hidden = true; return; }
-				var dt = dayType(qeDate.value);
-				var per = dt === 'weekday' ? rate.weekday : rate.regular;
-				var t = per * g;
-				meta.textContent = (dt === 'weekday' ? 'Weekday −20% 🔥 · ' : '') + '৳' + Number(per).toLocaleString('en-IN') + ' × ' + g + ' জন';
-				total.textContent = '৳' + Number(t).toLocaleString('en-IN');
+				if (!g) { result.hidden = true; return; }
+				// Chosen cabin sets the sharing size guests will sit in; no choice
+				// yet = the largest (cheapest per-head) tier, matching the
+				// schedule's "from" price.
+				var share = qeCabin.value && bhelaTheme.rates[qeCabin.value]
+					? parseInt(bhelaTheme.rates[qeCabin.value].sharing, 10) : maxShare;
+				var weekday = dayType(qeDate.value) === 'weekday';
+				var remaining = g, sum = 0, cabins = 0;
+				while (remaining > 0 && cabins < 12) {
+					var occ = Math.min(share, remaining);
+					if (occ < 2 && g >= 2) { occ = 2; }      // engine: a cabin opens for ≥2 adults
+					var r = rateForOcc(occ);
+					sum += (weekday ? r.weekday : r.regular) * occ;
+					remaining -= occ;
+					cabins++;
+				}
+				var avg = Math.round(sum / g);
+				meta.textContent = (weekday ? 'Weekday −20% 🔥 · ' : '')
+					+ 'জনপ্রতি ~৳' + Number(avg).toLocaleString('en-IN')
+					+ ' · ' + cabins + ' কেবিন';
+				totalEl.textContent = '৳' + Number(sum).toLocaleString('en-IN');
 				result.hidden = false;
 			}
 			[qeCabin, qeGuests, qeDate].forEach(function (el) {
 				el.addEventListener('change', calc);
 				el.addEventListener('input', calc);
 			});
+			calc(); // show a price immediately (default guests, cheapest tier)
 		}
 
 		/* ----- Gallery: category filter + lightbox -----
