@@ -51,13 +51,14 @@
 		}
 
 		/* ----- Hero quick estimator ----- */
-		var qeCabin = document.getElementById('qe-cabin');
 		var qeGuests = document.getElementById('qe-guests');
 		var qeDate = document.getElementById('qe-date');
-		if (qeCabin && typeof bhelaTheme !== 'undefined' && bhelaTheme.rates) {
+		if (qeGuests && typeof bhelaTheme !== 'undefined' && bhelaTheme.rates) {
 			var result = document.getElementById('qe-result');
 			var meta = document.getElementById('qe-meta');
 			var totalEl = document.getElementById('qe-total');
+			var qeBook = document.getElementById('qe-book');
+			var bookBase = (qeBook && qeBook.getAttribute('href')) || bhelaTheme.bookingUrl || '';
 
 			function dayType(str) {
 				if (!str) return 'weekend';
@@ -85,36 +86,60 @@
 				return occRates[maxShare];
 			}
 
+			function updateBookLink(g) {
+				if (!qeBook || !bookBase) { return; }
+				var sep = bookBase.indexOf('?') === -1 ? '?' : '&';
+				var qs = [];
+				if (qeDate.value) { qs.push('date=' + encodeURIComponent(qeDate.value)); }
+				if (g) { qs.push('adults=' + g); }   // hero "total guests" seeds the booking form's adult count
+				qeBook.setAttribute('href', qs.length ? bookBase + sep + qs.join('&') : bookBase);
+			}
+
+			// Cheapest way to seat `g` adults, obeying the engine's rules: every
+			// cabin holds 2..maxShare adults, the per-person rate is that cabin's
+			// occupancy tier, and no cabin may be left with a single adult. A DP
+			// (not a greedy fill) is needed — for 7 guests, greedy 6+1 is invalid
+			// and 6+2 over-charges; the real cheapest is 5+2.
+			function cheapest(g, weekday) {
+				var INF = Infinity;
+				var cost = [0];
+				var pick = [0];
+				for (var n = 1; n <= g; n++) { cost[n] = INF; pick[n] = 0; }
+				for (var t = 2; t <= g; t++) {
+					for (var p = 2; p <= Math.min(maxShare, t); p++) {
+						var rest = t - p;
+						if (rest !== 0 && rest < 2) { continue; } // leftover can't form a cabin
+						if (cost[rest] === INF) { continue; }
+						var r = rateForOcc(p);
+						var c = (weekday ? r.weekday : r.regular) * p + cost[rest];
+						if (c < cost[t]) { cost[t] = c; pick[t] = p; }
+					}
+				}
+				if (cost[g] === INF) { return null; }
+				var cabins = 0, nn = g;
+				while (nn > 0 && pick[nn] > 0) { cabins++; nn -= pick[nn]; }
+				return { sum: cost[g], cabins: cabins };
+			}
+
 			function calc() {
 				var g = parseInt(qeGuests.value, 10) || 0;
+				updateBookLink(g);
 				if (!g) { result.hidden = true; return; }
-				// Chosen cabin sets the sharing size guests will sit in; no choice
-				// yet = the largest (cheapest per-head) tier, matching the
-				// schedule's "from" price.
-				var share = qeCabin.value && bhelaTheme.rates[qeCabin.value]
-					? parseInt(bhelaTheme.rates[qeCabin.value].sharing, 10) : maxShare;
+				// A booking needs at least 2 adults in a cabin, so 1 guest is
+				// estimated at the 2-person minimum.
 				var weekday = dayType(qeDate.value) === 'weekday';
-				var remaining = g, sum = 0, cabins = 0;
-				while (remaining > 0 && cabins < 12) {
-					var occ = Math.min(share, remaining);
-					if (occ < 2 && g >= 2) { occ = 2; }      // engine: a cabin opens for ≥2 adults
-					var r = rateForOcc(occ);
-					sum += (weekday ? r.weekday : r.regular) * occ;
-					remaining -= occ;
-					cabins++;
-				}
-				var avg = Math.round(sum / g);
+				var est = cheapest(Math.max(g, 2), weekday);
+				if (!est) { result.hidden = true; return; }
 				meta.textContent = (weekday ? 'Weekday −20% 🔥 · ' : '')
-					+ 'জনপ্রতি ~৳' + Number(avg).toLocaleString('en-IN')
-					+ ' · ' + cabins + ' কেবিন';
-				totalEl.textContent = '৳' + Number(sum).toLocaleString('en-IN');
+					+ 'আনুমানিক · ' + est.cabins + ' কেবিন';
+				totalEl.textContent = '৳' + Number(est.sum).toLocaleString('en-IN') + ' থেকে';
 				result.hidden = false;
 			}
-			[qeCabin, qeGuests, qeDate].forEach(function (el) {
+			[qeGuests, qeDate].forEach(function (el) {
 				el.addEventListener('change', calc);
 				el.addEventListener('input', calc);
 			});
-			calc(); // show a price immediately (default guests, cheapest tier)
+			calc(); // show a price immediately (default guests)
 		}
 
 		/* ----- Gallery: category filter + lightbox -----

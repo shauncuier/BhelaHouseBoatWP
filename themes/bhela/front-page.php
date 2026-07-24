@@ -57,16 +57,9 @@ $img = get_template_directory_uri() . '/assets/images';
 			<h3>⚡ 2 মিনিটে Available ট্রিপ ডেট ও রেট দেখে হাওর ট্রিপ বুক করুন</h3>
 			<label for="qe-date">ভ্রমণের তারিখ</label>
 			<input type="date" id="qe-date" min="<?php echo esc_attr( date( 'Y-m-d' ) ); ?>">
-			<label for="qe-cabin">কোন ধরণের কেবিন</label>
-			<select id="qe-cabin">
-				<option value="">— বাছাই করুন —</option>
-				<?php foreach ( bhela_cabins() as $key => $c ) : ?>
-					<option value="<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $c['name'] ); ?> (<?php echo esc_html( $c['sharing'] ); ?> জন শেয়ারিং)</option>
-				<?php endforeach; ?>
-			</select>
 			<label for="qe-guests">মোট অতিথি</label>
 			<select id="qe-guests">
-				<?php for ( $i = 1; $i <= 40; $i++ ) : ?>
+				<?php for ( $i = 1; $i <= 36; $i++ ) : ?>
 					<option value="<?php echo esc_attr( $i ); ?>" <?php selected( $i, 4 ); ?>><?php echo esc_html( $i ); ?> জন</option>
 				<?php endfor; ?>
 			</select>
@@ -74,6 +67,7 @@ $img = get_template_directory_uri() . '/assets/images';
 				<span id="qe-meta">—</span>
 				<strong id="qe-total">—</strong>
 			</div>
+			<p class="hero-card__note" id="qe-note">আনুমানিক মূল্য — তারিখ ও অতিথি অনুযায়ী চূড়ান্ত দাম বুকিং পেজে দেখুন।</p>
 			<a class="btn btn--cta" id="qe-book" href="<?php echo esc_url( bhela_page_url( 'book-now' ) ); ?>">বুকিং করুন →</a>
 		</div>
 	</div>

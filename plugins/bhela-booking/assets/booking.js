@@ -845,7 +845,19 @@
 				sync();
 			});
 
-		wrap.setAttribute('data-mstep', '1');
+		/* Deep link from the homepage estimator: /book-now/?adults=N seeds the
+			   adult count so the guest lands with their party already set. */
+			var urlAdults = new URLSearchParams(window.location.search).get('adults');
+			if (urlAdults && /^\d+$/.test(urlAdults) && gAdults) {
+				var maxA = parseInt(gAdults.getAttribute('data-max'), 10) || 99;
+				var av = Math.max(0, Math.min(maxA, parseInt(urlAdults, 10)));
+				gAdults.value = av;
+				var outA = document.getElementById(gAdults.getAttribute('data-out'));
+				if (outA) { outA.textContent = av; }
+				gAdults.dispatchEvent(new Event('change', { bubbles: true }));
+			}
+
+			wrap.setAttribute('data-mstep', '1');
 		resetAvailability();
 		calc();
 		buildMobileBar(); setStep(1, true);
