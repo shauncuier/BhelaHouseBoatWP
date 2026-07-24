@@ -33,6 +33,10 @@
 
 		/* ----- Scroll reveal ----- */
 		if ('IntersectionObserver' in window) {
+			// threshold 0 (any pixel) + a bottom rootMargin: a tall element — e.g.
+			// the whole trip list stacked into one column on mobile — reveals as
+			// soon as its top edge scrolls in. A percentage threshold could never
+			// fire when the block is many screens tall, hiding it entirely.
 			var io = new IntersectionObserver(function (entries) {
 				entries.forEach(function (en) {
 					if (en.isIntersecting) {
@@ -40,7 +44,7 @@
 						io.unobserve(en.target);
 					}
 				});
-			}, { threshold: 0.12 });
+			}, { threshold: 0, rootMargin: '0px 0px -8% 0px' });
 			document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
 		} else {
 			document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('is-visible'); });

@@ -386,7 +386,9 @@
    Card grid mirroring the theme's .cabin-card language. Colours read theme
    tokens with fallbacks so the plugin still looks right on its own. */
 .bhela-trips {
-	display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+	/* min(100%, 300px): on a phone narrower than 300px the track collapses to
+	   the container width instead of forcing a 300px column that overflows. */
+	display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr));
 	gap: 1.2rem;
 }
 .bhela-trips__month {
