@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.15.4
+Version: 2.15.5
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -107,9 +107,12 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 
 /* Buttons */
 .btn {
+	position: relative; z-index: 2;
 	display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
 	padding: .95rem 2.1rem; border-radius: 999px; border: 0;
 	font-family: var(--font-body); font-size: 1.02rem; font-weight: 700; cursor: pointer;
+	text-decoration: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+	box-sizing: border-box;
 	transition: transform .2s var(--ease), box-shadow .2s, background .2s;
 	min-height: 48px;
 }
@@ -512,7 +515,7 @@ a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 
 	background: linear-gradient(120deg, var(--ink) 20%, var(--primary) 130%);
 	color: #fff; padding: 9.5rem 0 4rem; position: relative; overflow: hidden;
 }
-.page-hero::after { content: "🛶"; position: absolute; right: -1rem; bottom: -2.4rem; font-size: 11rem; opacity: .08; }
+.page-hero::after { content: "🛶"; position: absolute; right: -1rem; bottom: -2.4rem; font-size: 11rem; opacity: .08; pointer-events: none; }
 .page-hero h1 { color: #fff; font-size: clamp(2rem, 5vw, 3.4rem); }
 .page-hero p { color: var(--text-inverse); max-width: 640px; margin-top: .8rem; }
 .entry-content { max-width: 820px; margin-inline: auto; }
@@ -785,10 +788,12 @@ input, select, textarea { font-family: inherit; }
 
 /* --- Small screens: tighter hero, larger touch targets --- */
 @media (max-width: 640px) {
-	.hero__actions .btn { flex: 1 1 100%; }
+	.hero__actions .btn,
+	.bookpage-hero__actions .btn,
+	.page-hero .btn,
+	.cta-banner .btn-row .btn { width: 100%; flex: 1 1 100%; display: flex; text-align: center; }
 	.hero__stats { gap: 1.2rem 1.8rem; }
 	.section { padding-block: clamp(3.4rem, 10vw, 5rem); }
-	.cta-banner .btn-row .btn { width: 100%; }
 }
 
 /* ==========================================================

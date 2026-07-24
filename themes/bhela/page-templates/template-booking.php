@@ -26,7 +26,7 @@ get_header();
 <section class="page-hero bookpage-hero"><div class="container">
 	<h1>২ মিনিটে বুক করুন, সাথে সাথে রেট দেখুন</h1>
 	<p>তারিখ ও অতিথি সংখ্যা দিন — সিস্টেম নিজেই সেরা কেবিন কম্বিনেশন ও দাম বেছে দেবে। ৫০% অগ্রিমে বুকিং Confirmed।</p>
-	<div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.4rem">
+	<div class="bookpage-hero__actions" style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.4rem">
 		<a class="btn btn--cta" href="tel:<?php echo esc_attr( bhela_contact( 'phone_1' ) ); ?>">📞 <?php echo esc_html( bhela_contact( 'phone_1' ) ); ?></a>
 		<a class="btn btn--wa" href="<?php echo esc_url( bhela_wa_link() ); ?>" target="_blank" rel="noopener">💬 WhatsApp-এ সরাসরি বুক করুন</a>
 	</div>
