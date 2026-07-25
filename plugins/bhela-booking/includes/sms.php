@@ -37,7 +37,6 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 	$m        = function ( $k ) use ( $booking_id ) {
 		return get_post_meta( $booking_id, $k, true );
 	};
-	$statuses = bhela_bm_statuses();
 	$status   = $m( '_bhela_status' ) ? $m( '_bhela_status' ) : 'pending';
 	$total    = (int) $m( '_bhela_total' );
 	$paid     = (int) $m( '_bhela_paid_amount' );
@@ -52,7 +51,7 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 		'{total}'   => bhela_bm_money( $total ),
 		'{advance}' => bhela_bm_money( (int) $m( '_bhela_advance' ) ),
 		'{due}'     => bhela_bm_money( max( 0, $total - $paid ) ),
-		'{status}'  => isset( $statuses[ $status ] ) ? $statuses[ $status ] : $status,
+		'{status}'  => bhela_bm_status_en( $status ),
 	);
 	return strtr( (string) $template, $map );
 }

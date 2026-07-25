@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.15.8
+ * Version: 2.15.9
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.15.8' );
+define( 'BHELA_BM_VERSION', '2.15.9' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -330,6 +330,28 @@ function bhela_bm_money( $amount ) {
 	return '৳' . number_format( (float) $amount );
 }
 
+/**
+ * The advance expressed as a percentage of the booking total.
+ *
+ * Derived from the stored amount, NOT from the advance_percent setting: the
+ * admin sets each booking's advance freely (a ৳60,000 trip may be taken on
+ * ৳40,000 or ৳20,000 — it is their call), so the label has to follow the money
+ * or it will contradict the figure printed beside it. Returns 0 when there is
+ * no total or no advance.
+ *
+ * @param int|string $advance Amount taken as advance.
+ * @param int|string $total   Booking total.
+ * @return int Percentage, 0-100.
+ */
+function bhela_bm_advance_pct( $advance, $total ) {
+	$advance = (int) $advance;
+	$total   = (int) $total;
+	if ( $total <= 0 || $advance <= 0 ) {
+		return 0;
+	}
+	return (int) round( $advance / $total * 100 );
+}
+
 /* =========================================================
  * BOOKING STATUSES
  * ========================================================= */
@@ -342,6 +364,27 @@ function bhela_bm_statuses() {
 		'completed'    => __( 'Completed (সম্পন্ন)', 'bhela-booking' ),
 		'cancelled'    => __( 'Cancelled (বাতিল)', 'bhela-booking' ),
 	);
+}
+
+/**
+ * English-only status labels.
+ *
+ * bhela_bm_statuses() is bilingual for the admin UI, but SMS is billed per
+ * segment and Bengali forces Unicode encoding (70 chars a part instead of 160),
+ * so a bilingual status can silently triple the cost of every message.
+ *
+ * @param string $status Status key.
+ * @return string English label, or the raw key if unknown.
+ */
+function bhela_bm_status_en( $status ) {
+	$map = array(
+		'pending'      => 'Pending',
+		'advance_paid' => 'Advance Paid',
+		'confirmed'    => 'Confirmed',
+		'completed'    => 'Completed',
+		'cancelled'    => 'Cancelled',
+	);
+	return isset( $map[ $status ] ) ? $map[ $status ] : $status;
 }
 
 function bhela_bm_status_color( $status ) {

@@ -27,7 +27,7 @@ function bhela_bm_booking_summary_text( $booking_id ) {
 	if ( $m( '_bhela_total' ) ) {
 		$lines[] = 'Per Person: ' . bhela_bm_money( $m( '_bhela_per_person' ) ) . ' (' . $m( '_bhela_day_type' ) . ')';
 		$lines[] = 'Total: ' . bhela_bm_money( $m( '_bhela_total' ) );
-		$lines[] = 'Advance (50%): ' . bhela_bm_money( $m( '_bhela_advance' ) );
+		$lines[] = 'Advance (' . bhela_bm_advance_pct( $m( '_bhela_advance' ), $m( '_bhela_total' ) ) . '%): ' . bhela_bm_money( $m( '_bhela_advance' ) );
 		$lines[] = 'Paid: ' . bhela_bm_money( $m( '_bhela_paid_amount' ) );
 	}
 	if ( $m( '_bhela_full_boat' ) ) {
@@ -114,7 +114,7 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	} else {
 		$banner_bg   = '#b45309';
 		$banner_text = '🛶 বুকিং রিকোয়েস্ট গৃহীত';
-		$intro       = 'প্রিয় ' . esc_html( $name ) . ', আপনার বুকিং রিকোয়েস্ট আমরা পেয়েছি। আমাদের টিম শীঘ্রই ফোন/WhatsApp-এ যোগাযোগ করবে। <strong>অগ্রিম (৫০%) পরিশোধের পর বুকিং Confirmed হবে।</strong>';
+		$intro       = 'প্রিয় ' . esc_html( $name ) . ', আপনার বুকিং রিকোয়েস্ট আমরা পেয়েছি। আমাদের টিম শীঘ্রই ফোন/WhatsApp-এ যোগাযোগ করবে। <strong>অগ্রিম পরিশোধের পর বুকিং Confirmed হবে।</strong>';
 	}
 
 	$rows  = bhela_bm_email_row( 'বুকিং নম্বর', $invoice_no, true );
@@ -134,13 +134,13 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 			$rows .= bhela_bm_email_row( 'জনপ্রতি', bhela_bm_money( $m( '_bhela_per_person' ) ) );
 		}
 		$rows .= bhela_bm_email_row( 'মোট', bhela_bm_money( $total ), true );
-		$rows .= bhela_bm_email_row( 'অগ্রিম (৫০%)', bhela_bm_money( $advance ), true, '#E5601F' );
+		$rows .= bhela_bm_email_row( 'অগ্রিম (' . bhela_bm_advance_pct( $advance, $total ) . '%)', bhela_bm_money( $advance ), true, '#E5601F' );
 		$rows .= bhela_bm_email_row( 'পরিশোধিত', bhela_bm_money( $paid ), false, '#1a7f37' );
 		$rows .= bhela_bm_email_row( 'বাকি', bhela_bm_money( $due ), true, '#b32d2e' );
 	}
 
 	$boarding = ( 'confirmed' === $type )
-		? '<p style="margin:18px 0 0;padding:14px 16px;background:#EBF7EF;border-radius:10px;font-size:13.5px;color:#14532d;line-height:1.8;">📌 <strong>রিপোর্টিং:</strong> Anwarpur Ghat — নির্ধারিত সময় ফোনে জানানো হবে।<br>💵 বাকি ৫০% অনবোর্ড হওয়ার সময় পরিশোধযোগ্য।</p>'
+		? '<p style="margin:18px 0 0;padding:14px 16px;background:#EBF7EF;border-radius:10px;font-size:13.5px;color:#14532d;line-height:1.8;">📌 <strong>রিপোর্টিং:</strong> Anwarpur Ghat — নির্ধারিত সময় ফোনে জানানো হবে।<br>💵 বাকি টাকা অনবোর্ড হওয়ার সময় পরিশোধযোগ্য।</p>'
 		: '';
 
 	ob_start();

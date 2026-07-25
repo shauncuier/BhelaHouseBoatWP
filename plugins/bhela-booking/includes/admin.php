@@ -178,8 +178,25 @@ function bhela_bm_details_metabox( $post ) {
 		<tr><th><?php esc_html_e( 'Total (৳)', 'bhela-booking' ); ?></th>
 			<td><input type="number" name="bhela_total" value="<?php echo esc_attr( $m( '_bhela_total' ) ); ?>">
 			<label style="margin-left:8px"><input type="checkbox" name="bhela_manual_price" value="1" <?php checked( $m( '_bhela_manual_price' ), '1' ); ?>> <?php esc_html_e( 'Manual price override', 'bhela-booking' ); ?></label></td></tr>
-		<tr><th><?php esc_html_e( 'Advance Due (৳)', 'bhela-booking' ); ?></th>
-			<td><input type="number" name="bhela_advance" value="<?php echo esc_attr( $m( '_bhela_advance' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Advance (৳)', 'bhela-booking' ); ?></th>
+			<?php
+			$adv_total = (int) $m( '_bhela_total' );
+			$adv_pct   = bhela_bm_advance_pct( $m( '_bhela_advance' ), $adv_total );
+			$adv_sugg  = (int) ceil( $adv_total * ( (float) bhela_bm_get_settings()['advance_percent'] / 100 ) );
+			?>
+			<td><input type="number" name="bhela_advance" min="0" value="<?php echo esc_attr( $m( '_bhela_advance' ) ); ?>">
+			<strong style="margin-left:8px;color:#137A74"><?php echo esc_html( $adv_pct ); ?>%</strong>
+			<p class="description">
+				<?php esc_html_e( 'Whatever advance you actually agreed — any amount. Your figure is kept exactly as typed and is never recalculated, not even when the price or cabins change.', 'bhela-booking' ); ?>
+				<?php if ( $adv_total > 0 ) : ?>
+					<br><?php printf(
+						/* translators: 1: advance percent setting, 2: money amount */
+						esc_html__( 'For reference, %1$d%% of the current Total is %2$s.', 'bhela-booking' ),
+						(int) bhela_bm_get_settings()['advance_percent'],
+						esc_html( bhela_bm_money( $adv_sugg ) )
+					); ?>
+				<?php endif; ?>
+			</p></td></tr>
 		<tr><th><?php esc_html_e( 'Paid Amount (৳)', 'bhela-booking' ); ?></th>
 			<td><input type="number" name="bhela_paid_amount" value="<?php echo esc_attr( $m( '_bhela_paid_amount', 0 ) ); ?>"></td></tr>
 		<tr><th><?php esc_html_e( 'Payment Method', 'bhela-booking' ); ?></th>
@@ -315,7 +332,6 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	if ( '1' === $fields['_bhela_manual_price'] || ! $cabin_key ) {
 		update_post_meta( $post_id, '_bhela_per_person', (int) ( $_POST['bhela_per_person'] ?? 0 ) );
 		update_post_meta( $post_id, '_bhela_total', (int) ( $_POST['bhela_total'] ?? 0 ) );
-		update_post_meta( $post_id, '_bhela_advance', (int) ( $_POST['bhela_advance'] ?? 0 ) );
 	} else {
 		$price = bhela_bm_calc_price( $cabin_key, $fields['_bhela_guests'], $fields['_bhela_travel_date'] );
 		if ( ! is_wp_error( $price ) ) {
@@ -323,7 +339,6 @@ function bhela_bm_save_booking( $post_id, $post ) {
 			update_post_meta( $post_id, '_bhela_day_type', $price['day_type'] );
 			update_post_meta( $post_id, '_bhela_per_person', $price['per_person'] );
 			update_post_meta( $post_id, '_bhela_total', $price['total'] );
-			update_post_meta( $post_id, '_bhela_advance', $price['advance'] );
 		}
 	}
 
@@ -355,7 +370,6 @@ function bhela_bm_save_booking( $post_id, $post ) {
 			update_post_meta( $post_id, '_bhela_per_person', 0 );
 			update_post_meta( $post_id, '_bhela_total', $cprice['total'] );
 			update_post_meta( $post_id, '_bhela_base_price', $cprice['total'] );
-			update_post_meta( $post_id, '_bhela_advance', $cprice['advance'] );
 			update_post_meta( $post_id, '_bhela_manual_price', '1' );
 		}
 	}
@@ -391,10 +405,18 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	$offer = $custom > 0 ? $custom : max( 0, (int) round( $base - ( $base * $pct / 100 ) - $flat ) );
 	update_post_meta( $post_id, '_bhela_offer_price', $offer );
 	if ( ! empty( $_POST['bhela_apply_offer'] ) && $offer > 0 ) {
-		$settings = bhela_bm_get_settings();
 		update_post_meta( $post_id, '_bhela_total', $offer );
-		update_post_meta( $post_id, '_bhela_advance', (int) ceil( $offer * ( (float) $settings['advance_percent'] / 100 ) ) );
 		update_post_meta( $post_id, '_bhela_manual_price', '1' );
+	}
+
+	// The Advance is the admin's decision, never a formula. 50% is only the
+	// suggestion a *new* booking is created with (see bhela_bm_process_submission);
+	// from then on this field is the single source of truth and no repricing path
+	// above may touch it. Repricing the trip changes the Total, not what the guest
+	// was asked to pay up front — the metabox shows the current 50% figure beside
+	// the field so it can be re-applied by hand when that is what is wanted.
+	if ( isset( $_POST['bhela_advance'] ) ) {
+		update_post_meta( $post_id, '_bhela_advance', max( 0, (int) $_POST['bhela_advance'] ) );
 	}
 
 	$old_status     = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';

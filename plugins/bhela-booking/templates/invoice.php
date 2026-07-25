@@ -149,7 +149,7 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 
 			<div class="totals">
 				<div class="row"><span>Subtotal</span><strong><?php echo esc_html( bhela_bm_money( $invoice['total'] ) ); ?></strong></div>
-				<div class="row"><span>Advance Due (<?php echo esc_html( $s['advance_percent'] ); ?>%)</span><strong><?php echo esc_html( bhela_bm_money( $invoice['advance'] ) ); ?></strong></div>
+				<div class="row"><span>Advance (<?php echo esc_html( bhela_bm_advance_pct( $invoice['advance'], $invoice['total'] ) ); ?>%)</span><strong><?php echo esc_html( bhela_bm_money( $invoice['advance'] ) ); ?></strong></div>
 				<div class="row paid"><span>Paid</span><strong><?php echo esc_html( bhela_bm_money( $invoice['paid'] ) ); ?><?php echo $invoice['pay_method'] ? ' (' . esc_html( strtoupper( $invoice['pay_method'] ) ) . ( $invoice['txn_id'] ? ' — ' . esc_html( $invoice['txn_id'] ) : '' ) . ')' : ''; ?></strong></div>
 				<div class="row grand due"><span>Balance Due</span><strong><?php echo esc_html( bhela_bm_money( $due ) ); ?></strong></div>
 			</div>

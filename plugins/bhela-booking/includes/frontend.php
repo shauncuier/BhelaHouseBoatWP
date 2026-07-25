@@ -207,7 +207,7 @@ function bhela_bm_booking_form_shortcode() {
 							<div class="bhela-bm-price__row"><span>মোট অতিথি</span><strong id="bm-guests-echo">—</strong></div>
 							<div class="bhela-bm-price__row"><span>মোট</span><strong id="bm-total">—</strong></div>
 							<div class="bhela-bm-price__row bhela-bm-price__row--save" id="bm-savings-row" hidden><span>আপনার সাশ্রয় 🎉</span><strong id="bm-savings">—</strong></div>
-							<div class="bhela-bm-price__row bhela-bm-price__row--advance"><span>অগ্রিম (৫০%)</span><strong id="bm-advance">—</strong></div>
+							<div class="bhela-bm-price__row bhela-bm-price__row--advance"><span>অগ্রিম (<?php echo esc_html( bhela_bm_bn_num( (int) $settings['advance_percent'] ) ); ?>%)</span><strong id="bm-advance">—</strong></div>
 						</div>
 						<p class="bhela-bm-empty" id="bhela-bm-empty">তারিখ ও অতিথি সংখ্যা দিলে এখানে সেরা কেবিন অপশন ও দাম দেখা যাবে।</p>
 						<div class="bm-discount" id="bm-discount">
@@ -485,9 +485,11 @@ function bhela_bm_process_submission( $data ) {
 		);
 	} else {
 		$wa_text = sprintf(
-			"আসসালামু আলাইকুম। আমি ভেলা হাউসবোট বুকিং করতে চাই।\n\n🧾 Booking No: %s\nনাম: %s\nমোবাইল: %s\nতারিখ: %s\nকেবিন: %s\nঅতিথি: %d জন\nমোট: %s | অগ্রিম (৫০%%): %s",
+			"আসসালামু আলাইকুম। আমি ভেলা হাউসবোট বুকিং করতে চাই।\n\n🧾 Booking No: %s\nনাম: %s\nমোবাইল: %s\nতারিখ: %s\nকেবিন: %s\nঅতিথি: %d জন\nমোট: %s | অগ্রিম (%s%%): %s",
 			$invoice_no, $name, $phone, $date, $cabin_summary, $price['guests'],
-			bhela_bm_money( $price['total'] ), bhela_bm_money( $price['advance'] )
+			bhela_bm_money( $price['total'] ),
+			bhela_bm_bn_num( (int) $settings['advance_percent'] ),
+			bhela_bm_money( $price['advance'] )
 		);
 	}
 	if ( $requested > 0 ) {
