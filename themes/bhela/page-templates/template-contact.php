@@ -5,6 +5,10 @@
  * @package Bhela
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 
 $bhela_wa_num  = preg_replace( '/[^0-9]/', '', bhela_contact( 'whatsapp' ) );

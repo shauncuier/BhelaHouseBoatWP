@@ -5,6 +5,10 @@
  * @package Bhela
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 
 $day1 = array(

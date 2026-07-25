@@ -4,6 +4,10 @@
  *
  * @package Bhela
  */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
 ?>
 </main>
 <footer class="site-footer">

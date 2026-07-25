@@ -5,6 +5,10 @@
  * @package Bhela
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 get_header();
 
 // Owner-managed gallery (booking plugin). Returns '' when the plugin is

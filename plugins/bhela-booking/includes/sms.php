@@ -58,6 +58,27 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 }
 
 /**
+ * SSRF guard for the outbound gateway call: require HTTPS and a public host.
+ * Blocks localhost, link-local and private/reserved IP ranges so the API key
+ * can never be posted to an internal service.
+ */
+function bhela_bm_sms_url_is_safe( $url ) {
+	$parts = wp_parse_url( $url );
+	if ( empty( $parts['host'] ) || empty( $parts['scheme'] ) || 'https' !== strtolower( $parts['scheme'] ) ) {
+		return false;
+	}
+	$host = trim( $parts['host'], '[]' ); // unwrap IPv6 literals like [::1]
+	$ip   = filter_var( $host, FILTER_VALIDATE_IP ) ? $host : gethostbyname( $host );
+	// If the host resolves to an IP, it must be public. (An unresolvable name
+	// returns the host unchanged, which fails FILTER_VALIDATE_IP → allowed as a
+	// normal DNS name; WordPress' own request filters still apply.)
+	if ( filter_var( $ip, FILTER_VALIDATE_IP ) ) {
+		return (bool) filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE );
+	}
+	return true;
+}
+
+/**
  * Send one SMS. Returns true on a 2xx gateway response.
  *
  * @param string $number  Recipient (any format — normalised here).
@@ -73,7 +94,16 @@ function bhela_bm_send_sms( $number, $message ) {
 		return false;
 	}
 
-	$url    = esc_url_raw( $s['sms_api_url'] );
+	$url = esc_url_raw( $s['sms_api_url'] );
+	// SSRF guard: the gateway URL is admin-set, but refuse anything that is not
+	// an external HTTPS endpoint so a mis-set/compromised value can't make the
+	// server call an internal host (e.g. cloud metadata) with the API key.
+	if ( ! bhela_bm_sms_url_is_safe( $url ) ) {
+		if ( function_exists( 'bhela_bm_log' ) ) {
+			bhela_bm_log( 'error', 'SMS পাঠানো যায়নি — গেটওয়ে URL নিরাপদ নয় (HTTPS ও পাবলিক হোস্ট লাগবে)।', false );
+		}
+		return false;
+	}
 	$method = ( 'POST' === strtoupper( $s['sms_method'] ) ) ? 'POST' : 'GET';
 	$params = array(
 		$s['sms_param_key']     => $s['sms_api_key'],

@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.15.5' );
+define( 'BHELA_VERSION', '2.15.6' );
 
 /* ---------- Setup ---------- */
 
@@ -589,8 +589,11 @@ function bhela_set_seed_thumbnail( $post_id, $rel ) {
 	if ( has_post_thumbnail( $post_id ) ) {
 		return;
 	}
-	$src = get_template_directory() . '/assets/images/' . $rel;
-	if ( ! file_exists( $src ) ) {
+	// Contain to the bundled images dir — reject any traversal in $rel.
+	$base = wp_normalize_path( trailingslashit( get_template_directory() . '/assets/images' ) );
+	$src  = realpath( $base . $rel );
+	$src  = $src ? wp_normalize_path( $src ) : '';
+	if ( ! $src || 0 !== strpos( $src, $base ) || ! is_file( $src ) ) {
 		return;
 	}
 	if ( ! function_exists( 'wp_generate_attachment_metadata' ) ) {

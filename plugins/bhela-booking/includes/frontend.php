@@ -442,6 +442,8 @@ function bhela_bm_process_submission( $data ) {
 	update_post_meta( $post_id, '_bhela_travel_date', $date );
 	update_post_meta( $post_id, '_bhela_cabin_type', $cabin_summary );
 	update_post_meta( $post_id, '_bhela_cabins_json', wp_json_encode( is_array( $cabins ) ? $cabins : array(), JSON_UNESCAPED_UNICODE ) );
+	// Explicit cabin count for the availability engine — a Full Boat takes them all.
+	update_post_meta( $post_id, '_bhela_cabin_count', $full_boat ? bhela_bm_max_cabins() : ( is_array( $cabins ) ? count( $cabins ) : 1 ) );
 	update_post_meta( $post_id, '_bhela_lines', wp_json_encode( $price['lines'], JSON_UNESCAPED_UNICODE ) );
 	if ( function_exists( 'bhela_bm_log' ) ) {
 		bhela_bm_log( 'booking', sprintf( 'নতুন বুকিং %s — %s, %s, %s জন, মোট %s',
@@ -534,6 +536,16 @@ add_action( 'wp_ajax_nopriv_bhela_bm_submit', 'bhela_bm_ajax_submit' );
 /** AJAX: room availability check (from Trip Calendar). */
 function bhela_bm_ajax_availability() {
 	check_ajax_referer( 'bhela_bm_booking', 'nonce' );
+
+	// Per-IP throttle, matching the submit/track endpoints — blunts scraping.
+	$ip  = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$key = 'bhela_bm_avail_' . md5( $ip );
+	$hits = (int) get_transient( $key );
+	if ( $hits >= 60 ) {
+		wp_send_json_error( array( 'message' => __( 'অনেকবার চেষ্টা হয়েছে — কিছুক্ষণ পর আবার চেষ্টা করুন।', 'bhela-booking' ) ) );
+	}
+	set_transient( $key, $hits + 1, MINUTE_IN_SECONDS );
+
 	$date = sanitize_text_field( wp_unslash( $_POST['date'] ?? '' ) );
 	if ( ! $date ) {
 		wp_send_json_error( array( 'message' => 'আগে তারিখ বাছাই করুন।' ) );

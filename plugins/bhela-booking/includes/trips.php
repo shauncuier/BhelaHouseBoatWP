@@ -187,10 +187,33 @@ function bhela_bm_trip_availability( $date ) {
  * Memoised per request — availability is asked for the same date several
  * times while rendering the schedule, and this saves the repeat queries.
  */
-function bhela_bm_counted_booked_cabins( $date ) {
+/**
+ * Cabins a single booking consumes. Prefer the explicit `_bhela_cabin_count`
+ * (written on every save), fall back to the count of `_bhela_cabins_json`, then
+ * to 1 — so a booking is never counted as less than one cabin.
+ */
+function bhela_bm_booking_cabin_count( $post_id ) {
+	$explicit = get_post_meta( $post_id, '_bhela_cabin_count', true );
+	if ( '' !== $explicit && null !== $explicit ) {
+		return max( 1, (int) $explicit );
+	}
+	$rows = json_decode( (string) get_post_meta( $post_id, '_bhela_cabins_json', true ), true );
+	return is_array( $rows ) && $rows ? count( $rows ) : 1;
+}
+
+/**
+ * Cabins consumed by real bookings on a date. A "consuming" booking is one that
+ * holds a seat: advance_paid, confirmed or completed (a completed future trip
+ * still occupies its cabin; cancelled/pending do not reserve stock).
+ *
+ * @param string $date       Y-m-d.
+ * @param int    $exclude_id Booking to leave out (used by the capacity guard).
+ */
+function bhela_bm_counted_booked_cabins( $date, $exclude_id = 0 ) {
 	static $cache = array();
-	if ( array_key_exists( $date, $cache ) ) {
-		return $cache[ $date ];
+	$ck = $date . '|' . (int) $exclude_id;
+	if ( array_key_exists( $ck, $cache ) ) {
+		return $cache[ $ck ];
 	}
 	$q = new WP_Query( array(
 		'post_type'      => 'bhela_booking',
@@ -198,17 +221,17 @@ function bhela_bm_counted_booked_cabins( $date ) {
 		'posts_per_page' => 50,
 		'fields'         => 'ids',
 		'no_found_rows'  => true,
+		'post__not_in'   => $exclude_id ? array( (int) $exclude_id ) : array(),
 		'meta_query'     => array(
 			array( 'key' => '_bhela_travel_date', 'value' => $date, 'compare' => '=' ),
-			array( 'key' => '_bhela_status', 'value' => array( 'advance_paid', 'confirmed' ), 'compare' => 'IN' ),
+			array( 'key' => '_bhela_status', 'value' => array( 'advance_paid', 'confirmed', 'completed' ), 'compare' => 'IN' ),
 		),
 	) );
 	$cabins = 0;
 	foreach ( $q->posts as $id ) {
-		$rows    = json_decode( (string) get_post_meta( $id, '_bhela_cabins_json', true ), true );
-		$cabins += is_array( $rows ) && $rows ? count( $rows ) : 1;
+		$cabins += bhela_bm_booking_cabin_count( $id );
 	}
-	$cache[ $date ] = $cabins;
+	$cache[ $ck ] = $cabins;
 	return $cabins;
 }
 

@@ -258,7 +258,9 @@ function bhela_bm_actions_metabox( $post ) {
 			<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $status, $key ); ?>><?php echo esc_html( $label ); ?></option>
 		<?php endforeach; ?>
 	</select></p>
-	<?php if ( $invoice_no ) : ?>
+			<p><label><input type="checkbox" name="bhela_overbook" value="1"> ⚠️ ওভারবুক — এই তারিখে কেবিন ফুরালেও কনফার্ম করুন (Full Boat/ব্যতিক্রম)</label>
+		<span class="description">সাধারণত দরকার নেই — কেবিন ফুরালে কনফার্ম আটকে যাবে।</span></p>
+		<?php if ( $invoice_no ) : ?>
 		<p><a class="button button-secondary" href="<?php echo esc_url( bhela_bm_invoice_url( $post->ID ) ); ?>" target="_blank">🧾 <?php esc_html_e( 'View / Print Invoice', 'bhela-booking' ); ?></a></p>
 	<?php endif; ?>
 	<?php if ( $email ) : ?>
@@ -284,6 +286,10 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	if ( ! current_user_can( 'edit_post', $post_id ) ) {
 		return;
 	}
+
+	// Capture the pre-save travel date so the capacity guard can tell a date
+	// move (into a possibly-full date) from a plain status change.
+	$old_date = get_post_meta( $post_id, '_bhela_travel_date', true );
 
 	$fields = array(
 		'_bhela_phone'        => sanitize_text_field( $_POST['bhela_phone'] ?? '' ),
@@ -354,6 +360,26 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		}
 	}
 
+	// Always persist an accurate cabin count for the availability engine — never
+	// depend on the "Recalculate" checkbox. The combo table is posted on every
+	// edit, so count the rows that actually hold a guest; fall back to the stored
+	// cabins JSON, then to a single cabin.
+	if ( isset( $_POST['bhela_cabin_adults'] ) && is_array( $_POST['bhela_cabin_adults'] ) ) {
+		$adults_c = (array) $_POST['bhela_cabin_adults'];
+		$c48_c    = (array) ( $_POST['bhela_cabin_c48'] ?? array() );
+		$c04_c    = (array) ( $_POST['bhela_cabin_c04'] ?? array() );
+		$cnt      = 0;
+		foreach ( $adults_c as $i => $a ) {
+			if ( (int) $a + (int) ( $c48_c[ $i ] ?? 0 ) + (int) ( $c04_c[ $i ] ?? 0 ) > 0 ) {
+				$cnt++;
+			}
+		}
+		update_post_meta( $post_id, '_bhela_cabin_count', max( 1, $cnt ) );
+	} elseif ( '' === get_post_meta( $post_id, '_bhela_cabin_count', true ) ) {
+		$rows = json_decode( (string) get_post_meta( $post_id, '_bhela_cabins_json', true ), true );
+		update_post_meta( $post_id, '_bhela_cabin_count', is_array( $rows ) && $rows ? count( $rows ) : 1 );
+	}
+
 	// Discount & counter-offer panel.
 	$base   = (int) ( get_post_meta( $post_id, '_bhela_base_price', true ) ?: get_post_meta( $post_id, '_bhela_total', true ) );
 	$pct    = max( 0, min( 100, (float) ( $_POST['bhela_discount_percent'] ?? 0 ) ) );
@@ -373,13 +399,49 @@ function bhela_bm_save_booking( $post_id, $post ) {
 
 	$old_status     = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
 	$new_status     = sanitize_key( $_POST['bhela_status'] ?? $old_status );
+	$new_date       = $fields['_bhela_travel_date'];
 	$sent_confirmed = false;
-	if ( array_key_exists( $new_status, bhela_bm_statuses() ) ) {
+	$invoice_ref    = get_post_meta( $post_id, '_bhela_invoice_no', true );
+
+	// ---- Capacity guard ---------------------------------------------------
+	// A booking "consumes" a cabin once it is advance_paid, confirmed or
+	// completed. If this save moves the booking INTO a consuming state (or
+	// moves an already-consuming booking to a different date), make sure the
+	// date still has room. Block by default; the "Overbook" checkbox forces it
+	// through for Full Boat / exceptions.
+	$consuming   = array( 'advance_paid', 'confirmed', 'completed' );
+	$is_entering = in_array( $new_status, $consuming, true )
+		&& ( ! in_array( $old_status, $consuming, true ) || $new_date !== $old_date );
+	$override    = ! empty( $_POST['bhela_overbook'] );
+	$cap_blocked = false;
+
+	if ( $is_entering && $new_date && function_exists( 'bhela_bm_counted_booked_cabins' ) ) {
+		$free   = bhela_bm_max_cabins() - (int) bhela_bm_counted_booked_cabins( $new_date, $post_id );
+		$need   = (int) bhela_bm_booking_cabin_count( $post_id );
+		$bn     = function_exists( 'bhela_bm_bn_num' ) ? 'bhela_bm_bn_num' : 'strval';
+		if ( $need > $free && ! $override ) {
+			$cap_blocked = true;
+			set_transient( 'bhela_bm_cap_err_' . $post_id, sprintf(
+				/* translators: 1: free cabins, 2: needed, 3: total */
+				__( 'কনফার্ম করা যায়নি — %1$s তারিখে মাত্র %2$sটি কেবিন খালি, কিন্তু এই বুকিংয়ে %3$sটি কেবিন লাগবে। স্ট্যাটাস অপরিবর্তিত রাখা হলো। প্রয়োজনে “ওভারবুক” টিক দিয়ে জোর করে কনফার্ম করুন।', 'bhela-booking' ),
+				esc_html( $new_date ), $bn( max( 0, $free ) ), $bn( $need )
+			), 45 );
+			if ( function_exists( 'bhela_bm_log' ) ) {
+				bhela_bm_log( 'error', sprintf( 'বুকিং %s — কনফার্ম আটকানো হয়েছে: %s তারিখে খালি %sটি, দরকার %sটি কেবিন।',
+					$invoice_ref, $new_date, $bn( max( 0, $free ) ), $bn( $need ) ), false );
+			}
+		} elseif ( $need > $free && $override && function_exists( 'bhela_bm_log' ) ) {
+			bhela_bm_log( 'status', sprintf( 'বুকিং %s — ওভারবুক করে কনফার্ম (%s তারিখে ধারণক্ষমতার বেশি)।', $invoice_ref, $new_date ) );
+		}
+	}
+	// -----------------------------------------------------------------------
+
+	if ( ! $cap_blocked && array_key_exists( $new_status, bhela_bm_statuses() ) ) {
 		update_post_meta( $post_id, '_bhela_status', $new_status );
 		if ( $new_status !== $old_status && function_exists( 'bhela_bm_log' ) ) {
 			$st_labels = bhela_bm_statuses();
 			bhela_bm_log( 'status', sprintf( 'বুকিং %s — %s → %s',
-				get_post_meta( $post_id, '_bhela_invoice_no', true ),
+				$invoice_ref,
 				$st_labels[ $old_status ] ?? $old_status,
 				$st_labels[ $new_status ] ?? $new_status ) );
 		}
@@ -390,6 +452,8 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		if ( function_exists( 'bhela_bm_sms_on_status_change' ) ) {
 			bhela_bm_sms_on_status_change( $post_id, $new_status, $old_status );
 		}
+	} elseif ( $cap_blocked ) {
+		$new_status = $old_status; // keep downstream (email) logic honest
 	}
 
 	if ( ! empty( $_POST['bhela_send_email'] ) ) {
@@ -413,6 +477,11 @@ function bhela_bm_combo_error_notice() {
 	if ( $err ) {
 		delete_transient( 'bhela_combo_err_' . $post->ID );
 		echo '<div class="notice notice-error is-dismissible"><p><strong>Cabin combination not applied:</strong> ' . esc_html( $err ) . '</p></div>';
+	}
+	$cap = get_transient( 'bhela_bm_cap_err_' . $post->ID );
+	if ( $cap ) {
+		delete_transient( 'bhela_bm_cap_err_' . $post->ID );
+		echo '<div class="notice notice-error is-dismissible"><p>⚠️ ' . esc_html( $cap ) . '</p></div>';
 	}
 }
 add_action( 'admin_notices', 'bhela_bm_combo_error_notice' );

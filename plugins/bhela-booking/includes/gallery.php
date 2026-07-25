@@ -246,8 +246,13 @@ function bhela_bm_import_theme_image( $rel ) {
 		return (int) $existing[0];
 	}
 
-	$src = get_template_directory() . '/assets/images/' . $rel;
-	if ( ! file_exists( $src ) ) {
+	// Contain the copy to the bundled images dir: resolve the path and confirm
+	// it stays inside, so a traversal segment in $rel (e.g. "../../wp-config")
+	// can never be copied into the media library.
+	$base = wp_normalize_path( trailingslashit( get_template_directory() . '/assets/images' ) );
+	$src  = realpath( $base . $rel );
+	$src  = $src ? wp_normalize_path( $src ) : '';
+	if ( ! $src || 0 !== strpos( $src, $base ) || ! is_file( $src ) ) {
 		return 0;
 	}
 

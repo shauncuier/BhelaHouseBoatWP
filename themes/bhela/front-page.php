@@ -5,6 +5,10 @@
  * @package Bhela
  */
 
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
 // Gutenberg override: if the front page has its own block content, render that
 // instead of the default design — making the homepage fully editable.
 $front_id = (int) get_option( 'page_on_front' );
