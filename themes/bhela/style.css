@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.15.7
+Version: 2.15.8
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -1049,3 +1049,32 @@ input, select, textarea { font-family: inherit; }
 .sched-cta h3 { font-size: 1.25rem; margin-bottom: .3rem; }
 .sched-cta p { color: var(--text-soft); font-size: .95rem; max-width: 52ch; }
 @media (max-width: 640px) { .sched-cta { padding: 1.4rem; } .sched-cta .btn { width: 100%; } }
+
+/* ---- Trip Spots page ---- */
+.spot-map { margin: 0; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); border: 1px solid var(--line); }
+.spot-map img { width: 100%; height: auto; display: block; }
+.spots-route { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.4rem; }
+.spot-card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); transition: transform .25s var(--ease), box-shadow .25s; display: flex; flex-direction: column; }
+.spot-card:hover { transform: translateY(-6px); box-shadow: var(--shadow); }
+.spot-card__media { position: relative; aspect-ratio: 4 / 3; overflow: hidden; }
+.spot-card__media img { width: 100%; height: 100%; object-fit: cover; }
+.spot-card__num { position: absolute; top: .7rem; left: .7rem; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--cta); color: #fff; font-weight: 700; font-family: var(--font-display); box-shadow: 0 4px 12px rgba(255,122,61,.45); }
+.spot-card__body { padding: 1.1rem 1.2rem 1.3rem; }
+.spot-card__title { font-size: 1.12rem; margin: 0; }
+.spot-card__bn { display: block; color: var(--primary); font-weight: 600; font-size: .92rem; margin: .1rem 0 .5rem; }
+.spot-card__desc { color: var(--text-soft); font-size: .9rem; margin: 0; }
+.spot-card--return { background: var(--sand); align-items: center; justify-content: center; text-align: center; }
+.spot-card--return .spot-card__body { padding: 2rem 1.2rem; }
+.spot-card__num--return { position: static; margin: 0 auto .6rem; background: var(--ink); }
+.spots-legend { display: flex; flex-wrap: wrap; gap: 1.2rem 1.8rem; margin: 0 0 2rem; font-size: .9rem; color: var(--text-soft); }
+.spots-legend__item { display: inline-flex; align-items: center; gap: .5rem; }
+.spots-legend .dot { width: 12px; height: 12px; border-radius: 50%; }
+.spots-legend .dot--in { background: #1a7f37; }
+.spots-legend .dot--opt { background: #b45309; }
+.spots-group { font-size: 1.35rem; margin: 2.4rem 0 1.2rem; padding-bottom: .5rem; border-bottom: 2px solid var(--sand); }
+.spots-group:first-of-type { margin-top: 0; }
+.spots-group--optional { color: var(--cta-dark); border-bottom-color: rgba(255,122,61,.25); }
+.spot-tag { position: absolute; bottom: .7rem; left: .7rem; right: .7rem; font-size: .72rem; font-weight: 700; padding: .3rem .6rem; border-radius: 8px; color: #fff; text-align: center; backdrop-filter: blur(2px); }
+.spot-tag--included { background: rgba(26,127,55,.9); }
+.spot-tag--optional { background: rgba(180,83,9,.92); }
+.spot-card__noimg { display: grid; place-items: center; width: 100%; height: 100%; font-size: 2.4rem; background: var(--sand); }

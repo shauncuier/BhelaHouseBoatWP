@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.15.7' );
+define( 'BHELA_VERSION', '2.15.8' );
 
 /* ---------- Setup ---------- */
 
@@ -300,6 +300,26 @@ function bhela_image_slots() {
 		'spot_5'       => array( 'label' => 'Spot — ওয়াচ টাওয়ার', 'file' => 'spots/spot-5.jpg' ),
 		'spot_6'       => array( 'label' => 'Spot — শিমুল বাগান', 'file' => 'spots/spot-6.jpg' ),
 		'spot_7'       => array( 'label' => 'Spot — খরচার হাওর', 'file' => 'spots/spot-7.jpg' ),
+		'trip_map'     => array( 'label' => 'Trip Map (ট্রিপ ম্যাপ ছবি — স্পট পেজে বড় করে দেখায়)', 'file' => '' ),
+	);
+}
+
+/**
+ * The trip's stops in visit order — the "Haor Trip Map". Shared by the Spots
+ * page (and available to the homepage). Each entry reuses the matching
+ * Customizer image slot (spot_1..7 / hero), so owner uploads flow through.
+ */
+function bhela_spots() {
+	return array(
+		array( 'num' => 1, 'en' => 'Anwarpur Ghat', 'bn' => 'আনোয়ারপুর ঘাট', 'desc' => 'যাত্রা শুরু ও শেষ পয়েন্ট — Tahirpur, Sunamganj।', 'img' => 'hero',   'file' => 'hero/hero-haor.jpg' ),
+		array( 'num' => 2, 'en' => 'Khurchar Haor', 'bn' => 'খরচার হাওর', 'desc' => 'সূর্যাস্তের অপূর্ব দৃশ্য, শান্ত জলরাশি।',        'img' => 'spot_7', 'file' => 'spots/spot-7.jpg' ),
+		array( 'num' => 3, 'en' => 'Tanguar Haor', 'bn' => 'টাঙ্গুয়ার হাওর', 'desc' => 'অথৈ জলরাজ্য — ট্রিপের মূল আকর্ষণ, রামসার সাইট।', 'img' => 'spot_1', 'file' => 'spots/spot-1.jpg' ),
+		array( 'num' => 4, 'en' => 'Watch Tower', 'bn' => 'ওয়াচ টাওয়ার', 'desc' => 'উপর থেকে হাওরের ৩৬০° প্যানোরামা।',              'img' => 'spot_5', 'file' => 'spots/spot-5.jpg' ),
+		array( 'num' => 5, 'en' => 'Tekerghat', 'bn' => 'টেকেরঘাট', 'desc' => 'পরিত্যক্ত চুনাপাথর খনি ও নীল জলের এলাকা।',           'img' => 'spot_3', 'file' => 'spots/spot-3.jpg' ),
+		array( 'num' => 6, 'en' => 'Niladri Lake', 'bn' => 'নীলাদ্রি লেক', 'desc' => 'নীল জলের রাজ্য (শহীদ সিরাজ লেক)।',              'img' => 'spot_2', 'file' => 'spots/spot-2.jpg' ),
+		array( 'num' => 7, 'en' => 'Zadukata Nodi', 'bn' => 'যাদুকাটা নদী', 'desc' => 'স্বচ্ছ জলের পাহাড়ি নদী, রূপালি বালুচর।',       'img' => 'spot_3', 'file' => 'spots/spot-3.jpg' ),
+		array( 'num' => 8, 'en' => 'Shimul Bagaan', 'bn' => 'শিমুল বাগান', 'desc' => 'মৌসুমে লাল শিমুলে ছেয়ে যাওয়া বিশাল বাগান।',     'img' => 'spot_6', 'file' => 'spots/spot-6.jpg' ),
+		array( 'num' => 9, 'en' => 'Barikka Tila', 'bn' => 'বারিক্কা টিলা', 'desc' => 'সীমান্তঘেঁষা টিলা থেকে মেঘালয়ের পাহাড়ি ভিউ।',   'img' => 'spot_4', 'file' => 'spots/spot-4.jpg' ),
 	);
 }
 
@@ -391,6 +411,7 @@ function bhela_auto_setup() {
 	$pages = array(
 		'cabins'   => array( 'title' => 'কেবিন ও রেট', 'template' => 'page-templates/template-cabins.php' ),
 		'schedule' => array( 'title' => 'ট্রিপ সিডিউল', 'template' => 'page-templates/template-schedule.php' ),
+		'spots'    => array( 'title' => 'ট্রিপ ম্যাপ', 'template' => 'page-templates/template-spots.php' ),
 		'food'     => array( 'title' => 'খাবার মেনু', 'template' => 'page-templates/template-food.php' ),
 		'gallery'  => array( 'title' => 'গ্যালারি', 'template' => 'page-templates/template-gallery.php' ),
 		'faq'      => array( 'title' => 'সাধারণ প্রশ্ন (FAQ)', 'template' => 'page-templates/template-faq.php' ),
@@ -468,7 +489,7 @@ function bhela_auto_setup() {
 	$menu = wp_get_nav_menu_object( 'BHELA Primary' );
 	if ( ! $menu ) {
 		$menu_id = wp_create_nav_menu( 'BHELA Primary' );
-		$order   = array( 'cabins', 'schedule', 'food', 'gallery', 'faq', 'blog', 'contact' );
+		$order   = array( 'cabins', 'schedule', 'spots', 'food', 'gallery', 'faq', 'blog', 'contact' );
 		foreach ( $order as $slug ) {
 			if ( isset( $menu_items[ $slug ] ) ) {
 				wp_update_nav_menu_item( $menu_id, 0, array(
@@ -485,7 +506,7 @@ function bhela_auto_setup() {
 	} else {
 		// Menu already exists (upgrade path): append any page added in a later
 		// release that is not in the menu yet.
-		$ensure   = array( 'blog' => 'ব্লগ', 'contact' => 'যোগাযোগ' );
+		$ensure   = array( 'spots' => 'ট্রিপ ম্যাপ', 'blog' => 'ব্লগ', 'contact' => 'যোগাযোগ' );
 		$existing = array();
 		foreach ( (array) wp_get_nav_menu_items( $menu->term_id ) as $mi ) {
 			$existing[] = (int) $mi->object_id;

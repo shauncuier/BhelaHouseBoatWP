@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.15.7
+ * Version: 2.15.8
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.15.7' );
+define( 'BHELA_BM_VERSION', '2.15.8' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -205,6 +205,33 @@ function bhela_bm_migrate_holidays() {
 }
 add_action( 'admin_init', 'bhela_bm_migrate_holidays' );
 
+/**
+ * One-time backfill of `_bhela_cabin_count` for bookings created before that
+ * meta existed. The availability engine already falls back to the cabins JSON
+ * (or 1), so this only makes the stored count explicit and future-proof.
+ */
+function bhela_bm_backfill_cabin_count() {
+	if ( get_option( 'bhela_bm_cabincount_backfilled' ) ) {
+		return;
+	}
+	$ids = get_posts( array(
+		'post_type'      => 'bhela_booking',
+		'post_status'    => 'any',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+	) );
+	foreach ( $ids as $id ) {
+		if ( '' !== get_post_meta( $id, '_bhela_cabin_count', true ) ) {
+			continue;
+		}
+		$rows = json_decode( (string) get_post_meta( $id, '_bhela_cabins_json', true ), true );
+		update_post_meta( $id, '_bhela_cabin_count', is_array( $rows ) && $rows ? count( $rows ) : 1 );
+	}
+	update_option( 'bhela_bm_cabincount_backfilled', 1, false );
+}
+add_action( 'admin_init', 'bhela_bm_backfill_cabin_count' );
+
 /** Day type for a Y-m-d date: 'holiday' | 'weekend' | 'weekday'. */
 function bhela_bm_day_type( $date ) {
 	$settings = bhela_bm_get_settings();
@@ -370,6 +397,7 @@ require_once BHELA_BM_PATH . 'includes/sms.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';
 require_once BHELA_BM_PATH . 'includes/gallery.php';
+require_once BHELA_BM_PATH . 'includes/spots.php';
 if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/guide.php';
 }

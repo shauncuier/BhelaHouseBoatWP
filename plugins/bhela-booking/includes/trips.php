@@ -447,7 +447,7 @@ function bhela_bm_trips_page() {
 							$bm_full = (int) $bm_av['available'] <= 0;
 							?>
 							<div class="bhela-hold">
-								<input type="number" name="trip_booked[<?php echo esc_attr( $i ); ?>]" min="0" max="<?php echo esc_attr( bhela_bm_max_cabins() ); ?>" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" title="<?php esc_attr_e( 'ম্যানুয়াল হোল্ড (সর্বনিম্ন) — যেমন ফোন/ফুল বোট বুকিং', 'bhela-booking' ); ?>">
+								<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" name="trip_booked[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" title="<?php esc_attr_e( 'ম্যানুয়াল হোল্ড (সর্বনিম্ন) — যেমন ফোন/ফুল বোট বুকিং', 'bhela-booking' ); ?>">
 								<span class="bhela-hold__cap"><?php esc_html_e( 'হোল্ড', 'bhela-booking' ); ?></span>
 							</div>
 							<span class="bhela-avail-pill <?php echo $bm_full ? 'is-full' : 'is-open'; ?>">
@@ -599,7 +599,7 @@ function bhela_bm_trips_page() {
 				'<td><input type="text" style="width:100%" name="trip_note[' + i + ']"></td>' +
 				'<td style="text-align:center"><label class="bhela-hol"><input type="checkbox" name="trip_holiday[' + i + ']" value="1"> <span>ছুটি</span></label></td>' +
 				'<td><select name="trip_status[' + i + ']"><option value="available">Available</option><option value="filling">Filling Fast</option><option value="booked">Booked</option></select></td>' +
-				'<td><input type="number" name="trip_booked[' + i + ']" min="0" max="6" value="0" style="width:64px"> / 6</td>' +
+				'<td><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" name="trip_booked[' + i + ']" value="0" style="width:64px"> / 6</td>' +
 				'<td style="text-align:center"><input type="checkbox" name="trip_delete[' + i + ']" value="1"></td>';
 			tbody.appendChild(row);
 			bind(row);

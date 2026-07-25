@@ -48,6 +48,7 @@ function bhela_bm_dashboard_menu_order() {
 		'edit.php?post_type=bhela_booking',       // All Bookings
 		'post-new.php?post_type=bhela_booking',   // Add New Booking
 		'bhela-bm-trips',                         // Trip Calendar
+		'edit.php?post_type=bhela_spot',          // Spots (trip route)
 		'edit.php?post_type=bhela_gallery',       // Gallery
 		'bhela-bm-gallery-bulk',                  // Bulk Upload
 		'edit.php?post_type=bhela_review',        // Reviews
@@ -215,7 +216,7 @@ function bhela_bm_dashboard_page() {
 		<!-- Money -->
 		<div class="bhela-money" style="margin-bottom:22px">
 			<div><span class="bhela-stat__l"><?php esc_html_e( 'Earned (confirmed + completed)', 'bhela-booking' ); ?></span><b><?php echo esc_html( bhela_bm_money( $money['earned'] ) ); ?></b></div>
-			<div><span class="bhela-stat__l"><?php esc_html_e( 'Collected so far', 'bhela-booking' ); ?></span><b><?php echo esc_html( bhela_bm_money( $money['collected'] ) ); ?></b></div>
+			<div><span class="bhela-stat__l"><?php esc_html_e( 'Received (incl. advances)', 'bhela-booking' ); ?></span><b><?php echo esc_html( bhela_bm_money( $money['collected'] ) ); ?></b></div>
 			<div><span class="bhela-stat__l"><?php esc_html_e( 'Pending value', 'bhela-booking' ); ?></span><b><?php echo esc_html( bhela_bm_money( $money['pending_value'] ) ); ?></b></div>
 		</div>
 
