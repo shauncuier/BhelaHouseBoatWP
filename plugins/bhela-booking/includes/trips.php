@@ -146,12 +146,12 @@ function bhela_bm_trip_statuses() {
 /**
  * Cabin availability for a date.
  *
- * Effective booked = the larger of the owner's manual hold (the calendar's
- * "Booked Cabins" field) and the live count of real bookings that hold a seat
- * (advance paid / confirmed). So confirming a booking reduces availability
- * automatically — nobody has to edit the calendar — which keeps every manager
- * and the public schedule on the same live number, while an owner's manual
- * full-boat hold is still honoured. A full boat forces status 'booked'.
+ * Effective booked = the owner's manual hold (the calendar's "Booked Cabins"
+ * field — off-system phone/VIP cabins) PLUS the live count of online bookings
+ * that hold a seat (advance paid / confirmed), capped at capacity. So a hold of
+ * 3 with 2 online-sold reads 5 booked / 1 free. Confirming a booking reduces
+ * availability automatically, keeping every manager and the public schedule on
+ * the same live number. A full boat forces status 'booked'.
  *
  * @return array{ total:int, booked:int, manual:int, counted:int, available:int, trip:array|null, status:string }
  */
@@ -164,12 +164,25 @@ function bhela_bm_trip_availability( $date ) {
 			break;
 		}
 	}
+	// Manual hold = off-system cabins (phone/VIP/walk-in) that are NOT entered as
+	// booking records; the engine count = online advance-paid/confirmed bookings.
+	// They do not overlap, so a date's booked cabins is the SUM of the two,
+	// capped at capacity.
 	$manual  = $trip ? max( 0, (int) ( $trip['booked'] ?? 0 ) ) : 0;
 	$counted = min( $total, (int) bhela_bm_counted_booked_cabins( $date ) );
-	$booked  = min( $total, max( $manual, $counted ) );
+	$booked  = min( $total, $manual + $counted );
 	$status  = $trip ? $trip['status'] : 'unknown';
 	if ( $booked >= $total ) {
 		$status = 'booked';
+	}
+	// A date can be closed two ways: hold+sold reaches capacity (above), OR the
+	// admin sets the trip Status to "Booked" as a hard close (Full Boat /
+	// maintenance) even if cabins are technically free. Either way, no cabin is
+	// bookable — so a manual close forces availability to zero everywhere (the
+	// calendar cell, the homepage/booking chips and the server submit guard all
+	// read this one figure).
+	if ( 'booked' === $status ) {
+		$booked = $total;
 	}
 	return array(
 		'total'     => $total,

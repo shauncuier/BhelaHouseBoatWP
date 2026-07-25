@@ -416,7 +416,11 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	$cap_blocked = false;
 
 	if ( $is_entering && $new_date && function_exists( 'bhela_bm_counted_booked_cabins' ) ) {
-		$free   = bhela_bm_max_cabins() - (int) bhela_bm_counted_booked_cabins( $new_date, $post_id );
+		// Free = capacity − manual hold − other online-sold cabins (hold + sold
+		// are additive, so the guard must subtract both).
+		$manual = function_exists( 'bhela_bm_trip_availability' ) ? (int) bhela_bm_trip_availability( $new_date )['manual'] : 0;
+		$others = (int) bhela_bm_counted_booked_cabins( $new_date, $post_id );
+		$free   = bhela_bm_max_cabins() - $manual - $others;
 		$need   = (int) bhela_bm_booking_cabin_count( $post_id );
 		$bn     = function_exists( 'bhela_bm_bn_num' ) ? 'bhela_bm_bn_num' : 'strval';
 		if ( $need > $free && ! $override ) {
