@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.15.9
+ * Version: 2.15.10
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.15.9' );
+define( 'BHELA_BM_VERSION', '2.15.10' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -198,8 +198,8 @@ function bhela_bm_migrate_holidays() {
 
 	if ( function_exists( 'bhela_bm_log' ) ) {
 		bhela_bm_log( 'settings', sprintf(
-			'ছুটির তালিকা সেটিংস থেকে ট্রিপ ক্যালেন্ডারে সরানো হয়েছে — %sটি ট্রিপে “ছুটি” টিক বসেছে।',
-			function_exists( 'bhela_bm_bn_num' ) ? bhela_bm_bn_num( $moved ) : $moved
+			'Holiday list moved from Settings to the Trip Calendar — "Holiday" ticked on %d trip(s).',
+			(int) $moved
 		) );
 	}
 }
@@ -306,7 +306,7 @@ function bhela_bm_calc_price( $cabin_key, $guests, $date ) {
 	$guests   = max( 1, (int) $guests );
 
 	if ( ! isset( $rates[ $cabin_key ] ) ) {
-		return new WP_Error( 'bad_cabin', __( 'অজানা কেবিন টাইপ।', 'bhela-booking' ) );
+		return new WP_Error( 'bad_cabin', __( 'Unknown cabin type.', 'bhela-booking' ) );
 	}
 	$row      = $rates[ $cabin_key ];
 	$day_type = bhela_bm_day_type( $date );
@@ -356,33 +356,38 @@ function bhela_bm_advance_pct( $advance, $total ) {
  * BOOKING STATUSES
  * ========================================================= */
 
+/**
+ * Status labels for the admin and for SMS — English only.
+ *
+ * The wp-admin side of this plugin is English throughout. Keeping SMS on the
+ * same map matters for a second reason: messages are billed per segment and
+ * Bengali forces Unicode encoding (70 characters a part instead of 160), so a
+ * bilingual status label silently inflates the cost of every message sent.
+ * Guest-facing Bengali lives in bhela_bm_status_bn().
+ */
 function bhela_bm_statuses() {
 	return array(
-		'pending'      => __( 'Pending (নতুন রিকোয়েস্ট)', 'bhela-booking' ),
-		'advance_paid' => __( 'Advance Paid (অগ্রিম পরিশোধিত)', 'bhela-booking' ),
-		'confirmed'    => __( 'Confirmed (নিশ্চিত)', 'bhela-booking' ),
-		'completed'    => __( 'Completed (সম্পন্ন)', 'bhela-booking' ),
-		'cancelled'    => __( 'Cancelled (বাতিল)', 'bhela-booking' ),
+		'pending'      => __( 'Pending', 'bhela-booking' ),
+		'advance_paid' => __( 'Advance Paid', 'bhela-booking' ),
+		'confirmed'    => __( 'Confirmed', 'bhela-booking' ),
+		'completed'    => __( 'Completed', 'bhela-booking' ),
+		'cancelled'    => __( 'Cancelled', 'bhela-booking' ),
 	);
 }
 
 /**
- * English-only status labels.
- *
- * bhela_bm_statuses() is bilingual for the admin UI, but SMS is billed per
- * segment and Bengali forces Unicode encoding (70 chars a part instead of 160),
- * so a bilingual status can silently triple the cost of every message.
+ * Bengali status labels for guest-facing output (the public booking tracker).
  *
  * @param string $status Status key.
- * @return string English label, or the raw key if unknown.
+ * @return string Bengali label, or the raw key if unknown.
  */
-function bhela_bm_status_en( $status ) {
+function bhela_bm_status_bn( $status ) {
 	$map = array(
-		'pending'      => 'Pending',
-		'advance_paid' => 'Advance Paid',
-		'confirmed'    => 'Confirmed',
-		'completed'    => 'Completed',
-		'cancelled'    => 'Cancelled',
+		'pending'      => 'নতুন রিকোয়েস্ট',
+		'advance_paid' => 'অগ্রিম পরিশোধিত',
+		'confirmed'    => 'নিশ্চিত',
+		'completed'    => 'সম্পন্ন',
+		'cancelled'    => 'বাতিল',
 	);
 	return isset( $map[ $status ] ) ? $map[ $status ] : $status;
 }

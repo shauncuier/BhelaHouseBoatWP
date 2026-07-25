@@ -1,6 +1,6 @@
 <?php
 /**
- * No-coder management guide — a friendly Bangla control panel inside wp-admin.
+ * No-coder management guide — a friendly control panel inside wp-admin.
  *
  * @package BhelaBooking
  */
@@ -26,125 +26,137 @@ function bhela_bm_guide_page() {
 	$cards = array(
 		array(
 			'icon'  => '📊',
-			'title' => 'ড্যাশবোর্ড — সব এক নজরে',
+			'title' => 'Dashboard — everything at a glance',
 			'steps' => array(
-				'বাঁ মেনুতে Bookings → 📊 Dashboard',
-				'কতগুলো বুকিং, কত আয়, আসন্ন ট্রিপ ও সাম্প্রতিক কাজ এক পাতায়',
-				'"Quick Actions" থেকে যেকোনো কাজ এক ক্লিকে শুরু করুন',
-				'"Setup Checklist"-এ ⬜ থাকলে সেটি ঠিক করে নিন',
+				'Left menu: Bookings → 📊 Dashboard',
+				'Booking counts, revenue, upcoming trips and recent activity on one page',
+				'Start any job in one click from "Quick Actions"',
+				'Anything still showing ⬜ in the Setup Checklist needs finishing',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-dashboard' ),
-			'btn'   => 'ড্যাশবোর্ড খুলুন',
+			'btn'   => 'Open Dashboard',
 		),
 		array(
 			'icon'  => '📋',
-			'title' => 'নতুন বুকিং দেখুন ও কনফার্ম করুন',
+			'title' => 'Review and confirm a new booking',
 			'steps' => array(
-				'নতুন রিকোয়েস্ট এলে ইমেইলে জানতে পারবেন',
-				'All Bookings → নাম-এ ক্লিক করুন',
-				'অগ্রিম পেলে Paid Amount ও TXN ID লিখুন',
-				'Status → Confirmed করে Update চাপুন — কাস্টমার অটো ইমেইল পাবে',
+				'You get an email whenever a new request arrives',
+				'All Bookings → click the guest name',
+				'When the advance arrives, fill in Paid Amount and TXN ID',
+				'Set Status → Confirmed and press Update — the guest is emailed automatically',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking' ),
-			'btn'   => 'বুকিং লিস্ট খুলুন',
+			'btn'   => 'Open bookings list',
 		),
 		array(
 			'icon'  => '🧾',
-			'title' => 'ইনভয়েস প্রিন্ট / পাঠান',
+			'title' => 'Print or send an invoice',
 			'steps' => array(
-				'বুকিং খুলুন → ডানপাশে "View / Print Invoice"',
-				'Print চেপে PDF সেভ করুন',
-				'অথবা লিংকটি কপি করে WhatsApp-এ পাঠান',
+				'Open the booking → "View / Print Invoice" on the right',
+				'Press Print and save it as a PDF',
+				'Or copy the link and send it on WhatsApp',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking' ),
-			'btn'   => 'বুকিং লিস্ট খুলুন',
+			'btn'   => 'Open bookings list',
 		),
 		array(
 			'icon'  => '📅',
-			'title' => 'ট্রিপের তারিখ ম্যানেজ করুন',
+			'title' => 'Manage trip dates',
 			'steps' => array(
-				'"Add Trip" চেপে Start Date দিন',
-				'End Date খালি রাখলে ২ দিন ১ রাত ধরা হয় — Full Boat/লম্বা ট্রিপে বাড়িয়ে দিন',
-				'Label ও Days নিজে থেকেই বসে যায়',
-				'ছুটির দিন হলে "ছুটি" টিক দিন — রেগুলার রেট বসবে (উইকডে ছাড় থাকবে না)',
-				'সিট ভরলে Status → Filling Fast/Booked; মুছতে Delete টিক; শেষে Save',
+				'Press "Add Trip" and set a Start Date',
+				'Leave End Date empty for the standard 2 days 1 night — extend it for a Full Boat or longer charter',
+				'Label and Days fill in on their own',
+				'Tick "Holiday" for holiday departures — the regular rate applies, with no weekday discount',
+				'As it fills up set Status → Filling Fast / Booked; tick Delete to remove a row; then Save',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-trips' ),
-			'btn'   => 'ট্রিপ ক্যালেন্ডার খুলুন',
+			'btn'   => 'Open Trip Calendar',
 		),
 		array(
 			'icon'  => '💰',
-			'title' => 'রেট ও পেমেন্ট নম্বর',
+			'title' => 'Rates and payment numbers',
 			'steps' => array(
-				'কেবিন রেট বদলাতে টেবিলে নতুন দাম লিখুন',
-				'শিশু (৪–৮) ফি ও অগ্রিমের শতাংশ এখানেই',
-				'bKash/Nagad নম্বর ও QR ছবির লিংক এখানেই',
-				'ছুটির দিন এখন ট্রিপ ক্যালেন্ডারে "ছুটি" টিক দিয়ে ঠিক হয়',
+				'Type new prices into the cabin rate table to change them',
+				'The child fee (ages 4–8) and the advance percentage live here too',
+				'So do the bKash / Nagad numbers and the QR image URLs',
+				'Holidays are set on the Trip Calendar now, using the "Holiday" tick',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings' ),
-			'btn'   => 'সেটিংস খুলুন',
+			'btn'   => 'Open Settings',
 		),
 		array(
 			'icon'  => '🖼️',
-			'title' => 'গ্যালারির ছবি যোগ / বদল করুন',
+			'title' => 'Add or change gallery photos',
 			'steps' => array(
-				'একসাথে অনেক ছবি: Bookings → 🖼️ Bulk Upload → "ছবি বাছাই করুন"',
-				'একটা একটা করে: 🖼️ Gallery → নতুন ছবি → Featured Image দিন',
-				'ক্যাপশন = Title, ক্যাটাগরি ও ক্রম (Order) ঠিক করুন',
-				'পেমেন্ট QR ছবি Media-তে আপলোড করে URL Settings-এ পেস্ট করুন',
+				'Many at once: Bookings → 🖼️ Bulk Upload → "Select photos"',
+				'One at a time: 🖼️ Gallery → new photo → set a Featured Image',
+				'Caption = Title. Set the Category and the Order',
+				'Upload payment QR images to Media, then paste the URL into Settings',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-gallery-bulk' ),
-			'btn'   => 'একসাথে ছবি যোগ করুন',
+			'btn'   => 'Bulk upload photos',
+		),
+		array(
+			'icon'  => '🗺️',
+			'title' => 'Manage trip spots',
+			'steps' => array(
+				'Left menu: Bookings → 🗺️ Spots',
+				'Featured Image = the spot photo; add a Bengali name and a one-line description',
+				'Pick a Type: Included in the package, or Optional (guest pays their own way)',
+				'Page Attributes → Order sets the sequence on the Spots page',
+			),
+			'link'  => admin_url( 'edit.php?post_type=bhela_spot' ),
+			'btn'   => 'Manage spots',
 		),
 		array(
 			'icon'  => '⭐',
-			'title' => 'গেস্ট রিভিউ যোগ / বদল করুন',
+			'title' => 'Add or change guest reviews',
 			'steps' => array(
-				'বাঁ মেনুতে All Reviews → Add New',
-				'Title-এ অতিথির নাম, নিচে রিভিউ লেখা',
-				'ডানপাশে স্টার রেটিং ও Trip Type দিন',
-				'Publish চাপলেই হোমপেজে দেখাবে',
+				'Left menu: All Reviews → Add New',
+				'Guest name goes in the Title, the review text goes below',
+				'Set the star rating and Trip Type on the right',
+				'Press Publish and it appears on the homepage',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_review' ),
-			'btn'   => 'রিভিউ ম্যানেজ করুন',
+			'btn'   => 'Manage reviews',
 		),
 		array(
 			'icon'  => '📋',
-			'title' => 'কাজ ঠিকমতো হলো কিনা দেখুন',
+			'title' => 'Check whether something actually worked',
 			'steps' => array(
 				'Bookings → Activity Log',
-				'বুকিং, ইমেইল, SMS, ট্রিপ ও সেটিংসের সব রেকর্ড এখানে',
-				'✅ মানে সফল, ❌ মানে সমস্যা — উপরে নতুনটা',
+				'Every booking, email, SMS, trip and settings change is recorded here',
+				'✅ means it worked, ❌ means it failed — newest at the top',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-log' ),
-			'btn'   => 'অ্যাক্টিভিটি লগ খুলুন',
+			'btn'   => 'Open Activity Log',
 		),
 		array(
 			'icon'  => '✏️',
-			'title' => 'পেজের লেখা বদলান',
+			'title' => 'Change the wording on a page',
 			'steps' => array(
-				'Pages → যে পেজ বদলাবেন সেটি Edit করুন',
-				'Elementor থাকলে "Edit with Elementor" — টেনে টেনে ডিজাইন',
-				'হোমপেজের মূল লেখা: Appearance → Customize → BHELA Homepage',
+				'Pages → Edit the page you want to change',
+				'With Elementor installed, use "Edit with Elementor" for drag-and-drop',
+				'Homepage headline text: Appearance → Customize → BHELA Homepage',
 			),
 			'link'  => admin_url( 'edit.php?post_type=page' ),
-			'btn'   => 'পেজ লিস্ট খুলুন',
+			'btn'   => 'Open pages list',
 		),
 		array(
 			'icon'  => '📞',
-			'title' => 'ফোন / WhatsApp নম্বর বদলান',
+			'title' => 'Change the phone / WhatsApp number',
 			'steps' => array(
-				'Bookings → Settings-এ নম্বর বদলান',
-				'পুরো ওয়েবসাইট, ফর্ম, ইনভয়েস — সব জায়গায় অটো আপডেট',
+				'Bookings → Settings, and edit the numbers there',
+				'The whole website, the booking form and invoices all update automatically',
 			),
 			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings' ),
-			'btn'   => 'সেটিংস খুলুন',
+			'btn'   => 'Open Settings',
 		),
 	);
 	?>
 	<div class="wrap">
-		<h1 style="font-size:1.8em">🛶 ভেলা ওয়েবসাইট — সহজ ম্যানেজমেন্ট গাইড</h1>
-		<p style="font-size:14px;max-width:720px">কোনো কোডিং লাগবে না। নিচের যেকোনো কাজের বাটনে ক্লিক করুন, ধাপগুলো অনুসরণ করুন। কোথাও আটকে গেলে ডেভেলপারকে জানান: <a href="https://3s-soft.com" target="_blank">3s-Soft</a></p>
+		<h1 style="font-size:1.8em">🛶 BHELA — Quick Management Guide</h1>
+		<p style="font-size:14px;max-width:720px">No coding needed. Click the button for whatever you want to do and follow the steps. If you get stuck anywhere, contact the developer: <a href="https://3s-soft.com" target="_blank">3s-Soft</a></p>
 		<div style="column-width:300px;column-gap:14px;max-width:1280px;margin-top:16px">
 			<?php foreach ( $cards as $c ) : ?>
 				<div style="background:#fff;border:1px solid #dcdcde;border-left:5px solid #137A74;border-radius:10px;padding:14px 16px;break-inside:avoid;-webkit-column-break-inside:avoid;margin-bottom:14px">

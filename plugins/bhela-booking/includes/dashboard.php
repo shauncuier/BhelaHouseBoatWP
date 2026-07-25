@@ -197,7 +197,7 @@ function bhela_bm_dashboard_page() {
 
 	<div class="wrap bhela-dash">
 		<h1>🛶 <?php esc_html_e( 'BHELA Dashboard', 'bhela-booking' ); ?></h1>
-		<p class="bhela-dash__lead"><?php echo esc_html( $s['business_name'] ); ?> — <?php esc_html_e( 'সব কিছুর সারসংক্ষেপ এক জায়গায়।', 'bhela-booking' ); ?></p>
+		<p class="bhela-dash__lead"><?php echo esc_html( $s['business_name'] ); ?> — <?php esc_html_e( 'Everything at a glance, in one place.', 'bhela-booking' ); ?></p>
 
 		<!-- Booking counts -->
 		<div class="bhela-dash__grid">

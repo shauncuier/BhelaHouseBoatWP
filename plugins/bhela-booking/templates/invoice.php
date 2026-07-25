@@ -11,6 +11,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 $s        = $invoice['settings'];
 $statuses = bhela_bm_statuses();
 $due      = max( 0, (int) $invoice['total'] - (int) $invoice['paid'] );
+// A discounted booking keeps the pre-discount figure in base_price, while the
+// line items still add up to it — so without an explicit discount row the guest
+// sees the items total one number and the summary total another.
+$base     = (int) $invoice['base_price'] > 0 ? (int) $invoice['base_price'] : (int) $invoice['total'];
+$discount = max( 0, $base - (int) $invoice['total'] );
 $logo     = '';
 $theme_logo = get_template_directory() . '/assets/images/logo.png';
 if ( file_exists( $theme_logo ) ) {
@@ -50,6 +55,8 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.totals .row.grand { border-top:2px solid #0B2E33; font-size:18px; font-weight:700; margin-top:6px; padding-top:12px; }
 	.totals .row.due strong { color:#D8621E; }
 	.totals .row.paid strong { color:#1a7f37; }
+	.totals .row.discount strong { color:#1a7f37; }
+	.totals .row.subtotal-net { border-top:1px solid #d9dde0; font-weight:600; }
 	.pay-info { background:#F8F5EF; border-radius:10px; padding:18px 22px; margin:26px 0; line-height:1.9; }
 	.pay-info h3 { color:#14676B; font-size:14px; margin-bottom:6px; }
 	.pay-qrs { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; margin-top:16px; padding-top:16px; border-top:1px dashed #d8cfbc; }
@@ -148,7 +155,11 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 			</table>
 
 			<div class="totals">
-				<div class="row"><span>Subtotal</span><strong><?php echo esc_html( bhela_bm_money( $invoice['total'] ) ); ?></strong></div>
+				<div class="row"><span>Subtotal</span><strong><?php echo esc_html( bhela_bm_money( $base ) ); ?></strong></div>
+				<?php if ( $discount > 0 ) : ?>
+					<div class="row discount"><span>Discount / ছাড়</span><strong>− <?php echo esc_html( bhela_bm_money( $discount ) ); ?></strong></div>
+					<div class="row subtotal-net"><span>Total</span><strong><?php echo esc_html( bhela_bm_money( $invoice['total'] ) ); ?></strong></div>
+				<?php endif; ?>
 				<div class="row"><span>Advance (<?php echo esc_html( bhela_bm_advance_pct( $invoice['advance'], $invoice['total'] ) ); ?>%)</span><strong><?php echo esc_html( bhela_bm_money( $invoice['advance'] ) ); ?></strong></div>
 				<div class="row paid"><span>Paid</span><strong><?php echo esc_html( bhela_bm_money( $invoice['paid'] ) ); ?><?php echo $invoice['pay_method'] ? ' (' . esc_html( strtoupper( $invoice['pay_method'] ) ) . ( $invoice['txn_id'] ? ' — ' . esc_html( $invoice['txn_id'] ) : '' ) . ')' : ''; ?></strong></div>
 				<div class="row grand due"><span>Balance Due</span><strong><?php echo esc_html( bhela_bm_money( $due ) ); ?></strong></div>

@@ -631,7 +631,6 @@ function bhela_bm_track_payload( $booking_id ) {
 		return get_post_meta( $booking_id, $k, true );
 	};
 	$status   = $m( '_bhela_status' ) ? $m( '_bhela_status' ) : 'pending';
-	$statuses = bhela_bm_statuses();
 	$total    = (int) $m( '_bhela_total' );
 	$paid     = (int) $m( '_bhela_paid_amount' );
 
@@ -646,7 +645,7 @@ function bhela_bm_track_payload( $booking_id ) {
 		'paid'         => $paid,
 		'due'          => max( 0, $total - $paid ),
 		'status_key'   => $status,
-		'status_label' => isset( $statuses[ $status ] ) ? $statuses[ $status ] : $status,
+		'status_label' => bhela_bm_status_bn( $status ), // guest-facing tracker stays Bengali
 		'status_color' => bhela_bm_status_color( $status ),
 	);
 }

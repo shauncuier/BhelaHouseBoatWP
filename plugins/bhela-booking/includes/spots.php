@@ -45,8 +45,8 @@ add_action( 'init', 'bhela_bm_register_spot_cpt' );
 /** The two spot types → label + colour. */
 function bhela_bm_spot_types() {
 	return array(
-		'included' => array( 'label' => 'প্যাকেজে অন্তর্ভুক্ত', 'short' => 'Included', 'color' => '#1a7f37' ),
-		'optional' => array( 'label' => 'ঐচ্ছিক — নিজ খরচে', 'short' => 'Optional', 'color' => '#b45309' ),
+		'included' => array( 'label' => 'Included', 'short' => 'Included', 'color' => '#1a7f37' ),
+		'optional' => array( 'label' => 'Optional', 'short' => 'Optional', 'color' => '#b45309' ),
 	);
 }
 
@@ -63,15 +63,15 @@ function bhela_bm_spot_metabox_cb( $post ) {
 	$desc = get_post_meta( $post->ID, '_bhela_spot_desc', true );
 	$type = get_post_meta( $post->ID, '_bhela_spot_type', true ) ?: 'included';
 	?>
-	<p><label><strong><?php esc_html_e( 'বাংলা নাম', 'bhela-booking' ); ?></strong><br>
-		<input type="text" name="bhela_spot_bn" value="<?php echo esc_attr( $bn ); ?>" style="width:100%" placeholder="যেমন টাঙ্গুয়ার হাওর"></label></p>
-	<p><label><strong><?php esc_html_e( 'বিবরণ (এক লাইন)', 'bhela-booking' ); ?></strong><br>
-		<textarea name="bhela_spot_desc" rows="2" style="width:100%" placeholder="স্পট সম্পর্কে সংক্ষেপে..."><?php echo esc_textarea( $desc ); ?></textarea></label></p>
-	<p><strong><?php esc_html_e( 'ধরন', 'bhela-booking' ); ?></strong><br>
-		<label style="margin-right:16px"><input type="radio" name="bhela_spot_type" value="included" <?php checked( $type, 'included' ); ?>> ✅ <?php esc_html_e( 'প্যাকেজে অন্তর্ভুক্ত (আমরা নিয়ে যাই)', 'bhela-booking' ); ?></label>
-		<label><input type="radio" name="bhela_spot_type" value="optional" <?php checked( $type, 'optional' ); ?>> 💠 <?php esc_html_e( 'ঐচ্ছিক — অতিথি নিজ খরচে যেতে পারেন', 'bhela-booking' ); ?></label>
+	<p><label><strong><?php esc_html_e( 'Bengali name', 'bhela-booking' ); ?></strong><br>
+		<input type="text" name="bhela_spot_bn" value="<?php echo esc_attr( $bn ); ?>" style="width:100%" placeholder="e.g. টাঙ্গুয়ার হাওর"></label></p>
+	<p><label><strong><?php esc_html_e( 'Description (one line)', 'bhela-booking' ); ?></strong><br>
+		<textarea name="bhela_spot_desc" rows="2" style="width:100%" placeholder="Shown on the Spots page, in Bengali..."><?php echo esc_textarea( $desc ); ?></textarea></label></p>
+	<p><strong><?php esc_html_e( 'Type', 'bhela-booking' ); ?></strong><br>
+		<label style="margin-right:16px"><input type="radio" name="bhela_spot_type" value="included" <?php checked( $type, 'included' ); ?>> ✅ <?php esc_html_e( 'Included in the package (we take guests there)', 'bhela-booking' ); ?></label>
+		<label><input type="radio" name="bhela_spot_type" value="optional" <?php checked( $type, 'optional' ); ?>> 💠 <?php esc_html_e( 'Optional — guests may visit at their own cost', 'bhela-booking' ); ?></label>
 	</p>
-	<p class="description"><?php esc_html_e( 'ডানপাশের Featured Image = স্পটের ছবি · Page Attributes → Order = ক্রম (ছোট আগে)।', 'bhela-booking' ); ?></p>
+	<p class="description"><?php esc_html_e( 'Featured Image (right) = the spot photo · Page Attributes → Order sets the sequence (lowest first).', 'bhela-booking' ); ?></p>
 	<?php
 }
 
@@ -97,11 +97,11 @@ add_action( 'save_post_bhela_spot', 'bhela_bm_spot_save' );
 function bhela_bm_spot_columns( $columns ) {
 	return array(
 		'cb'    => $columns['cb'],
-		'thumb' => 'ছবি',
+		'thumb' => 'Photo',
 		'title' => 'Spot (EN)',
-		'spot_bn'   => 'বাংলা নাম',
-		'spot_type' => 'ধরন',
-		'order' => 'ক্রম',
+		'spot_bn'   => 'Bengali name',
+		'spot_type' => 'Type',
+		'order' => 'Order',
 	);
 }
 add_filter( 'manage_bhela_spot_posts_columns', 'bhela_bm_spot_columns' );
@@ -110,7 +110,7 @@ function bhela_bm_spot_column_content( $column, $post_id ) {
 	if ( 'thumb' === $column ) {
 		echo has_post_thumbnail( $post_id )
 			? get_the_post_thumbnail( $post_id, array( 70, 52 ), array( 'style' => 'width:70px;height:52px;object-fit:cover;border-radius:6px;' ) )
-			: '<span style="color:#b32d2e">⚠️ নেই</span>';
+			: '<span style="color:#b32d2e">⚠️ none</span>';
 	} elseif ( 'spot_bn' === $column ) {
 		echo esc_html( get_post_meta( $post_id, '_bhela_spot_bn', true ) ?: '—' );
 	} elseif ( 'spot_type' === $column ) {
@@ -224,7 +224,7 @@ function bhela_bm_seed_spots() {
 	}
 	update_option( 'bhela_bm_spots_seeded', 1 );
 	if ( function_exists( 'bhela_bm_log' ) ) {
-		bhela_bm_log( 'settings', 'ট্রিপ স্পট সিস্টেম চালু — ১২টি ডিফল্ট স্পট যোগ হয়েছে (Included/Optional আলাদা)।' );
+		bhela_bm_log( 'settings', 'Trip Spots enabled — 12 default spots added (split into Included / Optional).' );
 	}
 }
 add_action( 'admin_init', 'bhela_bm_seed_spots' );

@@ -51,7 +51,7 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 		'{total}'   => bhela_bm_money( $total ),
 		'{advance}' => bhela_bm_money( (int) $m( '_bhela_advance' ) ),
 		'{due}'     => bhela_bm_money( max( 0, $total - $paid ) ),
-		'{status}'  => bhela_bm_status_en( $status ),
+		'{status}'  => bhela_bm_statuses()[ $status ] ?? $status,
 	);
 	return strtr( (string) $template, $map );
 }

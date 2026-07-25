@@ -118,8 +118,29 @@ function bhela_bm_discount_metabox( $post ) {
 	$custom    = get_post_meta( $post->ID, '_bhela_custom_total', true );
 	$offer     = (int) get_post_meta( $post->ID, '_bhela_offer_price', true );
 	$full      = get_post_meta( $post->ID, '_bhela_full_boat', true );
+	$saving    = ( $offer && $base > $offer ) ? $base - $offer : 0;
 	?>
-	<style>.bhela-disc label{display:block;font-weight:600;margin:8px 0 2px}.bhela-disc input{width:100%}.bhela-disc .req{background:#FFF7E6;border:1px solid #F5C97B;border-radius:8px;padding:8px 10px;margin:0 0 10px;font-size:12.5px;line-height:1.6}</style>
+	<style>
+	/* Scoped to real text fields — a blanket "input{width:100%}" also stretched
+	   the Apply checkbox into a full-width empty box. */
+	.bhela-disc .bhela-disc__f{margin:0 0 12px}
+	.bhela-disc label.bhela-disc__l{display:block;font-weight:600;margin:0 0 4px;font-size:12px;color:#1d2327}
+	.bhela-disc input[type=text]{width:100%;text-align:right;font-variant-numeric:tabular-nums}
+	.bhela-disc .bhela-disc__hint{color:#646970;font-size:11.5px;margin:3px 0 0;font-weight:400}
+	.bhela-disc .req{background:#FFF7E6;border:1px solid #F5C97B;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12.5px;line-height:1.6}
+	.bhela-disc__base{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:8px 10px;background:#f6f7f7;border-radius:8px;margin:0 0 14px}
+	.bhela-disc__base span{font-size:12px;color:#646970}
+	.bhela-disc__base strong{font-size:14px}
+	.bhela-disc__out{background:#EBF7EF;border:1px solid #A8DDBB;border-radius:8px;padding:10px;margin:0 0 12px}
+	.bhela-disc__out .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+	.bhela-disc__out .row+.row{margin-top:4px}
+	.bhela-disc__out span{font-size:12px;color:#14532d}
+	.bhela-disc__out strong{font-size:17px;color:#137A74;line-height:1.2}
+	.bhela-disc__out .save strong{font-size:12.5px;color:#1a7f37;font-weight:600}
+	.bhela-disc__apply{display:flex;gap:8px;align-items:flex-start;background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:10px;margin:0}
+	.bhela-disc__apply input[type=checkbox]{width:auto;margin:2px 0 0;flex:0 0 auto}
+	.bhela-disc__apply span{font-size:12.5px;line-height:1.5}
+	</style>
 	<div class="bhela-disc">
 		<?php if ( $full ) : ?>
 			<p class="req">🚢 <strong><?php esc_html_e( 'Full Boat — custom quote requested.', 'bhela-booking' ); ?></strong> <?php esc_html_e( 'Set the price with Custom Total below.', 'bhela-booking' ); ?></p>
@@ -130,18 +151,52 @@ function bhela_bm_discount_metabox( $post ) {
 				<?php if ( $disc_msg ) : ?><em><?php echo esc_html( $disc_msg ); ?></em><?php endif; ?>
 			</div>
 		<?php endif; ?>
-		<p><?php esc_html_e( 'Base Price:', 'bhela-booking' ); ?> <strong><?php echo esc_html( bhela_bm_money( $base ) ); ?></strong></p>
-		<label><?php esc_html_e( 'Discount %', 'bhela-booking' ); ?></label>
-		<input type="number" name="bhela_discount_percent" min="0" max="100" step="0.5" value="<?php echo esc_attr( $pct ); ?>">
-		<label><?php esc_html_e( 'Flat Discount (৳)', 'bhela-booking' ); ?></label>
-		<input type="number" name="bhela_discount_flat" min="0" value="<?php echo esc_attr( $flat ); ?>">
-		<label><?php esc_html_e( 'Custom Total (৳ — overrides both)', 'bhela-booking' ); ?></label>
-		<input type="number" name="bhela_custom_total" min="0" value="<?php echo esc_attr( $custom ); ?>">
+
+		<div class="bhela-disc__base">
+			<span><?php esc_html_e( 'Base Price', 'bhela-booking' ); ?></span>
+			<strong><?php echo esc_html( bhela_bm_money( $base ) ); ?></strong>
+		</div>
+
+		<?php
+		// text + inputmode, not type=number: a Bangla-locale admin renders numeric
+		// spinners in Bengali digits (০, ২০০০), which then cast to 0 on save.
+		?>
+		<div class="bhela-disc__f">
+			<label class="bhela-disc__l" for="bhela_discount_percent"><?php esc_html_e( 'Discount %', 'bhela-booking' ); ?></label>
+			<input type="text" id="bhela_discount_percent" name="bhela_discount_percent" inputmode="decimal" pattern="[0-9.]*" placeholder="0" value="<?php echo esc_attr( $pct ); ?>">
+		</div>
+		<div class="bhela-disc__f">
+			<label class="bhela-disc__l" for="bhela_discount_flat"><?php esc_html_e( 'Flat Discount (৳)', 'bhela-booking' ); ?></label>
+			<input type="text" id="bhela_discount_flat" name="bhela_discount_flat" inputmode="numeric" pattern="[0-9]*" placeholder="0" value="<?php echo esc_attr( $flat ); ?>">
+		</div>
+		<div class="bhela-disc__f">
+			<label class="bhela-disc__l" for="bhela_custom_total"><?php esc_html_e( 'Custom Total (৳)', 'bhela-booking' ); ?></label>
+			<input type="text" id="bhela_custom_total" name="bhela_custom_total" inputmode="numeric" pattern="[0-9]*" placeholder="0" value="<?php echo esc_attr( $custom ); ?>">
+			<p class="bhela-disc__hint"><?php esc_html_e( 'Set this to name an exact price — it overrides both discounts above.', 'bhela-booking' ); ?></p>
+		</div>
+
 		<?php if ( $offer ) : ?>
-			<p style="margin-top:10px"><?php esc_html_e( 'Computed Offer:', 'bhela-booking' ); ?> <strong style="color:#137A74;font-size:15px"><?php echo esc_html( bhela_bm_money( $offer ) ); ?></strong></p>
+			<div class="bhela-disc__out">
+				<div class="row">
+					<span><?php esc_html_e( 'Computed Offer', 'bhela-booking' ); ?></span>
+					<strong><?php echo esc_html( bhela_bm_money( $offer ) ); ?></strong>
+				</div>
+				<?php if ( $saving ) : ?>
+					<div class="row save">
+						<span><?php esc_html_e( 'Guest saves', 'bhela-booking' ); ?></span>
+						<strong><?php echo esc_html( bhela_bm_money( $saving ) ); ?></strong>
+					</div>
+				<?php endif; ?>
+			</div>
 		<?php endif; ?>
-		<p style="margin-top:8px"><label style="font-weight:400"><input type="checkbox" name="bhela_apply_offer" value="1"> <?php esc_html_e( 'Apply offer as the booking Total on save', 'bhela-booking' ); ?></label></p>
-		<p class="description"><?php esc_html_e( 'Offer = Custom Total, or Base − %% − Flat. Applying it updates Total & Advance.', 'bhela-booking' ); ?></p>
+
+		<label class="bhela-disc__apply">
+			<input type="checkbox" name="bhela_apply_offer" value="1">
+			<span><strong><?php esc_html_e( 'Apply this offer as the booking Total when I save', 'bhela-booking' ); ?></strong><br>
+			<?php esc_html_e( 'Only changes the Total. The Advance stays exactly as you set it.', 'bhela-booking' ); ?></span>
+		</label>
+
+		<p class="description" style="margin-top:10px"><?php esc_html_e( 'Offer = Custom Total, or Base minus the % and the flat discount.', 'bhela-booking' ); ?></p>
 	</div>
 	<?php
 }
@@ -275,8 +330,8 @@ function bhela_bm_actions_metabox( $post ) {
 			<option value="<?php echo esc_attr( $key ); ?>" <?php selected( $status, $key ); ?>><?php echo esc_html( $label ); ?></option>
 		<?php endforeach; ?>
 	</select></p>
-			<p><label><input type="checkbox" name="bhela_overbook" value="1"> ⚠️ ওভারবুক — এই তারিখে কেবিন ফুরালেও কনফার্ম করুন (Full Boat/ব্যতিক্রম)</label>
-		<span class="description">সাধারণত দরকার নেই — কেবিন ফুরালে কনফার্ম আটকে যাবে।</span></p>
+		<p><label><input type="checkbox" name="bhela_overbook" value="1"> ⚠️ <?php esc_html_e( 'Overbook — confirm even if this date has no cabins left (Full Boat / exceptions)', 'bhela-booking' ); ?></label>
+		<span class="description"><?php esc_html_e( 'Rarely needed. Without it, confirming is blocked once the date is full.', 'bhela-booking' ); ?></span></p>
 		<?php if ( $invoice_no ) : ?>
 		<p><a class="button button-secondary" href="<?php echo esc_url( bhela_bm_invoice_url( $post->ID ) ); ?>" target="_blank">🧾 <?php esc_html_e( 'View / Print Invoice', 'bhela-booking' ); ?></a></p>
 	<?php endif; ?>
@@ -444,20 +499,19 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		$others = (int) bhela_bm_counted_booked_cabins( $new_date, $post_id );
 		$free   = bhela_bm_max_cabins() - $manual - $others;
 		$need   = (int) bhela_bm_booking_cabin_count( $post_id );
-		$bn     = function_exists( 'bhela_bm_bn_num' ) ? 'bhela_bm_bn_num' : 'strval';
 		if ( $need > $free && ! $override ) {
 			$cap_blocked = true;
 			set_transient( 'bhela_bm_cap_err_' . $post_id, sprintf(
-				/* translators: 1: free cabins, 2: needed, 3: total */
-				__( 'কনফার্ম করা যায়নি — %1$s তারিখে মাত্র %2$sটি কেবিন খালি, কিন্তু এই বুকিংয়ে %3$sটি কেবিন লাগবে। স্ট্যাটাস অপরিবর্তিত রাখা হলো। প্রয়োজনে “ওভারবুক” টিক দিয়ে জোর করে কনফার্ম করুন।', 'bhela-booking' ),
-				esc_html( $new_date ), $bn( max( 0, $free ) ), $bn( $need )
+				/* translators: 1: travel date, 2: free cabins, 3: cabins needed */
+				__( 'Could not confirm — %1$s has only %2$d cabin(s) free, but this booking needs %3$d. The status was left unchanged. Tick "Overbook" to force it through.', 'bhela-booking' ),
+				esc_html( $new_date ), max( 0, $free ), $need
 			), 45 );
 			if ( function_exists( 'bhela_bm_log' ) ) {
-				bhela_bm_log( 'error', sprintf( 'বুকিং %s — কনফার্ম আটকানো হয়েছে: %s তারিখে খালি %sটি, দরকার %sটি কেবিন।',
-					$invoice_ref, $new_date, $bn( max( 0, $free ) ), $bn( $need ) ), false );
+				bhela_bm_log( 'error', sprintf( 'Booking %s — confirm blocked: %s has %d cabin(s) free, %d needed.',
+					$invoice_ref, $new_date, max( 0, $free ), $need ), false );
 			}
 		} elseif ( $need > $free && $override && function_exists( 'bhela_bm_log' ) ) {
-			bhela_bm_log( 'status', sprintf( 'বুকিং %s — ওভারবুক করে কনফার্ম (%s তারিখে ধারণক্ষমতার বেশি)।', $invoice_ref, $new_date ) );
+			bhela_bm_log( 'status', sprintf( 'Booking %s — confirmed by overbooking (%s is over capacity).', $invoice_ref, $new_date ) );
 		}
 	}
 	// -----------------------------------------------------------------------
@@ -466,7 +520,7 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		update_post_meta( $post_id, '_bhela_status', $new_status );
 		if ( $new_status !== $old_status && function_exists( 'bhela_bm_log' ) ) {
 			$st_labels = bhela_bm_statuses();
-			bhela_bm_log( 'status', sprintf( 'বুকিং %s — %s → %s',
+			bhela_bm_log( 'status', sprintf( 'Booking %s — %s → %s',
 				$invoice_ref,
 				$st_labels[ $old_status ] ?? $old_status,
 				$st_labels[ $new_status ] ?? $new_status ) );
@@ -584,7 +638,7 @@ function bhela_bm_settings_page() {
 
 		update_option( 'bhela_bm_settings', $s );
 		if ( function_exists( 'bhela_bm_log' ) ) {
-			bhela_bm_log( 'settings', 'বুকিং সেটিংস সেভ করা হয়েছে' );
+			bhela_bm_log( 'settings', 'Booking settings saved' );
 		}
 
 		$rates = bhela_bm_get_rates();
@@ -629,8 +683,8 @@ function bhela_bm_settings_page() {
 					<p class="description"><?php esc_html_e( 'Shown on the invoice so guests can scan & pay. Media → Add New → copy File URL.', 'bhela-booking' ); ?></p></td></tr>
 				<tr><th>Bangla QR Image URL</th><td><input type="url" class="large-text" name="bangla_qr" value="<?php echo esc_attr( $s['bangla_qr'] ?? '' ); ?>" placeholder="Upload the Bangla QR photo in Media Library, paste its URL here"></td></tr>
 				<tr><th>Advance %</th><td><input type="number" name="advance_percent" min="1" max="100" value="<?php echo esc_attr( $s['advance_percent'] ); ?>"> %</td></tr>
-				<tr><th>তারিখ চিপ সংখ্যা</th><td><input type="number" name="date_chips" min="0" max="20" value="<?php echo esc_attr( $s['date_chips'] ); ?>"> টি<br><span class="description">বুকিং ফর্মে Trip Calendar থেকে কতগুলো আসন্ন তারিখ কুইক-পিক হিসেবে দেখাবে। ০ দিলে চিপ লুকানো থাকবে।</span></td></tr>
-				<tr><th>শিশু (৪–৮) ফি</th><td><input type="number" name="child_fee" min="0" step="100" value="<?php echo esc_attr( $s['child_fee'] ); ?>"> ৳ প্রতি শিশু<br><span class="description">ফিক্সড চার্জ — কেবিনের রেট বা Weekday ছাড়ের সাথে বদলায় না। ০–৪ বছর সবসময় ফ্রি।</span></td></tr>
+				<tr><th>Date chips</th><td><input type="number" name="date_chips" min="0" max="20" value="<?php echo esc_attr( $s['date_chips'] ); ?>"><br><span class="description">How many upcoming Trip Calendar dates appear as quick-pick chips on the booking form. Set 0 to hide them.</span></td></tr>
+				<tr><th>Child fee (age 4–8)</th><td><input type="number" name="child_fee" min="0" step="100" value="<?php echo esc_attr( $s['child_fee'] ); ?>"> ৳ per child<br><span class="description">A flat charge — it does not follow the cabin rate or the weekday discount. Ages 0–4 are always free.</span></td></tr>
 				<tr><th>Invoice Prefix</th><td><input type="text" name="invoice_prefix" value="<?php echo esc_attr( $s['invoice_prefix'] ); ?>"></td></tr>
 				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="3" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea></td></tr>
 			</table>
@@ -643,8 +697,8 @@ function bhela_bm_settings_page() {
 					<?php endforeach; ?>
 				</td></tr>
 				<tr><th><?php esc_html_e( 'Holidays', 'bhela-booking' ); ?></th>
-					<td><p class="description"><?php esc_html_e( 'ছুটির তারিখ এখন ট্রিপ ক্যালেন্ডারে ঠিক করা হয় — যে ট্রিপে “ছুটি” টিক দেওয়া থাকবে সেটিতে রেগুলার রেট বসবে (২০% উইকডে ছাড় থাকবে না)। ছুটি ও উইকএন্ড ছাড়া বাকি দিনে উইকডে রেট।', 'bhela-booking' ); ?></p>
-					<p><a class="button" href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-trips' ), admin_url( 'edit.php' ) ) ); ?>">📅 <?php esc_html_e( 'ট্রিপ ক্যালেন্ডার খুলুন', 'bhela-booking' ); ?></a></p></td></tr>
+					<td><p class="description"><?php esc_html_e( 'Holidays are set on the Trip Calendar now. Any trip ticked as a holiday is charged the regular rate (no 20% weekday discount). Every other non-weekend day gets the weekday rate.', 'bhela-booking' ); ?></p>
+					<p><a class="button" href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-trips' ), admin_url( 'edit.php' ) ) ); ?>">📅 <?php esc_html_e( 'Open Trip Calendar', 'bhela-booking' ); ?></a></p></td></tr>
 			</table>
 
 			<h2><?php esc_html_e( 'Cabin Rates (per person, 2D1N)', 'bhela-booking' ); ?></h2>

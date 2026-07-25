@@ -17,7 +17,7 @@ function bhela_bm_register_reviews_cpt() {
 			'name'          => 'Reviews',
 			'singular_name' => 'Review',
 			'menu_name'     => '⭐ Reviews',
-			'add_new_item'  => 'Add New Review (নতুন রিভিউ)',
+			'add_new_item'  => 'Add New Review',
 			'edit_item'     => 'Edit Review',
 			'all_items'     => 'All Reviews',
 			'not_found'     => 'No reviews yet.',
@@ -47,8 +47,8 @@ function bhela_bm_review_meta_cb( $post ) {
 	$rating   = $rating ? (int) $rating : 5;
 	$subtitle = get_post_meta( $post->ID, '_bhela_subtitle', true );
 	?>
-	<p><strong>Title = অতিথির নাম</strong>, মূল লেখা = রিভিউ টেক্সট।</p>
-	<p><label for="bhela_rating"><strong>Rating (স্টার)</strong></label><br>
+	<p><strong>Title = guest name</strong>. The main editor content is the review text.</p>
+	<p><label for="bhela_rating"><strong>Rating (stars)</strong></label><br>
 	<select name="bhela_rating" id="bhela_rating" style="width:100%">
 		<?php for ( $i = 5; $i >= 1; $i-- ) : ?>
 			<option value="<?php echo esc_attr( $i ); ?>" <?php selected( $rating, $i ); ?>><?php echo esc_html( str_repeat( '★', $i ) . str_repeat( '☆', 5 - $i ) ); ?></option>

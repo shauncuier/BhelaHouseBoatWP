@@ -80,12 +80,23 @@ function bhela_bm_trip_nights( $start, $end ) {
 }
 
 /**
- * Human duration, e.g. "২ দিন ১ রাত" or "৪ দিন ৩ রাত". Full-boat charters can
- * run longer than the standard package, so this is derived, never hardcoded.
+ * Human duration, e.g. "২ দিন ১ রাত" or "4 days 3 nights". Full-boat charters
+ * can run longer than the standard package, so this is derived, never hardcoded.
+ *
+ * @param string $start Y-m-d.
+ * @param string $end   Y-m-d.
+ * @param bool   $en    True for the English wording used in wp-admin; the guest
+ *                      calendar keeps Bengali.
  */
-function bhela_bm_trip_duration( $start, $end ) {
+function bhela_bm_trip_duration( $start, $end, $en = false ) {
 	$nights = bhela_bm_trip_nights( $start, $end );
-	$bn     = function ( $n ) {
+	if ( $en ) {
+		if ( $nights < 1 ) {
+			return 'Day trip';
+		}
+		return sprintf( '%d days %d night%s', $nights + 1, $nights, $nights > 1 ? 's' : '' );
+	}
+	$bn = function ( $n ) {
 		return function_exists( 'bhela_bm_bn_num' ) ? bhela_bm_bn_num( $n ) : $n;
 	};
 	if ( $nights < 1 ) {
@@ -137,9 +148,9 @@ function bhela_bm_get_trips() {
 
 function bhela_bm_trip_statuses() {
 	return array(
-		'available' => array( 'label' => 'Available (সিট আছে)', 'short' => 'Available ✅', 'color' => '#1a7f37' ),
-		'filling'   => array( 'label' => 'Filling Fast (দ্রুত পূরণ হচ্ছে)', 'short' => 'Filling Fast 🔥', 'color' => '#b45309' ),
-		'booked'    => array( 'label' => 'Booked (বুকড)', 'short' => 'Booked ❌', 'color' => '#b32d2e' ),
+		'available' => array( 'label' => 'Available', 'short' => 'Available ✅', 'color' => '#1a7f37' ),
+		'filling'   => array( 'label' => 'Filling Fast', 'short' => 'Filling Fast 🔥', 'color' => '#b45309' ),
+		'booked'    => array( 'label' => 'Booked', 'short' => 'Booked ❌', 'color' => '#b32d2e' ),
 	);
 }
 
@@ -336,19 +347,19 @@ function bhela_bm_trips_page() {
 		update_option( 'bhela_bm_trips', $trips );
 
 		if ( function_exists( 'bhela_bm_log' ) ) {
-			$total = bhela_bm_bn_num( count( $after_dates ) );
+			$total = count( $after_dates );
 			if ( $removed && $added ) {
-				$msg = sprintf( '%sটি তারিখ মুছে ফেলা হয়েছে (%s), %sটি যোগ হয়েছে (%s)। এখন মোট %sটি ট্রিপ।',
-					bhela_bm_bn_num( count( $removed ) ), $names( $removed ),
-					bhela_bm_bn_num( count( $added ) ), $names( $added ), $total );
+				$msg = sprintf( '%d date(s) removed (%s), %d added (%s). %d trip(s) now.',
+					count( $removed ), $names( $removed ),
+					count( $added ), $names( $added ), $total );
 			} elseif ( $removed ) {
-				$msg = sprintf( '%sটি তারিখ মুছে ফেলা হয়েছে — %s। এখন মোট %sটি ট্রিপ।',
-					bhela_bm_bn_num( count( $removed ) ), $names( $removed ), $total );
+				$msg = sprintf( '%d date(s) removed — %s. %d trip(s) now.',
+					count( $removed ), $names( $removed ), $total );
 			} elseif ( $added ) {
-				$msg = sprintf( '%sটি নতুন তারিখ যোগ হয়েছে — %s। এখন মোট %sটি ট্রিপ।',
-					bhela_bm_bn_num( count( $added ) ), $names( $added ), $total );
+				$msg = sprintf( '%d new date(s) added — %s. %d trip(s) now.',
+					count( $added ), $names( $added ), $total );
 			} else {
-				$msg = sprintf( 'ক্যালেন্ডার আপডেট করা হয়েছে — মোট %sটি ট্রিপ (তারিখ অপরিবর্তিত)।', $total );
+				$msg = sprintf( 'Calendar updated — %d trip(s) total (dates unchanged).', $total );
 			}
 			bhela_bm_log( 'trips', $msg );
 		}
@@ -357,8 +368,8 @@ function bhela_bm_trips_page() {
 		if ( $removed ) {
 			echo '<div class="notice notice-warning"><p>' . esc_html( sprintf(
 				/* translators: 1: number of removed dates, 2: comma separated trip labels */
-				__( '⚠️ %1$sটি তারিখ মুছে ফেলা হয়েছে: %2$s', 'bhela-booking' ),
-				bhela_bm_bn_num( count( $removed ) ),
+				__( '⚠️ %1$d date(s) removed: %2$s', 'bhela-booking' ),
+				count( $removed ),
 				$names( $removed )
 			) ) . '</p></div>';
 		}
@@ -370,9 +381,9 @@ function bhela_bm_trips_page() {
 	<div class="wrap">
 		<h1>📅 <?php esc_html_e( 'BHELA Trip Calendar', 'bhela-booking' ); ?></h1>
 		<p><?php esc_html_e( 'Manage departure dates here — the website schedule page and booking calendar update automatically. Empty date = row ignored.', 'bhela-booking' ); ?></p>
-		<p class="description"><?php esc_html_e( '“ছুটি” টিক দিলে ওই ট্রিপে ২০% উইকডে ছাড় থাকবে না — রেগুলার রেট ধরা হবে এবং সাইটে “ছুটির দিন” দেখাবে।', 'bhela-booking' ); ?></p>
-		<p class="description"><?php esc_html_e( 'Booked Cabins স্বয়ংক্রিয়: কোনো বুকিং Advance Paid বা Confirmed হলে ওই তারিখের খালি কেবিন নিজে থেকেই কমে যায় — আলাদা করে এখানে বসাতে হয় না, সব ম্যানেজার ও ওয়েবসাইট একই লাইভ সংখ্যা দেখে। Booked Cabins ঘরটি শুধু ম্যানুয়াল হোল্ড (সর্বনিম্ন) — যেমন ফোন বুকিং বা পুরো বোট ব্লক করতে।', 'bhela-booking' ); ?></p>
-		<p class="description"><?php esc_html_e( 'End Date খালি রাখলে ২ দিন ১ রাত ধরা হয়। Full Boat বা লম্বা ট্রিপে End Date বাড়িয়ে দিন — লেবেল, দিন ও সময়কাল নিজে থেকেই ঠিক হবে। Start Date বদলালে ট্রিপের দৈর্ঘ্য ঠিক থাকে।', 'bhela-booking' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Ticking "Holiday" removes the 20% weekday discount for that trip — the regular rate applies and the site shows it as a holiday.', 'bhela-booking' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Booked Cabins is automatic: as soon as a booking is Advance Paid or Confirmed, that date loses a cabin on its own — you do not enter it here, and every manager and the website read the same live number. This box is only for manual holds, such as a phone booking or blocking the whole boat; holds are added on top of the online count.', 'bhela-booking' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Leave End Date empty for the standard 2 days 1 night. Extend it for a Full Boat or a longer charter — the label, days and duration fill in automatically. Moving the Start Date keeps the trip the same length.', 'bhela-booking' ); ?></p>
 		<form method="post">
 			<?php wp_nonce_field( 'bhela_bm_trips', 'bhela_bm_trips_nonce' ); ?>
 			<style>
@@ -410,7 +421,7 @@ function bhela_bm_trips_page() {
 					<th style="width:20%"><?php esc_html_e( 'Display Label', 'bhela-booking' ); ?></th>
 					<th style="width:20%"><?php esc_html_e( 'Days (Bangla)', 'bhela-booking' ); ?></th>
 					<th style="width:16%"><?php esc_html_e( 'Note', 'bhela-booking' ); ?></th>
-					<th style="width:70px"><?php esc_html_e( 'ছুটি', 'bhela-booking' ); ?></th>
+					<th style="width:70px"><?php esc_html_e( 'Holiday', 'bhela-booking' ); ?></th>
 					<th style="width:170px"><?php esc_html_e( 'Status', 'bhela-booking' ); ?></th>
 					<th style="width:130px"><?php esc_html_e( 'Booked Cabins', 'bhela-booking' ); ?></th>
 					<th style="width:60px"><?php esc_html_e( 'Delete', 'bhela-booking' ); ?></th>
@@ -424,17 +435,17 @@ function bhela_bm_trips_page() {
 					<tr class="<?php echo $bm_is_past ? 'is-past' : ''; ?>">
 						<td><input type="date" class="bhela-trip-start" name="trip_date[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( $t['date'] ); ?>">
 							<?php if ( $bm_is_past ) : ?>
-								<span class="bhela-past-tag"><?php esc_html_e( 'চলে গেছে — সাইটে দেখাচ্ছে না', 'bhela-booking' ); ?></span>
+								<span class="bhela-past-tag"><?php esc_html_e( 'Past — hidden on the site', 'bhela-booking' ); ?></span>
 							<?php endif; ?>
 						</td>
 						<td><input type="date" class="bhela-trip-end" name="trip_end[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( bhela_bm_trip_end( $t ) ); ?>">
-							<span class="bhela-trip-dur"><?php echo esc_html( bhela_bm_trip_duration( $t['date'], bhela_bm_trip_end( $t ) ) ); ?></span>
+							<span class="bhela-trip-dur"><?php echo esc_html( bhela_bm_trip_duration( $t['date'], bhela_bm_trip_end( $t ), true ) ); ?></span>
 						</td>
 						<td><input type="text" style="width:100%" class="bhela-trip-label" name="trip_label[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( $t['label'] ); ?>"></td>
 						<td><input type="text" style="width:100%" class="bhela-trip-days" name="trip_days[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( $t['days'] ); ?>"></td>
 						<td><input type="text" style="width:100%" name="trip_note[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( $t['note'] ); ?>"></td>
 						<td style="text-align:center">
-							<label class="bhela-hol"><input type="checkbox" name="trip_holiday[<?php echo esc_attr( $i ); ?>]" value="1" <?php checked( ! empty( $t['holiday'] ) ); ?>> <span><?php esc_html_e( 'ছুটি', 'bhela-booking' ); ?></span></label>
+							<label class="bhela-hol"><input type="checkbox" name="trip_holiday[<?php echo esc_attr( $i ); ?>]" value="1" <?php checked( ! empty( $t['holiday'] ) ); ?>> <span><?php esc_html_e( 'Holiday', 'bhela-booking' ); ?></span></label>
 						</td>
 						<td><select name="trip_status[<?php echo esc_attr( $i ); ?>]">
 							<?php foreach ( $statuses as $key => $st ) : ?>
@@ -447,16 +458,16 @@ function bhela_bm_trips_page() {
 							$bm_full = (int) $bm_av['available'] <= 0;
 							?>
 							<div class="bhela-hold">
-								<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" name="trip_booked[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" title="<?php esc_attr_e( 'ম্যানুয়াল হোল্ড (সর্বনিম্ন) — যেমন ফোন/ফুল বোট বুকিং', 'bhela-booking' ); ?>">
-								<span class="bhela-hold__cap"><?php esc_html_e( 'হোল্ড', 'bhela-booking' ); ?></span>
+								<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" name="trip_booked[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" title="<?php esc_attr_e( 'Manual hold — e.g. a phone booking or a full-boat block. Added on top of online bookings.', 'bhela-booking' ); ?>">
+								<span class="bhela-hold__cap"><?php esc_html_e( 'hold', 'bhela-booking' ); ?></span>
 							</div>
 							<span class="bhela-avail-pill <?php echo $bm_full ? 'is-full' : 'is-open'; ?>">
 								<?php echo $bm_full
-									? sprintf( esc_html__( 'বুকড %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['booked'], (int) $bm_av['total'] )
-									: sprintf( esc_html__( 'খালি %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['available'], (int) $bm_av['total'] ); ?>
+									? sprintf( esc_html__( 'Booked %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['booked'], (int) $bm_av['total'] )
+									: sprintf( esc_html__( 'Free %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['available'], (int) $bm_av['total'] ); ?>
 							</span>
 							<?php if ( (int) $bm_av['counted'] > 0 ) : ?>
-								<span class="bhela-avail-note"><?php printf( esc_html__( 'বুকিং: %d', 'bhela-booking' ), (int) $bm_av['counted'] ); ?></span>
+								<span class="bhela-avail-note"><?php printf( esc_html__( 'online: %d', 'bhela-booking' ), (int) $bm_av['counted'] ); ?></span>
 							<?php endif; ?>
 						</td>
 						<td style="text-align:center"><input type="checkbox" name="trip_delete[<?php echo esc_attr( $i ); ?>]" value="1"></td>
@@ -521,11 +532,9 @@ function bhela_bm_trips_page() {
 			if (!s || !e || e <= s) { return 1; }
 			return Math.max(0, Math.round((e - s) / 86400000));
 		}
-		function bn(n) {
-			return String(n).replace(/[0-9]/g, function (d) { return '০১২৩৪৫৬৭৮৯'[+d]; });
-		}
 		function durationText(n) {
-			return n < 1 ? 'দিনে দিনে' : bn(n + 1) + ' দিন ' + bn(n) + ' রাত';
+			/* Admin table preview — English, mirroring bhela_bm_trip_duration($en=true). */
+			return n < 1 ? 'Day trip' : (n + 1) + ' days ' + n + ' night' + (n > 1 ? 's' : '');
 		}
 
 		/* `movedStart` shifts the end by the same number of days, so a 4-day
@@ -594,10 +603,10 @@ function bhela_bm_trips_page() {
 			var i = tbody.rows.length;
 			row.innerHTML = '<td><input type="date" class="bhela-trip-start" name="trip_date[' + i + ']"></td>' +
 				'<td><input type="date" class="bhela-trip-end" name="trip_end[' + i + ']"><span class="bhela-trip-dur"></span></td>' +
-				'<td><input type="text" style="width:100%" class="bhela-trip-label" name="trip_label[' + i + ']" placeholder="তারিখ দিলে নিজে থেকেই বসবে"></td>' +
+				'<td><input type="text" style="width:100%" class="bhela-trip-label" name="trip_label[' + i + ']" placeholder="Fills in from the dates"></td>' +
 				'<td><input type="text" style="width:100%" class="bhela-trip-days" name="trip_days[' + i + ']" placeholder="শুক্র – শনি"></td>' +
 				'<td><input type="text" style="width:100%" name="trip_note[' + i + ']"></td>' +
-				'<td style="text-align:center"><label class="bhela-hol"><input type="checkbox" name="trip_holiday[' + i + ']" value="1"> <span>ছুটি</span></label></td>' +
+				'<td style="text-align:center"><label class="bhela-hol"><input type="checkbox" name="trip_holiday[' + i + ']" value="1"> <span>Holiday</span></label></td>' +
 				'<td><select name="trip_status[' + i + ']"><option value="available">Available</option><option value="filling">Filling Fast</option><option value="booked">Booked</option></select></td>' +
 				'<td><input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" name="trip_booked[' + i + ']" value="0" style="width:64px"> / 6</td>' +
 				'<td style="text-align:center"><input type="checkbox" name="trip_delete[' + i + ']" value="1"></td>';

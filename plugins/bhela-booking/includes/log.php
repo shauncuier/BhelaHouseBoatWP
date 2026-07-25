@@ -23,22 +23,21 @@ define( 'BHELA_BM_LOG_MAX', 300 );
 /** Log entry types → label + colour, used by the admin table. */
 function bhela_bm_log_types() {
 	return array(
-		'booking'  => array( 'label' => 'বুকিং', 'color' => '#137A74' ),
-		'status'   => array( 'label' => 'স্ট্যাটাস', 'color' => '#0A2A2F' ),
-		'email'    => array( 'label' => 'ইমেইল', 'color' => '#1a7f37' ),
+		'booking'  => array( 'label' => 'Bookings', 'color' => '#137A74' ),
+		'status'   => array( 'label' => 'Status', 'color' => '#0A2A2F' ),
+		'email'    => array( 'label' => 'Email', 'color' => '#1a7f37' ),
 		'sms'      => array( 'label' => 'SMS', 'color' => '#7c3aed' ),
-		'trips'    => array( 'label' => 'ট্রিপ ক্যালেন্ডার', 'color' => '#b45309' ),
-		'settings' => array( 'label' => 'সেটিংস', 'color' => '#5E7472' ),
-		'gallery'  => array( 'label' => 'গ্যালারি', 'color' => '#0891b2' ),
-		'error'    => array( 'label' => 'সমস্যা', 'color' => '#b32d2e' ),
+		'trips'    => array( 'label' => 'Trip Calendar', 'color' => '#b45309' ),
+		'settings' => array( 'label' => 'Settings', 'color' => '#5E7472' ),
+		'gallery'  => array( 'label' => 'Gallery', 'color' => '#0891b2' ),
+		'error'    => array( 'label' => 'Problems', 'color' => '#b32d2e' ),
 	);
 }
 
 /**
- * Bangla digits for log sentences. The site locale is en_US, so
- * number_format_i18n() would return English digits inside Bangla text.
- * Money keeps English digits elsewhere to match invoices — this is only
- * for counts in admin-facing sentences.
+ * Bengali digits. wp-admin is English throughout, so this is now only for
+ * guest-facing output (the booking form's advance percentage), where English
+ * numerals would look wrong inside Bengali copy.
  */
 function bhela_bm_bn_num( $n ) {
 	return strtr( (string) $n, array(
@@ -96,7 +95,7 @@ add_action( 'admin_menu', 'bhela_bm_log_menu' );
 
 function bhela_bm_log_clear() {
 	if ( ! current_user_can( 'manage_options' ) ) {
-		wp_die( esc_html__( 'অনুমতি নেই।', 'bhela-booking' ) );
+		wp_die( esc_html__( 'Permission denied.', 'bhela-booking' ) );
 	}
 	check_admin_referer( 'bhela_bm_log_clear' );
 	update_option( BHELA_BM_LOG_OPTION, array(), false );
@@ -117,16 +116,16 @@ function bhela_bm_log_page() {
 	$filter = isset( $_GET['ltype'] ) ? sanitize_key( $_GET['ltype'] ) : '';
 	?>
 	<div class="wrap">
-		<h1>📋 <?php esc_html_e( 'অ্যাক্টিভিটি লগ', 'bhela-booking' ); ?></h1>
-		<p><?php esc_html_e( 'সাইটে কী কী ঘটছে তার রেকর্ড — বুকিং এসেছে কিনা, ইমেইল/SMS গেছে কিনা, ট্রিপ ক্যালেন্ডারে কী বদলেছে। নতুনটা সবার উপরে।', 'bhela-booking' ); ?></p>
+		<h1>📋 <?php esc_html_e( 'Activity Log', 'bhela-booking' ); ?></h1>
+		<p><?php esc_html_e( 'A record of what the site actually did — bookings received, emails and SMS sent or failed, and every change to the trip calendar. Newest first.', 'bhela-booking' ); ?></p>
 
 		<?php if ( isset( $_GET['cleared'] ) ) : ?>
-			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'লগ মুছে ফেলা হয়েছে।', 'bhela-booking' ); ?></p></div>
+			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Log cleared.', 'bhela-booking' ); ?></p></div>
 		<?php endif; ?>
 
 		<p>
 			<a href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-log' ), admin_url( 'edit.php' ) ) ); ?>"
-				class="button<?php echo '' === $filter ? ' button-primary' : ''; ?>"><?php esc_html_e( 'সব', 'bhela-booking' ); ?></a>
+				class="button<?php echo '' === $filter ? ' button-primary' : ''; ?>"><?php esc_html_e( 'All', 'bhela-booking' ); ?></a>
 			<?php foreach ( $types as $key => $t ) : ?>
 				<a href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-log', 'ltype' => $key ), admin_url( 'edit.php' ) ) ); ?>"
 					class="button<?php echo $filter === $key ? ' button-primary' : ''; ?>"><?php echo esc_html( $t['label'] ); ?></a>
@@ -134,14 +133,14 @@ function bhela_bm_log_page() {
 		</p>
 
 		<?php if ( ! $log ) : ?>
-			<p><em><?php esc_html_e( 'এখনো কিছু রেকর্ড হয়নি। একটা বুকিং বা সেটিংস সেভ করলেই এখানে দেখা যাবে।', 'bhela-booking' ); ?></em></p>
+			<p><em><?php esc_html_e( 'Nothing recorded yet. Take a booking or save your settings and it will show up here.', 'bhela-booking' ); ?></em></p>
 		<?php else : ?>
 			<table class="widefat striped" style="max-width:1000px">
 				<thead><tr>
-					<th style="width:150px"><?php esc_html_e( 'সময়', 'bhela-booking' ); ?></th>
-					<th style="width:130px"><?php esc_html_e( 'ধরন', 'bhela-booking' ); ?></th>
-					<th><?php esc_html_e( 'কী হয়েছে', 'bhela-booking' ); ?></th>
-					<th style="width:110px"><?php esc_html_e( 'কে', 'bhela-booking' ); ?></th>
+					<th style="width:150px"><?php esc_html_e( 'Time', 'bhela-booking' ); ?></th>
+					<th style="width:130px"><?php esc_html_e( 'Type', 'bhela-booking' ); ?></th>
+					<th><?php esc_html_e( 'What happened', 'bhela-booking' ); ?></th>
+					<th style="width:110px"><?php esc_html_e( 'Who', 'bhela-booking' ); ?></th>
 				</tr></thead>
 				<tbody>
 				<?php
@@ -161,7 +160,7 @@ function bhela_bm_log_page() {
 					</tr>
 				<?php endforeach; ?>
 				<?php if ( ! $shown ) : ?>
-					<tr><td colspan="4"><em><?php esc_html_e( 'এই ধরনের কোনো রেকর্ড নেই।', 'bhela-booking' ); ?></em></td></tr>
+					<tr><td colspan="4"><em><?php esc_html_e( 'No records of this type.', 'bhela-booking' ); ?></em></td></tr>
 				<?php endif; ?>
 				</tbody>
 			</table>
@@ -169,8 +168,8 @@ function bhela_bm_log_page() {
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="margin-top:16px">
 				<input type="hidden" name="action" value="bhela_bm_log_clear">
 				<?php wp_nonce_field( 'bhela_bm_log_clear' ); ?>
-				<button type="submit" class="button" onclick="return confirm('পুরো লগ মুছে যাবে — নিশ্চিত?')"><?php esc_html_e( 'লগ মুছুন', 'bhela-booking' ); ?></button>
-				<span class="description" style="margin-left:8px"><?php echo esc_html( sprintf( __( 'সর্বশেষ %d টি রেকর্ড রাখা হয়।', 'bhela-booking' ), BHELA_BM_LOG_MAX ) ); ?></span>
+				<button type="submit" class="button" onclick="return confirm('This will erase the entire log. Are you sure?')"><?php esc_html_e( 'Clear log', 'bhela-booking' ); ?></button>
+				<span class="description" style="margin-left:8px"><?php echo esc_html( sprintf( __( 'The most recent %d records are kept.', 'bhela-booking' ), BHELA_BM_LOG_MAX ) ); ?></span>
 			</form>
 		<?php endif; ?>
 	</div>

@@ -69,6 +69,7 @@ function bhela_bm_maybe_render_invoice() {
 		'per_person'  => (int) $m( '_bhela_per_person' ),
 		'lines'       => is_array( json_decode( (string) $m( '_bhela_lines' ), true ) ) ? json_decode( (string) $m( '_bhela_lines' ), true ) : array(),
 		'total'       => (int) $m( '_bhela_total' ),
+		'base_price'  => (int) $m( '_bhela_base_price' ),
 		'advance'     => (int) $m( '_bhela_advance' ),
 		'paid'        => (int) $m( '_bhela_paid_amount' ),
 		'pay_method'  => $m( '_bhela_pay_method' ),
