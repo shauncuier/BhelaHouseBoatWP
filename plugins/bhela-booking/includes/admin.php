@@ -61,7 +61,7 @@ function bhela_bm_table_column_content( $column, $post_id ) {
 			printf(
 				'<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-weight:600;color:#fff;background:%s;font-size:11px;">%s</span>',
 				esc_attr( bhela_bm_status_color( $status ) ),
-				esc_html( isset( $statuses[ $status ] ) ? strtok( $statuses[ $status ], ' ' ) : $status )
+				esc_html( $statuses[ $status ] ?? $status )
 			);
 			break;
 	}
@@ -587,7 +587,7 @@ function bhela_bm_settings_page() {
 
 	if ( isset( $_POST['bhela_bm_settings_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_settings_nonce'] ) ), 'bhela_bm_settings' ) ) {
 		$s = bhela_bm_get_settings();
-		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix' ) as $f ) {
+		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix', 'ops_manager', 'support_whatsapp' ) as $f ) {
 			$s[ $f ] = isset( $_POST[ $f ] ) ? sanitize_text_field( wp_unslash( $_POST[ $f ] ) ) : $s[ $f ];
 		}
 		$s['email'] = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : $s['email'];
@@ -672,6 +672,10 @@ function bhela_bm_settings_page() {
 				<tr><th>Phone 2</th><td><input type="text" name="phone_2" value="<?php echo esc_attr( $s['phone_2'] ); ?>"></td></tr>
 				<tr><th>WhatsApp</th><td><input type="text" name="whatsapp" value="<?php echo esc_attr( $s['whatsapp'] ); ?>"></td></tr>
 				<tr><th>Business Email</th><td><input type="text" class="regular-text" name="email" value="<?php echo esc_attr( $s['email'] ); ?>"></td></tr>
+				<tr><th>Operation Manager</th><td><input type="text" name="ops_manager" value="<?php echo esc_attr( $s['ops_manager'] ?? '' ); ?>" placeholder="Uttam">
+					<p class="description"><?php esc_html_e( 'Named at the bottom of every invoice so guests know who to contact. Leave empty to hide that line.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th>Support WhatsApp</th><td><input type="text" name="support_whatsapp" value="<?php echo esc_attr( $s['support_whatsapp'] ?? '' ); ?>" placeholder="+8801781720957">
+					<p class="description"><?php esc_html_e( 'Booking-support number shown on the invoice. Falls back to the WhatsApp number above when empty.', 'bhela-booking' ); ?></p></td></tr>
 			</table>
 
 			<h2><?php esc_html_e( 'Payment Details (shown on invoice)', 'bhela-booking' ); ?></h2>

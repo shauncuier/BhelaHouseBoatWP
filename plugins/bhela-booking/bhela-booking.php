@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.15.10
+ * Version: 2.15.11
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.15.10' );
+define( 'BHELA_BM_VERSION', '2.15.11' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -36,6 +36,8 @@ function bhela_bm_default_settings() {
 		'nagad_qr'         => '',
 		'bangla_qr'        => '',
 		'invoice_prefix'   => 'BH',
+		'ops_manager'      => 'Uttam',              // named on the invoice footer
+		'support_whatsapp' => '+8801781720957',     // booking-support number
 		'advance_percent'  => 50,
 		'child_fee'        => 5000, // flat charge per 4–8 year old, any day type
 		'date_chips'       => 5,    // how many upcoming trips show as quick-pick chips (0 = hide)
@@ -280,6 +282,47 @@ function bhela_bm_is_mobile( $raw ) {
 	return '' !== bhela_bm_normalize_mobile( $raw );
 }
 
+/**
+ * International display form: "+880 1703-284728".
+ *
+ * The same number reaches the invoice in three shapes — a guest types
+ * 01703284728, Settings holds 01891-562461, and the WhatsApp field holds
+ * +8801781720957 — which made one page show three formats. Anything that is not
+ * a valid BD mobile (a landline, a free-text note) is returned untouched rather
+ * than mangled.
+ */
+function bhela_bm_phone_intl( $raw ) {
+	$local = bhela_bm_normalize_mobile( $raw );
+	if ( '' === $local ) {
+		return trim( (string) $raw );
+	}
+	return '+880 ' . substr( $local, 1, 4 ) . '-' . substr( $local, 5 );
+}
+
+/** tel: href for a number in any format, or '' when it is not dialable. */
+function bhela_bm_phone_href( $raw ) {
+	$local = bhela_bm_normalize_mobile( $raw );
+	return $local ? 'tel:+880' . substr( $local, 1 ) : '';
+}
+
+/**
+ * wa.me link for a number in any format.
+ *
+ * @param string $raw  Number in any shape.
+ * @param string $text Optional prefilled message.
+ */
+function bhela_bm_wa_url( $raw, $text = '' ) {
+	$digits = preg_replace( '/[^0-9]/', '', (string) $raw );
+	if ( '' === $digits ) {
+		return '';
+	}
+	if ( 0 !== strpos( $digits, '880' ) ) {
+		$local  = bhela_bm_normalize_mobile( $digits );
+		$digits = $local ? '880' . substr( $local, 1 ) : $digits;
+	}
+	return 'https://wa.me/' . $digits . ( '' !== $text ? '?text=' . rawurlencode( $text ) : '' );
+}
+
 /** Match a cabin key or label text to a rates key. */
 function bhela_bm_match_cabin( $input ) {
 	$rates = bhela_bm_get_rates();
@@ -339,17 +382,24 @@ function bhela_bm_money( $amount ) {
  * or it will contradict the figure printed beside it. Returns 0 when there is
  * no total or no advance.
  *
+ * Rounding to a whole number used to make the label contradict the money it sits
+ * beside: ৳5,000 of ৳32,000 is 15.625%, which rounded to "16%" — but 16% of
+ * ৳32,000 is ৳5,120. So this keeps two decimals and trims them away only when
+ * they are meaningless, giving "15.63" but a clean "50".
+ *
  * @param int|string $advance Amount taken as advance.
  * @param int|string $total   Booking total.
- * @return int Percentage, 0-100.
+ * @return string Percentage for display, 0-100, without a trailing "%".
  */
 function bhela_bm_advance_pct( $advance, $total ) {
 	$advance = (int) $advance;
 	$total   = (int) $total;
 	if ( $total <= 0 || $advance <= 0 ) {
-		return 0;
+		return '0';
 	}
-	return (int) round( $advance / $total * 100 );
+	// number_format() always emits the decimal point, and that point stops the
+	// first rtrim() from eating a whole number's own zeros (100.00 → 100, not 1).
+	return rtrim( rtrim( number_format( $advance / $total * 100, 2, '.', '' ), '0' ), '.' );
 }
 
 /* =========================================================
@@ -393,14 +443,17 @@ function bhela_bm_status_bn( $status ) {
 }
 
 function bhela_bm_status_color( $status ) {
+	// Drives the invoice badge, the bookings list pill and the dashboard counters,
+	// so the same status reads the same colour everywhere: money still owed warms
+	// towards amber, an agreed booking is blue, a finished one green.
 	$map = array(
-		'pending'      => '#996800',
-		'advance_paid' => '#0E6E6B',
-		'confirmed'    => '#1a7f37',
-		'completed'    => '#555d66',
-		'cancelled'    => '#b32d2e',
+		'pending'      => '#b45309', // amber — nothing paid yet
+		'advance_paid' => '#ca8a04', // yellow — part paid
+		'confirmed'    => '#1d4ed8', // blue — locked in
+		'completed'    => '#1a7f37', // green — done and settled
+		'cancelled'    => '#3c434a', // dark grey — closed
 	);
-	return isset( $map[ $status ] ) ? $map[ $status ] : '#555d66';
+	return isset( $map[ $status ] ) ? $map[ $status ] : '#3c434a';
 }
 
 /* =========================================================

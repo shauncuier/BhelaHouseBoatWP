@@ -16,6 +16,9 @@ $due      = max( 0, (int) $invoice['total'] - (int) $invoice['paid'] );
 // sees the items total one number and the summary total another.
 $base     = (int) $invoice['base_price'] > 0 ? (int) $invoice['base_price'] : (int) $invoice['total'];
 $discount = max( 0, $base - (int) $invoice['total'] );
+// Booking-support number: the dedicated one when set, else the general WhatsApp.
+// Used twice (payment block and footer), so it is resolved once up here.
+$inv_support = ! empty( $s['support_whatsapp'] ) ? $s['support_whatsapp'] : $s['whatsapp'];
 $logo     = '';
 $theme_logo = get_template_directory() . '/assets/images/logo.png';
 if ( file_exists( $theme_logo ) ) {
@@ -41,7 +44,7 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.inv-head p { opacity:.85; font-size:13px; }
 	.inv-no { text-align:right; }
 	.inv-no .num { font-size:20px; font-weight:700; color:#FFB88C; }
-	.badge { display:inline-block; margin-top:6px; padding:3px 14px; border-radius:20px; font-size:12px; font-weight:700; background:<?php echo esc_attr( bhela_bm_status_color( $invoice['status'] ) ); ?>; color:#fff; text-transform:uppercase; letter-spacing:.5px; }
+	.badge { display:inline-block; margin-top:6px; padding:3px 14px; border-radius:20px; font-size:12px; font-weight:700; background:<?php echo esc_attr( bhela_bm_status_color( $invoice['status'] ) ); ?>; color:#fff; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
 	.inv-body { padding:32px 40px; }
 	.cols { display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:28px; }
 	.cols h3 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:#14676B; margin-bottom:8px; }
@@ -52,7 +55,9 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	table.items td:last-child, table.items th:last-child { text-align:right; }
 	.totals { margin-left:auto; width:320px; max-width:100%; }
 	.totals .row { display:flex; justify-content:space-between; padding:8px 4px; }
-	.totals .row.grand { border-top:2px solid #0B2E33; font-size:18px; font-weight:700; margin-top:6px; padding-top:12px; }
+	.totals .row.grand { border-top:2px solid #0B2E33; font-size:19px; font-weight:700; margin-top:6px; padding-top:14px; align-items:baseline; }
+	/* Balance Due is the one figure the guest acts on, so it outweighs every other row. */
+	.totals .row.grand.due strong { font-size:26px; line-height:1.1; letter-spacing:-.5px; }
 	.totals .row.due strong { color:#D8621E; }
 	.totals .row.paid strong { color:#1a7f37; }
 	.totals .row.discount strong { color:#1a7f37; }
@@ -101,7 +106,7 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<div style="font-size:13px;opacity:.8">INVOICE</div>
 				<div class="num"><?php echo esc_html( $invoice['invoice_no'] ); ?></div>
 				<div style="font-size:12px;opacity:.8;margin-top:4px"><?php echo esc_html( mysql2date( 'd M Y', $invoice['created'] ) ); ?></div>
-				<span class="badge"><?php echo esc_html( strtok( $statuses[ $invoice['status'] ] ?? $invoice['status'], ' ' ) ); ?></span>
+				<span class="badge"><?php echo esc_html( $statuses[ $invoice['status'] ] ?? $invoice['status'] ); ?></span>
 			</div>
 		</div>
 
@@ -110,7 +115,12 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<div>
 					<h3>Bill To / অতিথি</h3>
 					<p><strong><?php echo esc_html( $invoice['name'] ); ?></strong><br>
-					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg><?php echo esc_html( $invoice['phone'] ); ?></span>
+					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M17 1.01L7 1c-1.1 0-2 .9-2 2v18c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V3c0-1.1-.9-1.99-2-1.99zM17 19H7V5h10v14z"/></svg><?php
+				$inv_tel = bhela_bm_phone_href( $invoice['phone'] );
+				echo $inv_tel
+					? '<a href="' . esc_url( $inv_tel ) . '" style="color:inherit;text-decoration:none">' . esc_html( bhela_bm_phone_intl( $invoice['phone'] ) ) . '</a>'
+					: esc_html( bhela_bm_phone_intl( $invoice['phone'] ) );
+				?></span>
 					<?php if ( $invoice['email'] ) : ?><br><span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg><?php echo esc_html( $invoice['email'] ); ?></span><?php endif; ?></p>
 				</div>
 				<div>
@@ -170,7 +180,20 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<strong>Bangla QR (bKash/Bank App):</strong> <?php echo esc_html( $s['bkash_number'] ); ?><br>
 				<strong>Nagad:</strong> <?php echo esc_html( $s['nagad_number'] ); ?>
 				<?php if ( $s['bank_details'] ) : ?><br><strong>Bank:</strong> <?php echo nl2br( esc_html( $s['bank_details'] ) ); ?><?php endif; ?>
-				<br><strong>📞</strong> <?php echo esc_html( $s['phone_1'] ); ?>, <?php echo esc_html( $s['phone_2'] ); ?> &nbsp;|&nbsp; <strong>WhatsApp:</strong> <?php echo esc_html( $s['whatsapp'] ); ?>
+				<?php
+				// One page used to carry three phone formats; everything dialable is
+				// normalised to +880 here and linked, since invoices get read on a
+				// phone at least as often as they get printed.
+				$inv_phone = function ( $raw ) {
+					$label = bhela_bm_phone_intl( $raw );
+					$href  = bhela_bm_phone_href( $raw );
+					return $href
+						? '<a href="' . esc_url( $href ) . '" style="color:inherit;text-decoration:none">' . esc_html( $label ) . '</a>'
+						: esc_html( $label );
+				};
+				?>
+				<br><strong>📞</strong> <?php echo $inv_phone( $s['phone_1'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>, <?php echo $inv_phone( $s['phone_2'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<br><strong>Booking Support (WhatsApp):</strong> <a href="<?php echo esc_url( bhela_bm_wa_url( $inv_support, 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice['invoice_no'] ) ); ?>" style="color:inherit"><?php echo esc_html( bhela_bm_phone_intl( $inv_support ) ); ?></a>
 
 				<?php if ( ! empty( $s['nagad_qr'] ) || ! empty( $s['bangla_qr'] ) ) : ?>
 					<div class="pay-qrs">
@@ -200,6 +223,15 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 
 		<div class="inv-foot">
 			<?php echo esc_html( $s['business_name'] ); ?> — "<?php echo esc_html( $s['business_tagline'] ); ?>" | <?php echo esc_html( $s['email'] ); ?>
+			<?php if ( ! empty( $s['ops_manager'] ) ) : ?>
+				<div style="margin-top:6px;font-size:12.5px;opacity:.92">
+					<?php esc_html_e( 'Operation Manager:', 'bhela-booking' ); ?> <strong><?php echo esc_html( $s['ops_manager'] ); ?></strong>
+					<?php if ( $inv_support ) : ?>
+						&nbsp;·&nbsp; <?php esc_html_e( 'WhatsApp:', 'bhela-booking' ); ?>
+						<a href="<?php echo esc_url( bhela_bm_wa_url( $inv_support ) ); ?>" style="color:inherit"><?php echo esc_html( bhela_bm_phone_intl( $inv_support ) ); ?></a>
+					<?php endif; ?>
+				</div>
+			<?php endif; ?>
 		</div>
 	</div>
 </body>
