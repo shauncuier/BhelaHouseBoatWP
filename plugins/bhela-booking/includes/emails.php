@@ -104,8 +104,7 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	$paid       = (int) $m( '_bhela_paid_amount' );
 	$due        = max( 0, $total - $paid );
 	$inv_url    = bhela_bm_invoice_url( $booking_id );
-	$wa_num     = preg_replace( '/[^0-9]/', '', $settings['whatsapp'] );
-	$wa_url     = 'https://wa.me/' . $wa_num . '?text=' . rawurlencode( 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice_no );
+	$wa_url     = bhela_bm_wa_url( $settings['whatsapp'], 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice_no );
 
 	if ( 'completed' === $type ) {
 		$banner_bg   = '#0E6E6B';

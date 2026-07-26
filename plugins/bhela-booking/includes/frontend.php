@@ -477,7 +477,6 @@ function bhela_bm_process_submission( $data ) {
 	}
 
 	$settings = bhela_bm_get_settings();
-	$wa_num   = preg_replace( '/[^0-9]/', '', $settings['whatsapp'] );
 	if ( $full_boat ) {
 		$wa_text = sprintf(
 			"আসসালামু আলাইকুম। আমি পুরো বোট (Full Boat) রিজার্ভ করতে চাই — কাস্টম কোট প্রয়োজন।\n\n🧾 Booking No: %s\nনাম: %s\nমোবাইল: %s\nতারিখ: %s",
@@ -499,7 +498,7 @@ function bhela_bm_process_submission( $data ) {
 	return array(
 		'booking_id'   => $post_id,
 		'invoice_no'   => $invoice_no,
-		'whatsapp_url' => 'https://wa.me/' . $wa_num . '?text=' . rawurlencode( $wa_text ),
+		'whatsapp_url' => bhela_bm_wa_url( $settings['whatsapp'], $wa_text ),
 		'invoice_url'  => bhela_bm_invoice_url( $post_id ),
 	);
 }

@@ -218,7 +218,7 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<p style="margin-bottom:16px"><strong>Note:</strong> <?php echo esc_html( $invoice['message'] ); ?></p>
 			<?php endif; ?>
 
-			<div class="note"><?php echo nl2br( esc_html( $s['invoice_note'] ) ); ?></div>
+			<div class="note"><?php echo nl2br( esc_html( bhela_bm_render_invoice_note( $s['invoice_note'], $invoice ) ) ); ?></div>
 		</div>
 
 		<div class="inv-foot">

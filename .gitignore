@@ -11,6 +11,10 @@
 # Allow documentation directory
 !/docs/
 
+# Allow the regression suite. It lives outside themes/ and plugins/, so the
+# release ZIPs never carry it.
+!/tests/
+
 # Allow agent skills & rules (so they sync across machines)
 !/.agents/
 

@@ -560,6 +560,20 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		if ( function_exists( 'bhela_bm_sms_on_status_change' ) ) {
 			bhela_bm_sms_on_status_change( $post_id, $new_status, $old_status );
 		}
+		/**
+		 * A booking's status changed.
+		 *
+		 * The extension point this plugin was missing: every notification so far
+		 * had to be wired into this function by hand, which is why it grew so
+		 * long. New side effects can hook here instead.
+		 *
+		 * @param int    $post_id    Booking ID.
+		 * @param string $new_status Status it moved to.
+		 * @param string $old_status Status it came from.
+		 */
+		if ( $new_status !== $old_status ) {
+			do_action( 'bhela_bm_status_changed', $post_id, $new_status, $old_status );
+		}
 	} elseif ( $cap_blocked ) {
 		$new_status = $old_status; // keep downstream (email) logic honest
 	}
@@ -635,7 +649,14 @@ function bhela_bm_settings_page() {
 		$s['advance_percent'] = min( 100, max( 1, (int) ( $_POST['advance_percent'] ?? 50 ) ) );
 		$s['child_fee']       = max( 0, (int) ( $_POST['child_fee'] ?? 5000 ) );
 		$s['date_chips']      = min( 20, max( 0, (int) ( $_POST['date_chips'] ?? 5 ) ) );
-		$s['weekend_days']    = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
+		// Only rewrite the weekend days when the Pricing Days panel was actually
+		// submitted. Unticked checkboxes are simply absent from a POST, so a save
+		// that does not include this panel would otherwise clear every weekend
+		// day — and with none set, every date silently falls to the discounted
+		// weekday rate. A marker field tells the two cases apart.
+		if ( isset( $_POST['bhela_pricing_days_present'] ) ) {
+			$s['weekend_days'] = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
+		}
 
 		// Guest review submissions — caps on the only public upload surface.
 		$s['review_max_photos'] = min( 10, max( 0, (int) ( $_POST['review_max_photos'] ?? 5 ) ) );
@@ -834,15 +855,27 @@ function bhela_bm_settings_page() {
 				<tr><th>Review photos per guest</th><td><input type="number" name="review_max_photos" min="0" max="10" value="<?php echo esc_attr( $s['review_max_photos'] ?? 5 ); ?>"> <?php esc_html_e( 'photos, max', 'bhela-booking' ); ?>
 					<input type="number" name="review_max_mb" min="1" max="20" value="<?php echo esc_attr( $s['review_max_mb'] ?? 5 ); ?>"> MB <?php esc_html_e( 'each', 'bhela-booking' ); ?>
 					<p class="description"><?php esc_html_e( 'Guests attach these to the review they submit after a completed trip. JPEG, PNG and WebP only. Set photos to 0 to turn uploads off.', 'bhela-booking' ); ?></p></td></tr>
-				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="3" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea></td></tr>
+				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="4" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea>
+					<p class="description">
+						<?php esc_html_e( 'Printed at the bottom of every invoice. These fill in per booking:', 'bhela-booking' ); ?>
+						<code>{total}</code> <code>{advance}</code> <code>{advance_pct}</code> <code>{paid}</code> <code>{due}</code>
+						<br><?php esc_html_e( 'Use them instead of typing a fixed percentage — you now set each booking\'s advance yourself, so a hardcoded figure here can contradict the invoice above it.', 'bhela-booking' ); ?>
+					</p></td></tr>
 			</table>
 			</div><!-- /payment -->
 
 			<div class="bhela-set__panel" id="bhela-panel-pricing" role="tabpanel" aria-labelledby="bhela-tab-pricing">
 			<h2><?php esc_html_e( 'Pricing Days', 'bhela-booking' ); ?></h2>
 			<p class="bhela-set__lead"><?php esc_html_e( 'Which days charge the regular rate. Every other day gets the weekday rate, currently 20% less.', 'bhela-booking' ); ?></p>
+			<?php if ( ! array_filter( (array) $s['weekend_days'], 'strlen' ) ) : ?>
+				<div class="notice notice-warning inline" style="margin:12px 0"><p>
+					<strong><?php esc_html_e( 'No weekend days are ticked.', 'bhela-booking' ); ?></strong>
+					<?php esc_html_e( 'That means every date is charged the discounted weekday rate — including Fridays and Saturdays. Tick the days that should charge your regular rate.', 'bhela-booking' ); ?>
+				</p></div>
+			<?php endif; ?>
 			<table class="form-table">
 				<tr><th><?php esc_html_e( 'Weekend Days (regular rate)', 'bhela-booking' ); ?></th><td>
+					<input type="hidden" name="bhela_pricing_days_present" value="1">
 					<?php foreach ( $days as $num => $label ) : ?>
 						<label style="margin-right:14px"><input type="checkbox" name="weekend_days[]" value="<?php echo esc_attr( $num ); ?>" <?php checked( in_array( $num, array_map( 'intval', (array) $s['weekend_days'] ), true ) ); ?>> <?php echo esc_html( $label ); ?></label>
 					<?php endforeach; ?>
