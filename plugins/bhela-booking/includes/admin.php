@@ -335,6 +335,29 @@ function bhela_bm_actions_metabox( $post ) {
 		<?php if ( $invoice_no ) : ?>
 		<p><a class="button button-secondary" href="<?php echo esc_url( bhela_bm_invoice_url( $post->ID ) ); ?>" target="_blank">🧾 <?php esc_html_e( 'View / Print Invoice', 'bhela-booking' ); ?></a></p>
 	<?php endif; ?>
+	<?php if ( function_exists( 'bhela_bm_review_url' ) ) : ?>
+		<?php $bhela_rv = function_exists( 'bhela_bm_review_for_booking' ) ? bhela_bm_review_for_booking( $post->ID ) : 0; ?>
+		<p><a class="button button-secondary" href="<?php echo esc_url( bhela_bm_review_url( $post->ID ) ); ?>" target="_blank">⭐ <?php esc_html_e( 'Open review form', 'bhela-booking' ); ?></a></p>
+		<p class="description">
+			<?php if ( $bhela_rv ) : ?>
+				<?php
+				printf(
+					/* translators: %s: link to the submitted review */
+					esc_html__( 'This guest has already reviewed the trip — %s.', 'bhela-booking' ),
+					'<a href="' . esc_url( get_edit_post_link( $bhela_rv ) ) . '">'
+						. ( 'pending' === get_post_status( $bhela_rv )
+							? esc_html__( 'awaiting your approval', 'bhela-booking' )
+							: esc_html__( 'published', 'bhela-booking' ) )
+						. '</a>'
+				);
+				?>
+			<?php elseif ( 'completed' === $status ) : ?>
+				<?php esc_html_e( 'This is the private link emailed and texted to the guest. Nothing submitted yet.', 'bhela-booking' ); ?>
+			<?php else : ?>
+				<?php esc_html_e( 'Preview only — guests can open this once the booking is set to Completed.', 'bhela-booking' ); ?>
+			<?php endif; ?>
+		</p>
+	<?php endif; ?>
 	<?php if ( $email ) : ?>
 		<p><label><input type="checkbox" name="bhela_send_email" value="1"> <?php esc_html_e( 'Email summary + invoice link to customer on save', 'bhela-booking' ); ?></label></p>
 	<?php else : ?>
@@ -529,6 +552,11 @@ function bhela_bm_save_booking( $post_id, $post ) {
 			bhela_bm_email_customer( $post_id, 'confirmed' );
 			$sent_confirmed = true;
 		}
+		// Trip finished: thank the guest and invite a review. Guarded on the
+		// transition, so re-saving a completed booking never mails them twice.
+		if ( 'completed' === $new_status && 'completed' !== $old_status ) {
+			bhela_bm_email_customer( $post_id, 'completed' );
+		}
 		if ( function_exists( 'bhela_bm_sms_on_status_change' ) ) {
 			bhela_bm_sms_on_status_change( $post_id, $new_status, $old_status );
 		}
@@ -598,7 +626,7 @@ function bhela_bm_settings_page() {
 		$s['invoice_note']    = sanitize_textarea_field( $_POST['invoice_note'] ?? '' );
 
 		// Email notification settings.
-		foreach ( array( 'email_enabled', 'email_admin_new', 'email_customer_request', 'email_customer_confirmed' ) as $f ) {
+		foreach ( array( 'email_enabled', 'email_admin_new', 'email_customer_request', 'email_customer_confirmed', 'email_customer_completed' ) as $f ) {
 			$s[ $f ] = empty( $_POST[ $f ] ) ? 0 : 1;
 		}
 		$s['notify_email']    = sanitize_email( wp_unslash( $_POST['notify_email'] ?? '' ) );
@@ -608,6 +636,10 @@ function bhela_bm_settings_page() {
 		$s['child_fee']       = max( 0, (int) ( $_POST['child_fee'] ?? 5000 ) );
 		$s['date_chips']      = min( 20, max( 0, (int) ( $_POST['date_chips'] ?? 5 ) ) );
 		$s['weekend_days']    = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
+
+		// Guest review submissions — caps on the only public upload surface.
+		$s['review_max_photos'] = min( 10, max( 0, (int) ( $_POST['review_max_photos'] ?? 5 ) ) );
+		$s['review_max_mb']     = min( 20, max( 1, (int) ( $_POST['review_max_mb'] ?? 5 ) ) );
 
 		// SMS notification settings.
 		$s['sms_enabled']  = empty( $_POST['sms_enabled'] ) ? 0 : 1;
@@ -623,7 +655,7 @@ function bhela_bm_settings_page() {
 		if ( '' !== $posted_key && $posted_key !== bhela_bm_mask( $s['sms_api_key'] ) ) {
 			$s['sms_api_key'] = $posted_key;
 		}
-		foreach ( array( 'sms_tpl_admin', 'sms_tpl_new', 'sms_tpl_confirmed' ) as $f ) {
+		foreach ( array( 'sms_tpl_admin', 'sms_tpl_new', 'sms_tpl_confirmed', 'sms_tpl_completed' ) as $f ) {
 			$s[ $f ] = sanitize_textarea_field( wp_unslash( $_POST[ $f ] ?? '' ) );
 		}
 		// BulkSMSBD preset: lock the well-known endpoint + params.
@@ -690,6 +722,9 @@ function bhela_bm_settings_page() {
 				<tr><th>Date chips</th><td><input type="number" name="date_chips" min="0" max="20" value="<?php echo esc_attr( $s['date_chips'] ); ?>"><br><span class="description">How many upcoming Trip Calendar dates appear as quick-pick chips on the booking form. Set 0 to hide them.</span></td></tr>
 				<tr><th>Child fee (age 4–8)</th><td><input type="number" name="child_fee" min="0" step="100" value="<?php echo esc_attr( $s['child_fee'] ); ?>"> ৳ per child<br><span class="description">A flat charge — it does not follow the cabin rate or the weekday discount. Ages 0–4 are always free.</span></td></tr>
 				<tr><th>Invoice Prefix</th><td><input type="text" name="invoice_prefix" value="<?php echo esc_attr( $s['invoice_prefix'] ); ?>"></td></tr>
+				<tr><th>Review photos per guest</th><td><input type="number" name="review_max_photos" min="0" max="10" value="<?php echo esc_attr( $s['review_max_photos'] ?? 5 ); ?>"> <?php esc_html_e( 'photos, max', 'bhela-booking' ); ?>
+					<input type="number" name="review_max_mb" min="1" max="20" value="<?php echo esc_attr( $s['review_max_mb'] ?? 5 ); ?>"> MB <?php esc_html_e( 'each', 'bhela-booking' ); ?>
+					<p class="description"><?php esc_html_e( 'Guests attach these to the review they submit after a completed trip. JPEG, PNG and WebP only. Set photos to 0 to turn uploads off.', 'bhela-booking' ); ?></p></td></tr>
 				<tr><th>Invoice Note / Terms</th><td><textarea name="invoice_note" rows="3" class="large-text"><?php echo esc_textarea( $s['invoice_note'] ); ?></textarea></td></tr>
 			</table>
 
@@ -727,7 +762,8 @@ function bhela_bm_settings_page() {
 				<tr><th><?php esc_html_e( 'Which emails', 'bhela-booking' ); ?></th><td>
 					<label style="display:block;margin-bottom:6px"><input type="checkbox" name="email_admin_new" value="1" <?php checked( ! empty( $s['email_admin_new'] ) ); ?>> <?php esc_html_e( 'New booking → notify you (owner)', 'bhela-booking' ); ?></label>
 					<label style="display:block;margin-bottom:6px"><input type="checkbox" name="email_customer_request" value="1" <?php checked( ! empty( $s['email_customer_request'] ) ); ?>> <?php esc_html_e( 'New booking → customer (request received)', 'bhela-booking' ); ?></label>
-					<label style="display:block"><input type="checkbox" name="email_customer_confirmed" value="1" <?php checked( ! empty( $s['email_customer_confirmed'] ) ); ?>> <?php esc_html_e( 'Status = Confirmed → customer (confirmation)', 'bhela-booking' ); ?></label>
+					<label style="display:block;margin-bottom:6px"><input type="checkbox" name="email_customer_confirmed" value="1" <?php checked( ! empty( $s['email_customer_confirmed'] ) ); ?>> <?php esc_html_e( 'Status = Confirmed → customer (confirmation)', 'bhela-booking' ); ?></label>
+					<label style="display:block"><input type="checkbox" name="email_customer_completed" value="1" <?php checked( ! empty( $s['email_customer_completed'] ) ); ?>> <?php esc_html_e( 'Status = Completed → customer (thank-you + review invite)', 'bhela-booking' ); ?></label>
 				</td></tr>
 				<tr><th><?php esc_html_e( 'Owner notification email', 'bhela-booking' ); ?></th><td><input type="email" class="regular-text" name="notify_email" value="<?php echo esc_attr( $s['notify_email'] ); ?>" placeholder="<?php echo esc_attr( $s['email'] ); ?>">
 					<p class="description"><?php esc_html_e( 'Where new-booking alerts go. Blank = Business Email.', 'bhela-booking' ); ?></p></td></tr>
@@ -786,10 +822,12 @@ function bhela_bm_settings_page() {
 			</div>
 
 			<table class="form-table">
-				<tr><th colspan="2"><em><?php esc_html_e( 'Placeholders:', 'bhela-booking' ); ?></em> <code>{name} {phone} {invoice} {date} {cabin} {guests} {total} {advance} {due} {status}</code></th></tr>
+				<tr><th colspan="2"><em><?php esc_html_e( 'Placeholders:', 'bhela-booking' ); ?></em> <code>{name} {phone} {invoice} {date} {cabin} {guests} {total} {advance} {due} {status} {review_link}</code></th></tr>
 				<tr><th><?php esc_html_e( 'New booking → you', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_admin" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_admin'] ); ?></textarea></td></tr>
 				<tr><th><?php esc_html_e( 'New booking → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_new" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_new'] ); ?></textarea></td></tr>
 				<tr><th><?php esc_html_e( 'Status change → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_confirmed" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_confirmed'] ); ?></textarea></td></tr>
+				<tr><th><?php esc_html_e( 'Trip completed → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_completed" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_completed'] ?? '' ); ?></textarea>
+					<p class="description"><?php esc_html_e( 'Sent instead of the line above when a booking is marked Completed. Use {review_link} for the guest\'s private review link. Leave empty to keep using the generic status message.', 'bhela-booking' ); ?></p></td></tr>
 			</table>
 			<?php
 			$sms_last = get_transient( 'bhela_bm_sms_test_result' );

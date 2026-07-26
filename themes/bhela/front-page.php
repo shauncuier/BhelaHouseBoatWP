@@ -229,27 +229,43 @@ $img = get_template_directory_uri() . '/assets/images';
 			<span class="eyebrow reveal">অতিথিদের কথা</span>
 			<h2 class="section-title reveal">যারা ঘুরে এসেছেন</h2>
 		</div>
-		<div class="reviews-grid" style="margin-top:2.5rem">
-			<?php
-			$bhela_reviews = function_exists( 'bhela_bm_get_reviews' ) ? bhela_bm_get_reviews( 3 ) : array();
-			if ( ! $bhela_reviews ) {
-				$bhela_reviews = array(
+		<?php
+		// Every approved review, not just the first three — the carousel pages
+		// through them, so the section stays one screen tall however many there are.
+		$bhela_reviews = function_exists( 'bhela_bm_get_reviews' ) ? bhela_bm_get_reviews( 50 ) : array();
+		if ( ! $bhela_reviews ) {
+			$bhela_reviews = array(
 					array( 'name' => 'রাশেদুল ইসলাম', 'text' => 'পরিবার নিয়ে গিয়েছিলাম — কেবিন, খাবার, ক্রুদের ব্যবহার সবকিছু এক কথায় অসাধারণ। বাচ্চাদের নিয়ে এত নিরাপদ লেগেছে!', 'rating' => 5, 'subtitle' => 'Family Trip · Dhaka' ),
 					array( 'name' => 'সাবরিনা আক্তার', 'text' => 'অফিসের ২৮ জনের টিম নিয়ে Full Boat নিয়েছিলাম। রুফটপে টিম আড্ডা আর হাওরের সূর্যাস্ত — best team retreat ever!', 'rating' => 5, 'subtitle' => 'Corporate Tour' ),
-					array( 'name' => 'তানভীর হাসান', 'text' => 'Weekday অফারে বন্ধুরা মিলে গিয়েছিলাম। এই দামে AC কেবিন, এত খাবার আর ৭টা স্পট — টাঙ্গুয়ায় এর চেয়ে ভালো ডিল নেই।', 'rating' => 5, 'subtitle' => 'Friends Group' ),
-				);
-			}
-			foreach ( $bhela_reviews as $r ) :
-				?>
-				<div class="review reveal">
+				array( 'name' => 'তানভীর হাসান', 'text' => 'Weekday অফারে বন্ধুরা মিলে গিয়েছিলাম। এই দামে AC কেবিন, এত খাবার আর ৭টা স্পট — টাঙ্গুয়ায় এর চেয়ে ভালো ডিল নেই।', 'rating' => 5, 'subtitle' => 'Friends Group' ),
+			);
+		}
+		?>
+		<div class="rev-carousel reveal" data-rev-carousel style="margin-top:2.5rem">
+			<button type="button" class="rev-nav rev-nav--prev" aria-label="আগের রিভিউ" hidden>&#8249;</button>
+			<div class="rev-track" tabindex="0" role="group" aria-roledescription="carousel" aria-label="অতিথিদের রিভিউ">
+			<?php foreach ( $bhela_reviews as $r ) : ?>
+				<div class="review">
 					<div class="review__stars"><?php echo esc_html( str_repeat( '★', max( 1, (int) $r['rating'] ) ) ); ?></div>
 					<p>"<?php echo esc_html( $r['text'] ); ?>"</p>
+					<?php if ( ! empty( $r['photos'] ) ) : ?>
+						<div class="review__photos">
+							<?php foreach ( $r['photos'] as $bhela_ph ) : ?>
+								<a href="<?php echo esc_url( $bhela_ph['full'] ); ?>" target="_blank" rel="noopener">
+									<img src="<?php echo esc_url( $bhela_ph['thumb'] ); ?>" alt="<?php echo esc_attr( $bhela_ph['alt'] ); ?>" loading="lazy">
+								</a>
+							<?php endforeach; ?>
+						</div>
+					<?php endif; ?>
 					<div class="review__who">
 						<span class="avatar"><?php echo esc_html( mb_substr( $r['name'], 0, 1 ) ); ?></span>
 						<div><strong><?php echo esc_html( $r['name'] ); ?></strong><span><?php echo esc_html( $r['subtitle'] ); ?></span></div>
 					</div>
 				</div>
 			<?php endforeach; ?>
+			</div>
+			<button type="button" class="rev-nav rev-nav--next" aria-label="পরের রিভিউ" hidden>&#8250;</button>
+			<div class="rev-dots" aria-hidden="true"></div>
 		</div>
 	</div>
 </section>

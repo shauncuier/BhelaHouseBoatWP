@@ -50,6 +50,104 @@
 			document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('is-visible'); });
 		}
 
+		/* ----- Reviews carousel -----
+		   The track already scrolls and snaps with CSS alone, so this only adds
+		   arrows and dots. Everything is measured from the live layout rather
+		   than hardcoded, so the same code handles 1, 2 or 3 cards per view. */
+		document.querySelectorAll('[data-rev-carousel]').forEach(function (root) {
+			var track = root.querySelector('.rev-track');
+			var prev = root.querySelector('.rev-nav--prev');
+			var next = root.querySelector('.rev-nav--next');
+			var dots = root.querySelector('.rev-dots');
+			if (!track) return;
+
+			var cards = Array.prototype.slice.call(track.querySelectorAll('.review'));
+			if (!cards.length) return;
+
+			function step() {
+				// Card width plus the flex gap, read back from the rendered layout.
+				if (cards.length < 2) return cards[0].offsetWidth;
+				return cards[1].offsetLeft - cards[0].offsetLeft;
+			}
+			function perView() {
+				return Math.max(1, Math.round(track.clientWidth / step()));
+			}
+			function pages() {
+				return Math.max(1, Math.ceil(cards.length / perView()));
+			}
+			function currentPage() {
+				var p = Math.round(track.scrollLeft / (step() * perView()));
+				return Math.min(pages() - 1, Math.max(0, p));
+			}
+
+			function buildDots() {
+				if (!dots) return;
+				dots.innerHTML = '';
+				var total = pages();
+				if (total < 2) return;
+				for (var i = 0; i < total; i++) {
+					var b = document.createElement('button');
+					b.type = 'button';
+					b.setAttribute('aria-label', 'রিভিউ পেজ ' + (i + 1));
+					(function (idx) {
+						b.addEventListener('click', function () {
+							track.scrollTo({ left: idx * step() * perView(), behavior: 'smooth' });
+						});
+					})(i);
+					dots.appendChild(b);
+				}
+			}
+
+			function sync() {
+				// Snapping and sub-pixel layout leave scrollLeft a few px off the
+				// true extremes, so compare with a tolerance rather than to 0.
+				var slack = 12;
+				var atStart = track.scrollLeft <= slack;
+				var atEnd = track.scrollLeft >= track.scrollWidth - track.clientWidth - slack;
+				var many = cards.length > perView();
+				if (prev) prev.hidden = !many || atStart;
+				if (next) next.hidden = !many || atEnd;
+				if (dots) {
+					var cur = currentPage();
+					Array.prototype.forEach.call(dots.children, function (d, i) {
+						d.classList.toggle('is-active', i === cur);
+					});
+				}
+			}
+
+			if (prev) prev.addEventListener('click', function () {
+				track.scrollBy({ left: -step() * perView(), behavior: 'smooth' });
+			});
+			if (next) next.addEventListener('click', function () {
+				track.scrollBy({ left: step() * perView(), behavior: 'smooth' });
+			});
+
+			// Keyboard: the track is focusable, so arrow keys page through it.
+			track.addEventListener('keydown', function (e) {
+				if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+				e.preventDefault();
+				track.scrollBy({ left: (e.key === 'ArrowRight' ? 1 : -1) * step() * perView(), behavior: 'smooth' });
+			});
+
+			var raf;
+			track.addEventListener('scroll', function () {
+				if (raf) cancelAnimationFrame(raf);
+				raf = requestAnimationFrame(sync);
+			}, { passive: true });
+
+			var rt;
+			window.addEventListener('resize', function () {
+				clearTimeout(rt);
+				rt = setTimeout(function () { buildDots(); sync(); }, 150);
+			}, { passive: true });
+
+			buildDots();
+			sync();
+			// Images loading late change the card height, not the width, but a
+			// late web font can shift widths — re-measure once everything settles.
+			window.addEventListener('load', function () { buildDots(); sync(); });
+		});
+
 		/* ----- Hero quick estimator ----- */
 		var qeGuests = document.getElementById('qe-guests');
 		var qeDate = document.getElementById('qe-date');

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.15.11
+ * Version: 2.16.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.15.11' );
+define( 'BHELA_BM_VERSION', '2.16.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -49,6 +49,7 @@ function bhela_bm_default_settings() {
 		'email_admin_new'          => 1, // notify owner on a new booking
 		'email_customer_request'   => 1, // customer "request received" email
 		'email_customer_confirmed' => 1, // customer "confirmed" email
+		'email_customer_completed' => 1, // customer thank-you + review invite
 		'notify_email'             => '', // admin recipient (blank → business email)
 		'email_from_name'          => '', // From name (blank → business_name)
 		'email_reply_to'           => '', // Reply-To (blank → business email)
@@ -70,6 +71,11 @@ function bhela_bm_default_settings() {
 		'sms_tpl_admin'      => "নতুন বুকিং! {invoice} — {name}, {phone}, {date}, {guests} জন, মোট {total}।",
 		'sms_tpl_new'        => "প্রিয় {name}, ভেলা হাউসবোটে আপনার বুকিং রিকোয়েস্ট ({invoice}) পেয়েছি। তারিখ {date}। আমরা শীঘ্রই যোগাযোগ করব। — BHELA",
 		'sms_tpl_confirmed'  => "প্রিয় {name}, আপনার বুকিং {invoice} এখন: {status}। তারিখ {date}। বাকি {due}। ধন্যবাদ — BHELA",
+		'sms_tpl_completed'  => "প্রিয় {name}, ভেলার সাথে ভ্রমণের জন্য ধন্যবাদ! আপনার মতামত জানান: {review_link} — BHELA",
+
+		// Guest review submissions.
+		'review_max_photos'  => 5,   // photos per review
+		'review_max_mb'      => 5,   // megabytes per photo
 	);
 }
 

@@ -52,6 +52,8 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 		'{advance}' => bhela_bm_money( (int) $m( '_bhela_advance' ) ),
 		'{due}'     => bhela_bm_money( max( 0, $total - $paid ) ),
 		'{status}'  => bhela_bm_statuses()[ $status ] ?? $status,
+		// Private review link — only meaningful in the completion template.
+		'{review_link}' => function_exists( 'bhela_bm_review_url' ) ? bhela_bm_review_url( $booking_id ) : '',
 	);
 	return strtr( (string) $template, $map );
 }
@@ -182,9 +184,15 @@ function bhela_bm_sms_on_status_change( $booking_id, $new_status, $old_status ) 
 	}
 	$s     = bhela_bm_get_settings();
 	$phone = get_post_meta( $booking_id, '_bhela_phone', true );
-	if ( $phone ) {
-		bhela_bm_send_sms( $phone, bhela_bm_render_sms( $s['sms_tpl_confirmed'], $booking_id ) );
+	if ( ! $phone ) {
+		return;
 	}
+	// A finished trip gets the thank-you + review link instead of the generic
+	// status line — same single message, so this costs nothing extra.
+	$tpl = ( 'completed' === $new_status && ! empty( $s['sms_tpl_completed'] ) )
+		? $s['sms_tpl_completed']
+		: $s['sms_tpl_confirmed'];
+	bhela_bm_send_sms( $phone, bhela_bm_render_sms( $tpl, $booking_id ) );
 }
 
 /* ---------- Admin: test-send endpoint ---------- */

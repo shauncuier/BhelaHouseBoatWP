@@ -107,7 +107,11 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	$wa_num     = preg_replace( '/[^0-9]/', '', $settings['whatsapp'] );
 	$wa_url     = 'https://wa.me/' . $wa_num . '?text=' . rawurlencode( 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice_no );
 
-	if ( 'confirmed' === $type ) {
+	if ( 'completed' === $type ) {
+		$banner_bg   = '#0E6E6B';
+		$banner_text = '🙏 ধন্যবাদ!';
+		$intro       = 'প্রিয় ' . esc_html( $name ) . ', ভেলার সাথে হাওর ভ্রমণের জন্য ধন্যবাদ! 🛶 আপনার অভিজ্ঞতা আমাদের কাছে অনেক মূল্যবান — নিচের বাটনে ক্লিক করে কয়েক মিনিটেই একটি রিভিউ ও ট্রিপের ছবি শেয়ার করতে পারেন।';
+	} elseif ( 'confirmed' === $type ) {
 		$banner_bg   = '#1a7f37';
 		$banner_text = '✅ বুকিং কনফার্মড!';
 		$intro       = 'প্রিয় ' . esc_html( $name ) . ', আপনার ভেলা হাউসবোট বুকিং নিশ্চিত হয়েছে! 🎉 নিচে আপনার ট্রিপের বিস্তারিত দেওয়া হলো।';
@@ -169,6 +173,9 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 					</table>
 					<?php echo $boarding; ?>
 					<div style="text-align:center;margin:24px 0 6px;">
+						<?php if ( 'completed' === $type && function_exists( 'bhela_bm_review_url' ) ) : ?>
+							<?php echo bhela_bm_email_btn( bhela_bm_review_url( $booking_id ), '⭐ রিভিউ ও ছবি দিন', '#E5601F' ); ?>
+						<?php endif; ?>
 						<?php echo bhela_bm_email_btn( $inv_url, '🧾 ইনভয়েস দেখুন / প্রিন্ট করুন', '#137A74' ); ?>
 						<?php echo bhela_bm_email_btn( $wa_url, '💬 WhatsApp-এ যোগাযোগ', '#25D366' ); ?>
 					</div>
@@ -200,25 +207,61 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	return ob_get_clean();
 }
 
-/** Customer email (branded HTML). $type: 'request' | 'confirmed'. */
+/**
+ * Per-type email definition: which setting gates it, its subject, and the log
+ * word. A map rather than a ternary chain — the old binary form quietly funnelled
+ * every unrecognised type into the "request" bucket, so a new type could not be
+ * added without it silently mailing the wrong thing.
+ *
+ * @param string $type request | confirmed | completed.
+ */
+function bhela_bm_email_customer_types( $type ) {
+	$map = array(
+		'request'   => array(
+			'gate'    => 'email_customer_request',
+			'subject' => '🛶 BHELA Booking Request Received — %s',
+			'log'     => 'Request',
+		),
+		'confirmed' => array(
+			'gate'    => 'email_customer_confirmed',
+			'subject' => '✅ BHELA Booking Confirmed — %s',
+			'log'     => 'Confirmation',
+		),
+		'completed' => array(
+			'gate'    => 'email_customer_completed',
+			'subject' => '🙏 Thank you for travelling with BHELA — %s',
+			'log'     => 'Thank-you',
+		),
+	);
+	return $map[ $type ] ?? $map['request'];
+}
+
+/** Customer email (branded HTML). $type: 'request' | 'confirmed' | 'completed'. */
 function bhela_bm_email_customer( $booking_id, $type = 'request' ) {
-	$email = get_post_meta( $booking_id, '_bhela_email', true );
-	if ( ! $email || ! is_email( $email ) ) {
-		return false;
-	}
+	$def        = bhela_bm_email_customer_types( $type );
 	$settings   = bhela_bm_get_settings();
-	if ( empty( $settings['email_enabled'] ) ) {
-		return false;
-	}
-	$type_key = ( 'confirmed' === $type ) ? 'email_customer_confirmed' : 'email_customer_request';
-	if ( empty( $settings[ $type_key ] ) ) {
-		return false;
-	}
 	$invoice_no = get_post_meta( $booking_id, '_bhela_invoice_no', true );
 
-	$subject = ( 'confirmed' === $type )
-		? sprintf( '✅ BHELA Booking Confirmed — %s', $invoice_no )
-		: sprintf( '🛶 BHELA Booking Request Received — %s', $invoice_no );
+	// Say why nothing was sent. A silent return here is indistinguishable from a
+	// delivery failure, which sends the owner hunting for a bug that isn't there.
+	$skip = function ( $why ) use ( $def, $invoice_no ) {
+		if ( function_exists( 'bhela_bm_log' ) ) {
+			bhela_bm_log( 'email', sprintf( '%s email not sent (%s) — %s', $def['log'], $why, $invoice_no ), false );
+		}
+		return false;
+	};
+
+	$email = get_post_meta( $booking_id, '_bhela_email', true );
+	if ( ! $email || ! is_email( $email ) ) {
+		return $skip( __( 'no customer email on this booking', 'bhela-booking' ) );
+	}
+	if ( empty( $settings['email_enabled'] ) ) {
+		return $skip( __( 'Settings → "Enable emails" is off', 'bhela-booking' ) );
+	}
+	if ( empty( $settings[ $def['gate'] ] ) ) {
+		return $skip( __( 'this notification is switched off in Settings', 'bhela-booking' ) );
+	}
+	$subject = sprintf( $def['subject'], $invoice_no );
 
 	$body      = bhela_bm_email_customer_html( $booking_id, $type );
 	$from      = sanitize_email( $settings['email'] ? $settings['email'] : get_option( 'admin_email' ) );
@@ -236,8 +279,8 @@ function bhela_bm_email_customer( $booking_id, $type = 'request' ) {
 	if ( function_exists( 'bhela_bm_log' ) ) {
 		bhela_bm_log(
 			$sent ? 'email' : 'error',
-			sprintf( '%s ইমেইল %s — %s (%s)', 'confirmed' === $type ? 'কনফার্মেশন' : 'রিকোয়েস্ট',
-				$sent ? 'পাঠানো হয়েছে' : 'পাঠানো যায়নি', $email, $invoice_no ),
+			sprintf( '%s email %s — %s (%s)', $def['log'],
+				$sent ? 'sent' : 'failed', $email, $invoice_no ),
 			$sent
 		);
 	}

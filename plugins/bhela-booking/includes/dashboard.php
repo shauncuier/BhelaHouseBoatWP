@@ -157,6 +157,9 @@ function bhela_bm_dashboard_page() {
 	$gallery_n = function_exists( 'bhela_bm_get_gallery' ) ? count( bhela_bm_get_gallery() ) : 0;
 	$review_q  = new WP_Query( array( 'post_type' => 'bhela_review', 'post_status' => 'publish', 'posts_per_page' => 1, 'fields' => 'ids' ) );
 	$review_n  = (int) $review_q->found_posts;
+	// Guest-submitted reviews sit in 'pending' until approved, so the published
+	// count alone would hide them.
+	$review_pending = function_exists( 'bhela_bm_reviews_pending_count' ) ? bhela_bm_reviews_pending_count() : 0;
 
 	// Setup-health checklist.
 	$checks = array(
@@ -299,7 +302,13 @@ function bhela_bm_dashboard_page() {
 					<h2><?php esc_html_e( 'Content', 'bhela-booking' ); ?></h2>
 					<table>
 						<tr><td>🖼️ <?php esc_html_e( 'Gallery photos', 'bhela-booking' ); ?></td><td style="text-align:right"><strong><?php echo esc_html( $gallery_n ); ?></strong> · <a href="<?php echo $link( array( 'post_type' => 'bhela_gallery' ) ); ?>"><?php esc_html_e( 'manage', 'bhela-booking' ); ?></a></td></tr>
-						<tr><td>⭐ <?php esc_html_e( 'Reviews', 'bhela-booking' ); ?></td><td style="text-align:right"><strong><?php echo esc_html( $review_n ); ?></strong> · <a href="<?php echo $link( array( 'post_type' => 'bhela_review' ) ); ?>"><?php esc_html_e( 'manage', 'bhela-booking' ); ?></a></td></tr>
+						<tr><td>⭐ <?php esc_html_e( 'Reviews', 'bhela-booking' ); ?></td><td style="text-align:right"><strong><?php echo esc_html( $review_n ); ?></strong>
+						<?php if ( $review_pending ) : ?>
+							· <a href="<?php echo $link( array( 'post_type' => 'bhela_review', 'post_status' => 'pending' ) ); ?>" style="color:#b45309;font-weight:600"><?php echo esc_html( sprintf(
+								/* translators: %d: number of reviews awaiting approval */
+								_n( '%d awaiting approval', '%d awaiting approval', $review_pending, 'bhela-booking' ), $review_pending ) ); ?></a>
+						<?php endif; ?>
+						· <a href="<?php echo $link( array( 'post_type' => 'bhela_review' ) ); ?>"><?php esc_html_e( 'manage', 'bhela-booking' ); ?></a></td></tr>
 					</table>
 				</div>
 

@@ -484,6 +484,11 @@
 }
 .bhela-review-card__stars { color: #F5C97B; letter-spacing: .2em; margin-bottom: .7rem; font-size: 1.05rem; }
 .bhela-review-card p { font-size: .96rem; line-height: 1.8; margin: 0 0 1rem; }
+/* Guest-uploaded trip photos, shown once a review is approved. */
+.bhela-review-card__photos { display: flex; flex-wrap: wrap; gap: 6px; margin: .8rem 0 0; }
+.bhela-review-card__photos img { width: 62px; height: 62px; object-fit: cover; border-radius: 8px; display: block; transition: transform .15s ease; }
+.bhela-review-card__photos a:hover img { transform: scale(1.06); }
+
 .bhela-review-card__who { display: flex; align-items: center; gap: .7rem; }
 .bhela-review-card__avatar {
 	width: 42px; height: 42px; border-radius: 50%; background: var(--primary, #137A74); color: #fff;

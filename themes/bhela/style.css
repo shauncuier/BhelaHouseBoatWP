@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.15.11
+Version: 2.16.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -377,12 +377,62 @@ a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 
    10. REVIEWS
    ========================================================== */
 .reviews-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.6rem; }
+
+/* ---------- Reviews carousel ----------
+   Native horizontal scroll + scroll-snap, so it works with a finger swipe, a
+   trackpad and the keyboard before any JS runs. The arrows and dots are
+   progressive enhancement — theme.js unhides them once it takes over. */
+.rev-carousel { position: relative; }
+.rev-track {
+	display: flex; gap: 1.6rem; overflow-x: auto; scroll-snap-type: x mandatory;
+	scroll-behavior: smooth; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+	padding-bottom: .5rem;
+	/* No inline padding: it would offset the resting scrollLeft off zero and
+	   make the "at the start" test in theme.js unreliable. */
+}
+.rev-track::-webkit-scrollbar { display: none; }
+.rev-track:focus-visible { outline: 2px solid var(--accent, #E5A400); outline-offset: 6px; border-radius: var(--radius); }
+.rev-track > .review {
+	flex: 0 0 clamp(260px, 84vw, 340px);
+	scroll-snap-align: start; height: auto;
+}
+@media (min-width: 700px)  { .rev-track > .review { flex-basis: calc((100% - 1.6rem) / 2); } }
+@media (min-width: 1040px) { .rev-track > .review { flex-basis: calc((100% - 3.2rem) / 3); } }
+
+.rev-nav {
+	position: absolute; top: 50%; transform: translateY(-50%); z-index: 3;
+	width: 44px; height: 44px; border-radius: 50%; cursor: pointer;
+	border: 1px solid var(--line-inverse); background: rgba(10,42,47,.86); color: #fff;
+	font-size: 26px; line-height: 1; display: flex; align-items: center; justify-content: center;
+	backdrop-filter: blur(6px); transition: background .2s, opacity .2s, transform .2s;
+}
+.rev-nav:hover { background: var(--accent, #E5A400); color: #0A2A2F; }
+.rev-nav:focus-visible { outline: 2px solid var(--accent, #E5A400); outline-offset: 3px; }
+.rev-nav[hidden] { display: none; }
+.rev-nav--prev { left: -8px; }
+.rev-nav--next { right: -8px; }
+@media (max-width: 780px) { .rev-nav { display: none; } }
+
+.rev-dots { display: flex; justify-content: center; gap: 8px; margin-top: 1.5rem; flex-wrap: wrap; }
+.rev-dots button {
+	width: 9px; height: 9px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+	background: rgba(255,255,255,.28); transition: background .25s, width .25s;
+}
+.rev-dots button.is-active { background: var(--accent, #E5A400); width: 26px; border-radius: 5px; }
+.rev-dots:empty { display: none; }
+
+@media (prefers-reduced-motion: reduce) { .rev-track { scroll-behavior: auto; } }
 .review {
 	background: rgba(255,255,255,.06); border: 1px solid var(--line-inverse);
 	border-radius: var(--radius); padding: 1.8rem;
 }
 .review__stars { color: var(--gold); letter-spacing: .2em; margin-bottom: .8rem; }
 .review p { font-size: .98rem; }
+/* Guest-uploaded trip photos, shown once a review is approved. */
+.review__photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 1rem; }
+.review__photos img { width: 66px; height: 66px; object-fit: cover; border-radius: 10px; display: block; border: 1px solid rgba(255,255,255,.14); transition: transform .15s ease; }
+.review__photos a:hover img { transform: scale(1.06); }
+
 .review__who { margin-top: 1.2rem; display: flex; align-items: center; gap: .8rem; }
 .review__who .avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--primary); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.1rem; }
 .review__who strong { color: #fff; display: block; line-height: 1.3; }
