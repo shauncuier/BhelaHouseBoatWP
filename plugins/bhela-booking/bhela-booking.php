@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.16.0
+ * Version: 2.17.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.16.0' );
+define( 'BHELA_BM_VERSION', '2.17.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -56,6 +56,12 @@ function bhela_bm_default_settings() {
 
 		// SMS notifications (provider-agnostic — configure any BD gateway).
 		'sms_enabled'        => 0,
+		// Per-message switches, mirroring the email ones. Default on so enabling
+		// the master switch behaves exactly as it did before these existed.
+		'sms_admin_new'           => 1, // new booking → owner
+		'sms_customer_request'    => 1, // new booking → customer
+		'sms_customer_confirmed'  => 1, // status change → customer
+		'sms_customer_completed'  => 1, // trip completed → customer (review invite)
 		'sms_provider'       => 'bulksmsbd', // 'bulksmsbd' | 'custom'
 		'sms_api_url'        => 'https://bulksmsbd.net/api/smsapi',
 		'sms_method'         => 'GET',       // GET | POST

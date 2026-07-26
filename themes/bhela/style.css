@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.16.0
+Version: 2.17.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -265,6 +265,10 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 .qe-avail.is-open { color: #7ee0a0; background: rgba(26,127,55,.2); }
 .qe-avail.is-full { color: #ff9d94; background: rgba(179,45,46,.24); }
 .qe-avail.is-none { color: var(--gold); background: rgba(245,201,123,.16); }
+/* Required: the UA sheet's [hidden]{display:none} loses to the display values
+   above, so without this the empty pill paints as a stray dot before a date is
+   picked, and the quote panel can never be hidden again. */
+.qe-avail[hidden], .qe-quote[hidden] { display: none; }
 
 /* Quote panel */
 .qe-quote {

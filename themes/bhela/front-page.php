@@ -77,7 +77,8 @@ $img = get_template_directory_uri() . '/assets/images';
 					<label for="qe-guests">মোট অতিথি</label>
 					<select id="qe-guests">
 						<?php for ( $i = 2; $i <= 36; $i++ ) : // booking needs at least 2 people ?>
-							<option value="<?php echo esc_attr( $i ); ?>" <?php selected( $i, 4 ); ?>><?php echo esc_html( $i ); ?> জন</option>
+							<?php // Default 6 — one full cabin, the most common booking. ?>
+							<option value="<?php echo esc_attr( $i ); ?>" <?php selected( $i, 6 ); ?>><?php echo esc_html( $i ); ?> জন</option>
 						<?php endfor; ?>
 					</select>
 				</div>

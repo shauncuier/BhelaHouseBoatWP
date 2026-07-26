@@ -92,6 +92,12 @@ function bhela_bm_send_sms( $number, $message ) {
 	}
 	$to = bhela_bm_sms_number( $number );
 	if ( '' === $to || '' === trim( (string) $message ) ) {
+		// Say why. A silent return here reads exactly like a gateway failure.
+		if ( function_exists( 'bhela_bm_log' ) ) {
+			bhela_bm_log( 'sms', '' === $to
+				? 'SMS not sent — no valid mobile number.'
+				: 'SMS not sent — the message template is empty.', false );
+		}
 		return false;
 	}
 
@@ -165,16 +171,38 @@ function bhela_bm_sms_admin_number() {
 	return ! empty( $s['sms_admin_number'] ) ? $s['sms_admin_number'] : $s['phone_1'];
 }
 
+/**
+ * A message template, falling back to the packaged default when the stored one
+ * is blank.
+ *
+ * A blank template used to mean "send nothing", silently — bhela_bm_send_sms()
+ * drops empty messages, so a template cleared by accident disabled that
+ * notification with no trace. Whether a message sends is now the checkbox's job,
+ * so a blank box simply means "use the wording we shipped".
+ *
+ * @param string $key sms_tpl_* settings key.
+ */
+function bhela_bm_sms_template( $key ) {
+	$s = bhela_bm_get_settings();
+	if ( ! empty( $s[ $key ] ) && '' !== trim( $s[ $key ] ) ) {
+		return $s[ $key ];
+	}
+	$defaults = bhela_bm_default_settings();
+	return $defaults[ $key ] ?? '';
+}
+
 /* ---------- Triggers ---------- */
 
 /** New booking → customer + admin. Called from the submission processor. */
 function bhela_bm_sms_on_new_booking( $booking_id ) {
 	$s     = bhela_bm_get_settings();
 	$phone = get_post_meta( $booking_id, '_bhela_phone', true );
-	if ( $phone ) {
-		bhela_bm_send_sms( $phone, bhela_bm_render_sms( $s['sms_tpl_new'], $booking_id ) );
+	if ( $phone && ! empty( $s['sms_customer_request'] ) ) {
+		bhela_bm_send_sms( $phone, bhela_bm_render_sms( bhela_bm_sms_template( 'sms_tpl_new' ), $booking_id ) );
 	}
-	bhela_bm_send_sms( bhela_bm_sms_admin_number(), bhela_bm_render_sms( $s['sms_tpl_admin'], $booking_id ) );
+	if ( ! empty( $s['sms_admin_new'] ) ) {
+		bhela_bm_send_sms( bhela_bm_sms_admin_number(), bhela_bm_render_sms( bhela_bm_sms_template( 'sms_tpl_admin' ), $booking_id ) );
+	}
 }
 
 /** Status change → customer. Called from the booking save handler. */
@@ -188,10 +216,14 @@ function bhela_bm_sms_on_status_change( $booking_id, $new_status, $old_status ) 
 		return;
 	}
 	// A finished trip gets the thank-you + review link instead of the generic
-	// status line — same single message, so this costs nothing extra.
-	$tpl = ( 'completed' === $new_status && ! empty( $s['sms_tpl_completed'] ) )
-		? $s['sms_tpl_completed']
-		: $s['sms_tpl_confirmed'];
+	// status line — same single message, so this costs nothing extra. Each has
+	// its own switch, so the owner can pay for one and not the other.
+	$completed = ( 'completed' === $new_status );
+	$gate      = $completed ? 'sms_customer_completed' : 'sms_customer_confirmed';
+	if ( empty( $s[ $gate ] ) ) {
+		return;
+	}
+	$tpl = bhela_bm_sms_template( $completed ? 'sms_tpl_completed' : 'sms_tpl_confirmed' );
 	bhela_bm_send_sms( $phone, bhela_bm_render_sms( $tpl, $booking_id ) );
 }
 
