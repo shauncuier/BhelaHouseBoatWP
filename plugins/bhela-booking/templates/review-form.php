@@ -58,7 +58,9 @@ $bhela_done = $submitted || $existing;
 	.rv__done .tick { font-size:52px; line-height:1; }
 	.rv__done h1 { margin:14px 0 8px; }
 	.rv__foot { background:#0B2E33; color:#cfe3e2; text-align:center; padding:16px; font-size:12.5px; }
-	.rv__foot a { color:#8fd6cf; }
+	.rv__foot a { color:#8fd6cf; text-decoration:none; }
+	.rv__foot a:hover { text-decoration:underline; }
+	.rv__by { margin-top:6px; font-size:11.5px; color:#7fa6a4; }
 	@media (max-width:520px) { .rv__body { padding:22px 20px 26px; } .rv__head { padding:22px; } }
 	</style>
 </head>
@@ -146,10 +148,19 @@ $bhela_done = $submitted || $existing;
 		<?php endif; ?>
 
 		<div class="rv__foot">
-			<?php echo esc_html( $settings['business_name'] ); ?>
+			<a href="<?php echo esc_url( home_url( '/' ) ); ?>">🌐 <?php echo esc_html( preg_replace( '#^www\.#', '', (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) ) ); ?></a>
 			<?php if ( ! empty( $settings['ops_manager'] ) ) : ?>
-				· <?php esc_html_e( 'Operation Manager:', 'bhela-booking' ); ?> <?php echo esc_html( $settings['ops_manager'] ); ?>
+				&nbsp;·&nbsp; <?php esc_html_e( 'Operation Manager:', 'bhela-booking' ); ?> <?php echo esc_html( $settings['ops_manager'] ); ?>
 			<?php endif; ?>
+			<div class="rv__by">
+				<?php
+				printf(
+					/* translators: %s: linked developer name */
+					esc_html__( 'Designed &amp; developed by %s', 'bhela-booking' ),
+					'<a href="https://3s-soft.com" target="_blank" rel="noopener">3s-Soft</a>'
+				);
+				?>
+			</div>
 		</div>
 	</div>
 </body>

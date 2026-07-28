@@ -323,9 +323,18 @@ $do_save( array(
 	'bhela_cabin_c48'    => array( 1 ),
 	'bhela_cabin_c04'    => array( 1 ),
 ) );
-bhela_is( 'head count follows the cabin combination', (int) get_post_meta( $edit, '_bhela_guests', true ), 5 );
+// 3 adults + 1 child(4-8) + 1 infant. "Guests" means paying occupants, so the
+// free 0-4 infant is not counted — the same rule bhela_bm_calc_multi() applies,
+// which is what keeps the SMS and the invoice showing one number.
+bhela_is( 'head count follows the cabin combination', (int) get_post_meta( $edit, '_bhela_guests', true ), 4 );
 bhela_is( 'cabin count follows the combination', (int) get_post_meta( $edit, '_bhela_cabin_count', true ), 1 );
-bhela_is( 'the SMS reports the same head count', bhela_bm_render_sms( '{guests}', $edit ), '5' );
+bhela_is( 'the SMS reports the same head count', bhela_bm_render_sms( '{guests}', $edit ), '4' );
+
+// The engine is the authority on what "guests" means — assert they agree.
+$engine = bhela_bm_calc_multi( array( array( 'adults' => 3, 'c48' => 1, 'c04' => 1 ) ), '2029-12-28' );
+if ( ! is_wp_error( $engine ) ) {
+	bhela_is( 'the saved count matches the pricing engine', (int) get_post_meta( $edit, '_bhela_guests', true ), (int) $engine['guests'] );
+}
 
 $do_save( array() ); // no combo posted at all
 bhela_is( 'without a combination the typed number is respected', (int) get_post_meta( $edit, '_bhela_guests', true ), 1 );

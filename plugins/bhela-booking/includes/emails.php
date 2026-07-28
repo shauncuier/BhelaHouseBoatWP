@@ -192,12 +192,15 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 				<tr><td style="background:#0A2A2F;padding:20px 32px;text-align:center;">
 					<div style="font-size:13px;color:#DCEBE9;line-height:2;">
 						📞 <?php echo esc_html( $settings['phone_1'] ); ?>, <?php echo esc_html( $settings['phone_2'] ); ?><br>
-						✉️ <?php echo esc_html( $settings['email'] ); ?> &nbsp;·&nbsp; 📍 <?php echo esc_html( $settings['address'] ); ?>
+						✉️ <?php echo esc_html( $settings['email'] ); ?> &nbsp;·&nbsp; 🌐 <a href="<?php echo esc_url( home_url( '/' ) ); ?>" style="color:#DCEBE9;text-decoration:none;"><?php echo esc_html( preg_replace( '#^www\.#', '', (string) wp_parse_url( home_url( '/' ), PHP_URL_HOST ) ) ); ?></a><br>
+						📍 <?php echo esc_html( $settings['address'] ); ?>
 					</div>
 					<div style="font-size:12px;color:#F5C97B;margin-top:10px;font-style:italic;">"<?php echo esc_html( $settings['business_tagline'] ); ?>"</div>
 				</td></tr>
 			</table>
-			<div style="font-size:11px;color:#8aa19f;margin-top:14px;">© <?php echo esc_html( date( 'Y' ) ); ?> <?php echo esc_html( $settings['business_name'] ); ?></div>
+			<div style="font-size:11px;color:#8aa19f;margin-top:14px;">© <?php echo esc_html( date( 'Y' ) ); ?> <?php echo esc_html( $settings['business_name'] ); ?>
+				&nbsp;·&nbsp; Designed &amp; developed by <a href="https://3s-soft.com" target="_blank" rel="noopener" style="color:#8aa19f;">3s-Soft</a>
+			</div>
 		</td></tr>
 	</table>
 </body>

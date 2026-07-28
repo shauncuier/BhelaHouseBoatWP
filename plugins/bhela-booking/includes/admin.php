@@ -468,10 +468,15 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		$cnt      = 0;
 		$heads    = 0;
 		foreach ( $adults_c as $i => $a ) {
-			$row = (int) $a + (int) ( $c48_c[ $i ] ?? 0 ) + (int) ( $c04_c[ $i ] ?? 0 );
-			if ( $row > 0 ) {
+			$adults = (int) $a;
+			$c48    = (int) ( $c48_c[ $i ] ?? 0 );
+			$c04    = (int) ( $c04_c[ $i ] ?? 0 );
+			if ( $adults + $c48 + $c04 > 0 ) {
 				$cnt++;
-				$heads += $row;
+				// Match bhela_bm_calc_multi(): "guests" means paying occupants, so
+				// 0–4 infants ride along without being counted. Counting them here
+				// would put a different number in the SMS than on the invoice.
+				$heads += $adults + $c48;
 			}
 		}
 		update_post_meta( $post_id, '_bhela_cabin_count', max( 1, $cnt ) );
@@ -799,10 +804,6 @@ function bhela_bm_settings_page() {
 		.bhela-set__save .button-primary:hover { background: #0f635e; border-color: #0f635e; }
 		.bhela-set__save .spacer { flex: 1; }
 
-		.bhela-set__credit { text-align: center; color: #646970; font-size: 12.5px; margin: 18px 0 8px; }
-		.bhela-set__credit strong { color: #0A2A2F; font-weight: 600; }
-		.bhela-set__credit a { color: #137A74; font-weight: 600; text-decoration: none; }
-		.bhela-set__credit a:hover { text-decoration: underline; }
 		@media (max-width: 782px) {
 			.bhela-set .form-table th { width: auto; display: block; padding-bottom: 0; }
 			.bhela-set .form-table td { display: block; }
@@ -1046,18 +1047,7 @@ function bhela_bm_settings_page() {
 			<input type="hidden" name="action" value="bhela_bm_sms_test">
 		</form>
 
-		<p class="bhela-set__credit">
-			🛶 <strong><?php esc_html_e( 'BHELA Booking Engine', 'bhela-booking' ); ?></strong>
-			<?php echo esc_html( defined( 'BHELA_BM_VERSION' ) ? 'v' . BHELA_BM_VERSION : '' ); ?>
-			&nbsp;·&nbsp;
-			<?php
-			printf(
-				/* translators: %s: linked developer name */
-				esc_html__( 'Designed &amp; developed by %s', 'bhela-booking' ),
-				'<a href="https://3s-soft.com" target="_blank" rel="noopener">3s-Soft</a>'
-			);
-			?>
-		</p>
+		<?php // The credit now sits in the admin footer on every BHELA screen, so it is not repeated here. ?>
 
 		<script>
 		(function () {
@@ -1106,6 +1096,47 @@ function bhela_bm_settings_page() {
 }
 
 /** Mask a secret for display (keep last 4). */
+/* ---------- Admin footer credit ---------- */
+
+/** True on any screen belonging to this plugin. */
+function bhela_bm_is_plugin_screen() {
+	if ( ! function_exists( 'get_current_screen' ) ) {
+		return false;
+	}
+	$screen = get_current_screen();
+	if ( ! $screen ) {
+		return false;
+	}
+	if ( in_array( $screen->post_type, array( 'bhela_booking', 'bhela_review', 'bhela_gallery', 'bhela_spot' ), true ) ) {
+		return true;
+	}
+	$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+	return 0 === strpos( $page, 'bhela-bm-' );
+}
+
+/**
+ * Replace the admin footer text on this plugin's screens only.
+ *
+ * Scoped deliberately: taking over the footer across all of wp-admin would put
+ * our credit on other people's plugin pages, which is not ours to do.
+ */
+function bhela_bm_admin_footer_text( $text ) {
+	if ( ! bhela_bm_is_plugin_screen() ) {
+		return $text;
+	}
+	return sprintf(
+		'🛶 <strong>%1$s</strong> v%2$s &nbsp;·&nbsp; %3$s',
+		esc_html__( 'BHELA Booking Engine', 'bhela-booking' ),
+		esc_html( BHELA_BM_VERSION ),
+		sprintf(
+			/* translators: %s: linked developer name */
+			esc_html__( 'Designed &amp; developed by %s', 'bhela-booking' ),
+			'<a href="https://3s-soft.com" target="_blank" rel="noopener">3s-Soft</a>'
+		)
+	);
+}
+add_filter( 'admin_footer_text', 'bhela_bm_admin_footer_text' );
+
 function bhela_bm_mask( $value ) {
 	$value = (string) $value;
 	if ( strlen( $value ) <= 4 ) {

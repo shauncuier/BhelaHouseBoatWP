@@ -101,6 +101,10 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 
 	.note { font-size:12.5px; color:#5b6b6a; line-height:1.8; border-top:1px dashed #cdd9d8; padding-top:16px; }
 	.inv-foot { background:#0B2E33; color:#cfe3e2; text-align:center; padding:18px; font-size:13px; }
+	.inv-foot a { color:#cfe3e2; text-decoration:none; }
+	.inv-foot a:hover { color:#fff; text-decoration:underline; }
+	.inv-foot__by { margin-top:8px; font-size:11.5px; color:#7fa6a4; }
+	.inv-foot__by a { color:#9fd8d2; font-weight:600; }
 	.print-bar { max-width:820px; margin:0 auto 16px; display:flex; justify-content:flex-end; gap:10px; }
 	.print-bar button { background:#F2762E; color:#fff; border:0; padding:12px 26px; border-radius:8px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; display:inline-flex; align-items:center; }
 	.print-bar button:hover { background:#D8621E; }
@@ -269,9 +273,26 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 			<div class="note"><?php echo nl2br( esc_html( bhela_bm_render_invoice_note( $s['invoice_note'], $invoice ) ) ); ?></div>
 		</div>
 
-		<?php // The manager now has his own card in the body, so the footer stays a plain sign-off. ?>
+		<?php
+		// The name, tagline and address are already in the header, so repeating
+		// them here said nothing new. The footer now carries only what is not
+		// above it: where to find us online, and who built the system.
+		$inv_site = home_url( '/' );
+		$inv_host = preg_replace( '#^www\.#', '', (string) wp_parse_url( $inv_site, PHP_URL_HOST ) );
+		?>
 		<div class="inv-foot">
-			<?php echo esc_html( $s['business_name'] ); ?> — "<?php echo esc_html( $s['business_tagline'] ); ?>" | <?php echo esc_html( $s['email'] ); ?>
+			<a href="<?php echo esc_url( $inv_site ); ?>">🌐 <?php echo esc_html( $inv_host ); ?></a>
+			&nbsp;·&nbsp;
+			<a href="mailto:<?php echo esc_attr( $s['email'] ); ?>">✉️ <?php echo esc_html( $s['email'] ); ?></a>
+			<div class="inv-foot__by">
+				<?php
+				printf(
+					/* translators: %s: linked developer name */
+					esc_html__( 'Designed &amp; developed by %s', 'bhela-booking' ),
+					'<a href="https://3s-soft.com" target="_blank" rel="noopener">3s-Soft</a>'
+				);
+				?>
+			</div>
 		</div>
 	</div>
 </body>
