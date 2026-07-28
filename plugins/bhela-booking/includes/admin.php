@@ -452,21 +452,32 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		}
 	}
 
-	// Always persist an accurate cabin count for the availability engine — never
-	// depend on the "Recalculate" checkbox. The combo table is posted on every
-	// edit, so count the rows that actually hold a guest; fall back to the stored
-	// cabins JSON, then to a single cabin.
+	// Always persist an accurate cabin count AND head count — never depend on the
+	// "Recalculate" checkbox. The combo table is posted on every edit, so count
+	// the rows that actually hold a guest; fall back to the stored cabins JSON,
+	// then to a single cabin.
+	//
+	// The head count matters as much as the cabin count: the plain "Guests" number
+	// field is written on every save, so a stale value there would otherwise
+	// overwrite the real total and go out in the SMS and emails — an invoice
+	// listing four people alongside a text reading "Guests: 1".
 	if ( isset( $_POST['bhela_cabin_adults'] ) && is_array( $_POST['bhela_cabin_adults'] ) ) {
 		$adults_c = (array) $_POST['bhela_cabin_adults'];
 		$c48_c    = (array) ( $_POST['bhela_cabin_c48'] ?? array() );
 		$c04_c    = (array) ( $_POST['bhela_cabin_c04'] ?? array() );
 		$cnt      = 0;
+		$heads    = 0;
 		foreach ( $adults_c as $i => $a ) {
-			if ( (int) $a + (int) ( $c48_c[ $i ] ?? 0 ) + (int) ( $c04_c[ $i ] ?? 0 ) > 0 ) {
+			$row = (int) $a + (int) ( $c48_c[ $i ] ?? 0 ) + (int) ( $c04_c[ $i ] ?? 0 );
+			if ( $row > 0 ) {
 				$cnt++;
+				$heads += $row;
 			}
 		}
 		update_post_meta( $post_id, '_bhela_cabin_count', max( 1, $cnt ) );
+		if ( $heads > 0 ) {
+			update_post_meta( $post_id, '_bhela_guests', $heads );
+		}
 	} elseif ( '' === get_post_meta( $post_id, '_bhela_cabin_count', true ) ) {
 		$rows = json_decode( (string) get_post_meta( $post_id, '_bhela_cabins_json', true ), true );
 		update_post_meta( $post_id, '_bhela_cabin_count', is_array( $rows ) && $rows ? count( $rows ) : 1 );

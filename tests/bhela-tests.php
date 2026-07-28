@@ -291,6 +291,63 @@ bhela_ok( 'placeholders are substituted', false === strpos( $note, '{' ) );
 bhela_ok( 'the derived percentage appears', false !== strpos( $note, '৩৩' ) || false !== strpos( $note, '33' ) );
 
 /* ================================================================== */
+bhela_group( 'Booking edits — derived fields must not drift' );
+
+// The head count and cabin count are derived from the cabin combination. The
+// plain "Guests" number field is written on every save, so a stale value there
+// used to overwrite the real total — producing an invoice listing four people
+// beside an SMS reading "Guests: 1".
+$edit = wp_insert_post( array( 'post_type' => 'bhela_booking', 'post_title' => 'BHELA TEST edit', 'post_status' => 'publish' ) );
+update_post_meta( $edit, '_bhela_travel_date', '2029-12-28' );
+update_post_meta( $edit, '_bhela_status', 'pending' );
+update_post_meta( $edit, '_bhela_guests', 4 );
+$edit_post = get_post( $edit );
+
+$do_save = function ( $extra ) use ( $edit, $edit_post ) {
+	$_POST = array_merge( array(
+		'bhela_bm_nonce'     => wp_create_nonce( 'bhela_bm_save' ),
+		'bhela_phone'        => '01820113903',
+		'bhela_travel_date'  => '2029-12-28',
+		'bhela_cabin_key'    => '',
+		'bhela_guests'       => 1, // deliberately stale
+		'bhela_manual_price' => '1',
+		'bhela_total'        => 20000,
+		'bhela_status'       => 'pending',
+	), $extra );
+	bhela_bm_save_booking( $edit, $edit_post );
+	$_POST = array();
+};
+
+$do_save( array(
+	'bhela_cabin_adults' => array( 3 ),
+	'bhela_cabin_c48'    => array( 1 ),
+	'bhela_cabin_c04'    => array( 1 ),
+) );
+bhela_is( 'head count follows the cabin combination', (int) get_post_meta( $edit, '_bhela_guests', true ), 5 );
+bhela_is( 'cabin count follows the combination', (int) get_post_meta( $edit, '_bhela_cabin_count', true ), 1 );
+bhela_is( 'the SMS reports the same head count', bhela_bm_render_sms( '{guests}', $edit ), '5' );
+
+$do_save( array() ); // no combo posted at all
+bhela_is( 'without a combination the typed number is respected', (int) get_post_meta( $edit, '_bhela_guests', true ), 1 );
+
+wp_delete_post( $edit, true );
+
+/* ================================================================== */
+bhela_group( 'Invoice contacts — two numbers, never the same one twice' );
+
+$wa_general = bhela_bm_get_settings()['whatsapp'];
+$wa_manager = bhela_bm_get_settings()['support_whatsapp'];
+bhela_ok( 'a general WhatsApp number is set', '' !== trim( (string) $wa_general ) );
+if ( '' !== trim( (string) $wa_manager ) ) {
+	bhela_ok(
+		'the manager number differs from the general one (or the footer hides it)',
+		bhela_bm_normalize_mobile( $wa_manager ) !== bhela_bm_normalize_mobile( $wa_general )
+	);
+}
+bhela_is( 'the same number in two formats is recognised as one',
+	bhela_bm_normalize_mobile( '+8801781720957' ), bhela_bm_normalize_mobile( '01781720957' ) );
+
+/* ================================================================== */
 bhela_group( 'Settings — every key the code reads exists' );
 
 foreach ( array(

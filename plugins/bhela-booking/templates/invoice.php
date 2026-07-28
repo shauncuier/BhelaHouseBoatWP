@@ -18,7 +18,16 @@ $base     = (int) $invoice['base_price'] > 0 ? (int) $invoice['base_price'] : (i
 $discount = max( 0, $base - (int) $invoice['total'] );
 // Booking-support number: the dedicated one when set, else the general WhatsApp.
 // Used twice (payment block and footer), so it is resolved once up here.
-$inv_support = ! empty( $s['support_whatsapp'] ) ? $s['support_whatsapp'] : $s['whatsapp'];
+// Two distinct numbers: the general booking WhatsApp in the payment block, and
+// the operation manager's own in the footer. Falling both back to the same
+// setting printed one number twice and hid the other entirely.
+$inv_wa     = $s['whatsapp'];
+$inv_mgr_wa = ! empty( $s['support_whatsapp'] ) ? $s['support_whatsapp'] : '';
+// Only repeat a number in the footer when it is genuinely a different one —
+// compare normalised, so +8801781720957 and 01781720957 count as the same.
+if ( $inv_mgr_wa && bhela_bm_normalize_mobile( $inv_mgr_wa ) === bhela_bm_normalize_mobile( $inv_wa ) ) {
+	$inv_mgr_wa = '';
+}
 $logo     = '';
 $theme_logo = get_template_directory() . '/assets/images/logo.png';
 if ( file_exists( $theme_logo ) ) {
@@ -70,6 +79,26 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.pay-qrs figcaption { font-size:12.5px; font-weight:700; color:#0B2E33; margin-top:6px; line-height:1.4; }
 	.pay-qrs figcaption small { font-weight:400; color:#5b6b6a; }
 	.pay-qrs__hint { flex-basis:100%; font-size:12.5px; color:#5b6b6a; margin-top:4px; }
+	/* Trip manager — the one contact a guest needs after booking, so it is a
+	   card in the body rather than a line in the footer. Kept light so it does
+	   not drink ink when the invoice is printed. */
+	.mgr { display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+		background:#EBF7EF; border:1px solid #A8DDBB; border-left:6px solid #25D366;
+		border-radius:12px; padding:18px 22px; margin:26px 0; }
+	.mgr__ico { width:46px; height:46px; border-radius:50%; background:#25D366; color:#fff;
+		display:flex; align-items:center; justify-content:center; font-size:24px; flex:none; }
+	.mgr__body { flex:1; min-width:200px; }
+	.mgr__label { font-size:11.5px; text-transform:uppercase; letter-spacing:1px; color:#14676B; font-weight:700; }
+	.mgr__name { font-size:17px; font-weight:700; color:#0B2E33; line-height:1.3; margin-top:2px; }
+	.mgr__num { display:inline-block; font-size:21px; font-weight:700; color:#0B2E33;
+		text-decoration:none; letter-spacing:-.3px; margin-top:4px; }
+	.mgr__num:hover { color:#137A74; }
+	.mgr__hint { font-size:12.5px; color:#4b6b5e; margin-top:3px; }
+	.mgr__cta { background:#25D366; color:#fff; text-decoration:none; font-weight:700; font-size:14px;
+		padding:12px 22px; border-radius:999px; white-space:nowrap; flex:none; }
+	.mgr__cta:hover { background:#1da851; }
+	@media (max-width:560px) { .mgr__cta { width:100%; text-align:center; } }
+
 	.note { font-size:12.5px; color:#5b6b6a; line-height:1.8; border-top:1px dashed #cdd9d8; padding-top:16px; }
 	.inv-foot { background:#0B2E33; color:#cfe3e2; text-align:center; padding:18px; font-size:13px; }
 	.print-bar { max-width:820px; margin:0 auto 16px; display:flex; justify-content:flex-end; gap:10px; }
@@ -193,7 +222,7 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				};
 				?>
 				<br><strong>📞</strong> <?php echo $inv_phone( $s['phone_1'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>, <?php echo $inv_phone( $s['phone_2'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-				<br><strong>Booking Support (WhatsApp):</strong> <a href="<?php echo esc_url( bhela_bm_wa_url( $inv_support, 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice['invoice_no'] ) ); ?>" style="color:inherit"><?php echo esc_html( bhela_bm_phone_intl( $inv_support ) ); ?></a>
+				<br><strong>Booking Support (WhatsApp):</strong> <a href="<?php echo esc_url( bhela_bm_wa_url( $inv_wa, 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice['invoice_no'] ) ); ?>" style="color:inherit"><?php echo esc_html( bhela_bm_phone_intl( $inv_wa ) ); ?></a>
 
 				<?php if ( ! empty( $s['nagad_qr'] ) || ! empty( $s['bangla_qr'] ) ) : ?>
 					<div class="pay-qrs">
@@ -214,6 +243,25 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<?php endif; ?>
 			</div>
 
+			<?php
+			// The manager runs everything once the booking is made, so his number
+			// is the single most useful thing on this page after the amount due.
+			$mgr_wa = $inv_mgr_wa ? $inv_mgr_wa : $inv_wa;
+			if ( ! empty( $s['ops_manager'] ) && $mgr_wa ) :
+				$mgr_msg = 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice['invoice_no'];
+				?>
+				<div class="mgr">
+					<span class="mgr__ico" aria-hidden="true">👤</span>
+					<div class="mgr__body">
+						<div class="mgr__label"><?php esc_html_e( 'Your trip manager', 'bhela-booking' ); ?></div>
+						<div class="mgr__name"><?php echo esc_html( $s['ops_manager'] ); ?></div>
+						<a class="mgr__num" href="<?php echo esc_url( bhela_bm_wa_url( $mgr_wa, $mgr_msg ) ); ?>"><?php echo esc_html( bhela_bm_phone_intl( $mgr_wa ) ); ?></a>
+						<div class="mgr__hint"><?php esc_html_e( 'বুকিংয়ের পর ট্রিপ সংক্রান্ত যেকোনো প্রয়োজনে সরাসরি যোগাযোগ করুন — সময়, রিপোর্টিং, খাবার বা যেকোনো পরিবর্তন।', 'bhela-booking' ); ?></div>
+					</div>
+					<a class="mgr__cta" href="<?php echo esc_url( bhela_bm_wa_url( $mgr_wa, $mgr_msg ) ); ?>">💬 <?php esc_html_e( 'WhatsApp', 'bhela-booking' ); ?></a>
+				</div>
+			<?php endif; ?>
+
 			<?php if ( $invoice['message'] ) : ?>
 				<p style="margin-bottom:16px"><strong>Note:</strong> <?php echo esc_html( $invoice['message'] ); ?></p>
 			<?php endif; ?>
@@ -221,17 +269,9 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 			<div class="note"><?php echo nl2br( esc_html( bhela_bm_render_invoice_note( $s['invoice_note'], $invoice ) ) ); ?></div>
 		</div>
 
+		<?php // The manager now has his own card in the body, so the footer stays a plain sign-off. ?>
 		<div class="inv-foot">
 			<?php echo esc_html( $s['business_name'] ); ?> — "<?php echo esc_html( $s['business_tagline'] ); ?>" | <?php echo esc_html( $s['email'] ); ?>
-			<?php if ( ! empty( $s['ops_manager'] ) ) : ?>
-				<div style="margin-top:6px;font-size:12.5px;opacity:.92">
-					<?php esc_html_e( 'Operation Manager:', 'bhela-booking' ); ?> <strong><?php echo esc_html( $s['ops_manager'] ); ?></strong>
-					<?php if ( $inv_support ) : ?>
-						&nbsp;·&nbsp; <?php esc_html_e( 'WhatsApp:', 'bhela-booking' ); ?>
-						<a href="<?php echo esc_url( bhela_bm_wa_url( $inv_support ) ); ?>" style="color:inherit"><?php echo esc_html( bhela_bm_phone_intl( $inv_support ) ); ?></a>
-					<?php endif; ?>
-				</div>
-			<?php endif; ?>
 		</div>
 	</div>
 </body>
