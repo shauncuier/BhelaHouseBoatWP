@@ -47,6 +47,7 @@ function bhela_bm_dashboard_menu_order() {
 		'bhela-bm-dashboard',                     // 📊 Dashboard
 		'edit.php?post_type=bhela_booking',       // All Bookings
 		'post-new.php?post_type=bhela_booking',   // Add New Booking
+		'bhela-bm-reports',                       // Trip Report
 		'bhela-bm-trips',                         // Trip Calendar
 		'edit.php?post_type=bhela_spot',          // Spots (trip route)
 		'edit.php?post_type=bhela_gallery',       // Gallery

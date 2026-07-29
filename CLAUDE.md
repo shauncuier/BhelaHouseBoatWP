@@ -71,6 +71,7 @@ wp-content/                          ← Git root
 │   │   ├── trips.php                ← Trip calendar admin + shortcode + availability
 │   │   ├── reviews.php              ← Reviews CPT + admin + shortcode
 │   │   ├── admin.php                ← Admin UI: columns, meta boxes, settings page, dashboard widget
+│   │   ├── reports.php              ← Trip Report: per-date bookings, advance/due, print + WhatsApp + CSV
 │   │   └── guide.php                ← Embedded admin guide
 │   ├── assets/
 │   │   ├── booking.css              ← Booking form styles (29KB)

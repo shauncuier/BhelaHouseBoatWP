@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.6.2
+- **Version:** 2.19.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -32,6 +32,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/trips.php` | Trip calendar admin + shortcode + availability helper |
 | `includes/reviews.php` | Reviews CPT |
 | `includes/admin.php` | Bookings columns, edit meta box, Settings page, dashboard widget |
+| `includes/reports.php` | Trip Report screen — bookings for a date/range with advance, due and totals; print, WhatsApp text and CSV export |
 | `templates/invoice.php` | Printable invoice |
 
 ## Key functions / extension points
@@ -39,6 +40,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_send_sms( $number, $message )` — send via the configured gateway.
 - `bhela_bm_render_sms( $template, $booking_id )` — fill `{placeholders}` from a booking.
 - `bhela_bm_trip_availability( $date )` → `total / booked / available / status`.
+- `bhela_bm_report_rows( $from, $to, $with_cancelled )` → `rows / totals` for a travel-date range.
 - `bhela_bm_calc_multi( $cabins, $date )` — authoritative per-cabin pricing.
 - Notifications fire from `bhela_bm_process_submission()` (new booking) and `bhela_bm_save_booking()` (status change).
 
