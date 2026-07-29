@@ -9,7 +9,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.17.3' );
+define( 'BHELA_VERSION', '2.18.0' );
+
+// Bump when bhela_menu_structure() changes: existing installs rebuild the
+// primary menu once, then it is left alone so owner edits stick.
+define( 'BHELA_MENU_REVISION', 2 );
 
 /* ---------- Setup ---------- */
 
@@ -409,15 +413,16 @@ function bhela_auto_setup() {
 
 	// 3) Create pages with templates.
 	$pages = array(
-		'cabins'   => array( 'title' => 'কেবিন ও রেট', 'template' => 'page-templates/template-cabins.php' ),
-		'schedule' => array( 'title' => 'ট্রিপ সিডিউল', 'template' => 'page-templates/template-schedule.php' ),
-		'spots'    => array( 'title' => 'ট্রিপ ম্যাপ', 'template' => 'page-templates/template-spots.php' ),
-		'food'     => array( 'title' => 'খাবার মেনু', 'template' => 'page-templates/template-food.php' ),
-		'gallery'  => array( 'title' => 'গ্যালারি', 'template' => 'page-templates/template-gallery.php' ),
-		'faq'      => array( 'title' => 'সাধারণ প্রশ্ন (FAQ)', 'template' => 'page-templates/template-faq.php' ),
-		'book-now' => array( 'title' => 'বুক করুন', 'template' => 'page-templates/template-booking.php' ),
-		'policies' => array( 'title' => 'বুকিং নীতিমালা', 'template' => 'page-templates/template-policy.php' ),
-		'contact'  => array( 'title' => 'যোগাযোগ', 'template' => 'page-templates/template-contact.php' ),
+		'cabins'        => array( 'title' => 'কেবিন ও রেট', 'template' => 'page-templates/template-cabins.php' ),
+		'schedule'      => array( 'title' => 'ট্রিপ সিডিউল', 'template' => 'page-templates/template-schedule.php' ),
+		'spots'         => array( 'title' => 'ট্রিপ ম্যাপ', 'template' => 'page-templates/template-spots.php' ),
+		'food'          => array( 'title' => 'খাবার মেনু', 'template' => 'page-templates/template-food.php' ),
+		'gallery'       => array( 'title' => 'গ্যালারি', 'template' => 'page-templates/template-gallery.php' ),
+		'faq'           => array( 'title' => 'সাধারণ প্রশ্ন (FAQ)', 'template' => 'page-templates/template-faq.php' ),
+		'booking-guide' => array( 'title' => 'বুকিং গাইড', 'template' => 'page-templates/template-guide.php' ),
+		'book-now'      => array( 'title' => 'বুক করুন', 'template' => 'page-templates/template-booking.php' ),
+		'policies'      => array( 'title' => 'বুকিং নীতিমালা', 'template' => 'page-templates/template-policy.php' ),
+		'contact'       => array( 'title' => 'যোগাযোগ', 'template' => 'page-templates/template-contact.php' ),
 	);
 
 	$menu_items = array();
@@ -486,49 +491,126 @@ function bhela_auto_setup() {
 	bhela_seed_blog_posts( $cat_ids );
 
 	// 5) Primary menu.
-	$menu = wp_get_nav_menu_object( 'BHELA Primary' );
-	if ( ! $menu ) {
-		$menu_id = wp_create_nav_menu( 'BHELA Primary' );
-		$order   = array( 'cabins', 'schedule', 'spots', 'food', 'gallery', 'faq', 'blog', 'contact' );
-		foreach ( $order as $slug ) {
-			if ( isset( $menu_items[ $slug ] ) ) {
-				wp_update_nav_menu_item( $menu_id, 0, array(
-					'menu-item-object-id' => $menu_items[ $slug ],
-					'menu-item-object'    => 'page',
-					'menu-item-type'      => 'post_type',
-					'menu-item-status'    => 'publish',
-				) );
-			}
-		}
-		$locations            = get_theme_mod( 'nav_menu_locations', array() );
-		$locations['primary'] = $menu_id;
-		set_theme_mod( 'nav_menu_locations', $locations );
-	} else {
-		// Menu already exists (upgrade path): append any page added in a later
-		// release that is not in the menu yet.
-		$ensure   = array( 'spots' => 'ট্রিপ ম্যাপ', 'blog' => 'ব্লগ', 'contact' => 'যোগাযোগ' );
-		$existing = array();
-		foreach ( (array) wp_get_nav_menu_items( $menu->term_id ) as $mi ) {
-			$existing[] = (int) $mi->object_id;
-		}
-		foreach ( $ensure as $slug => $title ) {
-			if ( ! isset( $menu_items[ $slug ] ) || in_array( (int) $menu_items[ $slug ], $existing, true ) ) {
-				continue;
-			}
-			wp_update_nav_menu_item( $menu->term_id, 0, array(
-				'menu-item-object-id' => (int) $menu_items[ $slug ],
-				'menu-item-object'    => 'page',
-				'menu-item-type'      => 'post_type',
-				'menu-item-status'    => 'publish',
-				'menu-item-title'     => $title,
-			) );
-		}
-	}
+	bhela_build_primary_menu( $menu_items );
 
 	// 6) Flush rewrite rules.
 	flush_rewrite_rules();
 }
 add_action( 'after_switch_theme', 'bhela_auto_setup' );
+
+/**
+ * Shape of the primary navigation.
+ *
+ * A node is either a single page (`page` => slug, rendered as a plain link) or a
+ * dropdown (`label` + `children`). A dropdown parent is a custom `#` item: it is
+ * a heading, not a destination — theme.js turns its click into an open/close.
+ *
+ * @return array
+ */
+function bhela_menu_structure() {
+	return array(
+		array(
+			'label'    => 'ভ্রমণ',
+			'children' => array( 'cabins', 'schedule', 'spots', 'food', 'gallery' ),
+		),
+		array(
+			'label'    => 'বুকিং তথ্য',
+			'children' => array( 'faq', 'booking-guide', 'policies' ),
+		),
+		array( 'page' => 'blog' ),
+		array( 'page' => 'contact' ),
+	);
+}
+
+/**
+ * Build (or rebuild once) the two-level "BHELA Primary" menu.
+ *
+ * On a fresh install the menu is created and assigned to the `primary` location.
+ * On an existing install the tree is rebuilt only when BHELA_MENU_REVISION moves
+ * ahead of the stored one — otherwise every provisioning run would undo whatever
+ * the owner rearranged in Appearance → Menus. The rebuild removes only the items
+ * this theme created (its own pages and its `#` dropdown parents); anything the
+ * owner added by hand survives and ends up after the generated tree.
+ *
+ * @param array $menu_items slug => page ID map from bhela_auto_setup().
+ */
+function bhela_build_primary_menu( $menu_items ) {
+	$menu  = wp_get_nav_menu_object( 'BHELA Primary' );
+	$fresh = ! $menu;
+
+	if ( $fresh ) {
+		$menu_id = wp_create_nav_menu( 'BHELA Primary' );
+		if ( is_wp_error( $menu_id ) ) {
+			return;
+		}
+	} else {
+		if ( (int) get_option( 'bhela_menu_revision' ) >= BHELA_MENU_REVISION ) {
+			return;
+		}
+		$menu_id = (int) $menu->term_id;
+		$owned   = array_map( 'intval', array_values( $menu_items ) );
+		foreach ( (array) wp_get_nav_menu_items( $menu_id ) as $mi ) {
+			$is_our_page   = 'post_type' === $mi->type && in_array( (int) $mi->object_id, $owned, true );
+			$is_our_parent = 'custom' === $mi->type && '#' === $mi->url;
+			if ( $is_our_page || $is_our_parent ) {
+				wp_delete_post( $mi->ID, true );
+			}
+		}
+	}
+
+	$position = 0;
+	foreach ( bhela_menu_structure() as $node ) {
+		if ( isset( $node['page'] ) ) {
+			if ( ! isset( $menu_items[ $node['page'] ] ) ) {
+				continue;
+			}
+			$position++;
+			wp_update_nav_menu_item( $menu_id, 0, array(
+				'menu-item-object-id' => (int) $menu_items[ $node['page'] ],
+				'menu-item-object'    => 'page',
+				'menu-item-type'      => 'post_type',
+				'menu-item-status'    => 'publish',
+				'menu-item-position'  => $position,
+			) );
+			continue;
+		}
+
+		$position++;
+		$parent_id = wp_update_nav_menu_item( $menu_id, 0, array(
+			'menu-item-title'    => $node['label'],
+			'menu-item-url'      => '#',
+			'menu-item-type'     => 'custom',
+			'menu-item-status'   => 'publish',
+			'menu-item-position' => $position,
+		) );
+		if ( is_wp_error( $parent_id ) ) {
+			continue;
+		}
+
+		foreach ( $node['children'] as $slug ) {
+			if ( ! isset( $menu_items[ $slug ] ) ) {
+				continue;
+			}
+			$position++;
+			wp_update_nav_menu_item( $menu_id, 0, array(
+				'menu-item-object-id' => (int) $menu_items[ $slug ],
+				'menu-item-object'    => 'page',
+				'menu-item-type'      => 'post_type',
+				'menu-item-parent-id' => (int) $parent_id,
+				'menu-item-status'    => 'publish',
+				'menu-item-position'  => $position,
+			) );
+		}
+	}
+
+	$locations = get_theme_mod( 'nav_menu_locations', array() );
+	if ( empty( $locations['primary'] ) ) {
+		$locations['primary'] = $menu_id;
+		set_theme_mod( 'nav_menu_locations', $locations );
+	}
+
+	update_option( 'bhela_menu_revision', BHELA_MENU_REVISION );
+}
 
 /**
  * Re-run provisioning once per released version (covers file-only upgrades where
@@ -679,17 +761,38 @@ add_filter( 'pings_open', '__return_false', 20 );
 /* ---------- Fallback menu ---------- */
 
 function bhela_fallback_menu() {
-	$items = array(
-		'cabins'   => 'কেবিন ও রেট',
-		'schedule' => 'সিডিউল',
-		'food'     => 'খাবার',
-		'gallery'  => 'গ্যালারি',
-		'faq'      => 'FAQ',
-		'blog'     => 'ব্লগ',
+	$labels = array(
+		'cabins'        => 'কেবিন ও রেট',
+		'schedule'      => 'ট্রিপ সিডিউল',
+		'spots'         => 'ট্রিপ ম্যাপ',
+		'food'          => 'খাবার মেনু',
+		'gallery'       => 'গ্যালারি',
+		'faq'           => 'সাধারণ প্রশ্ন (FAQ)',
+		'booking-guide' => 'বুকিং গাইড',
+		'policies'      => 'বুকিং নীতিমালা',
+		'blog'          => 'ব্লগ',
+		'contact'       => 'যোগাযোগ',
 	);
 	echo '<ul class="site-nav__menu" id="site-menu">';
-	foreach ( $items as $slug => $label ) {
-		printf( '<li><a href="%s">%s</a></li>', esc_url( bhela_page_url( $slug ) ), esc_html( $label ) );
+	// Mirrors the real menu (same classes) so the dropdown CSS/JS applies here too.
+	foreach ( bhela_menu_structure() as $node ) {
+		if ( isset( $node['page'] ) ) {
+			printf(
+				'<li class="menu-item"><a href="%s">%s</a></li>',
+				esc_url( bhela_page_url( $node['page'] ) ),
+				esc_html( $labels[ $node['page'] ] )
+			);
+			continue;
+		}
+		printf( '<li class="menu-item menu-item-has-children"><a href="#">%s</a><ul class="sub-menu">', esc_html( $node['label'] ) );
+		foreach ( $node['children'] as $slug ) {
+			printf(
+				'<li class="menu-item"><a href="%s">%s</a></li>',
+				esc_url( bhela_page_url( $slug ) ),
+				esc_html( $labels[ $slug ] )
+			);
+		}
+		echo '</ul></li>';
 	}
 	printf( '<li><a class="btn btn--cta site-nav__book" href="%s">বুক করুন</a></li>', esc_url( bhela_page_url( 'book-now' ) ) );
 	echo '</ul>';

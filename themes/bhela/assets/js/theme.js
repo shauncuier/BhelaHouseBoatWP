@@ -16,18 +16,86 @@
 		/* ----- Mobile menu ----- */
 		var toggle = document.getElementById('nav-toggle');
 		var menu = document.getElementById('site-menu');
+
+		/* ----- Nav dropdowns -----
+		   A dropdown parent is a "#" item: a heading, not a destination. Desktop
+		   opens it on hover via CSS; this adds the click/keyboard path and the
+		   mobile accordion, and gives each one a real button so it is reachable
+		   without a pointer. */
+		var parents = menu ? menu.querySelectorAll('.menu-item-has-children') : [];
+		// Must match the dropdown breakpoint in style.css.
+		var isDesktop = window.matchMedia('(min-width: 901px)');
+
+		function closeDropdowns(except) {
+			Array.prototype.forEach.call(parents, function (li) {
+				if (li === except) return;
+				li.classList.remove('is-open');
+				var btn = li.querySelector('.site-nav__sub-toggle');
+				if (btn) btn.setAttribute('aria-expanded', 'false');
+			});
+		}
+
+		Array.prototype.forEach.call(parents, function (li) {
+			var link = li.querySelector(':scope > a');
+			var sub = li.querySelector(':scope > .sub-menu');
+			if (!link || !sub) return;
+
+			if (!sub.id) sub.id = 'submenu-' + Math.random().toString(36).slice(2, 8);
+
+			var btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'site-nav__sub-toggle';
+			btn.setAttribute('aria-expanded', 'false');
+			btn.setAttribute('aria-controls', sub.id);
+			btn.setAttribute('aria-label', link.textContent.trim());
+			link.insertAdjacentElement('afterend', btn);
+
+			function toggleSub(e) {
+				e.preventDefault();
+				var open = !li.classList.contains('is-open');
+				closeDropdowns(li);
+				li.classList.toggle('is-open', open);
+				btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+			}
+
+			// The caret always toggles — that is the keyboard path into the panel.
+			btn.addEventListener('click', toggleSub);
+
+			link.addEventListener('click', function (e) {
+				// The parent points at "#" — never let it navigate.
+				e.preventDefault();
+				// On desktop the panel is already open from :hover. Toggling here
+				// would shut it under the cursor, and hover would snap it back:
+				// a flicker on every click. Leave it to hover.
+				if (isDesktop.matches) return;
+				toggleSub(e);
+			});
+		});
+
+		document.addEventListener('keydown', function (e) {
+			if (e.key === 'Escape') closeDropdowns(null);
+		});
+		document.addEventListener('click', function (e) {
+			if (menu && !menu.contains(e.target)) closeDropdowns(null);
+		});
+
 		if (toggle && menu) {
 			toggle.addEventListener('click', function () {
 				var open = menu.classList.toggle('is-open');
 				toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 				document.body.style.overflow = open ? 'hidden' : '';
+				if (!open) closeDropdowns(null);
 			});
 			menu.addEventListener('click', function (e) {
-				if (e.target.tagName === 'A') {
-					menu.classList.remove('is-open');
-					toggle.setAttribute('aria-expanded', 'false');
-					document.body.style.overflow = '';
-				}
+				var link = e.target.closest ? e.target.closest('a') : null;
+				if (!link) return;
+				// A dropdown parent opens its panel instead of navigating, so it
+				// must not dismiss the mobile menu.
+				if (link.parentElement.classList.contains('menu-item-has-children')) return;
+				menu.classList.remove('is-open');
+				toggle.setAttribute('aria-expanded', 'false');
+				document.body.style.overflow = '';
+				closeDropdowns(null);
 			});
 		}
 

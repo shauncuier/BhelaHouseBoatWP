@@ -1,4 +1,4 @@
-# 🎨 BHELA WordPress Theme (v2.17.3)
+# 🎨 BHELA WordPress Theme (v2.18.0)
 
 This is the custom theme for **BHELA – The Haor Exclusive** houseboat experience. It is designed to render a premium, immersive, and fast experience tailored for travelers exploring Tanguar Haor, Sunamganj.
 
@@ -24,10 +24,30 @@ The theme includes several pre-built template files under `page-templates/`:
 | `template-food.php` | খাবার মেনু | খাবার মেনু | Displays day-by-day menu choices (Breakfast, Lunch, Dinner, Snacks). |
 | `template-gallery.php` | গ্যালারি | গ্যালারি | Automatically loops and scans images in asset directories. |
 | `template-faq.php` | সাধারণ প্রশ্ন (FAQ) | সাধারণ প্রশ্ন (FAQ) | Clean accordion list of common customer inquiries. |
+| `template-guide.php` | BHELA — Booking Guide | বুকিং গাইড | Buyer's guide: houseboat category comparison, 8-point pre-booking checklist, rate factors, why BHELA. Emits Article + FAQPage schema. |
 | `template-booking.php` | বুক করুন | বুক করুন | Main interface hosting the BHELA Booking Engine frontend form. |
 | `template-policy.php` | বুকিং নীতিমালা | বুকিং নীতিমালা | Policy list regarding payment options, advance refunds, and cancellations. |
 
 *Note: On theme activation, if these pages do not exist, they are automatically generated and set to their corresponding templates.*
+
+---
+
+## 🧭 Primary Navigation
+
+The **BHELA Primary** menu is two-level. Its shape lives in `bhela_menu_structure()` (`functions.php`):
+
+| Top level | Children |
+|---|---|
+| ভ্রমণ *(dropdown heading, not a link)* | কেবিন ও রেট · ট্রিপ সিডিউল · ট্রিপ ম্যাপ · খাবার মেনু · গ্যালারি |
+| বুকিং তথ্য *(dropdown heading, not a link)* | সাধারণ প্রশ্ন (FAQ) · বুকিং গাইড · বুকিং নীতিমালা |
+| ব্লগ | — |
+| যোগাযোগ | — |
+
+Plus the **বুক করুন** CTA button, which `header.php` appends via `items_wrap`.
+
+Dropdown parents are custom `#` items — headings, not destinations. `theme.js` turns their click into an open/close, injects a caret `<button>` for keyboard and touch users, and collapses the panels into accordions below 900px.
+
+`bhela_build_primary_menu()` writes this tree. On an existing site it rebuilds **once**, when `BHELA_MENU_REVISION` (`functions.php`) moves ahead of the `bhela_menu_revision` option — so later provisioning runs never undo menu edits made in Appearance → Menus. Bump that constant whenever `bhela_menu_structure()` changes. The rebuild removes only theme-created items; hand-added ones survive and land after the generated tree.
 
 ---
 

@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.17.3
+Version: 2.18.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -164,6 +164,80 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 .site-nav__book.btn--cta { background: var(--cta); color: #fff !important; box-shadow: 0 6px 20px rgba(255,122,61,.4); }
 .site-nav__book.btn--cta:hover { background: var(--cta-dark); color: #fff !important; transform: translateY(-2px); }
 .site-nav__book.btn--cta::after { display: none !important; }
+/* ----- Dropdowns ----- */
+.site-nav__menu > li { position: relative; display: flex; align-items: center; gap: .34rem; }
+.sub-menu { list-style: none; padding: 0; margin: 0; }
+.site-nav__sub-toggle {
+	background: none; border: 0; padding: 0; cursor: pointer; color: inherit;
+	width: 14px; height: 14px; display: grid; place-items: center; flex: none;
+}
+.site-nav__sub-toggle::before {
+	content: ""; width: 6px; height: 6px;
+	border-right: 1.8px solid currentColor; border-bottom: 1.8px solid currentColor;
+	color: var(--text-inverse); opacity: .65;
+	transform: translateY(-2px) rotate(45deg);
+	transition: transform .28s var(--ease), opacity .28s;
+}
+.menu-item-has-children:hover > .site-nav__sub-toggle::before,
+.menu-item-has-children.is-open > .site-nav__sub-toggle::before { opacity: 1; }
+.menu-item-has-children.is-open > .site-nav__sub-toggle::before { transform: translateY(1px) rotate(225deg); }
+/* Current page: highlight the item and, when it lives in a dropdown, its parent. */
+.site-nav__menu .current-menu-item > a,
+.site-nav__menu > .current-menu-ancestor > a { color: #fff; }
+.sub-menu .current-menu-item > a { color: var(--gold); }
+
+@media (min-width: 901px) {
+	/* Match the CTA button's height so every top-level item is one full-height
+	   hover target. 42px is the button, so this costs no extra bar height. */
+	.site-nav__menu > li { min-height: 42px; }
+
+	.site-nav__menu > .menu-item-has-children > .sub-menu {
+		/* Distance from the item to the panel. Must clear the nav's own bottom
+		   padding (.9rem, .55rem once scrolled) and leave ~.3rem of air below the
+		   bar, so it has to shrink in step with it. The bridge below reads the
+		   same value — keep them driven by this one property. */
+		--panel-gap: 1.2rem;
+		position: absolute; top: 100%; z-index: 1001; margin-top: var(--panel-gap);
+		/* Pulls the panel left by its own inset (padding .45rem + link padding
+		   .85rem) so a child label sits on the same vertical line as its parent. */
+		left: -1.3rem;
+		min-width: 244px; padding: .45rem;
+		background: rgba(10, 42, 47, 0.97);
+		backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+		border: 1px solid rgba(220,235,233,.14); border-radius: 14px;
+		box-shadow: 0 24px 48px -12px rgba(0,0,0,.55), 0 0 0 1px rgba(0,0,0,.15);
+		opacity: 0; visibility: hidden; transform: translateY(6px) scale(.985);
+		transform-origin: top left;
+		transition: opacity .2s var(--ease), transform .2s var(--ease), visibility .2s, margin-top .3s;
+	}
+	.site-nav.is-scrolled .site-nav__menu > .menu-item-has-children > .sub-menu { --panel-gap: .85rem; }
+	/* That gap is a strip the pointer crosses unhovered on its way down, which
+	   would close the panel mid-travel. This transparent bridge fills it. It
+	   belongs to .sub-menu, so hovering it still counts as hovering the parent
+	   <li> and the panel stays open. */
+	.site-nav__menu > .menu-item-has-children > .sub-menu::before {
+		content: ""; position: absolute; left: 0; right: 0;
+		top: calc(var(--panel-gap) * -1); height: var(--panel-gap);
+	}
+	.site-nav__menu > .menu-item-has-children:hover > .sub-menu,
+	.site-nav__menu > .menu-item-has-children:focus-within > .sub-menu,
+	.site-nav__menu > .menu-item-has-children.is-open > .sub-menu {
+		opacity: 1; visibility: visible; transform: none;
+	}
+
+	.sub-menu a {
+		display: block; padding: .6rem .85rem; border-radius: 10px;
+		font-size: .92rem; font-weight: 500; white-space: nowrap;
+		transition: background .18s, color .18s, padding-left .18s;
+	}
+	.sub-menu a:hover, .sub-menu a:focus-visible {
+		background: rgba(111,199,191,.13); color: #fff; padding-left: 1.05rem;
+	}
+	.sub-menu .current-menu-item > a { background: rgba(245,201,123,.1); }
+	/* The top-level underline animation reads as a glitch on a stacked panel. */
+	.sub-menu a::after { display: none; }
+}
+
 .site-nav__toggle {
 	display: none; background: none; border: 0; cursor: pointer;
 	width: 46px; height: 46px; border-radius: 10px; flex-direction: column; gap: 6px;
@@ -186,6 +260,28 @@ h1, h2, h3, h4 { font-family: var(--font-display); font-weight: 600; line-height
 	.site-nav__menu a { font-size: 1.35rem; }
 	.site-nav__toggle { position: relative; z-index: 1002; }
 	.site-nav__book.btn--cta { font-size: 1.2rem; padding: .8rem 2rem; margin-left: 0; }
+
+	/* Dropdowns become accordions. justify-content is start (not center): with a
+	   panel open the list can outgrow the screen, and centring would push its
+	   first items above the top edge where they cannot be scrolled back to. */
+	.site-nav__menu { justify-content: flex-start; padding: 6.5rem 1.5rem 3rem; gap: 1.1rem; }
+	.site-nav__menu > li { flex-wrap: wrap; justify-content: center; gap: .55rem; width: 100%; }
+	.site-nav__sub-toggle { width: 34px; height: 34px; }
+	.site-nav__sub-toggle::before { width: 9px; height: 9px; border-width: 2px; }
+	.sub-menu {
+		flex-basis: 100%; text-align: center;
+		max-height: 0; overflow: hidden; opacity: 0;
+		transition: max-height .35s var(--ease), opacity .25s var(--ease), margin .35s var(--ease);
+	}
+	.menu-item-has-children.is-open > .sub-menu {
+		max-height: 32rem; opacity: 1; margin-top: .6rem;
+		border-top: 1px solid var(--line-inverse);
+	}
+	.sub-menu li { padding: .55rem 0; }
+	.sub-menu li:first-child { padding-top: 1rem; }
+	.sub-menu a { font-size: 1.02rem; font-weight: 500; color: var(--aqua); }
+	.sub-menu .current-menu-item > a { color: var(--gold); }
+	.sub-menu a::after { display: none; }
 }
 
 /* ==========================================================
@@ -1132,3 +1228,35 @@ input, select, textarea { font-family: inherit; }
 .spot-tag--included { background: rgba(26,127,55,.9); }
 .spot-tag--optional { background: rgba(180,83,9,.92); }
 .spot-card__noimg { display: grid; place-items: center; width: 100%; height: 100%; font-size: 2.4rem; background: var(--sand); }
+
+/* ==========================================================
+   23. BOOKING GUIDE
+   ========================================================== */
+/* Narrow screens: the 5-column comparison table scrolls inside its own box
+   instead of forcing the whole page to scroll sideways. */
+.guide-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius); }
+.guide-table { min-width: 720px; }
+.guide-table td:first-child { min-width: 180px; }
+.guide-table__row--bhela td { background: var(--sand); }
+.guide-table__row--bhela td:first-child { box-shadow: inset 4px 0 0 var(--gold); }
+/* Two classes, so this beats the `span.tag` base rule without !important. */
+.guide-table__row--bhela .guide-badge { display: table; margin-top: .45rem; }
+.guide-note { margin-top: 1.2rem; color: var(--text-soft); font-size: .93rem; }
+.guide-points { margin: 0; padding-left: 1.2rem; }
+.guide-points li { margin-bottom: .4rem; }
+.guide-points li:last-child { margin-bottom: 0; }
+.guide-warn {
+	margin-top: 3rem; background: var(--white); border: 1px solid var(--line);
+	border-left: 5px solid var(--cta); border-radius: var(--radius);
+	padding: clamp(1.4rem, 3vw, 2.2rem); box-shadow: var(--shadow-sm);
+}
+.guide-warn h3 { font-size: 1.25rem; margin-bottom: .8rem; }
+.guide-warn p { color: var(--text-soft); }
+.guide-warn .guide-points { margin: 1rem 0; }
+.guide-warn__note { font-weight: 600; color: var(--cta-dark); margin-bottom: 0; }
+.guide-quote {
+	margin: 2.4rem 0 0; padding: 1.6rem 1.8rem; background: var(--white);
+	border-left: 5px solid var(--gold); border-radius: var(--radius-sm);
+	font-family: var(--font-display); font-size: 1.15rem; line-height: 1.75;
+}
+@media (max-width: 640px) { .guide-quote { font-size: 1.05rem; padding: 1.2rem 1.3rem; } }

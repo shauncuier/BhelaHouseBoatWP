@@ -52,6 +52,7 @@ wp-content/                          ← Git root
 │   │   ├── template-food.php        ← খাবার মেনু (Food Menu)
 │   │   ├── template-gallery.php     ← গ্যালারি (Gallery)
 │   │   ├── template-faq.php         ← সাধারণ প্রশ্ন (FAQ)
+│   │   ├── template-guide.php       ← বুকিং গাইড (Booking Guide)
 │   │   ├── template-policy.php      ← বুকিং নীতিমালা (Policies)
 │   │   └── template-fullwidth.php   ← Full-width Elementor template
 │   ├── assets/

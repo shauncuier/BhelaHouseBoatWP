@@ -25,6 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 					<li><a href="<?php echo esc_url( bhela_page_url( 'schedule' ) ); ?>">ট্রিপ সিডিউল</a></li>
 					<li><a href="<?php echo esc_url( bhela_page_url( 'food' ) ); ?>">খাবার মেনু</a></li>
 					<li><a href="<?php echo esc_url( bhela_page_url( 'gallery' ) ); ?>">গ্যালারি</a></li>
+					<li><a href="<?php echo esc_url( bhela_page_url( 'booking-guide' ) ); ?>">বুকিং গাইড</a></li>
 					<li><a href="<?php echo esc_url( bhela_page_url( 'faq' ) ); ?>">সাধারণ প্রশ্ন</a></li>
 				</ul>
 			</div>

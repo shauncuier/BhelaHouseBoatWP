@@ -91,7 +91,7 @@ foreach ( $faqs as $group ) {
 
 	<div class="cta-banner reveal" style="margin-top:3rem">
 		<h2>আরও প্রশ্ন আছে?</h2>
-		<p>সরাসরি আমাদের সাথে কথা বলুন — আমরা সবসময় পাশে আছি।</p>
+		<p>সরাসরি আমাদের সাথে কথা বলুন — আমরা সবসময় পাশে আছি। বুকিং করার আগে সম্পূর্ণ <a href="<?php echo esc_url( bhela_page_url( 'booking-guide' ) ); ?>" style="color:var(--gold)">বুকিং গাইড</a> পড়ে নিতে পারেন।</p>
 		<div class="btn-row">
 			<a class="btn btn--wa" href="<?php echo esc_url( bhela_wa_link() ); ?>" target="_blank" rel="noopener">💬 WhatsApp</a>
 			<a class="btn btn--ghost" href="tel:<?php echo esc_attr( bhela_contact( 'phone_1' ) ); ?>">📞 <?php echo esc_html( bhela_contact( 'phone_1' ) ); ?></a>

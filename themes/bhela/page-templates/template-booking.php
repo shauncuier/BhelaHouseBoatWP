@@ -85,7 +85,7 @@ get_header();
 			📱 <a href="tel:<?php echo esc_attr( bhela_contact( 'phone_2' ) ); ?>"><?php echo esc_html( bhela_contact( 'phone_2' ) ); ?></a> ·
 			✉️ <a href="mailto:<?php echo esc_attr( bhela_contact( 'email' ) ); ?>"><?php echo esc_html( bhela_contact( 'email' ) ); ?></a>
 		</p>
-		<p style="font-size:.9rem;color:var(--text-soft)">বুকিং সম্পন্ন করার মাধ্যমে আপনি আমাদের <a href="<?php echo esc_url( bhela_page_url( 'policies' ) ); ?>">বুকিং নীতিমালায়</a> সম্মতি প্রদান করছেন।</p>
+		<p style="font-size:.9rem;color:var(--text-soft)">বুকিং সম্পন্ন করার মাধ্যমে আপনি আমাদের <a href="<?php echo esc_url( bhela_page_url( 'policies' ) ); ?>">বুকিং নীতিমালায়</a> সম্মতি প্রদান করছেন। প্রথমবার হাউসবোট বুক করছেন? <a href="<?php echo esc_url( bhela_page_url( 'booking-guide' ) ); ?>">বুকিং গাইড</a> দেখে নিন।</p>
 	</div>
 </div></section>
 <?php get_footer(); ?>

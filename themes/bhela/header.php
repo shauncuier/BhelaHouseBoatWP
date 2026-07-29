@@ -37,6 +37,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 				'container'      => false,
 				'menu_class'     => 'site-nav__menu',
 				'menu_id'        => 'site-menu',
+				'depth'          => 2,
 				'items_wrap'     => '<ul id="%1$s" class="%2$s">%3$s<li><a class="btn btn--cta site-nav__book" href="' . esc_url( bhela_page_url( 'book-now' ) ) . '">বুক করুন</a></li></ul>',
 			) );
 		} else {
