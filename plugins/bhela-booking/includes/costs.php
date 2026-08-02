@@ -266,6 +266,81 @@ function bhela_bm_cost_booking_earnings( $date ) {
 	);
 }
 
+/**
+ * Trip calendar details for a date, if that date is a scheduled trip.
+ *
+ * @param string $date Y-m-d.
+ * @return array{label:string,days:string,end:string}
+ */
+function bhela_bm_cost_trip_info( $date ) {
+	$out = array( 'label' => '', 'days' => '', 'end' => '' );
+	if ( ! $date || ! function_exists( 'bhela_bm_get_trips' ) ) {
+		return $out;
+	}
+	foreach ( bhela_bm_get_trips() as $t ) {
+		if ( ( $t['date'] ?? '' ) === $date ) {
+			return array(
+				'label' => (string) ( $t['label'] ?? '' ),
+				'days'  => (string) ( $t['days'] ?? '' ),
+				'end'   => (string) ( $t['end'] ?? '' ),
+			);
+		}
+	}
+	return $out;
+}
+
+/**
+ * Everything the sheet can derive from a travel date, as JSON.
+ *
+ * The figures are computed server-side on page load too, but that only helps a
+ * sheet that already has a date saved. Choosing a date on a new sheet used to
+ * show nothing until after a save — this is what makes it fill immediately.
+ */
+function bhela_bm_cost_lookup() {
+	check_ajax_referer( 'bhela_bm_cost_lookup' );
+	if ( ! current_user_can( 'edit_bhela_costs' ) ) {
+		wp_send_json_error( array( 'message' => __( 'Permission denied.', 'bhela-booking' ) ), 403 );
+	}
+
+	$date = bhela_bm_cost_date( wp_unslash( $_GET['date'] ?? '' ) );
+	if ( ! $date ) {
+		wp_send_json_success( array(
+			'date'  => '',
+			'money' => array( 'bookings' => 0, 'total' => 0, 'paid' => 0, 'due' => 0 ),
+			'hint'  => __( 'Pick a trip date to pull its bookings.', 'bhela-booking' ),
+		) );
+	}
+
+	$data = bhela_bm_report_rows( $date, $date, false );
+	$t    = $data['totals'];
+	$trip = bhela_bm_cost_trip_info( $date );
+
+	wp_send_json_success( array(
+		'date'      => $date,
+		'money'     => array(
+			'bookings' => (int) $t['bookings'],
+			'total'    => (int) $t['total'],
+			'paid'     => (int) $t['paid'],
+			'due'      => (int) $t['due'],
+		),
+		'guests'    => (int) $t['guests'],
+		'cabins'    => (int) $t['cabins'],
+		'duration'  => $trip['days'],
+		'check_in'  => $date,
+		'check_out' => $trip['end'] ? $trip['end'] : $date,
+		'title'     => $trip['label'] ? $trip['label'] : mysql2date( 'j M Y', $date ),
+		'hint'      => sprintf(
+			/* translators: 1: bookings count, 2: total, 3: collected, 4: outstanding */
+			__( '%1$d booking(s) on this date · invoiced %2$s · collected %3$s · due %4$s', 'bhela-booking' ),
+			(int) $t['bookings'],
+			bhela_bm_money( $t['total'] ),
+			bhela_bm_money( $t['paid'] ),
+			bhela_bm_money( $t['due'] )
+		),
+	) );
+}
+add_action( 'wp_ajax_bhela_bm_cost_lookup', 'bhela_bm_cost_lookup' );
+
 /* =========================================================
  * LIST TABLE
  * ========================================================= */
@@ -570,24 +645,26 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			<div>
 				<span><?php esc_html_e( 'Total Earnings from This Trip', 'bhela-booking' ); ?></span>
 				<input type="number" step="1" id="bhela-cs-earn" name="bhela_cost_earnings" value="<?php echo esc_attr( $earnings ); ?>" style="font-size:19px;font-weight:700"<?php echo $ro; ?>>
-				<p class="bhela-cs__hint">
+				<p class="bhela-cs__hint" id="bhela-cs-hint">
 					<?php
-					printf(
-						/* translators: 1: bookings count, 2: total, 3: collected, 4: outstanding */
-						esc_html__( '%1$d booking(s) on this date · invoiced %2$s · collected %3$s · due %4$s', 'bhela-booking' ),
-						(int) $book['bookings'],
-						esc_html( bhela_bm_money( $book['total'] ) ),
-						esc_html( bhela_bm_money( $book['paid'] ) ),
-						esc_html( bhela_bm_money( $book['due'] ) )
-					);
+					if ( ! $date ) {
+						esc_html_e( 'Pick a trip date to pull its bookings.', 'bhela-booking' );
+					} else {
+						printf(
+							/* translators: 1: bookings count, 2: total, 3: collected, 4: outstanding */
+							esc_html__( '%1$d booking(s) on this date · invoiced %2$s · collected %3$s · due %4$s', 'bhela-booking' ),
+							(int) $book['bookings'],
+							esc_html( bhela_bm_money( $book['total'] ) ),
+							esc_html( bhela_bm_money( $book['paid'] ) ),
+							esc_html( bhela_bm_money( $book['due'] ) )
+						);
+					}
 					?>
 				</p>
-				<?php if ( ! $locked && $earnings !== (int) $book['total'] ) : ?>
-					<p class="bhela-cs__warn">
-						<?php esc_html_e( 'This differs from the booking total.', 'bhela-booking' ); ?>
-						<a href="#" id="bhela-cs-reset" data-v="<?php echo esc_attr( $book['total'] ); ?>"><?php esc_html_e( 'Use booking figure', 'bhela-booking' ); ?></a>
-					</p>
-				<?php endif; ?>
+				<p class="bhela-cs__warn" id="bhela-cs-warn"<?php echo ( $locked || $earnings === (int) $book['total'] ) ? ' hidden' : ''; ?>>
+					<?php esc_html_e( 'This differs from the booking total.', 'bhela-booking' ); ?>
+					<a href="#" id="bhela-cs-reset" data-v="<?php echo esc_attr( $book['total'] ); ?>"><?php esc_html_e( 'Use booking figure', 'bhela-booking' ); ?></a>
+				</p>
 			</div>
 			<div>
 				<span><?php esc_html_e( 'Total Profit from This Trip', 'bhela-booking' ); ?></span>
@@ -601,11 +678,61 @@ function bhela_bm_cost_sheet_cb( $post ) {
 		var wrap = document.querySelector('.bhela-cs');
 		if (!wrap) return;
 
-		var pick = document.getElementById('bhela_cost_trip_pick');
+		var dateEl = document.getElementById('bhela_cost_trip_date');
+		var pick   = document.getElementById('bhela_cost_trip_pick');
+		var hint   = document.getElementById('bhela-cs-hint');
+		var warn   = document.getElementById('bhela-cs-warn');
+		var reset  = document.getElementById('bhela-cs-reset');
+		var earnEl = document.getElementById('bhela-cs-earn');
+		var ajax   = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+		var lookupNonce = <?php echo wp_json_encode( wp_create_nonce( 'bhela_bm_cost_lookup' ) ); ?>;
+		var locked = <?php echo $locked ? 'true' : 'false'; ?>;
+
+		/* Pull everything the date implies — booking money, guest count, trip
+		   dates — the moment it changes. Without this the figures only appeared
+		   after a save, which read as "it doesn't fetch anything". */
+		function lookup(date) {
+			if (locked) return;
+			var url = ajax + '?action=bhela_bm_cost_lookup&_wpnonce=' +
+				encodeURIComponent(lookupNonce) + '&date=' + encodeURIComponent(date || '');
+			fetch(url, { credentials: 'same-origin' })
+				.then(function (r) { return r.json(); })
+				.then(function (res) {
+					if (!res || !res.success) return;
+					var d = res.data;
+					if (hint) hint.textContent = d.hint;
+					if (earnEl) earnEl.value = d.money.total;
+					if (reset) reset.dataset.v = d.money.total;
+					if (warn) warn.hidden = true;
+
+					var guests = document.getElementById('bhela_cost_h_total_guest');
+					if (guests) guests.value = d.guests || '';
+
+					// Descriptive fields are only filled when still blank, so a
+					// value typed by hand is never overwritten by a date change.
+					[['bhela_cost_h_duration', d.duration],
+					 ['bhela_cost_h_check_in', d.check_in],
+					 ['bhela_cost_h_check_out', d.check_out]].forEach(function (pair) {
+						var el = document.getElementById(pair[0]);
+						if (el && !el.value && pair[1]) el.value = pair[1];
+					});
+
+					recalc();
+				})
+				.catch(function () {
+					if (hint) hint.textContent = <?php echo wp_json_encode( __( 'Could not read the bookings for that date. Save and reload to try again.', 'bhela-booking' ) ); ?>;
+				});
+		}
+
 		if (pick) {
 			pick.addEventListener('change', function () {
-				if (pick.value) document.getElementById('bhela_cost_trip_date').value = pick.value;
+				if (!pick.value) return;
+				dateEl.value = pick.value;
+				lookup(pick.value);
 			});
+		}
+		if (dateEl) {
+			dateEl.addEventListener('change', function () { lookup(dateEl.value); });
 		}
 
 		var money = function (n) {
@@ -626,11 +753,15 @@ function bhela_bm_cost_sheet_cb( $post ) {
 				total += sub;
 			});
 			document.getElementById('bhela-cs-total').textContent = money(total);
-			var earn = parseInt((document.getElementById('bhela-cs-earn') || {}).value, 10) || 0;
+			var earn = parseInt((earnEl || {}).value, 10) || 0;
 			var pEl = document.getElementById('bhela-cs-profit');
 			if (pEl) {
 				pEl.textContent = money(earn - total);
 				pEl.style.color = (earn - total) < 0 ? '#b32d2e' : '#1a7f37';
+			}
+			// Surface the mismatch live, not only on the next page load.
+			if (warn && reset && !locked) {
+				warn.hidden = earn === (parseInt(reset.dataset.v, 10) || 0);
 			}
 		}
 
@@ -638,14 +769,17 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			if (e.target.classList.contains('bhela-cs__p') || e.target.id === 'bhela-cs-earn') recalc();
 		});
 
-		var reset = document.getElementById('bhela-cs-reset');
 		if (reset) {
 			reset.addEventListener('click', function (e) {
 				e.preventDefault();
-				document.getElementById('bhela-cs-earn').value = reset.dataset.v;
+				if (earnEl) earnEl.value = reset.dataset.v;
 				recalc();
 			});
 		}
+
+		// Deliberately no fetch on load: the server already rendered the stored
+		// figures, and re-deriving here would overwrite an earnings value the
+		// preparer entered by hand for outside income.
 	})();
 	</script>
 	<?php
