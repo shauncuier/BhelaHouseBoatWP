@@ -266,7 +266,7 @@ function bhela_bm_trips_menu() {
 		'edit.php?post_type=bhela_booking',
 		__( 'Trip Calendar', 'bhela-booking' ),
 		__( 'Trip Calendar', 'bhela-booking' ),
-		'manage_options',
+		'bhela_manage_trips',
 		'bhela-bm-trips',
 		'bhela_bm_trips_page'
 	);
@@ -274,7 +274,7 @@ function bhela_bm_trips_menu() {
 add_action( 'admin_menu', 'bhela_bm_trips_menu' );
 
 function bhela_bm_trips_page() {
-	if ( ! current_user_can( 'manage_options' ) ) {
+	if ( ! current_user_can( 'bhela_manage_trips' ) ) {
 		return;
 	}
 

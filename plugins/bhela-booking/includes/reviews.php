@@ -26,7 +26,9 @@ function bhela_bm_register_reviews_cpt() {
 			'menu_name'     => '⭐ Reviews',
 			'add_new_item'  => 'Add New Review',
 			'edit_item'     => 'Edit Review',
-			'all_items'     => 'All Reviews',
+			// Nested post types show `all_items` in the menu, so this carries the
+			// emoji to match the siblings around it.
+			'all_items'     => '⭐ Reviews',
 			'not_found'     => 'No reviews yet.',
 		),
 		'public'             => false,

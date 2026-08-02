@@ -24,7 +24,7 @@ function bhela_bm_reports_menu() {
 		'edit.php?post_type=bhela_booking',
 		__( 'Trip Report', 'bhela-booking' ),
 		__( '📄 Trip Report', 'bhela-booking' ),
-		'edit_posts',
+		'bhela_view_reports',
 		'bhela-bm-reports',
 		'bhela_bm_reports_page'
 	);
@@ -197,7 +197,7 @@ function bhela_bm_report_text( $rows, $totals, $label ) {
  * a clean request with no admin markup already sent.
  */
 function bhela_bm_report_csv() {
-	if ( ! current_user_can( 'edit_posts' ) ) {
+	if ( ! current_user_can( 'bhela_view_reports' ) ) {
 		wp_die( esc_html__( 'You are not allowed to export bookings.', 'bhela-booking' ), 403 );
 	}
 	check_admin_referer( 'bhela_bm_report_csv' );
@@ -274,7 +274,7 @@ function bhela_bm_report_pay_methods() {
 /* ---------- Page ---------- */
 
 function bhela_bm_reports_page() {
-	if ( ! current_user_can( 'edit_posts' ) ) {
+	if ( ! current_user_can( 'bhela_view_reports' ) ) {
 		return;
 	}
 

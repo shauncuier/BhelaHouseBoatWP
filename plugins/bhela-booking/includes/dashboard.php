@@ -21,7 +21,7 @@ function bhela_bm_dashboard_menu() {
 		'edit.php?post_type=bhela_booking',
 		__( 'BHELA Dashboard', 'bhela-booking' ),
 		__( '📊 Dashboard', 'bhela-booking' ),
-		'edit_posts',
+		'bhela_view_reports',
 		'bhela-bm-dashboard',
 		'bhela_bm_dashboard_page'
 	);
@@ -29,13 +29,16 @@ function bhela_bm_dashboard_menu() {
 add_action( 'admin_menu', 'bhela_bm_dashboard_menu' );
 
 /**
- * WordPress builds the Bookings submenu in registration order, which reads
- * as a jumble (CPT items, then each module in load order). Reorder the whole
- * thing into a task-flow sequence: overview → bookings → schedule → media →
- * feedback → logs → settings → help. Pure display order, no capability change.
+ * WordPress builds the Bookings submenu in registration order, which reads as a
+ * jumble (CPT items, then each module in load order). Reorder the whole thing
+ * into a task-flow sequence: overview → bookings → money → schedule → media →
+ * feedback → admin → help. Pure display order, no capability change.
  *
- * Items are matched by menu slug; anything not listed keeps its place at the
- * end, so a future page is never hidden by this.
+ * Nested post types (show_in_menu pointing at this parent) contribute exactly
+ * one entry each — core's _add_post_type_submenus() adds the "All items" link
+ * and nothing else. Only bhela_booking, which owns the top-level menu, also
+ * gets an "Add New". That is why the list below is shorter than the number of
+ * post types suggests.
  */
 function bhela_bm_dashboard_menu_order() {
 	global $submenu;
@@ -44,25 +47,47 @@ function bhela_bm_dashboard_menu_order() {
 		return;
 	}
 	$order = array(
+		// Every day
 		'bhela-bm-dashboard',                     // 📊 Dashboard
 		'edit.php?post_type=bhela_booking',       // All Bookings
 		'post-new.php?post_type=bhela_booking',   // Add New Booking
-		'bhela-bm-reports',                       // Trip Report
+		// Money
+		'bhela-bm-reports',                       // 📄 Trip Report
+		'edit.php?post_type=bhela_cost',          // 🧾 Cost Sheets
+		// Planning
 		'bhela-bm-trips',                         // Trip Calendar
-		'edit.php?post_type=bhela_spot',          // Spots (trip route)
-		'edit.php?post_type=bhela_gallery',       // Gallery
-		'bhela-bm-gallery-bulk',                  // Bulk Upload
-		'edit.php?post_type=bhela_review',        // Reviews
-		'bhela-bm-log',                           // Activity Log
-		'bhela-bm-settings',                      // Settings
-		'bhela-bm-guide',                         // Quick Guide (help last)
+		'edit.php?post_type=bhela_spot',          // 🗺️ Spots
+		// Content
+		'edit.php?post_type=bhela_gallery',       // 🖼️ Gallery
+		'bhela-bm-gallery-bulk',                  // 🖼️ Bulk Upload
+		'edit.php?post_type=bhela_review',        // ⭐ Reviews
+		// Administration
+		'bhela-bm-log',                           // 📋 Activity Log
+		'bhela-bm-team',                          // 👥 Team
+		'bhela-bm-settings',                      // ⚙️ Settings
+		'bhela-bm-guide',                         // 🎯 Quick Guide (help last)
 	);
-	$rank = array_flip( $order );
-	usort( $submenu[ $parent ], function ( $a, $b ) use ( $rank ) {
-		$ra = $rank[ $a[2] ] ?? PHP_INT_MAX;
-		$rb = $rank[ $b[2] ] ?? PHP_INT_MAX;
-		return $ra <=> $rb;
+
+	// html_entity_decode covers slugs WordPress stores escaped (a taxonomy link
+	// carries &amp; between its query args), so a future one still matches.
+	$rank = array();
+	foreach ( $order as $i => $slug ) {
+		$rank[ $slug ]                       = $i;
+		$rank[ html_entity_decode( $slug ) ] = $i;
+	}
+
+	// Anything unrecognised (a page added by a future release) keeps its
+	// registration order at the end rather than being dropped or hidden.
+	$fallback = count( $order );
+	foreach ( $submenu[ $parent ] as $i => $item ) {
+		$submenu[ $parent ][ $i ]['bhela_rank'] = $rank[ $item[2] ] ?? ( $fallback + $i );
+	}
+	usort( $submenu[ $parent ], function ( $a, $b ) {
+		return $a['bhela_rank'] <=> $b['bhela_rank'];
 	} );
+	foreach ( $submenu[ $parent ] as $i => $item ) {
+		unset( $submenu[ $parent ][ $i ]['bhela_rank'] );
+	}
 	$submenu[ $parent ] = array_values( $submenu[ $parent ] );
 }
 add_action( 'admin_menu', 'bhela_bm_dashboard_menu_order', 999 );
@@ -120,7 +145,7 @@ function bhela_bm_money_totals() {
 /* ---------- Page ---------- */
 
 function bhela_bm_dashboard_page() {
-	if ( ! current_user_can( 'edit_posts' ) ) {
+	if ( ! current_user_can( 'bhela_view_reports' ) ) {
 		return;
 	}
 	$s        = bhela_bm_get_settings();
@@ -228,6 +253,8 @@ function bhela_bm_dashboard_page() {
 		<div class="bhela-card bhela-actions">
 			<h2><?php esc_html_e( 'Quick Actions', 'bhela-booking' ); ?></h2>
 			<a class="button button-primary" href="<?php echo esc_url( admin_url( 'post-new.php?post_type=bhela_booking' ) ); ?>">➕ <?php esc_html_e( 'New Booking', 'bhela-booking' ); ?></a>
+			<a class="button" href="<?php echo $page( 'bhela-bm-reports' ); ?>">📄 <?php esc_html_e( 'Trip Report', 'bhela-booking' ); ?></a>
+			<a class="button" href="<?php echo $link( array( 'post_type' => 'bhela_cost' ) ); ?>">🧾 <?php esc_html_e( 'Cost Sheets', 'bhela-booking' ); ?></a>
 			<a class="button" href="<?php echo $page( 'bhela-bm-trips' ); ?>">📅 <?php esc_html_e( 'Trip Calendar', 'bhela-booking' ); ?></a>
 			<a class="button" href="<?php echo $page( 'bhela-bm-gallery-bulk' ); ?>">🖼️ <?php esc_html_e( 'Bulk Upload', 'bhela-booking' ); ?></a>
 			<a class="button" href="<?php echo $link( array( 'post_type' => 'bhela_review' ) ); ?>">⭐ <?php esc_html_e( 'Reviews', 'bhela-booking' ); ?></a>

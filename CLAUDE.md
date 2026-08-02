@@ -72,6 +72,8 @@ wp-content/                          ← Git root
 │   │   ├── reviews.php              ← Reviews CPT + admin + shortcode
 │   │   ├── admin.php                ← Admin UI: columns, meta boxes, settings page, dashboard widget
 │   │   ├── reports.php              ← Trip Report: per-date bookings, advance/due, print + WhatsApp + CSV
+│   │   ├── costs.php                ← Trip Cost Sheet CPT + prepare/check/approve workflow
+│   │   ├── roles.php                ← Staff roles, plugin capabilities, Team reference screen
 │   │   └── guide.php                ← Embedded admin guide
 │   ├── assets/
 │   │   ├── booking.css              ← Booking form styles (29KB)
@@ -310,6 +312,11 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_send_sms($number, $msg)` | `includes/sms.php` | Send via configured gateway |
 | `bhela_bm_render_sms($tpl, $id)` | `includes/sms.php` | Fill `{placeholders}` from booking |
 | `bhela_bm_save_booking()` | `includes/admin.php` | Save booking meta + trigger notifications |
+| `bhela_bm_report_rows($from,$to,$cancelled)` | `includes/reports.php` | Bookings + money totals for a travel-date range |
+| `bhela_bm_cost_items()` | `includes/costs.php` | Fixed expense heads on the trip cost sheet |
+| `bhela_bm_cost_transitions()` | `includes/costs.php` | Cost-sheet workflow: from-state → target + required capability |
+| `bhela_bm_roles()` | `includes/roles.php` | Staff role definitions — the single source of truth for permissions |
+| `bhela_bm_install_roles()` | `includes/roles.php` | Authoritative role sync (adds AND removes plugin caps) |
 
 ### Theme (`bhela`)
 

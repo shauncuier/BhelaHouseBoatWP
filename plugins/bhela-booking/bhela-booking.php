@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.19.0
+ * Version: 2.20.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.19.0' );
+define( 'BHELA_BM_VERSION', '2.20.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -518,7 +518,11 @@ function bhela_bm_register_cpt() {
 		'show_ui'            => true,
 		'show_in_menu'       => true,
 		'rewrite'            => false,
-		'capability_type'    => 'post',
+		// Own capability type, not 'post'. Booking staff must be able to run
+		// reservations without edit_posts, which would also hand them the
+		// site's pages, posts and every other plugin's content.
+		'capability_type'    => array( 'bhela_booking', 'bhela_bookings' ),
+		'map_meta_cap'       => true,
 		'has_archive'        => false,
 		'menu_position'      => 26,
 		'menu_icon'          => 'dashicons-calendar-alt',
@@ -544,9 +548,11 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/guide.php';
 }
 if ( is_admin() ) {
+	require_once BHELA_BM_PATH . 'includes/roles.php';
 	require_once BHELA_BM_PATH . 'includes/admin.php';
 	require_once BHELA_BM_PATH . 'includes/dashboard.php';
 	require_once BHELA_BM_PATH . 'includes/reports.php';
+	require_once BHELA_BM_PATH . 'includes/costs.php';
 }
 
 /* =========================================================
@@ -563,6 +569,13 @@ function bhela_bm_activate() {
 	if ( false === get_option( 'bhela_bm_invoice_counter', false ) ) {
 		add_option( 'bhela_bm_invoice_counter', 0 );
 	}
+	// Staff roles. The module is admin-only, so on a front-end activation path
+	// it may not be loaded yet.
+	if ( ! function_exists( 'bhela_bm_install_roles' ) ) {
+		require_once BHELA_BM_PATH . 'includes/roles.php';
+	}
+	bhela_bm_install_roles();
+	update_option( 'bhela_bm_roles_version', BHELA_BM_ROLES_VERSION );
 }
 register_activation_hook( __FILE__, 'bhela_bm_activate' );
 

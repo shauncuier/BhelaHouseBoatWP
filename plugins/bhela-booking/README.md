@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.19.0
+- **Version:** 2.20.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -33,6 +33,8 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/reviews.php` | Reviews CPT |
 | `includes/admin.php` | Bookings columns, edit meta box, Settings page, dashboard widget |
 | `includes/reports.php` | Trip Report screen — bookings for a date/range with advance, due and totals; print, WhatsApp text and CSV export |
+| `includes/costs.php` | Trip Cost Sheet CPT + prepare/check/approve workflow and the printable sheet |
+| `includes/roles.php` | Staff roles, every plugin capability, and the read-only Team reference screen |
 | `templates/invoice.php` | Printable invoice |
 
 ## Key functions / extension points
@@ -41,8 +43,50 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_render_sms( $template, $booking_id )` — fill `{placeholders}` from a booking.
 - `bhela_bm_trip_availability( $date )` → `total / booked / available / status`.
 - `bhela_bm_report_rows( $from, $to, $with_cancelled )` → `rows / totals` for a travel-date range.
+- `bhela_bm_cost_items()` — the fixed expense heads on the trip cost sheet.
+- `bhela_bm_cost_transitions()` — the workflow state machine (from-state, target, required capability).
+- `bhela_bm_roles()` — staff role definitions; the single source of truth for permissions.
 - `bhela_bm_calc_multi( $cabins, $date )` — authoritative per-cabin pricing.
 - Notifications fire from `bhela_bm_process_submission()` (new booking) and `bhela_bm_save_booking()` (status change).
+
+## Trip Cost Sheet
+
+`Bookings → 🧾 Cost Sheets`. One sheet per trip: the 21 expense heads from the operations spreadsheet plus 3 free-text rows, each with 1st/2nd/3rd payment columns and a remark.
+
+**Earnings are not typed in.** The sheet reads the travel date's booking total through `bhela_bm_report_rows()`, so cost and revenue can never disagree with the Trip Report. The field stays editable for outside income; when it differs from the booking figure the sheet says so and offers a one-click reset.
+
+**Approval chain** — each step stamps the user and time, and writes to the activity log:
+
+```
+draft ──submit──▶ prepared ──check──▶ checked ──approve──▶ approved (locked)
+                     ▲                    │                     │
+                     └────── return ──────┘                     │
+                     ◀──────────── unlock (admin only) ─────────┘
+```
+
+An approved sheet is locked in the save handler, not just in the UI — a crafted POST cannot edit it either.
+
+## Team & roles
+
+`Bookings → 👥 Team` (administrators only) is **read-only**: who currently has access, and a generated table of what each role may actually do.
+
+Creating users and assigning roles stays in **Users → Add New** — these are ordinary WordPress roles, so they appear in its dropdown with no extra code. Duplicating that here would mean two places to change a role and two places to keep correct. What WordPress cannot show is what a role *permits*: its user list prints role names and stops, so nothing there reveals that a Cost Checker cannot approve. That table is the screen's reason to exist, and it is built from `bhela_bm_roles()` so it cannot drift from what the site enforces.
+
+| Role | Bookings | Dashboard & Trip Report | Trip Calendar | Cost sheets | Settings |
+|---|---|---|---|---|---|
+| **BHELA Manager** | full | ✓ | ✓ | prepare + check | — |
+| **BHELA Booking Staff** | create & edit | ✓ | — | — | — |
+| **BHELA Cost Checker** | — | — | — | all sheets, check | — |
+| **BHELA Cost Preparer** | — | — | — | own sheets only | — |
+| Administrator | full | ✓ | ✓ | **approve** / unlock | ✓ |
+
+Both CPTs declare their own `capability_type` (`bhela_booking` / `bhela_cost`) rather than `'post'`. That is the load-bearing decision: with `'post'`, booking staff would need `edit_posts` and would inherit the site's pages, posts and every other plugin's content. None of these roles hold `edit_posts`, `manage_options`, `activate_plugins` or `list_users`.
+
+Screens are gated on plugin capabilities, not WordPress ones — `bhela_view_reports` for the Dashboard and Trip Report, `bhela_manage_trips` for the Trip Calendar, `bhela_cost_*` for the sheet workflow.
+
+**Role sync is authoritative.** `bhela_bm_install_roles()` runs on activation and whenever `BHELA_BM_ROLES_VERSION` moves. It adds missing capabilities *and removes plugin capabilities the current definition no longer grants* — add-only syncing looks safer but silently leaves old permissions in place when a role is narrowed. Capabilities from outside this plugin are never touched.
+
+Upgrade note: bookings previously ran on generic `post` capabilities, so any role with `edit_others_posts` (Editor by default) could manage them. The sync carries that across rather than revoking it.
 
 ## Settings (`bhela_bm_settings` option)
 

@@ -28,6 +28,7 @@ function bhela_bm_log_types() {
 		'email'    => array( 'label' => 'Email', 'color' => '#1a7f37' ),
 		'sms'      => array( 'label' => 'SMS', 'color' => '#7c3aed' ),
 		'trips'    => array( 'label' => 'Trip Calendar', 'color' => '#b45309' ),
+		'cost'     => array( 'label' => 'Cost Sheets', 'color' => '#9333ea' ),
 		'settings' => array( 'label' => 'Settings', 'color' => '#5E7472' ),
 		'gallery'  => array( 'label' => 'Gallery', 'color' => '#0891b2' ),
 		'error'    => array( 'label' => 'Problems', 'color' => '#b32d2e' ),
