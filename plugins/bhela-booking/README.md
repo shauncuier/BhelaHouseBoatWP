@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.20.1
+- **Version:** 2.21.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -45,7 +45,9 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_report_rows( $from, $to, $with_cancelled )` → `rows / totals` for a travel-date range.
 - `bhela_bm_cost_items()` — the fixed expense heads on the trip cost sheet.
 - `bhela_bm_cost_transitions()` — the workflow state machine (from-state, target, required capability).
-- `bhela_bm_roles()` — staff role definitions; the single source of truth for permissions.
+- `bhela_bm_roles()` — staff roles with their capabilities; the single source of truth the rest of the plugin reads.
+- `bhela_bm_permissions()` — the togglable permission registry, and the allow-list for what the Team screen may grant.
+- `bhela_bm_normalise_perms( $perms )` — drops unknown keys, pulls in prerequisites.
 - `bhela_bm_calc_multi( $cabins, $date )` — authoritative per-cabin pricing.
 - Notifications fire from `bhela_bm_process_submission()` (new booking) and `bhela_bm_save_booking()` (status change).
 
@@ -68,9 +70,11 @@ An approved sheet is locked in the save handler, not just in the UI — a crafte
 
 ## Team & roles
 
-`Bookings → 👥 Team` (administrators only) is **read-only**: who currently has access, and a generated table of what each role may actually do.
+`Bookings → 👥 Team` (administrators only) lists who has access and carries the **permission matrix** — a checkbox per permission per role, saved from the page.
 
-Creating users and assigning roles stays in **Users → Add New** — these are ordinary WordPress roles, so they appear in its dropdown with no extra code. Duplicating that here would mean two places to change a role and two places to keep correct. What WordPress cannot show is what a role *permits*: its user list prints role names and stops, so nothing there reveals that a Cost Checker cannot approve. That table is the screen's reason to exist, and it is built from `bhela_bm_roles()` so it cannot drift from what the site enforces.
+Creating users and assigning roles stays in **Users → Add New** — these are ordinary WordPress roles, so they appear in its dropdown with no extra code. This screen decides what those roles *may do*.
+
+Shipped defaults:
 
 | Role | Bookings | Dashboard & Trip Report | Trip Calendar | Cost sheets | Settings |
 |---|---|---|---|---|---|
@@ -79,6 +83,24 @@ Creating users and assigning roles stays in **Users → Add New** — these are 
 | **BHELA Cost Checker** | — | — | — | all sheets, check | — |
 | **BHELA Cost Preparer** | — | — | — | own sheets only | — |
 | Administrator | full | ✓ | ✓ | **approve** / unlock | ✓ |
+
+### How the matrix works
+
+`bhela_bm_permissions()` is the registry: one checkbox → a bundle of capabilities. It doubles as the allow-list, which is why `manage_options`, `edit_posts`, `activate_plugins` and `list_users` are absent — they cannot be granted from the UI at all.
+
+Some permissions carry a `requires`. `reports` needs `bookings_edit` because the Dashboard and Trip Report are submenus of Bookings; granting the capability alone would register menu items the user could never reach. `bhela_bm_normalise_perms()` pulls in missing prerequisites and drops unknown keys — on save **and** on read, so a stored set can never describe a half-granted permission however it got there. The browser cascades the same rules for feedback; the server never trusts it.
+
+Granting both **Check** and **Approve** to one role lets that person approve their own sheet. That is allowed, with a warning on the page.
+
+### Defaults vs. the owner's choices
+
+- `bhela_bm_role_defaults()` — the shipped baseline, described by permission key.
+- Option **`bhela_bm_role_perms`** — only roles the owner actually changed.
+- `bhela_bm_roles()` composes capabilities from `override ?? default`, so the sync, the matrix and `bhela_bm_owned_caps()` all read one source and neither know nor care whether anything was customised.
+
+A role that was never touched keeps following code defaults, so later releases can still adjust it. A customised role shows *(customised)* with a **reset to defaults** link.
+
+This layering is what makes the authoritative sync safe: it enforces a definition that already contains the owner's choices, so a version bump cannot quietly undo them.
 
 Both CPTs declare their own `capability_type` (`bhela_booking` / `bhela_cost`) rather than `'post'`. That is the load-bearing decision: with `'post'`, booking staff would need `edit_posts` and would inherit the site's pages, posts and every other plugin's content. None of these roles hold `edit_posts`, `manage_options`, `activate_plugins` or `list_users`.
 
