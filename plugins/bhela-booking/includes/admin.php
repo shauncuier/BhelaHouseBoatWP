@@ -705,6 +705,25 @@ function bhela_bm_settings_page() {
 			: sanitize_text_field( wp_unslash( $_POST['otp_brand'] ?? '' ) );
 		$s['otp_brand']       = mb_substr( $brand, 0, 20 ) ?: 'BHELA';
 		$s['sms_low_balance'] = max( 0, (int) ( $_POST['sms_low_balance'] ?? 100 ) );
+
+		// Cost heads live in their own option, not in the settings blob — the
+		// cost sheet reads them on every render and they have their own reset.
+		if ( isset( $_POST['cost_heads'] ) && function_exists( 'bhela_bm_save_cost_heads' ) ) {
+			bhela_bm_save_cost_heads( wp_unslash( $_POST['cost_heads'] ) );
+		}
+		if ( isset( $_POST['staff'] ) && function_exists( 'bhela_bm_save_staff' ) ) {
+			bhela_bm_save_staff( wp_unslash( $_POST['staff'] ) );
+		}
+		if ( function_exists( 'bhela_bm_save_expense_list' ) ) {
+			foreach ( array(
+				'expense_types'   => 'bhela_bm_expense_types',
+				'expense_methods' => 'bhela_bm_expense_methods',
+			) as $field => $option ) {
+				if ( isset( $_POST[ $field ] ) ) {
+					bhela_bm_save_expense_list( $option, wp_unslash( $_POST[ $field ] ) );
+				}
+			}
+		}
 		$s['sms_json']     = empty( $_POST['sms_json'] ) ? 0 : 1;
 		$s['sms_provider'] = in_array( ( $_POST['sms_provider'] ?? '' ), array( 'bulksmsbd', 'custom' ), true ) ? $_POST['sms_provider'] : 'bulksmsbd';
 		$s['sms_method']   = ( 'POST' === strtoupper( $_POST['sms_method'] ?? '' ) ) ? 'POST' : 'GET';
@@ -763,6 +782,8 @@ function bhela_bm_settings_page() {
 		'rates'    => array( 'icon' => '🛏️', 'label' => __( 'Cabin Rates', 'bhela-booking' ) ),
 		'email'    => array( 'icon' => '📧', 'label' => __( 'Email', 'bhela-booking' ) ),
 		'sms'      => array( 'icon' => '📱', 'label' => __( 'SMS', 'bhela-booking' ) ),
+		'heads'    => array( 'icon' => '🧾', 'label' => __( 'Lists', 'bhela-booking' ) ),
+		'staff'    => array( 'icon' => '👷', 'label' => __( 'Staff', 'bhela-booking' ) ),
 	);
 	?>
 	<div class="wrap bhela-set">
@@ -1083,6 +1104,208 @@ function bhela_bm_settings_page() {
 				<span class="description" style="margin-left:8px"><?php esc_html_e( 'Save your settings first.', 'bhela-booking' ); ?></span>
 			</p>
 			</div><!-- /sms -->
+
+			<div class="bhela-set__panel" id="bhela-panel-heads" role="tabpanel" aria-labelledby="bhela-tab-heads">
+			<h2><?php esc_html_e( 'Trip Cost Heads', 'bhela-booking' ); ?></h2>
+			<p class="bhela-set__lead"><?php esc_html_e( 'The standing expense lines on every trip cost sheet. Rename them, reorder them, add your own. One-off items belong on the sheet itself, not here.', 'bhela-booking' ); ?></p>
+			<?php
+			$all_heads = bhela_bm_cost_heads( true );
+			$raw_heads = get_option( 'bhela_bm_cost_heads', array() );
+			$in_use    = bhela_bm_cost_heads_in_use();
+			?>
+			<table class="widefat striped" id="bhela-heads-table">
+				<thead>
+					<tr>
+						<th style="width:44px">#</th>
+						<th><?php esc_html_e( 'Head', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'In use', 'bhela-booking' ); ?></th>
+						<th style="width:130px"><?php esc_html_e( 'Retired', 'bhela-booking' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php $n = 0; foreach ( $all_heads as $slug => $label ) : $n++; $used = in_array( $slug, $in_use, true ); ?>
+					<tr>
+						<td><?php echo esc_html( $n ); ?></td>
+						<td>
+							<input type="hidden" name="cost_heads[<?php echo esc_attr( $slug ); ?>][slug]" value="<?php echo esc_attr( $slug ); ?>">
+							<input type="text" class="large-text" name="cost_heads[<?php echo esc_attr( $slug ); ?>][label]" value="<?php echo esc_attr( $label ); ?>">
+						</td>
+						<td><?php echo $used ? '<span title="' . esc_attr__( 'Used on a saved cost sheet', 'bhela-booking' ) . '">✔</span>' : '—'; ?></td>
+						<td>
+							<label>
+								<input type="checkbox" name="cost_heads[<?php echo esc_attr( $slug ); ?>][retired]" value="1"
+									<?php checked( ! empty( $raw_heads[ $slug ]['retired'] ) ); ?>>
+								<?php esc_html_e( 'Hide', 'bhela-booking' ); ?>
+							</label>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p>
+				<button type="button" class="button" id="bhela-heads-add">+ <?php esc_html_e( 'Add head', 'bhela-booking' ); ?></button>
+				<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_reset_cost_heads' ), 'bhela_bm_reset_cost_heads' ) ); ?>"
+					style="margin-left:10px"
+					onclick="return confirm('<?php echo esc_js( __( 'Reset the head list to the one shipped with the plugin? Saved cost sheets keep their figures.', 'bhela-booking' ) ); ?>')"><?php esc_html_e( 'reset to defaults', 'bhela-booking' ); ?></a>
+			</p>
+			<p class="description">
+				<?php esc_html_e( 'Retiring a head hides it from new sheets but leaves it on the ones that already use it — a closed month must not change. Renaming only changes the label; the figures stay attached to the same head.', 'bhela-booking' ); ?>
+			</p>
+			<script>
+			(function () {
+				var btn = document.getElementById('bhela-heads-add');
+				if (!btn) return;
+				btn.addEventListener('click', function () {
+					var body = document.querySelector('#bhela-heads-table tbody');
+					// A new head gets a placeholder key; the server turns the
+					// typed label into a real slug on save.
+					var key = 'new_' + Date.now().toString(36);
+					var tr = document.createElement('tr');
+					tr.innerHTML =
+						'<td>' + (body.rows.length + 1) + '</td>' +
+						'<td><input type="hidden" name="cost_heads[' + key + '][slug]" value="">' +
+						'<input type="text" class="large-text" name="cost_heads[' + key + '][label]" placeholder="<?php echo esc_js( __( 'New head…', 'bhela-booking' ) ); ?>"></td>' +
+						'<td>—</td><td></td>';
+					body.appendChild(tr);
+					tr.querySelector('input[type=text]').focus();
+				});
+			})();
+			</script>
+
+			<?php
+			// Expense types and payment methods, same shape as the heads above.
+			$bhela_lists = array(
+				'expense_types'   => array(
+					'title' => __( 'Expense Types', 'bhela-booking' ),
+					'lead'  => __( 'How spending outside a trip is classified. Each type becomes its own deduction line on the Monthly Statement.', 'bhela-booking' ),
+					'items' => function_exists( 'bhela_bm_expense_types' ) ? bhela_bm_expense_types( true ) : array(),
+					'raw'   => get_option( 'bhela_bm_expense_types', array() ),
+				),
+				'expense_methods' => array(
+					'title' => __( 'Payment Methods', 'bhela-booking' ),
+					'lead'  => __( 'Offered when recording an expense.', 'bhela-booking' ),
+					'items' => function_exists( 'bhela_bm_expense_methods' ) ? bhela_bm_expense_methods( true ) : array(),
+					'raw'   => get_option( 'bhela_bm_expense_methods', array() ),
+				),
+			);
+			foreach ( $bhela_lists as $list_key => $list ) :
+				if ( ! $list['items'] ) { continue; }
+				?>
+				<h2 style="margin-top:32px"><?php echo esc_html( $list['title'] ); ?></h2>
+				<p class="bhela-set__lead"><?php echo esc_html( $list['lead'] ); ?></p>
+				<table class="widefat striped" data-list="<?php echo esc_attr( $list_key ); ?>">
+					<thead>
+						<tr>
+							<th><?php esc_html_e( 'Name', 'bhela-booking' ); ?></th>
+							<th style="width:130px"><?php esc_html_e( 'Retired', 'bhela-booking' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+					<?php foreach ( $list['items'] as $slug => $label ) : ?>
+						<tr>
+							<td>
+								<input type="hidden" name="<?php echo esc_attr( $list_key ); ?>[<?php echo esc_attr( $slug ); ?>][slug]" value="<?php echo esc_attr( $slug ); ?>">
+								<input type="text" class="large-text" name="<?php echo esc_attr( $list_key ); ?>[<?php echo esc_attr( $slug ); ?>][label]" value="<?php echo esc_attr( $label ); ?>">
+							</td>
+							<td><label><input type="checkbox" name="<?php echo esc_attr( $list_key ); ?>[<?php echo esc_attr( $slug ); ?>][retired]" value="1"
+								<?php checked( ! empty( $list['raw'][ $slug ]['retired'] ) ); ?>> <?php esc_html_e( 'Hide', 'bhela-booking' ); ?></label></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+				<p><button type="button" class="button bhela-list-add" data-list="<?php echo esc_attr( $list_key ); ?>">+ <?php esc_html_e( 'Add', 'bhela-booking' ); ?></button></p>
+			<?php endforeach; ?>
+
+			<script>
+			(function () {
+				document.querySelectorAll('.bhela-list-add').forEach(function (btn) {
+					btn.addEventListener('click', function () {
+						var name = btn.dataset.list;
+						var body = document.querySelector('table[data-list="' + name + '"] tbody');
+						var key = 'new_' + Date.now().toString(36);
+						var tr = document.createElement('tr');
+						tr.innerHTML =
+							'<td><input type="hidden" name="' + name + '[' + key + '][slug]" value="">' +
+							'<input type="text" class="large-text" name="' + name + '[' + key + '][label]"></td><td></td>';
+						body.appendChild(tr);
+						tr.querySelector('input[type=text]').focus();
+					});
+				});
+			})();
+			</script>
+			</div><!-- /heads -->
+
+			<div class="bhela-set__panel" id="bhela-panel-staff" role="tabpanel" aria-labelledby="bhela-tab-staff">
+			<h2><?php esc_html_e( 'Staff Roster', 'bhela-booking' ); ?></h2>
+			<p class="bhela-set__lead"><?php esc_html_e( 'Who gets paid, and how. Trip-based crew are multiplied by the number of approved trips in the month; monthly staff get a flat amount. The salary sheet fills the rest in.', 'bhela-booking' ); ?></p>
+			<?php
+			$staff_rows = function_exists( 'bhela_bm_staff' ) ? bhela_bm_staff( true ) : array();
+			$emp_types  = function_exists( 'bhela_bm_employment_types' ) ? bhela_bm_employment_types() : array();
+			?>
+			<table class="widefat striped" id="bhela-staff-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Name', 'bhela-booking' ); ?></th>
+						<th><?php esc_html_e( 'Designation', 'bhela-booking' ); ?></th>
+						<th style="width:130px"><?php esc_html_e( 'Type', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'Per trip (৳)', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'Monthly (৳)', 'bhela-booking' ); ?></th>
+						<th><?php esc_html_e( 'Account', 'bhela-booking' ); ?></th>
+						<th style="width:90px"><?php esc_html_e( 'Left', 'bhela-booking' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $staff_rows as $id => $st ) : ?>
+					<tr>
+						<td>
+							<input type="hidden" name="staff[<?php echo esc_attr( $id ); ?>][id]" value="<?php echo esc_attr( $id ); ?>">
+							<input type="text" name="staff[<?php echo esc_attr( $id ); ?>][name]" value="<?php echo esc_attr( $st['name'] ); ?>" style="width:100%">
+						</td>
+						<td><input type="text" name="staff[<?php echo esc_attr( $id ); ?>][designation]" value="<?php echo esc_attr( $st['designation'] ); ?>" style="width:100%"></td>
+						<td>
+							<select name="staff[<?php echo esc_attr( $id ); ?>][type]" style="width:100%">
+								<?php foreach ( $emp_types as $k => $lbl ) : ?>
+									<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $st['type'], $k ); ?>><?php echo esc_html( $lbl ); ?></option>
+								<?php endforeach; ?>
+							</select>
+						</td>
+						<td><input type="number" min="0" name="staff[<?php echo esc_attr( $id ); ?>][rate]" value="<?php echo esc_attr( $st['rate'] ?: '' ); ?>" style="width:100%"></td>
+						<td><input type="number" min="0" name="staff[<?php echo esc_attr( $id ); ?>][monthly]" value="<?php echo esc_attr( $st['monthly'] ?: '' ); ?>" style="width:100%"></td>
+						<td><input type="text" name="staff[<?php echo esc_attr( $id ); ?>][account]" value="<?php echo esc_attr( $st['account'] ); ?>" style="width:100%"></td>
+						<td><label><input type="checkbox" name="staff[<?php echo esc_attr( $id ); ?>][retired]" value="1" <?php checked( $st['retired'] ); ?>> <?php esc_html_e( 'Hide', 'bhela-booking' ); ?></label></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p><button type="button" class="button" id="bhela-staff-add">+ <?php esc_html_e( 'Add staff', 'bhela-booking' ); ?></button></p>
+			<p class="description"><?php esc_html_e( 'Marking someone as left keeps them on the salary sheets they were already on — a paid month must not change — but drops them from new ones. Clearing a name deletes the row.', 'bhela-booking' ); ?></p>
+			<script>
+			(function () {
+				var btn = document.getElementById('bhela-staff-add');
+				if (!btn) return;
+				var types = <?php echo wp_json_encode( $emp_types ); ?>;
+				btn.addEventListener('click', function () {
+					var body = document.querySelector('#bhela-staff-table tbody');
+					var key = 'new_' + Date.now().toString(36);
+					var opts = Object.keys(types).map(function (k) {
+						return '<option value="' + k + '">' + types[k] + '</option>';
+					}).join('');
+					var tr = document.createElement('tr');
+					tr.innerHTML =
+						'<td><input type="hidden" name="staff[' + key + '][id]" value="">' +
+						'<input type="text" name="staff[' + key + '][name]" style="width:100%"></td>' +
+						'<td><input type="text" name="staff[' + key + '][designation]" style="width:100%"></td>' +
+						'<td><select name="staff[' + key + '][type]" style="width:100%">' + opts + '</select></td>' +
+						'<td><input type="number" min="0" name="staff[' + key + '][rate]" style="width:100%"></td>' +
+						'<td><input type="number" min="0" name="staff[' + key + '][monthly]" style="width:100%"></td>' +
+						'<td><input type="text" name="staff[' + key + '][account]" style="width:100%"></td>' +
+						'<td></td>';
+					body.appendChild(tr);
+					tr.querySelector('input[type=text]').focus();
+				});
+			})();
+			</script>
+			</div><!-- /staff -->
 
 			<div class="bhela-set__save">
 				<button type="submit" class="button button-primary button-large"><?php esc_html_e( 'Save Settings', 'bhela-booking' ); ?></button>

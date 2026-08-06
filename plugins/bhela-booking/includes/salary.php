@@ -1,0 +1,417 @@
+<?php
+/**
+ * Staff roster and the monthly salary sheet.
+ *
+ * Most of the crew are paid per trip, so the month's wage bill is a function of
+ * how many trips actually ran — a number the site already knows from the
+ * approved cost sheets. The sheet fills that in and leaves the human parts
+ * (advances, settlement, adjustments) to be typed.
+ *
+ * Roster rows are snapshotted onto each month's sheet when it is saved. A pay
+ * rise next month must not rewrite what was paid last month.
+ *
+ * @package BhelaBooking
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/* =========================================================
+ * ROSTER
+ * ========================================================= */
+
+/** Employment types. These change the arithmetic, so the set is structural. */
+function bhela_bm_employment_types() {
+	return array(
+		'trip'    => __( 'Trip based', 'bhela-booking' ),
+		'monthly' => __( 'Monthly', 'bhela-booking' ),
+		'both'    => __( 'Trip + monthly', 'bhela-booking' ),
+	);
+}
+
+/** The roster as shipped — empty. The owner builds it in Settings. */
+function bhela_bm_staff( $include_retired = false ) {
+	$saved = get_option( 'bhela_bm_staff', array() );
+	if ( ! is_array( $saved ) ) {
+		return array();
+	}
+	$out = array();
+	foreach ( $saved as $id => $row ) {
+		$id = sanitize_key( $id );
+		if ( '' === $id || ! is_array( $row ) || '' === ( $row['name'] ?? '' ) ) {
+			continue;
+		}
+		if ( ! $include_retired && ! empty( $row['retired'] ) ) {
+			continue;
+		}
+		$out[ $id ] = array(
+			'name'        => (string) $row['name'],
+			'designation' => (string) ( $row['designation'] ?? '' ),
+			'type'        => array_key_exists( $row['type'] ?? '', bhela_bm_employment_types() ) ? $row['type'] : 'trip',
+			'rate'        => (int) ( $row['rate'] ?? 0 ),
+			'monthly'     => (int) ( $row['monthly'] ?? 0 ),
+			'account'     => (string) ( $row['account'] ?? '' ),
+			'retired'     => ! empty( $row['retired'] ),
+		);
+	}
+	return $out;
+}
+
+/**
+ * Save the roster.
+ *
+ * Like the cost heads, an id is minted once and frozen — it is the key a
+ * saved salary sheet refers back to.
+ */
+function bhela_bm_save_staff( $posted ) {
+	if ( ! is_array( $posted ) ) {
+		return;
+	}
+	$out  = array();
+	$seen = array();
+	foreach ( $posted as $row ) {
+		if ( ! is_array( $row ) ) {
+			continue;
+		}
+		$name = sanitize_text_field( $row['name'] ?? '' );
+		if ( '' === $name ) {
+			continue;                       // a blank name deletes the row
+		}
+		$id = sanitize_key( $row['id'] ?? '' );
+		if ( '' === $id ) {
+			$id = sanitize_key( sanitize_title( $name ) ) ?: 'staff';
+		}
+		$base = $id;
+		$n    = 2;
+		while ( isset( $seen[ $id ] ) ) {
+			$id = $base . '_' . $n;
+			$n++;
+		}
+		$seen[ $id ] = true;
+
+		$out[ $id ] = array(
+			'name'        => $name,
+			'designation' => sanitize_text_field( $row['designation'] ?? '' ),
+			'type'        => array_key_exists( $row['type'] ?? '', bhela_bm_employment_types() ) ? $row['type'] : 'trip',
+			'rate'        => max( 0, (int) ( $row['rate'] ?? 0 ) ),
+			'monthly'     => max( 0, (int) ( $row['monthly'] ?? 0 ) ),
+			'account'     => sanitize_text_field( $row['account'] ?? '' ),
+			'retired'     => ! empty( $row['retired'] ) ? 1 : 0,
+		);
+	}
+	update_option( 'bhela_bm_staff', $out );
+}
+
+/* =========================================================
+ * SHEETS
+ * ========================================================= */
+
+function bhela_bm_register_salary_cpt() {
+	register_post_type( 'bhela_salary', array(
+		'labels' => array(
+			'name'          => __( 'Salary Sheets', 'bhela-booking' ),
+			'singular_name' => __( 'Salary Sheet', 'bhela-booking' ),
+			'menu_name'     => __( '👷 Salary', 'bhela-booking' ),
+			'all_items'     => __( '👷 Salary', 'bhela-booking' ),
+			'add_new_item'  => __( 'New Salary Sheet', 'bhela-booking' ),
+			'edit_item'     => __( 'Salary Sheet', 'bhela-booking' ),
+			'not_found'     => __( 'No salary sheets yet.', 'bhela-booking' ),
+		),
+		'public'              => false,
+		'publicly_queryable'  => false,
+		'exclude_from_search' => true,
+		'show_ui'             => true,
+		'show_in_menu'        => 'edit.php?post_type=bhela_booking',
+		'show_in_rest'        => false,
+		'rewrite'             => false,
+		'capability_type'     => array( 'bhela_salary', 'bhela_salaries' ),
+		'map_meta_cap'        => true,
+		'has_archive'         => false,
+		'supports'            => array( 'title' ),
+	) );
+}
+add_action( 'init', 'bhela_bm_register_salary_cpt' );
+
+/** How many trips actually ran in a month, per the approved cost sheets. */
+function bhela_bm_salary_trip_count( $month ) {
+	if ( ! $month || ! function_exists( 'bhela_bm_statement_data' ) ) {
+		return 0;
+	}
+	return count( bhela_bm_statement_data( $month )['trips'] );
+}
+
+/**
+ * The rows to render for a sheet: whatever it already holds, plus any roster
+ * member not on it yet.
+ *
+ * A saved row keeps the name, rate and designation it was saved with — the
+ * roster can change without rewriting a month that has already been paid.
+ *
+ * @param int    $post_id Sheet ID (0 for a new one).
+ * @param string $month   YYYY-MM, used to default trips completed.
+ * @return array
+ */
+function bhela_bm_salary_rows( $post_id = 0, $month = '' ) {
+	$saved = $post_id ? json_decode( (string) get_post_meta( $post_id, '_bhela_salary_rows', true ), true ) : array();
+	$saved = is_array( $saved ) ? $saved : array();
+	$trips = bhela_bm_salary_trip_count( $month );
+
+	$rows = array();
+	foreach ( bhela_bm_staff() as $id => $s ) {
+		$r          = $saved[ $id ] ?? array();
+		$rows[ $id ] = bhela_bm_salary_row( $id, wp_parse_args( $r, $s ), $trips );
+		unset( $saved[ $id ] );
+	}
+	// Anyone left is a retired or removed staff member the sheet still records.
+	foreach ( $saved as $id => $r ) {
+		$rows[ $id ] = bhela_bm_salary_row( $id, $r, $trips );
+	}
+	return $rows;
+}
+
+/** Shape one row and do its arithmetic. */
+function bhela_bm_salary_row( $id, $r, $default_trips ) {
+	$type    = $r['type'] ?? 'trip';
+	$rate    = (int) ( $r['rate'] ?? 0 );
+	$monthly = (int) ( $r['monthly'] ?? 0 );
+	// A blank trips field means "all of them"; 0 typed in means none.
+	$trips   = isset( $r['trips'] ) && '' !== $r['trips'] ? max( 0, (int) $r['trips'] ) : (int) $default_trips;
+
+	$sub     = ( 'monthly' === $type ) ? 0 : $rate * $trips;
+	$monthly = ( 'trip' === $type ) ? 0 : $monthly;
+	$payable = $sub + $monthly;
+	$advance = max( 0, (int) ( $r['advance'] ?? 0 ) );
+
+	return array(
+		'id'          => (string) $id,
+		'name'        => (string) ( $r['name'] ?? '' ),
+		'designation' => (string) ( $r['designation'] ?? '' ),
+		'type'        => $type,
+		'account'     => (string) ( $r['account'] ?? '' ),
+		'rate'        => $rate,
+		'trips'       => $trips,
+		'sub'         => $sub,
+		'monthly'     => $monthly,
+		'payable'     => $payable,
+		'advance'     => $advance,
+		'after'       => $payable - $advance,
+		'settlement'  => (string) ( $r['settlement'] ?? '' ),
+		'adjustment'  => (string) ( $r['adjustment'] ?? '' ),
+		'verify'      => (string) ( $r['verify'] ?? '' ),
+	);
+}
+
+/** Month totals for a set of rows. */
+function bhela_bm_salary_totals( $rows ) {
+	$t = array( 'sub' => 0, 'monthly' => 0, 'payable' => 0, 'advance' => 0, 'after' => 0 );
+	foreach ( $rows as $r ) {
+		foreach ( array_keys( $t ) as $k ) {
+			$t[ $k ] += (int) $r[ $k ];
+		}
+	}
+	return $t;
+}
+
+/* =========================================================
+ * EDIT SCREEN
+ * ========================================================= */
+
+function bhela_bm_salary_meta_box() {
+	add_meta_box( 'bhela_salary_sheet', __( 'Salary Sheet', 'bhela-booking' ), 'bhela_bm_salary_meta_cb', 'bhela_salary', 'normal', 'high' );
+}
+add_action( 'add_meta_boxes', 'bhela_bm_salary_meta_box' );
+
+function bhela_bm_salary_meta_cb( $post ) {
+	wp_nonce_field( 'bhela_bm_salary_save', 'bhela_bm_salary_nonce' );
+	$month = (string) get_post_meta( $post->ID, '_bhela_salary_month', true );
+	if ( ! $month ) {
+		$month = current_time( 'Y-m' );
+	}
+	$rows   = bhela_bm_salary_rows( $post->ID, $month );
+	$totals = bhela_bm_salary_totals( $rows );
+	$trips  = bhela_bm_salary_trip_count( $month );
+	$types  = bhela_bm_employment_types();
+	?>
+	<style>
+		.bhela-sal__top { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
+		.bhela-sal__f { display: flex; flex-direction: column; gap: 5px; }
+		.bhela-sal__f label { font-size: 11px; font-weight: 600; color: #50575e; text-transform: uppercase; letter-spacing: .04em; }
+		.bhela-sal table { width: 100%; }
+		.bhela-sal td, .bhela-sal th { padding: 6px 8px; vertical-align: middle; }
+		.bhela-sal input[type=number] { width: 100%; text-align: right; }
+		.bhela-sal input[type=text] { width: 100%; }
+		.bhela-sal .n { text-align: right; white-space: nowrap; }
+		.bhela-sal tfoot td { background: #f6f7f7; font-weight: 700; border-top: 2px solid #c3c4c7; }
+		.bhela-sal__hint { color: #787c82; font-size: 12px; }
+		.bhela-sal__empty { background: #FFFBEB; border-left: 3px solid #b45309; padding: 10px 12px; }
+	</style>
+	<div class="bhela-sal">
+		<div class="bhela-sal__top">
+			<div class="bhela-sal__f">
+				<label for="sal_month"><?php esc_html_e( 'Month', 'bhela-booking' ); ?></label>
+				<input type="month" id="sal_month" name="sal_month" value="<?php echo esc_attr( $month ); ?>">
+			</div>
+			<p class="bhela-sal__hint" style="margin:0">
+				<?php
+				printf(
+					/* translators: %d: number of approved trips */
+					esc_html( _n( '%d approved trip this month — used as the default for everyone.', '%d approved trips this month — used as the default for everyone.', $trips, 'bhela-booking' ) ),
+					(int) $trips
+				);
+				?>
+				<br><?php esc_html_e( 'Override the count for anyone who missed a trip. Save the month first if you have just changed it.', 'bhela-booking' ); ?>
+			</p>
+		</div>
+
+		<?php if ( ! $rows ) : ?>
+			<p class="bhela-sal__empty">
+				<?php esc_html_e( 'No staff on the roster yet.', 'bhela-booking' ); ?>
+				<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings#bhela-panel-staff' ) ); ?>"><?php esc_html_e( 'Add staff in Settings → Staff', 'bhela-booking' ); ?></a>
+			</p>
+		<?php else : ?>
+		<table class="widefat striped">
+			<thead>
+				<tr>
+					<th><?php esc_html_e( 'Staff', 'bhela-booking' ); ?></th>
+					<th style="width:100px"><?php esc_html_e( 'Type', 'bhela-booking' ); ?></th>
+					<th style="width:90px" class="n"><?php esc_html_e( 'Rate', 'bhela-booking' ); ?></th>
+					<th style="width:80px" class="n"><?php esc_html_e( 'Trips', 'bhela-booking' ); ?></th>
+					<th style="width:100px" class="n"><?php esc_html_e( 'Sub-total', 'bhela-booking' ); ?></th>
+					<th style="width:100px" class="n"><?php esc_html_e( 'Monthly', 'bhela-booking' ); ?></th>
+					<th style="width:105px" class="n"><?php esc_html_e( 'Payable', 'bhela-booking' ); ?></th>
+					<th style="width:100px" class="n"><?php esc_html_e( 'Advance', 'bhela-booking' ); ?></th>
+					<th style="width:105px" class="n"><?php esc_html_e( 'After advance', 'bhela-booking' ); ?></th>
+					<th style="width:110px"><?php esc_html_e( 'Settlement', 'bhela-booking' ); ?></th>
+					<th style="width:140px"><?php esc_html_e( 'Adjustment', 'bhela-booking' ); ?></th>
+					<th style="width:130px"><?php esc_html_e( 'Verification', 'bhela-booking' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+			<?php foreach ( $rows as $id => $r ) : ?>
+				<tr>
+					<td>
+						<strong><?php echo esc_html( $r['name'] ); ?></strong>
+						<div class="bhela-sal__hint"><?php echo esc_html( $r['designation'] ); ?><?php echo $r['account'] ? ' · ' . esc_html( $r['account'] ) : ''; ?></div>
+						<?php // Snapshot the roster details onto the sheet, so a later pay rise
+						      // cannot rewrite a month that has already been paid. ?>
+						<?php foreach ( array( 'name', 'designation', 'type', 'account', 'rate', 'monthly' ) as $f ) : ?>
+							<input type="hidden" name="sal_rows[<?php echo esc_attr( $id ); ?>][<?php echo esc_attr( $f ); ?>]" value="<?php echo esc_attr( 'monthly' === $f ? ( $r['monthly'] ?: ( 'trip' === $r['type'] ? 0 : $r['monthly'] ) ) : $r[ $f ] ); ?>">
+						<?php endforeach; ?>
+					</td>
+					<td><?php echo esc_html( $types[ $r['type'] ] ?? $r['type'] ); ?></td>
+					<td class="n"><?php echo esc_html( $r['rate'] ? bhela_bm_money( $r['rate'] ) : '—' ); ?></td>
+					<td><input type="number" min="0" name="sal_rows[<?php echo esc_attr( $id ); ?>][trips]" value="<?php echo esc_attr( $r['trips'] ); ?>"></td>
+					<td class="n"><?php echo esc_html( bhela_bm_money( $r['sub'] ) ); ?></td>
+					<td class="n"><?php echo esc_html( $r['monthly'] ? bhela_bm_money( $r['monthly'] ) : '—' ); ?></td>
+					<td class="n"><strong><?php echo esc_html( bhela_bm_money( $r['payable'] ) ); ?></strong></td>
+					<td><input type="number" min="0" name="sal_rows[<?php echo esc_attr( $id ); ?>][advance]" value="<?php echo esc_attr( $r['advance'] ?: '' ); ?>"></td>
+					<td class="n"><strong><?php echo esc_html( bhela_bm_money( $r['after'] ) ); ?></strong></td>
+					<td><input type="text" name="sal_rows[<?php echo esc_attr( $id ); ?>][settlement]" value="<?php echo esc_attr( $r['settlement'] ); ?>" placeholder="PAID"></td>
+					<td><input type="text" name="sal_rows[<?php echo esc_attr( $id ); ?>][adjustment]" value="<?php echo esc_attr( $r['adjustment'] ); ?>" placeholder="<?php esc_attr_e( 'No Adjustment', 'bhela-booking' ); ?>"></td>
+					<td><input type="text" name="sal_rows[<?php echo esc_attr( $id ); ?>][verify]" value="<?php echo esc_attr( $r['verify'] ); ?>"></td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+			<tfoot>
+				<tr>
+					<td colspan="4"><?php esc_html_e( 'Total', 'bhela-booking' ); ?></td>
+					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['sub'] ) ); ?></td>
+					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['monthly'] ) ); ?></td>
+					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['payable'] ) ); ?></td>
+					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['advance'] ) ); ?></td>
+					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['after'] ) ); ?></td>
+					<td colspan="3"></td>
+				</tr>
+			</tfoot>
+		</table>
+		<p class="bhela-sal__hint"><?php esc_html_e( 'Sub-total is rate × trips. Payable adds any monthly salary. Save to recalculate.', 'bhela-booking' ); ?></p>
+		<?php endif; ?>
+	</div>
+	<?php
+}
+
+function bhela_bm_salary_save( $post_id, $post ) {
+	if ( 'bhela_salary' !== $post->post_type ) {
+		return;
+	}
+	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
+		return;
+	}
+	if ( ! isset( $_POST['bhela_bm_salary_nonce'] ) || ! wp_verify_nonce( $_POST['bhela_bm_salary_nonce'], 'bhela_bm_salary_save' ) ) {
+		return;
+	}
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+
+	$month = sanitize_text_field( wp_unslash( $_POST['sal_month'] ?? '' ) );
+	$month = preg_match( '/^\d{4}-(0[1-9]|1[0-2])$/', $month ) ? $month : current_time( 'Y-m' );
+	update_post_meta( $post_id, '_bhela_salary_month', $month );
+
+	$posted = isset( $_POST['sal_rows'] ) && is_array( $_POST['sal_rows'] ) ? wp_unslash( $_POST['sal_rows'] ) : array();
+	$rows   = array();
+	foreach ( $posted as $id => $r ) {
+		$id = sanitize_key( $id );
+		if ( '' === $id || ! is_array( $r ) ) {
+			continue;
+		}
+		$rows[ $id ] = array(
+			'name'        => sanitize_text_field( $r['name'] ?? '' ),
+			'designation' => sanitize_text_field( $r['designation'] ?? '' ),
+			'type'        => array_key_exists( $r['type'] ?? '', bhela_bm_employment_types() ) ? $r['type'] : 'trip',
+			'account'     => sanitize_text_field( $r['account'] ?? '' ),
+			'rate'        => max( 0, (int) ( $r['rate'] ?? 0 ) ),
+			'monthly'     => max( 0, (int) ( $r['monthly'] ?? 0 ) ),
+			'trips'       => max( 0, (int) ( $r['trips'] ?? 0 ) ),
+			'advance'     => max( 0, (int) ( $r['advance'] ?? 0 ) ),
+			'settlement'  => sanitize_text_field( $r['settlement'] ?? '' ),
+			'adjustment'  => sanitize_text_field( $r['adjustment'] ?? '' ),
+			'verify'      => sanitize_text_field( $r['verify'] ?? '' ),
+		);
+	}
+	update_post_meta( $post_id, '_bhela_salary_rows', wp_json_encode( $rows, JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT ) );
+
+	$totals = bhela_bm_salary_totals( bhela_bm_salary_rows( $post_id, $month ) );
+	update_post_meta( $post_id, '_bhela_salary_total', $totals['payable'] );
+
+	$title = sprintf( __( 'Salary — %s', 'bhela-booking' ), mysql2date( 'F Y', $month . '-01' ) );
+	if ( $title !== $post->post_title ) {
+		remove_action( 'save_post', 'bhela_bm_salary_save', 10 );
+		wp_update_post( array( 'ID' => $post_id, 'post_title' => $title ) );
+		add_action( 'save_post', 'bhela_bm_salary_save', 10, 2 );
+	}
+}
+add_action( 'save_post', 'bhela_bm_salary_save', 10, 2 );
+
+/* =========================================================
+ * LIST TABLE
+ * ========================================================= */
+
+function bhela_bm_salary_columns( $columns ) {
+	return array(
+		'cb'      => $columns['cb'] ?? '',
+		'title'   => __( 'Sheet', 'bhela-booking' ),
+		'salmon'  => __( 'Month', 'bhela-booking' ),
+		'salstaff' => __( 'Staff', 'bhela-booking' ),
+		'saltot'  => __( 'Total payable', 'bhela-booking' ),
+	);
+}
+add_filter( 'manage_bhela_salary_posts_columns', 'bhela_bm_salary_columns' );
+
+function bhela_bm_salary_column( $column, $post_id ) {
+	switch ( $column ) {
+		case 'salmon':
+			$m = get_post_meta( $post_id, '_bhela_salary_month', true );
+			echo $m ? esc_html( mysql2date( 'F Y', $m . '-01' ) ) : '—';
+			break;
+		case 'salstaff':
+			$rows = json_decode( (string) get_post_meta( $post_id, '_bhela_salary_rows', true ), true );
+			echo esc_html( is_array( $rows ) ? count( $rows ) : 0 );
+			break;
+		case 'saltot':
+			echo '<strong>' . esc_html( bhela_bm_money( (int) get_post_meta( $post_id, '_bhela_salary_total', true ) ) ) . '</strong>';
+			break;
+	}
+}
+add_action( 'manage_bhela_salary_posts_custom_column', 'bhela_bm_salary_column', 10, 2 );

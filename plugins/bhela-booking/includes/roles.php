@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Bump when bhela_bm_role_defaults() or bhela_bm_permissions() changes, so
 // existing sites re-sync once against the new definition.
-define( 'BHELA_BM_ROLES_VERSION', 3 );
+define( 'BHELA_BM_ROLES_VERSION', 5 );
 
 /* =========================================================
  * CAPABILITY SETS
@@ -40,6 +40,7 @@ function bhela_bm_extra_caps() {
 		'bhela_cost_prepare'  => __( 'Fill in cost sheets', 'bhela-booking' ),
 		'bhela_cost_check'    => __( 'Check cost sheets', 'bhela-booking' ),
 		'bhela_cost_approve'  => __( 'Approve cost sheets', 'bhela-booking' ),
+		'bhela_view_statement' => __( 'Monthly Statement', 'bhela-booking' ),
 	);
 }
 
@@ -151,6 +152,31 @@ function bhela_bm_permissions() {
 			'caps'     => array( 'bhela_cost_approve' ),
 			'requires' => 'costs_check',
 		),
+		'expenses'        => array(
+			'label' => __( 'Record expenses', 'bhela-booking' ),
+			'help'  => __( 'Advertising, renovation and other spending outside a trip.', 'bhela-booking' ),
+			'caps'  => array(
+				'edit_bhela_expenses', 'edit_others_bhela_expenses', 'edit_published_bhela_expenses',
+				'edit_private_bhela_expenses', 'publish_bhela_expenses', 'read_private_bhela_expenses',
+				'delete_bhela_expenses', 'delete_published_bhela_expenses',
+				'read_bhela_expense', 'edit_bhela_expense', 'delete_bhela_expense',
+			),
+		),
+		'salary'          => array(
+			'label' => __( 'Staff salary sheets', 'bhela-booking' ),
+			'help'  => __( 'What each staff member is owed for the month. Pay rates are visible here.', 'bhela-booking' ),
+			'caps'  => array(
+				'edit_bhela_salaries', 'edit_others_bhela_salaries', 'edit_published_bhela_salaries',
+				'edit_private_bhela_salaries', 'publish_bhela_salaries', 'read_private_bhela_salaries',
+				'delete_bhela_salaries', 'delete_published_bhela_salaries',
+				'read_bhela_salary', 'edit_bhela_salary', 'delete_bhela_salary',
+			),
+		),
+		'statement'       => array(
+			'label' => __( 'Monthly Statement', 'bhela-booking' ),
+			'help'  => __( 'The month\'s profit — every trip and every expense in one view.', 'bhela-booking' ),
+			'caps'  => array( 'bhela_view_statement' ),
+		),
 	);
 }
 
@@ -172,7 +198,7 @@ function bhela_bm_role_defaults() {
 		'bhela_manager' => array(
 			'name'  => __( 'BHELA Manager', 'bhela-booking' ),
 			'blurb' => __( 'Runs day-to-day operations: bookings, trip calendar, reports, and checks cost sheets. Cannot approve costs or change settings.', 'bhela-booking' ),
-			'perms' => array( 'bookings_edit', 'bookings_delete', 'reports', 'trips', 'costs_own', 'costs_all', 'costs_check' ),
+			'perms' => array( 'bookings_edit', 'bookings_delete', 'reports', 'trips', 'costs_own', 'costs_all', 'costs_check', 'expenses', 'statement', 'salary' ),
 		),
 		'bhela_booking_staff' => array(
 			'name'  => __( 'BHELA Booking Staff', 'bhela-booking' ),
@@ -281,6 +307,8 @@ function bhela_bm_admin_caps() {
 	$caps = array_keys( bhela_bm_extra_caps() );
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_booking', 'bhela_bookings' ) );
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_cost', 'bhela_costs' ) );
+	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_expense', 'bhela_expenses' ) );
+	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_salary', 'bhela_salaries' ) );
 	return array_values( array_unique( $caps ) );
 }
 
@@ -293,7 +321,9 @@ function bhela_bm_owned_caps() {
 	return array_values( array_unique( array_merge(
 		array_keys( bhela_bm_extra_caps() ),
 		bhela_bm_cpt_caps( 'bhela_booking', 'bhela_bookings' ),
-		bhela_bm_cpt_caps( 'bhela_cost', 'bhela_costs' )
+		bhela_bm_cpt_caps( 'bhela_cost', 'bhela_costs' ),
+		bhela_bm_cpt_caps( 'bhela_expense', 'bhela_expenses' ),
+		bhela_bm_cpt_caps( 'bhela_salary', 'bhela_salaries' )
 	) ) );
 }
 

@@ -54,6 +54,9 @@ function bhela_bm_dashboard_menu_order() {
 		// Money
 		'bhela-bm-reports',                       // 📄 Trip Report
 		'edit.php?post_type=bhela_cost',          // 🧾 Cost Sheets
+		'edit.php?post_type=bhela_expense',       // 💸 Expenses
+		'bhela-bm-statement',                     // 📊 Monthly Statement
+		'edit.php?post_type=bhela_salary',        // 👷 Salary
 		// Planning
 		'bhela-bm-trips',                         // Trip Calendar
 		'edit.php?post_type=bhela_spot',          // 🗺️ Spots

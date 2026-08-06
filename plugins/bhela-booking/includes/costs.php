@@ -108,31 +108,169 @@ add_action( 'admin_init', 'bhela_bm_cost_role_redirect' );
  * SHEET SHAPE
  * ========================================================= */
 
-/** The 21 expense heads from the spreadsheet, in its order. */
-function bhela_bm_cost_items() {
+/**
+ * The expense heads as shipped, in spreadsheet order.
+ *
+ * Slug => label. The slug is what a sheet actually stores, so it must never
+ * change once released: renaming a head is a label edit, not a key change.
+ *
+ * @return array
+ */
+function bhela_bm_cost_head_defaults() {
 	return array(
-		'Engine Fuel (Diesel)',
-		'Electricity Bill',
-		'Groceries (Rice, Spices Etc)',
-		'Meat (Duck/Chicken/Beef)',
-		'Fish',
-		'Kitchen Market (Vegetables)',
-		'Gas Bill',
-		'Staff Convency',
-		'Jetty Charge (Docking)',
-		'Water',
-		'Fruits',
-		'Dry Fish',
-		'Local Bill',
-		'Laundry',
-		'Ice',
-		'Movement Bill',
-		'Guest see off cost',
-		'Repair Bill (Minor)',
-		'B2B Partner',
-		'Staff Bill',
-		'Others (Any Bill & Purchase)',
+		'engine_fuel'    => 'Engine Fuel (Diesel)',
+		'electricity'    => 'Electricity Bill',
+		'groceries'      => 'Groceries (Rice, Spices Etc)',
+		'meat'           => 'Meat (Duck/Chicken/Beef)',
+		'fish'           => 'Fish',
+		'kitchen_market' => 'Kitchen Market (Vegetables)',
+		'gas'            => 'Gas Bill',
+		'staff_convency' => 'Staff Convency',
+		'jetty_charge'   => 'Jetty Charge (Docking)',
+		'water'          => 'Water',
+		'fruits'         => 'Fruits',
+		'dry_fish'       => 'Dry Fish',
+		'local_bill'     => 'Transgender/Local Bill',
+		'laundry'        => 'Laundry',
+		'ice'            => 'Ice',
+		'movement'       => 'Movement Bill',
+		'guest_see_off'  => 'Guest see off cost',
+		'repair_minor'   => 'Repair Bill (Minor)',
+		'b2b_partner'    => 'B2B Partner',
+		'staff_bill'     => 'Staff Bill',
+		'others'         => 'Others (Any Bill & Purchase)',
 	);
+}
+
+/**
+ * The heads in force — the owner's list if they have edited it, else the
+ * shipped one.
+ *
+ * Stored as slug => array{ label, retired }. Retired heads stay in the list so
+ * an approved sheet that used one still renders its label; they are simply not
+ * offered on new sheets. Deleting outright would silently blank a figure on a
+ * month the owner has already closed.
+ *
+ * @param bool $include_retired Include heads no longer offered on new sheets.
+ * @return array slug => label
+ */
+function bhela_bm_cost_heads( $include_retired = false ) {
+	$saved = get_option( 'bhela_bm_cost_heads', null );
+	if ( ! is_array( $saved ) || ! $saved ) {
+		return bhela_bm_cost_head_defaults();
+	}
+	$out = array();
+	foreach ( $saved as $slug => $row ) {
+		$slug  = sanitize_key( $slug );
+		$label = is_array( $row ) ? (string) ( $row['label'] ?? '' ) : (string) $row;
+		if ( '' === $slug || '' === $label ) {
+			continue;
+		}
+		if ( ! $include_retired && ! empty( $row['retired'] ) ) {
+			continue;
+		}
+		$out[ $slug ] = $label;
+	}
+	return $out ? $out : bhela_bm_cost_head_defaults();
+}
+
+/**
+ * Head slugs that appear on at least one saved sheet.
+ *
+ * Drives the "in use" column, so the owner can see which heads carry history
+ * before retiring one.
+ *
+ * @return string[]
+ */
+function bhela_bm_cost_heads_in_use() {
+	$ids  = get_posts( array(
+		'post_type'      => 'bhela_cost',
+		'post_status'    => 'any',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+	) );
+	$used = array();
+	foreach ( $ids as $id ) {
+		foreach ( bhela_bm_cost_stored_lines( $id ) as $key => $row ) {
+			if ( (int) ( $row['p1'] ?? 0 ) + (int) ( $row['p2'] ?? 0 ) + (int) ( $row['p3'] ?? 0 ) > 0 ) {
+				$used[ $key ] = true;
+			}
+		}
+	}
+	return array_keys( $used );
+}
+
+/**
+ * Save the owner's head list.
+ *
+ * A slug is minted once from the first label and then frozen — renaming must
+ * not change the key, or every sheet that used the head would lose its figure.
+ *
+ * @param array $posted Raw `cost_heads` input.
+ */
+function bhela_bm_save_cost_heads( $posted ) {
+	if ( ! is_array( $posted ) ) {
+		return;
+	}
+	$out  = array();
+	$seen = array();
+	foreach ( $posted as $row ) {
+		if ( ! is_array( $row ) ) {
+			continue;
+		}
+		$label = sanitize_text_field( $row['label'] ?? '' );
+		if ( '' === $label ) {
+			continue;                       // a blank row is a deletion
+		}
+		$slug = sanitize_key( $row['slug'] ?? '' );
+		if ( '' === $slug ) {
+			$slug = sanitize_key( sanitize_title( $label ) );
+			$slug = $slug ? $slug : 'head';
+		}
+		// Never collide with an existing key: that would merge two heads' money.
+		$base = $slug;
+		$n    = 2;
+		while ( isset( $seen[ $slug ] ) ) {
+			$slug = $base . '_' . $n;
+			$n++;
+		}
+		$seen[ $slug ] = true;
+
+		$out[ $slug ] = array(
+			'label'   => $label,
+			'retired' => ! empty( $row['retired'] ) ? 1 : 0,
+		);
+	}
+	if ( $out ) {
+		update_option( 'bhela_bm_cost_heads', $out );
+	}
+}
+
+/** Drop the override so the shipped head list applies again. */
+function bhela_bm_reset_cost_heads() {
+	if ( ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'Permission denied.', 'bhela-booking' ), 403 );
+	}
+	check_admin_referer( 'bhela_bm_reset_cost_heads' );
+	delete_option( 'bhela_bm_cost_heads' );
+	if ( function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'settings', 'Trip cost heads reset to the shipped list.' );
+	}
+	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings' ) );
+	exit;
+}
+add_action( 'admin_post_bhela_bm_reset_cost_heads', 'bhela_bm_reset_cost_heads' );
+
+/**
+ * Back-compat shim: the old flat list of labels.
+ *
+ * @deprecated Use bhela_bm_cost_heads(). Kept so anything still calling this
+ *             keeps working, including the first version of the test harness.
+ * @return string[]
+ */
+function bhela_bm_cost_items() {
+	return array_values( bhela_bm_cost_heads() );
 }
 
 /**
@@ -156,9 +294,20 @@ function bhela_bm_cost_date( $value ) {
 	return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ? $value : '';
 }
 
-/** How many blank, preparer-labelled rows sit under the fixed heads. */
+/** How many spare, preparer-labelled rows to keep available. A minimum, not a cap. */
 function bhela_bm_cost_extra_rows() {
-	return 3;
+	return 5;
+}
+
+/**
+ * Ceiling on one-off rows per sheet, so a crafted POST cannot grow unbounded.
+ *
+ * 30, not 15: July's 15–16 trip already used fourteen one-off rows in a single
+ * sheet (chair, motor, fans, burnish mistri, silencer screw…), which a cap of
+ * 15 would have sat one row away from refusing.
+ */
+function bhela_bm_cost_max_custom_rows() {
+	return 30;
 }
 
 /** Header fields, mirroring the top block of the spreadsheet. */
@@ -196,41 +345,108 @@ function bhela_bm_cost_is_locked( $post_id ) {
 }
 
 /**
- * The stored line rows, padded out to the full fixed + extra row set.
+ * Read the stored lines, converting anything written in the old shape.
  *
- * Always returns every row so the edit form and the totals agree even for a
- * sheet saved before a head was added to bhela_bm_cost_items().
+ * Sheets used to store a positional array whose labels came from a hardcoded
+ * list. Once the owner can rename, reorder or retire a head, position stops
+ * meaning anything — so rows are now keyed by head slug. Old data is mapped
+ * index → slug through the shipped list on read; the next save writes it back
+ * in the new shape, so there is no migration script and nothing to run.
  *
- * @param int $post_id Cost sheet ID (0 for a brand-new sheet).
- * @return array<int, array{label:string,fixed:bool,p1:int,p2:int,p3:int,remark:string,sub:int}>
+ * @param int $post_id Cost sheet ID.
+ * @return array slug|custom key => array{ label, p1, p2, p3, remark }
  */
-function bhela_bm_cost_lines( $post_id = 0 ) {
+function bhela_bm_cost_stored_lines( $post_id ) {
 	$saved = $post_id ? json_decode( (string) get_post_meta( $post_id, '_bhela_cost_lines', true ), true ) : array();
-	$saved = is_array( $saved ) ? $saved : array();
+	if ( ! is_array( $saved ) || ! $saved ) {
+		return array();
+	}
 
-	$rows  = array();
-	$fixed = bhela_bm_cost_items();
-	$count = count( $fixed ) + bhela_bm_cost_extra_rows();
+	// A list (0,1,2…) is the old positional format; a map is already keyed.
+	$is_positional = array_keys( $saved ) === range( 0, count( $saved ) - 1 );
+	if ( ! $is_positional ) {
+		return $saved;
+	}
 
-	for ( $i = 0; $i < $count; $i++ ) {
-		$row  = isset( $saved[ $i ] ) && is_array( $saved[ $i ] ) ? $saved[ $i ] : array();
-		$is_f = $i < count( $fixed );
-		$p1   = (int) ( $row['p1'] ?? 0 );
-		$p2   = (int) ( $row['p2'] ?? 0 );
-		$p3   = (int) ( $row['p3'] ?? 0 );
-		$rows[] = array(
-			// A fixed head always takes its label from code, so renaming one in
-			// bhela_bm_cost_items() updates every past sheet too.
-			'label'  => $is_f ? $fixed[ $i ] : (string) ( $row['label'] ?? '' ),
-			'fixed'  => $is_f,
-			'p1'     => $p1,
-			'p2'     => $p2,
-			'p3'     => $p3,
+	$slugs = array_keys( bhela_bm_cost_head_defaults() );
+	$out   = array();
+	foreach ( $saved as $i => $row ) {
+		if ( ! is_array( $row ) ) {
+			continue;
+		}
+		// Rows past the shipped heads were the free-text extras.
+		$key         = $slugs[ $i ] ?? 'custom_' . $i;
+		$out[ $key ] = array(
+			'label'  => (string) ( $row['label'] ?? ( $slugs[ $i ] ?? '' ) ),
+			'p1'     => (int) ( $row['p1'] ?? 0 ),
+			'p2'     => (int) ( $row['p2'] ?? 0 ),
+			'p3'     => (int) ( $row['p3'] ?? 0 ),
 			'remark' => (string) ( $row['remark'] ?? '' ),
-			'sub'    => $p1 + $p2 + $p3,
 		);
 	}
+	return $out;
+}
+
+/**
+ * Every row to render for a sheet: the heads in force, plus whatever else this
+ * particular sheet already holds, plus blanks to type into.
+ *
+ * A head retired after this sheet was approved still appears — with its saved
+ * label — because the figure is real and the month is closed.
+ *
+ * @param int $post_id Cost sheet ID (0 for a brand-new sheet).
+ * @return array<int, array{key:string,label:string,fixed:bool,p1:int,p2:int,p3:int,remark:string,sub:int}>
+ */
+function bhela_bm_cost_lines( $post_id = 0 ) {
+	$stored = bhela_bm_cost_stored_lines( $post_id );
+	$heads  = bhela_bm_cost_heads();
+	$rows   = array();
+
+	foreach ( $heads as $slug => $label ) {
+		$row    = $stored[ $slug ] ?? array();
+		$rows[] = bhela_bm_cost_row( $slug, $label, $row, true );
+		unset( $stored[ $slug ] );
+	}
+
+	// Anything left is either a retired head or a one-off the preparer typed.
+	$retired = bhela_bm_cost_heads( true );
+	foreach ( $stored as $key => $row ) {
+		$label  = (string) ( $row['label'] ?? '' );
+		$fixed  = isset( $retired[ $key ] );
+		$rows[] = bhela_bm_cost_row( $key, $fixed ? $retired[ $key ] : $label, $row, $fixed );
+	}
+
+	// Blank rows to type into, always a few spare. July's first real sheet used
+	// four one-off rows (Spoon, Pencil Battary, Electric Materials, Cold
+	// Drinks), so three was already one short.
+	$blanks = 0;
+	foreach ( $rows as $r ) {
+		if ( ! $r['fixed'] && 0 === $r['sub'] && '' === $r['label'] ) {
+			$blanks++;
+		}
+	}
+	for ( $i = $blanks; $i < bhela_bm_cost_extra_rows(); $i++ ) {
+		$rows[] = bhela_bm_cost_row( 'new_' . $i, '', array(), false );
+	}
+
 	return $rows;
+}
+
+/** Shape one render-ready row. */
+function bhela_bm_cost_row( $key, $label, $row, $fixed ) {
+	$p1 = (int) ( $row['p1'] ?? 0 );
+	$p2 = (int) ( $row['p2'] ?? 0 );
+	$p3 = (int) ( $row['p3'] ?? 0 );
+	return array(
+		'key'    => (string) $key,
+		'label'  => (string) $label,
+		'fixed'  => (bool) $fixed,
+		'p1'     => $p1,
+		'p2'     => $p2,
+		'p3'     => $p3,
+		'remark' => (string) ( $row['remark'] ?? '' ),
+		'sub'    => $p1 + $p2 + $p3,
+	);
 }
 
 /** Grand total of every line's sub-total. */
@@ -569,6 +785,8 @@ function bhela_bm_cost_sheet_cb( $post ) {
 		.bhela-cs__hint { color: #787c82; font-size: 12px; margin: 6px 0 0; }
 		.bhela-cs__warn { background: #fcf9e8; border-left: 3px solid #b45309; padding: 8px 10px; font-size: 12px; margin: 8px 0 0; }
 		.bhela-cs__locked { background: #edfaef; border-left: 3px solid #1a7f37; padding: 10px 12px; margin: 0 0 16px; font-weight: 600; }
+		.bhela-cs__addrow { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; }
+		.bhela-cs__sl { color: #787c82; }
 	</style>
 
 	<div class="bhela-cs">
@@ -611,31 +829,37 @@ function bhela_bm_cost_sheet_cb( $post ) {
 					<th style="width:220px"><?php esc_html_e( 'Remark', 'bhela-booking' ); ?></th>
 				</tr>
 			</thead>
-			<tbody>
-				<?php foreach ( $lines as $i => $l ) : ?>
+			<tbody id="bhela-cs-rows">
+				<?php foreach ( $lines as $i => $l ) : $k = $l['key']; ?>
 					<tr>
-						<td><?php echo esc_html( $i + 1 ); ?></td>
+						<td class="bhela-cs__sl"><?php echo esc_html( $i + 1 ); ?></td>
 						<td>
 							<?php if ( $l['fixed'] ) : ?>
 								<?php echo esc_html( $l['label'] ); ?>
-								<input type="hidden" name="bhela_cost_lines[<?php echo esc_attr( $i ); ?>][label]" value="<?php echo esc_attr( $l['label'] ); ?>">
 							<?php else : ?>
-								<input type="text" name="bhela_cost_lines[<?php echo esc_attr( $i ); ?>][label]"
+								<input type="text" name="bhela_cost_lines[<?php echo esc_attr( $k ); ?>][label]"
 									value="<?php echo esc_attr( $l['label'] ); ?>" placeholder="<?php esc_attr_e( 'Other item…', 'bhela-booking' ); ?>"<?php echo $ro; ?>>
 							<?php endif; ?>
 						</td>
 						<?php foreach ( array( 'p1', 'p2', 'p3' ) as $p ) : ?>
 							<td><input type="number" min="0" step="1" class="bhela-cs__p"
-								name="bhela_cost_lines[<?php echo esc_attr( $i ); ?>][<?php echo esc_attr( $p ); ?>]"
+								name="bhela_cost_lines[<?php echo esc_attr( $k ); ?>][<?php echo esc_attr( $p ); ?>]"
 								value="<?php echo esc_attr( $l[ $p ] ?: '' ); ?>"<?php echo $ro; ?>></td>
 						<?php endforeach; ?>
 						<td class="bhela-cs__sub" data-sub><?php echo esc_html( bhela_bm_money( $l['sub'] ) ); ?></td>
-						<td><input type="text" name="bhela_cost_lines[<?php echo esc_attr( $i ); ?>][remark]"
+						<td><input type="text" name="bhela_cost_lines[<?php echo esc_attr( $k ); ?>][remark]"
 							value="<?php echo esc_attr( $l['remark'] ); ?>"<?php echo $ro; ?>></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
 		</table>
+
+		<?php if ( ! $locked ) : ?>
+			<p class="bhela-cs__addrow">
+				<button type="button" class="button" id="bhela-cs-add">+ <?php esc_html_e( 'Add row', 'bhela-booking' ); ?></button>
+				<span class="bhela-cs__hint"><?php esc_html_e( 'For a one-off this trip. To change the standing list of heads, use Settings.', 'bhela-booking' ); ?></span>
+			</p>
+		<?php endif; ?>
 
 		<div class="bhela-cs__sum">
 			<div>
@@ -777,6 +1001,43 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			});
 		}
 
+		/* Add a one-off row. The key only has to be unique within this POST —
+		   the server keeps it verbatim for anything it does not recognise as a
+		   head, which is what keeps the amount attached to its label. */
+		var addBtn = document.getElementById('bhela-cs-add');
+		if (addBtn) {
+			var maxCustom = <?php echo (int) bhela_bm_cost_max_custom_rows(); ?>;
+			addBtn.addEventListener('click', function () {
+				var body = document.getElementById('bhela-cs-rows');
+				var custom = body.querySelectorAll('input[name$="[label]"]').length;
+				if (custom >= maxCustom) {
+					addBtn.disabled = true;
+					return;
+				}
+				var key = 'custom_' + Date.now().toString(36);
+				var tr = document.createElement('tr');
+				tr.innerHTML =
+					'<td class="bhela-cs__sl"></td>' +
+					'<td><input type="text" name="bhela_cost_lines[' + key + '][label]" placeholder="<?php echo esc_js( __( 'Other item…', 'bhela-booking' ) ); ?>"></td>' +
+					['p1', 'p2', 'p3'].map(function (p) {
+						return '<td><input type="number" min="0" step="1" class="bhela-cs__p" name="bhela_cost_lines[' + key + '][' + p + ']"></td>';
+					}).join('') +
+					'<td class="bhela-cs__sub" data-sub>৳0</td>' +
+					'<td><input type="text" name="bhela_cost_lines[' + key + '][remark]"></td>';
+				body.appendChild(tr);
+				renumber();
+				tr.querySelector('input').focus();
+			});
+		}
+
+		function renumber() {
+			var n = 0;
+			document.querySelectorAll('#bhela-cs-rows .bhela-cs__sl').forEach(function (td) {
+				n += 1;
+				td.textContent = n;
+			});
+		}
+
 		// Deliberately no fetch on load: the server already rendered the stored
 		// figures, and re-deriving here would overwrite an earnings value the
 		// preparer entered by hand for outside income.
@@ -819,26 +1080,57 @@ function bhela_bm_cost_save( $post_id, $post ) {
 	}
 	update_post_meta( $post_id, '_bhela_cost_header', wp_json_encode( $header, JSON_UNESCAPED_UNICODE ) );
 
-	$fixed  = bhela_bm_cost_items();
+	// Rows arrive keyed by head slug (or a custom key for a one-off). A known
+	// head always takes its label from the head list, so renaming a head can
+	// never rewrite what a saved sheet says it spent money on.
+	$heads  = bhela_bm_cost_heads( true );
 	$rows   = isset( $_POST['bhela_cost_lines'] ) && is_array( $_POST['bhela_cost_lines'] ) ? wp_unslash( $_POST['bhela_cost_lines'] ) : array();
 	$lines  = array();
-	$count  = count( $fixed ) + bhela_bm_cost_extra_rows();
 	$total  = 0;
-	for ( $i = 0; $i < $count; $i++ ) {
-		$r  = is_array( $rows[ $i ] ?? null ) ? $rows[ $i ] : array();
+	$custom = 0;
+
+	foreach ( $rows as $key => $r ) {
+		$key = sanitize_key( $key );
+		if ( '' === $key || ! is_array( $r ) ) {
+			continue;
+		}
+		$known = isset( $heads[ $key ] );
+		$label = $known ? $heads[ $key ] : sanitize_text_field( $r['label'] ?? '' );
+
 		$p1 = max( 0, (int) ( $r['p1'] ?? 0 ) );
 		$p2 = max( 0, (int) ( $r['p2'] ?? 0 ) );
 		$p3 = max( 0, (int) ( $r['p3'] ?? 0 ) );
-		$lines[] = array(
-			'label'  => $i < count( $fixed ) ? $fixed[ $i ] : sanitize_text_field( $r['label'] ?? '' ),
+		$remark = sanitize_text_field( $r['remark'] ?? '' );
+
+		// Store only rows that say something, so a re-save produces the same
+		// record rather than accumulating zeros:
+		//   • a known head with no money and no remark renders from the head
+		//     list anyway, so there is nothing to keep;
+		//   • an unlabelled one-off row is simply a blank the preparer skipped.
+		// A zero with a remark survives — that is someone explaining the zero —
+		// and so does a one-off that has been named but not yet priced.
+		if ( 0 === $p1 + $p2 + $p3 && '' === $remark && ( $known || '' === $label ) ) {
+			continue;
+		}
+		if ( ! $known ) {
+			$custom++;
+			if ( $custom > bhela_bm_cost_max_custom_rows() ) {
+				continue;
+			}
+		}
+
+		$lines[ $key ] = array(
+			'label'  => $label,
 			'p1'     => $p1,
 			'p2'     => $p2,
 			'p3'     => $p3,
-			'remark' => sanitize_text_field( $r['remark'] ?? '' ),
+			'remark' => $remark,
 		);
 		$total += $p1 + $p2 + $p3;
 	}
-	update_post_meta( $post_id, '_bhela_cost_lines', wp_json_encode( $lines, JSON_UNESCAPED_UNICODE ) );
+	// JSON_FORCE_OBJECT: an all-numeric-key map would otherwise encode as a
+	// list and be misread as the old positional format on the next load.
+	update_post_meta( $post_id, '_bhela_cost_lines', wp_json_encode( $lines, JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT ) );
 	update_post_meta( $post_id, '_bhela_cost_total', $total );
 
 	$book = bhela_bm_cost_booking_earnings( $date );

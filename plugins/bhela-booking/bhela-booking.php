@@ -563,6 +563,9 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/dashboard.php';
 	require_once BHELA_BM_PATH . 'includes/reports.php';
 	require_once BHELA_BM_PATH . 'includes/costs.php';
+	require_once BHELA_BM_PATH . 'includes/expenses.php';
+	require_once BHELA_BM_PATH . 'includes/statement.php';
+	require_once BHELA_BM_PATH . 'includes/salary.php';
 }
 
 /* =========================================================

@@ -34,7 +34,10 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/reviews.php` | Reviews CPT |
 | `includes/admin.php` | Bookings columns, edit meta box, Settings page, dashboard widget |
 | `includes/reports.php` | Trip Report screen — bookings for a date/range with advance, due and totals; print, WhatsApp text and CSV export |
-| `includes/costs.php` | Trip Cost Sheet CPT + prepare/check/approve workflow and the printable sheet |
+| `includes/costs.php` | Trip Cost Sheet CPT + prepare/check/approve workflow, editable heads, printable sheet |
+| `includes/expenses.php` | Expense CPT (advertising, renovation…), editable types and payment methods |
+| `includes/statement.php` | Monthly Statement — approved trips less the month's expenses |
+| `includes/salary.php` | Staff roster + monthly salary sheet |
 | `includes/roles.php` | Staff roles, every plugin capability, and the read-only Team reference screen |
 | `templates/invoice.php` | Printable invoice |
 
@@ -44,7 +47,9 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_render_sms( $template, $booking_id )` — fill `{placeholders}` from a booking.
 - `bhela_bm_trip_availability( $date )` → `total / booked / available / status`.
 - `bhela_bm_report_rows( $from, $to, $with_cancelled )` → `rows / totals` for a travel-date range.
-- `bhela_bm_cost_items()` — the fixed expense heads on the trip cost sheet.
+- `bhela_bm_cost_heads( $include_retired )` — the trip cost heads in force, slug => label.
+- `bhela_bm_expense_rows( $from, $to )` → expenses in a range, totalled per type.
+- `bhela_bm_statement_data( $month )` → a month's approved trips, deductions and gross profit.
 - `bhela_bm_cost_transitions()` — the workflow state machine (from-state, target, required capability).
 - `bhela_bm_roles()` — staff roles with their capabilities; the single source of truth the rest of the plugin reads.
 - `bhela_bm_permissions()` — the togglable permission registry, and the allow-list for what the Team screen may grant.
@@ -84,7 +89,17 @@ The card only appears for a provider that publishes a balance endpoint (currentl
 
 ## Trip Cost Sheet
 
-`Bookings → 🧾 Cost Sheets`. One sheet per trip: the 21 expense heads from the operations spreadsheet plus 3 free-text rows, each with 1st/2nd/3rd payment columns and a remark.
+`Bookings → 🧾 Cost Sheets`. One sheet per trip: the standing expense heads, each with 1st/2nd/3rd payment columns and a remark, plus spare rows for one-offs.
+
+### Heads are the owner's, not the code's
+
+`Settings → 🧾 Lists` — rename, reorder, add, retire. The 21 shipped heads are only defaults; `bhela_bm_cost_head_defaults()` seeds the `bhela_bm_cost_heads` option, and a "reset to defaults" drops the override. Same defaults-plus-override shape as the staff roles.
+
+**Rows are stored against stable slugs, not positions.** That is what makes editing safe: renaming a head changes a label and nothing else, and the figures stay attached. Sheets written before v2.23.0 stored a positional array; `bhela_bm_cost_stored_lines()` maps index → slug on read and the next save rewrites it in the new shape, so there is no migration to run.
+
+**Retire, don't delete.** A head still shows on the sheets that already used it — a closed month must never change — but disappears from new ones. The Settings table marks which heads carry history.
+
+Spare rows are a minimum (5), not a cap: **+ Add row** adds more, up to 30. July 2026's 15–16 trip used fourteen one-off rows in a single sheet, which is why three was not enough and fifteen was too close.
 
 **Earnings are not typed in.** The sheet reads the travel date's booking total through `bhela_bm_report_rows()`, so cost and revenue can never disagree with the Trip Report. The field stays editable for outside income; when it differs from the booking figure the sheet says so and offers a one-click reset.
 
@@ -98,6 +113,37 @@ draft ──submit──▶ prepared ──check──▶ checked ──approve�
 ```
 
 An approved sheet is locked in the save handler, not just in the UI — a crafted POST cannot edit it either.
+
+## Expenses & the Monthly Statement
+
+`Bookings → 💸 Expenses` records what is spent outside a trip — advertising, renovation, one-off purchases — with date, type, amount, payment method, payment date, means of verification and remark. It reproduces the "Digital Marketing & Renovation Report" kept by hand. Filter by month and type; the filter bar shows the month's total.
+
+`Bookings → 📊 Monthly Statement` puts the two together: the month's **approved** cost sheets as trip rows, then one deduction row per expense type, then gross profit — plus cost and profit per person, and the sign-offs carried through from the sheets.
+
+Types and payment methods are editable in `Settings → 🧾 Lists`, same defaults-plus-override shape as the cost heads. Because deductions are grouped by whatever types exist, **adding a type grows the statement with no code change**.
+
+**Only approved sheets count.** A sheet still being typed would otherwise move the month's profit on every save. Unapproved ones are listed with a warning and linked, rather than silently omitted.
+
+### Verified against a real month
+
+July 2026, rebuilt from the owner's PDFs, reproduces exactly: 13 trips, 335 guests, ৳1,922,500 revenue, ৳1,087,597 trip cost, ৳834,903 trip profit, ৳336,689 deductions, **৳498,214 gross profit**, ৳4,251.60 cost per person, ৳1,487.21 profit per person.
+
+Two modelling notes that came out of that:
+
+- Cost per person on the printed statement is computed on trip cost **plus** deductions, not trip cost alone — the two readings differ by about ৳1,000 a head. The screen follows the printed sheet and says so.
+- The statement deducts the renovation **adjustment** (৳250,000), not the raw renovation spend also listed in the marketing report (৳79,460 in July). Recording both would double-count.
+
+## Staff salary
+
+`Settings → 👷 Staff` holds the roster: name, designation, employment type (trip based / monthly / both), per-trip rate, monthly salary, account. `Bookings → 👷 Salary` is one sheet per month.
+
+**Trips completed defaults to the number of approved cost sheets in that month**, and is editable per person for anyone who missed one. Sub-total is rate × trips; payable adds any monthly salary; advance is subtracted to give payment-after-advance. Settlement, adjustment and means of verification are typed, following the printed sheet.
+
+**Roster details are snapshotted onto the sheet when it is saved.** A pay rise next month must not rewrite what was paid last month — a saved sheet keeps the rate, name and designation it was saved with, while a new sheet picks up the current roster. Marking someone as left keeps them on the months they were paid for and drops them from new ones.
+
+Verified against July 2026: 13 trips, ten staff, ৳265,500 in trip pay, ৳285,500 payable including the manager's ৳20,000 monthly, ৳265,500 after his ৳20,000 advance — and the supervisor correctly at 8 trips rather than 13.
+
+Payroll is off for Booking Staff by default: pay rates are visible on this screen.
 
 ## Team & roles
 

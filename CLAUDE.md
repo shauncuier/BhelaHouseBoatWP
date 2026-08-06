@@ -74,6 +74,9 @@ wp-content/                          ← Git root
 │   │   ├── admin.php                ← Admin UI: columns, meta boxes, settings page, dashboard widget
 │   │   ├── reports.php              ← Trip Report: per-date bookings, advance/due, print + WhatsApp + CSV
 │   │   ├── costs.php                ← Trip Cost Sheet CPT + prepare/check/approve workflow
+│   │   ├── expenses.php             ← Expense CPT + editable types/methods (marketing, renovation)
+│   │   ├── statement.php            ← Monthly Statement: approved trips − month's expenses
+│   │   ├── salary.php               ← Staff roster + monthly salary sheet
 │   │   ├── roles.php                ← Staff roles, plugin capabilities, Team reference screen
 │   │   └── guide.php                ← Embedded admin guide
 │   ├── assets/
@@ -167,6 +170,9 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 | `bhela_bm_rates` | Cabin rates array (regular + weekday per cabin) |
 | `bhela_bm_trips` | Trip calendar entries |
 | `bhela_bm_role_perms` | Per-role permission overrides set from the Team screen (only customised roles) |
+| `bhela_bm_cost_heads` | Owner-edited trip cost heads (slug => label, retired) |
+| `bhela_bm_expense_types` / `bhela_bm_expense_methods` | Owner-edited expense lists |
+| `bhela_bm_staff` | Staff roster (id => name, designation, type, rate, monthly, account) |
 
 Bookings are stored as a **private Custom Post Type** (`bhela_booking`) with post meta for each field.
 
@@ -318,7 +324,11 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_render_sms($tpl, $id)` | `includes/sms.php` | Fill `{placeholders}` from booking |
 | `bhela_bm_save_booking()` | `includes/admin.php` | Save booking meta + trigger notifications |
 | `bhela_bm_report_rows($from,$to,$cancelled)` | `includes/reports.php` | Bookings + money totals for a travel-date range |
-| `bhela_bm_cost_items()` | `includes/costs.php` | Fixed expense heads on the trip cost sheet |
+| `bhela_bm_cost_heads($retired)` | `includes/costs.php` | Expense heads in force (owner-editable, slug => label) |
+| `bhela_bm_cost_stored_lines($id)` | `includes/costs.php` | Sheet rows keyed by slug; converts legacy positional data on read |
+| `bhela_bm_expense_rows($from,$to)` | `includes/expenses.php` | Expenses in a range, totalled per type |
+| `bhela_bm_statement_data($month)` | `includes/statement.php` | A month's approved trips, deductions and gross profit |
+| `bhela_bm_salary_rows($id,$month)` | `includes/salary.php` | Payroll rows; trips default from approved sheets |
 | `bhela_bm_cost_transitions()` | `includes/costs.php` | Cost-sheet workflow: from-state → target + required capability |
 | `bhela_bm_roles()` | `includes/roles.php` | Staff roles + capabilities — the single source the plugin reads |
 | `bhela_bm_permissions()` | `includes/roles.php` | Togglable permissions; also the allow-list for the Team screen |
