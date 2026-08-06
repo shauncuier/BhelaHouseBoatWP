@@ -182,6 +182,22 @@ function bhela_bm_booking_form_shortcode() {
 								<input type="tel" id="bm-phone" name="phone" required placeholder="01XXXXXXXXX" autocomplete="tel" inputmode="tel">
 							</p>
 						</div>
+						<?php if ( function_exists( 'bhela_bm_otp_on' ) && bhela_bm_otp_on() ) : ?>
+							<div class="bm-otp" id="bm-otp" data-state="idle">
+								<div class="bm-otp__row">
+									<button type="button" class="bm-otp__send" id="bm-otp-send">নম্বর যাচাই করুন</button>
+									<span class="bm-otp__hint" id="bm-otp-hint">বুকিং জমা দিতে নম্বরটি যাচাই করা প্রয়োজন।</span>
+								</div>
+								<div class="bm-otp__enter" id="bm-otp-enter" hidden>
+									<label for="bm-otp-code" class="bm-otp__label">কোড</label>
+									<input type="text" id="bm-otp-code" inputmode="numeric" autocomplete="one-time-code"
+										maxlength="4" pattern="[0-9]*" placeholder="৪ সংখ্যার কোড">
+									<button type="button" class="bm-otp__check" id="bm-otp-check">যাচাই করুন</button>
+									<button type="button" class="bm-otp__resend" id="bm-otp-resend" disabled>আবার পাঠান</button>
+								</div>
+								<p class="bm-otp__msg" id="bm-otp-msg" role="status" aria-live="polite"></p>
+							</div>
+						<?php endif; ?>
 						<p class="bhela-bm-field">
 							<label for="bm-email">ইমেইল <span>(ইনভয়েস পেতে — ঐচ্ছিক)</span></label>
 							<input type="email" id="bm-email" name="email" autocomplete="email" placeholder="you@email.com">
@@ -380,6 +396,14 @@ function bhela_bm_process_submission( $data ) {
 	}
 	$phone = $normalized;
 
+	// The real gate. The form disables its submit button until the code checks
+	// out, but that is only a hint to a browser — a crafted POST has to fail
+	// here. Keyed to the normalised number, so editing the phone after
+	// verifying invalidates it with no extra bookkeeping.
+	if ( function_exists( 'bhela_bm_otp_on' ) && bhela_bm_otp_on() && ! bhela_bm_otp_verified( $phone ) ) {
+		return new WP_Error( 'unverified_phone', __( 'বুকিং জমা দেওয়ার আগে মোবাইল নম্বরটি যাচাই করুন।', 'bhela-booking' ) );
+	}
+
 	if ( $email && ! is_email( $email ) ) {
 		return new WP_Error( 'bad_email', __( 'ইমেইল ঠিকানাটি সঠিক নয়।', 'bhela-booking' ) );
 	}
@@ -438,6 +462,9 @@ function bhela_bm_process_submission( $data ) {
 	$invoice_no = bhela_bm_next_invoice_number();
 
 	update_post_meta( $post_id, '_bhela_phone', $phone );
+	if ( function_exists( 'bhela_bm_otp_stamp' ) ) {
+		bhela_bm_otp_stamp( $post_id, $phone );
+	}
 	update_post_meta( $post_id, '_bhela_email', $email );
 	update_post_meta( $post_id, '_bhela_travel_date', $date );
 	update_post_meta( $post_id, '_bhela_cabin_type', $cabin_summary );

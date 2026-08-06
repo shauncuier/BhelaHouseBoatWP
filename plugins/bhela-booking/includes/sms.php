@@ -118,6 +118,10 @@ function bhela_bm_send_sms( $number, $message ) {
 		$s['sms_param_number']  => $to,
 		$s['sms_param_message'] => $message,
 	);
+	// BulkSMSBD requires type=text; without it the gateway rejects the send.
+	if ( 'bulksmsbd' === ( $s['sms_provider'] ?? '' ) ) {
+		$params['type'] = 'text';
+	}
 
 	$args = array( 'timeout' => 15 );
 	if ( ! empty( $s['sms_auth_header'] ) ) {
@@ -149,7 +153,27 @@ function bhela_bm_send_sms( $number, $message ) {
 		'body'   => is_string( $body ) ? mb_substr( wp_strip_all_tags( $body ), 0, 300 ) : '',
 	), false );
 
-	$ok = $code >= 200 && $code < 300;
+	$ok     = $code >= 200 && $code < 300;
+	$detail = '';
+
+	// HTTP 200 is not the same as "sent". BulkSMSBD answers 200 for failures
+	// too and puts the real verdict in the body as response_code — 202 means
+	// accepted, anything else is a rejection (bad number, no balance, sender
+	// ID not approved…). Trusting the HTTP status alone reported success for
+	// messages that never left the building, which matters most for OTP: the
+	// guest waits for a code that is not coming and the email fallback never
+	// fires. Gateways without this field are unaffected.
+	if ( $ok && is_string( $body ) ) {
+		$json = json_decode( $body, true );
+		if ( is_array( $json ) && isset( $json['response_code'] ) ) {
+			$rc = (int) $json['response_code'];
+			if ( 202 !== $rc ) {
+				$ok     = false;
+				$detail = bhela_bm_sms_gateway_error( $rc );
+			}
+		}
+	}
+
 	if ( function_exists( 'bhela_bm_log' ) ) {
 		bhela_bm_log(
 			$ok ? 'sms' : 'error',
@@ -157,13 +181,132 @@ function bhela_bm_send_sms( $number, $message ) {
 				$ok ? 'পাঠানো হয়েছে' : 'পাঠানো যায়নি',
 				$to,
 				$code,
-				$ok ? '' : ' — ' . mb_substr( wp_strip_all_tags( (string) $body ), 0, 120 )
+				$ok ? '' : ' — ' . ( $detail ? $detail : mb_substr( wp_strip_all_tags( (string) $body ), 0, 120 ) )
 			),
 			$ok
 		);
 	}
 	return $ok;
 }
+
+/**
+ * Turn a BulkSMSBD response_code into something the owner can act on.
+ *
+ * @param int $rc Gateway response code.
+ * @return string
+ */
+function bhela_bm_sms_gateway_error( $rc ) {
+	$map = array(
+		1001 => 'Invalid number',
+		1002 => 'Sender ID not correct or disabled',
+		1003 => 'Required fields missing',
+		1005 => 'Gateway internal error',
+		1006 => 'Balance validity not available',
+		1007 => 'Balance insufficient — top up the SMS account',
+		1011 => 'User ID not found',
+		1012 => 'Masking SMS must be sent in Bangla',
+		1013 => 'Sender ID has no gateway for this API key',
+		1014 => 'Sender type not found for this API key',
+		1015 => 'Sender ID has no valid gateway for this API key',
+		1031 => 'Account not verified',
+		1032 => 'Server IP is not whitelisted at the gateway',
+	);
+	return sprintf( '%s (code %d)', $map[ $rc ] ?? 'Gateway rejected the message', $rc );
+}
+
+/* =========================================================
+ * CREDIT BALANCE
+ * ========================================================= */
+
+/**
+ * The gateway's balance endpoint, derived from the send URL.
+ *
+ * Only BulkSMSBD is known to publish one, and its balance API sits beside the
+ * send API on the same host. Other gateways return an empty string and the
+ * balance UI simply does not appear.
+ */
+function bhela_bm_sms_balance_url() {
+	$s = bhela_bm_get_settings();
+	if ( 'bulksmsbd' !== ( $s['sms_provider'] ?? '' ) || empty( $s['sms_api_key'] ) ) {
+		return '';
+	}
+	return 'https://bulksmsbd.net/api/getBalanceApi';
+}
+
+/**
+ * Remaining SMS credit.
+ *
+ * Cached for 15 minutes: the dashboard is opened all day and this is an
+ * external HTTP call on every page load otherwise. `$force` is for the manual
+ * refresh link.
+ *
+ * @param bool $force Skip the cache.
+ * @return array{balance:?float,at:string,error:string}
+ */
+function bhela_bm_sms_balance( $force = false ) {
+	$none = array( 'balance' => null, 'at' => '', 'error' => '' );
+	$url  = bhela_bm_sms_balance_url();
+	if ( ! $url ) {
+		return $none;
+	}
+	if ( ! $force ) {
+		$cached = get_transient( 'bhela_bm_sms_balance' );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+	}
+
+	$s = bhela_bm_get_settings();
+	if ( ! bhela_bm_sms_url_is_safe( $url ) ) {
+		return array_merge( $none, array( 'error' => __( 'Balance URL is not safe to call.', 'bhela-booking' ) ) );
+	}
+
+	$response = wp_remote_get(
+		add_query_arg( array( 'api_key' => rawurlencode( $s['sms_api_key'] ) ), $url ),
+		array( 'timeout' => 12 )
+	);
+
+	$out = $none;
+	if ( is_wp_error( $response ) ) {
+		$out['error'] = $response->get_error_message();
+	} else {
+		$json = json_decode( wp_remote_retrieve_body( $response ), true );
+		if ( is_array( $json ) && isset( $json['balance'] ) ) {
+			$out['balance'] = round( (float) $json['balance'], 2 );
+		} elseif ( is_array( $json ) && isset( $json['response_code'] ) ) {
+			$out['error'] = bhela_bm_sms_gateway_error( (int) $json['response_code'] );
+		} else {
+			$out['error'] = __( 'The gateway did not return a balance.', 'bhela-booking' );
+		}
+	}
+	$out['at'] = current_time( 'mysql' );
+
+	// Cache failures briefly too, so a dead gateway cannot stall every
+	// dashboard load with a 12-second timeout.
+	set_transient( 'bhela_bm_sms_balance', $out, null === $out['balance'] ? 2 * MINUTE_IN_SECONDS : 15 * MINUTE_IN_SECONDS );
+	return $out;
+}
+
+/** Is the credit low enough to act on? */
+function bhela_bm_sms_balance_low( $balance ) {
+	if ( null === $balance ) {
+		return false;
+	}
+	$s = bhela_bm_get_settings();
+	return $balance <= (float) ( $s['sms_low_balance'] ?? 100 );
+}
+
+/** Manual refresh from the dashboard / settings screen. */
+function bhela_bm_sms_balance_refresh() {
+	if ( ! current_user_can( 'bhela_view_reports' ) && ! current_user_can( 'manage_options' ) ) {
+		wp_die( esc_html__( 'Permission denied.', 'bhela-booking' ), 403 );
+	}
+	check_admin_referer( 'bhela_bm_sms_balance' );
+	bhela_bm_sms_balance( true );
+	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-dashboard' ) );
+	exit;
+}
+add_action( 'admin_post_bhela_bm_sms_balance', 'bhela_bm_sms_balance_refresh' );
 
 /** Admin recipient — explicit SMS number, else business Phone 1. */
 function bhela_bm_sms_admin_number() {

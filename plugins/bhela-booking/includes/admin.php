@@ -40,6 +40,22 @@ function bhela_bm_table_column_content( $column, $post_id ) {
 		case 'phone':
 			$phone = get_post_meta( $post_id, '_bhela_phone', true );
 			echo $phone ? '<a href="tel:' . esc_attr( $phone ) . '">' . esc_html( $phone ) . '</a>' : '—';
+			// Only ever a positive claim. A booking taken before verification
+			// existed, or typed in by hand here, carries no stamp — saying
+			// "unverified" would read as a warning about the guest.
+			$verified = function_exists( 'bhela_bm_otp_record' ) ? bhela_bm_otp_record( $post_id ) : array();
+			if ( $verified ) {
+				printf(
+					'<br><span style="color:#1a7f37;font-size:11px;font-weight:600" title="%s">✅ %s</span>',
+					esc_attr( sprintf(
+						/* translators: 1: sms|email, 2: date */
+						__( 'Verified by %1$s on %2$s', 'bhela-booking' ),
+						$verified['channel'] ?? '—',
+						$verified['at'] ? mysql2date( 'j M Y, g:i a', $verified['at'] ) : '—'
+					) ),
+					esc_html__( 'verified', 'bhela-booking' )
+				);
+			}
 			break;
 		case 'travel_date':
 			echo esc_html( get_post_meta( $post_id, '_bhela_travel_date', true ) ?: '—' );
@@ -679,9 +695,16 @@ function bhela_bm_settings_page() {
 		$s['review_max_mb']     = min( 20, max( 1, (int) ( $_POST['review_max_mb'] ?? 5 ) ) );
 
 		// SMS notification settings.
-		foreach ( array( 'sms_enabled', 'sms_admin_new', 'sms_customer_request', 'sms_customer_confirmed', 'sms_customer_completed' ) as $f ) {
+		foreach ( array( 'sms_enabled', 'sms_admin_new', 'sms_customer_request', 'sms_customer_confirmed', 'sms_customer_completed', 'otp_enabled' ) as $f ) {
 			$s[ $f ] = empty( $_POST[ $f ] ) ? 0 : 1;
 		}
+		// Forced through the GSM-7 filter on the way in, so a pasted en-dash or
+		// Bangla word cannot quietly double the cost of every code sent.
+		$brand = function_exists( 'bhela_bm_otp_gsm_safe' )
+			? bhela_bm_otp_gsm_safe( wp_unslash( $_POST['otp_brand'] ?? '' ) )
+			: sanitize_text_field( wp_unslash( $_POST['otp_brand'] ?? '' ) );
+		$s['otp_brand']       = mb_substr( $brand, 0, 20 ) ?: 'BHELA';
+		$s['sms_low_balance'] = max( 0, (int) ( $_POST['sms_low_balance'] ?? 100 ) );
 		$s['sms_json']     = empty( $_POST['sms_json'] ) ? 0 : 1;
 		$s['sms_provider'] = in_array( ( $_POST['sms_provider'] ?? '' ), array( 'bulksmsbd', 'custom' ), true ) ? $_POST['sms_provider'] : 'bulksmsbd';
 		$s['sms_method']   = ( 'POST' === strtoupper( $_POST['sms_method'] ?? '' ) ) ? 'POST' : 'GET';
@@ -957,6 +980,41 @@ function bhela_bm_settings_page() {
 			<p class="bhela-set__lead"><?php esc_html_e( 'Send an SMS on every new booking (to you and the customer) and when you change a booking status. Works with any Bangladesh SMS gateway.', 'bhela-booking' ); ?></p>
 			<table class="form-table">
 				<tr><th><?php esc_html_e( 'Enable SMS', 'bhela-booking' ); ?></th><td><label><input type="checkbox" name="sms_enabled" value="1" <?php checked( ! empty( $s['sms_enabled'] ) ); ?>> <?php esc_html_e( 'Master switch — send SMS notifications', 'bhela-booking' ); ?></label></td></tr>
+				<?php
+				$bal = function_exists( 'bhela_bm_sms_balance' ) ? bhela_bm_sms_balance() : array( 'balance' => null, 'at' => '', 'error' => '' );
+				if ( null !== $bal['balance'] || $bal['error'] ) :
+					?>
+					<tr><th><?php esc_html_e( 'SMS credit', 'bhela-booking' ); ?></th><td>
+						<?php if ( null !== $bal['balance'] ) : ?>
+							<strong style="font-size:16px;<?php echo bhela_bm_sms_balance_low( $bal['balance'] ) ? 'color:#b32d2e' : ''; ?>"><?php echo esc_html( bhela_bm_money( $bal['balance'] ) ); ?></strong>
+						<?php else : ?>
+							<strong style="color:#b32d2e"><?php echo esc_html( $bal['error'] ); ?></strong>
+						<?php endif; ?>
+						<a class="button button-small" style="margin-left:8px" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_sms_balance' ), 'bhela_bm_sms_balance' ) ); ?>"><?php esc_html_e( 'Refresh', 'bhela-booking' ); ?></a>
+						<p class="description"><?php esc_html_e( 'Read live from the gateway and cached for 15 minutes.', 'bhela-booking' ); ?></p>
+					</td></tr>
+					<tr><th><?php esc_html_e( 'Warn below', 'bhela-booking' ); ?></th><td>
+						<input type="number" name="sms_low_balance" min="0" step="1" value="<?php echo esc_attr( $s['sms_low_balance'] ?? 100 ); ?>" class="small-text">
+						<p class="description"><?php esc_html_e( 'Show a low-credit warning on the dashboard at or below this amount.', 'bhela-booking' ); ?></p>
+					</td></tr>
+				<?php endif; ?>
+				<tr><th><?php esc_html_e( 'Verify mobile numbers', 'bhela-booking' ); ?></th><td>
+					<label><input type="checkbox" name="otp_enabled" value="1" <?php checked( ! empty( $s['otp_enabled'] ) ); ?>> <?php esc_html_e( 'Require a code before a booking can be submitted', 'bhela-booking' ); ?></label>
+					<p class="description"><?php esc_html_e( 'Stops fake and mistyped numbers. Costs one SMS per booking attempt; if the gateway fails the code is emailed instead.', 'bhela-booking' ); ?></p>
+				</td></tr>
+				<tr><th><?php esc_html_e( 'Brand in the code SMS', 'bhela-booking' ); ?></th><td>
+					<input type="text" name="otp_brand" value="<?php echo esc_attr( $s['otp_brand'] ?? 'BHELA' ); ?>" class="regular-text" maxlength="20">
+					<p class="description">
+						<?php
+						printf(
+							/* translators: %s: the message preview */
+							esc_html__( 'Sent as: %s', 'bhela-booking' ),
+							'<code>' . esc_html( function_exists( 'bhela_bm_otp_message' ) ? bhela_bm_otp_message( '1234' ) : 'Your BHELA OTP is 1234' ) . '</code>'
+						);
+						?>
+						<br><?php esc_html_e( 'Keep it short and English. Any Bangla or fancy punctuation switches the SMS to Unicode, which halves the characters per message and doubles the cost of every code you send.', 'bhela-booking' ); ?>
+					</p>
+				</td></tr>
 				<tr><th><?php esc_html_e( 'Which SMS', 'bhela-booking' ); ?></th><td>
 					<label style="display:block;margin-bottom:6px"><input type="checkbox" name="sms_admin_new" value="1" <?php checked( ! empty( $s['sms_admin_new'] ) ); ?>> <?php esc_html_e( 'New booking → notify you (owner)', 'bhela-booking' ); ?></label>
 					<label style="display:block;margin-bottom:6px"><input type="checkbox" name="sms_customer_request" value="1" <?php checked( ! empty( $s['sms_customer_request'] ) ); ?>> <?php esc_html_e( 'New booking → customer (request received)', 'bhela-booking' ); ?></label>

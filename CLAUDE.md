@@ -68,6 +68,7 @@ wp-content/                          ← Git root
 │   │   ├── invoice.php              ← Secure invoice link generation
 │   │   ├── emails.php               ← Admin + customer email notifications
 │   │   ├── sms.php                  ← Provider-agnostic SMS (BulkSMSBD preset + custom)
+│   │   ├── otp.php                  ← Mobile verification on the booking form (SMS, email fallback)
 │   │   ├── trips.php                ← Trip calendar admin + shortcode + availability
 │   │   ├── reviews.php              ← Reviews CPT + admin + shortcode
 │   │   ├── admin.php                ← Admin UI: columns, meta boxes, settings page, dashboard widget
@@ -311,6 +312,9 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_process_submission()` | `includes/frontend.php` | Processes new booking AJAX submit |
 | `bhela_bm_trip_availability($date)` | `includes/trips.php` | Returns `total/booked/available/status` |
 | `bhela_bm_send_sms($number, $msg)` | `includes/sms.php` | Send via configured gateway |
+| `bhela_bm_otp_verified($phone)` | `includes/otp.php` | Has this number been proven recently? |
+| `bhela_bm_otp_gsm_safe($text)` | `includes/otp.php` | Force text into GSM-7 so an OTP stays 1 SMS part |
+| `bhela_bm_sms_balance($force)` | `includes/sms.php` | Gateway credit, cached 15 min; drives the dashboard card |
 | `bhela_bm_render_sms($tpl, $id)` | `includes/sms.php` | Fill `{placeholders}` from booking |
 | `bhela_bm_save_booking()` | `includes/admin.php` | Save booking meta + trigger notifications |
 | `bhela_bm_report_rows($from,$to,$cancelled)` | `includes/reports.php` | Bookings + money totals for a travel-date range |

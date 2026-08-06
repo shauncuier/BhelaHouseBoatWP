@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.21.0
+- **Version:** 2.22.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -29,6 +29,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/invoice.php` | Secure invoice links + rendering |
 | `includes/emails.php` | Admin + customer emails, test-send |
 | `includes/sms.php` | Provider-agnostic SMS sender, triggers, test-send |
+| `includes/otp.php` | Mobile verification on the booking form — send/verify endpoints, throttles, email fallback |
 | `includes/trips.php` | Trip calendar admin + shortcode + availability helper |
 | `includes/reviews.php` | Reviews CPT |
 | `includes/admin.php` | Bookings columns, edit meta box, Settings page, dashboard widget |
@@ -50,6 +51,36 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_normalise_perms( $perms )` — drops unknown keys, pulls in prerequisites.
 - `bhela_bm_calc_multi( $cabins, $date )` — authoritative per-cabin pricing.
 - Notifications fire from `bhela_bm_process_submission()` (new booking) and `bhela_bm_save_booking()` (status change).
+
+## Mobile verification (OTP)
+
+`Bookings → Settings → SMS`. Off by default. When on, a booking cannot be submitted until the guest enters a code sent to the number they typed.
+
+Message format, deliberately short: `Your BHELA OTP is 4821` — 22 characters, one SMS part.
+
+**Why the brand is its own setting.** One character outside GSM-7 flips an SMS to Unicode encoding, which drops the segment from 160 characters to 70 and doubles the cost of every code sent. `business_name` is `BHELA – The Haor Exclusive`, and that en-dash is exactly such a character. `otp_brand` is separate and pushed through `bhela_bm_otp_gsm_safe()` on save, which folds smart punctuation to ASCII and strips anything else.
+
+**Fallback.** SMS first; if the gateway fails — no balance, unreachable, sender ID rejected — the code is emailed. Email is optional in the form, so when there is no address the endpoint answers `need_email` and the form asks for one rather than dead-ending.
+
+**The gate is server-side.** `bhela_bm_process_submission()` refuses an unverified number. The disabled submit button is only a hint; a crafted POST still fails. The proof is keyed to the *normalised* number, so editing the phone after verifying invalidates it with no extra bookkeeping.
+
+**Limits**, per number: 60-second resend cooldown, 5 sends/day, 5 wrong guesses (the fifth destroys the code). Plus a per-IP ceiling. These are cost control as much as abuse control — an open send endpoint is an SMS-bombing tool pointed at a stranger's phone, and every send is billable.
+
+The code is stored only as `hash_hmac( 'sha256', $code, wp_salt( 'auth' ) )` and never appears in a response. Verified bookings carry `_bhela_phone_verified` (channel + time) and show a ✅ in the bookings list; bookings that predate this, or that the owner types in by hand, simply carry no stamp.
+
+### Gateway note — BulkSMSBD
+
+BulkSMSBD answers **HTTP 200 for failures too**, putting the real verdict in the body as `response_code` (202 = accepted; 1007 = no balance; 1002 = sender ID not approved; …). Judging by HTTP status alone reported success for messages that never left the building — which matters most here, because the guest waits for a code that is not coming and the email fallback never fires. `bhela_bm_send_sms()` now parses that field, and `bhela_bm_sms_gateway_error()` turns the code into something actionable. Gateways without the field are unaffected. The preset also sends the `type=text` parameter BulkSMSBD requires.
+
+The gateway URL must be **HTTPS** — the SSRF guard rejects plaintext, so the `http://` URL in BulkSMSBD's docs will not work. `https://bulksmsbd.net/api/smsapi` does.
+
+### SMS credit on the dashboard
+
+`bhela_bm_sms_balance()` reads the gateway's balance API and shows it on the BHELA Dashboard and in Settings, with a manual refresh. Cached for 15 minutes — the dashboard is opened all day and this is an external HTTP call otherwise; failures are cached for 2 minutes so a dead gateway cannot stall every page load behind a timeout.
+
+Below `sms_low_balance` (default ৳100) the card turns amber and says what will break. The warning is sharper when verification is on: once the credit hits zero, codes fall back to email, and **a guest who leaves the email blank cannot book at all**.
+
+The card only appears for a provider that publishes a balance endpoint (currently BulkSMSBD); other gateways simply do not show it. The API key is never rendered into the page or stored in the cached payload.
 
 ## Trip Cost Sheet
 

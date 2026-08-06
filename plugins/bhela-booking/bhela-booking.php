@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.21.0
+ * Version: 2.22.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.21.0' );
+define( 'BHELA_BM_VERSION', '2.22.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -76,10 +76,19 @@ function bhela_bm_default_settings() {
 		'sms_param_sender'   => 'senderid',
 		'sms_auth_header'    => '',           // optional "Authorization: Bearer …"
 		'sms_admin_number'   => '',           // blank → falls back to phone_1
+		'sms_low_balance'    => 100,          // warn on the dashboard at or below this credit
 		'sms_tpl_admin'      => "নতুন বুকিং! {invoice} — {name}, {phone}, {date}, {guests} জন, মোট {total}।",
 		'sms_tpl_new'        => "প্রিয় {name}, ভেলা হাউসবোটে আপনার বুকিং রিকোয়েস্ট ({invoice}) পেয়েছি। তারিখ {date}। আমরা শীঘ্রই যোগাযোগ করব। — BHELA",
 		'sms_tpl_confirmed'  => "প্রিয় {name}, আপনার বুকিং {invoice} এখন: {status}। তারিখ {date}। বাকি {due}। ধন্যবাদ — BHELA",
 		'sms_tpl_completed'  => "প্রিয় {name}, ভেলার সাথে ভ্রমণের জন্য ধন্যবাদ! আপনার মতামত জানান: {review_link} — BHELA",
+
+		// Mobile verification (OTP) on the booking form. Off until an SMS
+		// gateway is configured — with none, every booking would fall back to
+		// email and guests without an address could not book at all.
+		'otp_enabled' => 0,
+		// Deliberately NOT business_name: that contains an en-dash, which is
+		// outside GSM-7 and would double the cost of every OTP sent.
+		'otp_brand'   => 'BHELA',
 
 		// Guest review submissions.
 		'review_max_photos'  => 5,   // photos per review
@@ -540,6 +549,7 @@ require_once BHELA_BM_PATH . 'includes/frontend.php';
 require_once BHELA_BM_PATH . 'includes/invoice.php';
 require_once BHELA_BM_PATH . 'includes/emails.php';
 require_once BHELA_BM_PATH . 'includes/sms.php';
+require_once BHELA_BM_PATH . 'includes/otp.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';
 require_once BHELA_BM_PATH . 'includes/gallery.php';

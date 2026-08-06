@@ -222,6 +222,11 @@ function bhela_bm_dashboard_page() {
 		.bhela-check li:last-child { border-bottom: 0; }
 		.bhela-actions .button { margin: 0 6px 8px 0; }
 		.bhela-pill { display: inline-block; padding: 1px 8px; border-radius: 10px; color: #fff; font-size: 11px; font-weight: 600; }
+		.bhela-sms { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; margin-bottom: 22px; }
+		.bhela-sms--low { border-color: #b45309; background: #FFFBEB; }
+		.bhela-sms__main b { font-size: 26px; display: block; line-height: 1.2; }
+		.bhela-sms__note { font-size: 12px; color: #50575e; flex: 1; min-width: 240px; line-height: 1.6; }
+		.bhela-sms__note a { margin-left: 6px; }
 	</style>
 
 	<div class="wrap bhela-dash">
@@ -241,6 +246,43 @@ function bhela_bm_dashboard_page() {
 				</a>
 			<?php endforeach; ?>
 		</div>
+
+		<?php
+		// SMS credit. Only appears once a gateway with a balance API is set up.
+		$sms_bal = function_exists( 'bhela_bm_sms_balance' ) ? bhela_bm_sms_balance() : array( 'balance' => null, 'at' => '', 'error' => '' );
+		if ( null !== $sms_bal['balance'] || $sms_bal['error'] ) :
+			$low     = function_exists( 'bhela_bm_sms_balance_low' ) && bhela_bm_sms_balance_low( $sms_bal['balance'] );
+			$otp_on  = function_exists( 'bhela_bm_otp_on' ) && bhela_bm_otp_on();
+			$refresh = wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_sms_balance' ), 'bhela_bm_sms_balance' );
+			?>
+			<div class="bhela-card bhela-sms<?php echo $low || $sms_bal['error'] ? ' bhela-sms--low' : ''; ?>">
+				<div class="bhela-sms__main">
+					<span class="bhela-stat__l"><?php esc_html_e( 'SMS credit', 'bhela-booking' ); ?></span>
+					<?php if ( null !== $sms_bal['balance'] ) : ?>
+						<b><?php echo esc_html( bhela_bm_money( $sms_bal['balance'] ) ); ?></b>
+					<?php else : ?>
+						<b style="font-size:15px;color:#b32d2e"><?php esc_html_e( 'unavailable', 'bhela-booking' ); ?></b>
+					<?php endif; ?>
+				</div>
+				<div class="bhela-sms__note">
+					<?php if ( $sms_bal['error'] ) : ?>
+						<span style="color:#b32d2e"><?php echo esc_html( $sms_bal['error'] ); ?></span>
+					<?php elseif ( $low && $otp_on ) : ?>
+						<strong style="color:#b32d2e"><?php esc_html_e( 'Running low — top up soon.', 'bhela-booking' ); ?></strong>
+						<?php esc_html_e( 'Number verification is on, so when the credit runs out codes fall back to email — and guests who leave the email blank will not be able to book at all.', 'bhela-booking' ); ?>
+					<?php elseif ( $low ) : ?>
+						<strong style="color:#b45309"><?php esc_html_e( 'Running low — top up soon.', 'bhela-booking' ); ?></strong>
+						<?php esc_html_e( 'Booking notifications will stop sending once it reaches zero.', 'bhela-booking' ); ?>
+					<?php else : ?>
+						<?php esc_html_e( 'Enough for booking notifications and verification codes.', 'bhela-booking' ); ?>
+					<?php endif; ?>
+					<?php if ( $sms_bal['at'] ) : ?>
+						<span style="color:#a7aaad">· <?php echo esc_html( sprintf( __( 'checked %s', 'bhela-booking' ), mysql2date( 'j M, g:i a', $sms_bal['at'] ) ) ); ?></span>
+					<?php endif; ?>
+					<a href="<?php echo esc_url( $refresh ); ?>"><?php esc_html_e( 'refresh', 'bhela-booking' ); ?></a>
+				</div>
+			</div>
+		<?php endif; ?>
 
 		<!-- Money -->
 		<div class="bhela-money" style="margin-bottom:22px">

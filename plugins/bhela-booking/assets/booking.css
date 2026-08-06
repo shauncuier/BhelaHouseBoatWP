@@ -505,3 +505,42 @@
 	background: #FFF7ED;
 }
 .bhela-trip__type--long { background: rgba(19,122,116,.14); color: var(--primary, #137A74); }
+
+/* ---------- Mobile verification (OTP) ---------- */
+.bm-otp {
+	border: 1px solid #dcdcde; border-radius: 12px;
+	padding: 12px 14px; margin: 0 0 14px; background: #FBF8F2;
+}
+.bm-otp[data-state="ok"] { border-color: #1a7f37; background: #F2FBF4; }
+.bm-otp__row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.bm-otp__hint { font-size: .86rem; color: #6b7280; }
+.bm-otp__send,
+.bm-otp__check,
+.bm-otp__resend {
+	border: 1px solid var(--primary, #137A74); background: var(--primary, #137A74);
+	color: #fff; border-radius: 8px; padding: .55rem 1rem;
+	font: inherit; font-size: .9rem; font-weight: 600; cursor: pointer;
+	min-height: 40px; line-height: 1.2;
+}
+.bm-otp__resend { background: transparent; color: var(--primary, #137A74); }
+.bm-otp__send[disabled],
+.bm-otp__check[disabled],
+.bm-otp__resend[disabled] { opacity: .5; cursor: not-allowed; }
+.bm-otp__enter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.bm-otp__label { font-size: .86rem; font-weight: 600; color: #374151; }
+/* Wide spacing so a 4-digit code is easy to read back off the screen. */
+#bm-otp-code {
+	width: 8.5rem; text-align: center; letter-spacing: .4em;
+	font-size: 1.15rem; font-weight: 700; padding: .5rem .6rem;
+	border: 1px solid #cbd5e1; border-radius: 8px; min-height: 40px;
+}
+.bm-otp__msg { margin: 8px 0 0; font-size: .86rem; min-height: 1.2em; }
+.bm-otp__msg.is-ok { color: #1a7f37; font-weight: 600; }
+.bm-otp__msg.is-error { color: #b32d2e; font-weight: 600; }
+/* The email field turns required-looking only when SMS has actually failed. */
+.bhela-bm-field.is-required-now input { border-color: #b45309; background: #FFF7ED; }
+@media (max-width: 480px) {
+	.bm-otp__enter { gap: 6px; }
+	#bm-otp-code { width: 100%; }
+	.bm-otp__check, .bm-otp__resend { flex: 1 1 auto; }
+}

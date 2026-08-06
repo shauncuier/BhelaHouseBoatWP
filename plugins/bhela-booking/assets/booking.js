@@ -944,6 +944,154 @@
 
 		/* ---------- Submit ---------- */
 
+		/* ---------- Mobile verification (OTP) ----------
+		   Only present when the owner has switched verification on. The server
+		   re-checks before saving, so everything here is convenience, not
+		   security. */
+		var otpBox = document.getElementById('bm-otp');
+		var otpOk = false;          // the number proven in THIS page session
+		var otpFor = '';            // …and which number it was proven for
+
+		if (otpBox) {
+			var otpSend = document.getElementById('bm-otp-send');
+			var otpEnter = document.getElementById('bm-otp-enter');
+			var otpCode = document.getElementById('bm-otp-code');
+			var otpCheck = document.getElementById('bm-otp-check');
+			var otpResend = document.getElementById('bm-otp-resend');
+			var otpMsg = document.getElementById('bm-otp-msg');
+			var otpHint = document.getElementById('bm-otp-hint');
+			var phoneField = document.getElementById('bm-phone');
+			var emailField = document.getElementById('bm-email');
+			var tick = null;
+
+			function otpSay(text, kind) {
+				otpMsg.textContent = text || '';
+				otpMsg.className = 'bm-otp__msg' + (kind ? ' is-' + kind : '');
+			}
+
+			function otpPost(action, extra) {
+				var params = new URLSearchParams();
+				params.append('action', action);
+				params.append('nonce', bhelaBM.nonce);
+				params.append('phone', phoneField ? phoneField.value : '');
+				Object.keys(extra || {}).forEach(function (k) { params.append(k, extra[k]); });
+				return fetch(bhelaBM.ajaxUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					body: params.toString()
+				}).then(function (r) { return r.json(); });
+			}
+
+			function countdown(seconds) {
+				clearInterval(tick);
+				otpResend.disabled = true;
+				var left = seconds;
+				otpResend.textContent = 'আবার পাঠান (' + left + ')';
+				tick = setInterval(function () {
+					left -= 1;
+					if (left <= 0) {
+						clearInterval(tick);
+						otpResend.disabled = false;
+						otpResend.textContent = 'আবার পাঠান';
+						return;
+					}
+					otpResend.textContent = 'আবার পাঠান (' + left + ')';
+				}, 1000);
+			}
+
+			function requestCode() {
+				if (!normalizeMobile(phoneField.value)) {
+					otpSay('আগে সঠিক মোবাইল নম্বর দিন।', 'error');
+					phoneField.focus();
+					return;
+				}
+				otpSend.disabled = true;
+				otpSay('কোড পাঠানো হচ্ছে…');
+				otpPost('bhela_bm_otp_send', { email: emailField ? emailField.value : '' })
+					.then(function (res) {
+						otpSend.disabled = false;
+						if (res && res.success) {
+							otpBox.dataset.state = 'sent';
+							otpEnter.hidden = false;
+							otpHint.hidden = true;
+							otpCode.focus();
+							otpSay(res.data.message, 'ok');
+							countdown(res.data.cooldown || 60);
+							return;
+						}
+						var d = (res && res.data) || {};
+						// SMS is down and we have no address — ask for one
+						// rather than dead-ending the guest.
+						if (d.need_email && emailField) {
+							emailField.closest('.bhela-bm-field').classList.add('is-required-now');
+							emailField.focus();
+						}
+						otpSay(d.message || 'কোড পাঠানো যায়নি।', 'error');
+						if (d.retry) countdown(d.retry);
+					})
+					.catch(function () {
+						otpSend.disabled = false;
+						otpSay('সংযোগে সমস্যা — আবার চেষ্টা করুন।', 'error');
+					});
+			}
+
+			function verifyCode() {
+				var code = (otpCode.value || '').replace(/\D/g, '');
+				if (code.length < 4) {
+					otpSay('৪ সংখ্যার কোডটি দিন।', 'error');
+					return;
+				}
+				otpCheck.disabled = true;
+				otpPost('bhela_bm_otp_verify', { code: code })
+					.then(function (res) {
+						otpCheck.disabled = false;
+						if (res && res.success) {
+							otpOk = true;
+							otpFor = normalizeMobile(phoneField.value);
+							otpBox.dataset.state = 'ok';
+							otpEnter.hidden = true;
+							clearInterval(tick);
+							otpSay(res.data.message, 'ok');
+							return;
+						}
+						var d = (res && res.data) || {};
+						otpSay(d.message || 'কোড মেলেনি।', 'error');
+						if (d.expired) {
+							otpBox.dataset.state = 'idle';
+							otpEnter.hidden = true;
+							otpHint.hidden = false;
+							otpResend.disabled = false;
+							clearInterval(tick);
+						}
+					})
+					.catch(function () {
+						otpCheck.disabled = false;
+						otpSay('সংযোগে সমস্যা — আবার চেষ্টা করুন।', 'error');
+					});
+			}
+
+			otpSend.addEventListener('click', requestCode);
+			otpResend.addEventListener('click', requestCode);
+			otpCheck.addEventListener('click', verifyCode);
+			otpCode.addEventListener('keydown', function (e) {
+				if (e.key === 'Enter') { e.preventDefault(); verifyCode(); }
+			});
+
+			// Editing the number after verifying invalidates it — the server
+			// keys the proof to the number, so the UI must not claim otherwise.
+			if (phoneField) {
+				phoneField.addEventListener('input', function () {
+					if (otpOk && normalizeMobile(phoneField.value) !== otpFor) {
+						otpOk = false;
+						otpBox.dataset.state = 'idle';
+						otpEnter.hidden = true;
+						otpHint.hidden = false;
+						otpSay('নম্বর বদলেছে — আবার যাচাই করুন।', 'error');
+					}
+				});
+			}
+		}
+
 		form.addEventListener('submit', function (e) {
 			e.preventDefault();
 			response.innerHTML = '';
@@ -955,6 +1103,12 @@
 				response.innerHTML = '<div class="bhela-bm-error">⚠️ সঠিক মোবাইল নম্বর দিন — ১১ সংখ্যার, ০১ দিয়ে শুরু (যেমন ০১৭১২৩৪৫৬৭৮)।</div>';
 				phoneEl.classList.add('is-invalid');
 				phoneEl.focus();
+				return;
+			}
+
+			if (otpBox && !otpOk) {
+				response.innerHTML = '<div class="bhela-bm-error">⚠️ বুকিং জমা দেওয়ার আগে মোবাইল নম্বরটি যাচাই করুন।</div>';
+				document.getElementById('bm-otp-send').focus();
 				return;
 			}
 
