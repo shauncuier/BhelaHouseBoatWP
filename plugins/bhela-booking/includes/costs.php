@@ -351,6 +351,63 @@ function bhela_bm_cost_is_locked( $post_id ) {
 }
 
 /**
+ * Sheets with no trip date.
+ *
+ * Every report — the Monthly Statement, the Yearly Report, the expense mix —
+ * selects on `_bhela_cost_trip_date`. A sheet without one therefore belongs to
+ * no month and no year: its money is recorded and then never counted anywhere,
+ * silently. This is how the screens find them so they can say so.
+ *
+ * @return array List of array{id,title,status,total}.
+ */
+function bhela_bm_cost_undated() {
+	$ids = get_posts( array(
+		'post_type'      => 'bhela_cost',
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		// Two ways to have no date: the key was never written, or it was
+		// written empty by a save that left the field blank.
+		'meta_query'     => array(
+			'relation' => 'OR',
+			array( 'key' => '_bhela_cost_trip_date', 'compare' => 'NOT EXISTS' ),
+			array( 'key' => '_bhela_cost_trip_date', 'value' => '', 'compare' => '=' ),
+		),
+	) );
+
+	$out = array();
+	foreach ( $ids as $id ) {
+		$out[] = array(
+			'id'     => $id,
+			'title'  => get_the_title( $id ),
+			'status' => bhela_bm_cost_status( $id ),
+			'total'  => (int) get_post_meta( $id, '_bhela_cost_total', true ),
+		);
+	}
+	return $out;
+}
+
+/**
+ * May this sheet be approved?
+ *
+ * Approval is the point of no return: the sheet locks, and from then on it is
+ * what the statement and the yearly report read. Both select on the trip date,
+ * so approving an undated sheet would file a final, uneditable record into no
+ * month at all.
+ *
+ * A predicate rather than an inline check, because three places need the same
+ * answer — the transition that enforces it, the sidebar that greys the button,
+ * and the test that proves it.
+ *
+ * @param int $post_id Cost sheet.
+ * @return bool
+ */
+function bhela_bm_cost_can_approve( $post_id ) {
+	return '' !== trim( (string) get_post_meta( $post_id, '_bhela_cost_trip_date', true ) );
+}
+
+/**
  * Read the stored lines, converting anything written in the old shape.
  *
  * Sheets used to store a positional array whose labels came from a hardcoded
@@ -585,7 +642,11 @@ function bhela_bm_cost_column_content( $column, $post_id ) {
 	switch ( $column ) {
 		case 'trip_date':
 			$d = get_post_meta( $post_id, '_bhela_cost_trip_date', true );
-			echo $d ? esc_html( mysql2date( 'j M Y', $d ) ) : '—';
+			// An em dash reads as "nothing to see". A missing date is the one
+			// thing that keeps the sheet out of every report, so it gets a pill.
+			echo $d
+				? esc_html( mysql2date( 'j M Y', $d ) )
+				: bhela_bm_status_pill( __( 'No trip date', 'bhela-booking' ), 'attention' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes.
 			break;
 		case 'cost':
 			echo esc_html( bhela_bm_money( (int) get_post_meta( $post_id, '_bhela_cost_total', true ) ) );
@@ -683,7 +744,16 @@ function bhela_bm_cost_workflow_cb( $post ) {
 			'bhela_bm_cost_transition_' . $post->ID
 		);
 	};
+
+	// An undated sheet cannot be approved — see bhela_bm_cost_can_approve().
+	// Say so here rather than only refusing after the click.
+	$dated = bhela_bm_cost_can_approve( $post->ID );
 	?>
+	<?php if ( isset( $_GET['bhela_cost_msg'] ) && 'nodate' === $_GET['bhela_cost_msg'] ) : ?>
+		<p class="bha-callout bha-callout--attention bha-callout--lead">
+			<?php esc_html_e( 'Not approved — this sheet has no trip date, so it would belong to no month. Set the Trip Date above, save, then approve.', 'bhela-booking' ); ?>
+		</p>
+	<?php endif; ?>
 	<p style="margin-top:0">
 		<?php
 		echo bhela_bm_status_pill( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes.
@@ -733,7 +803,14 @@ function bhela_bm_cost_workflow_cb( $post ) {
 	<?php endif; ?>
 
 	<?php if ( 'checked' === $status && current_user_can( 'bhela_cost_approve' ) ) : ?>
-		<p><a class="button button-primary" href="<?php echo esc_url( $action( 'approve' ) ); ?>"><?php esc_html_e( '✓ Approve', 'bhela-booking' ); ?></a></p>
+		<?php if ( $dated ) : ?>
+			<p><a class="button button-primary" href="<?php echo esc_url( $action( 'approve' ) ); ?>"><?php esc_html_e( '✓ Approve', 'bhela-booking' ); ?></a></p>
+		<?php else : ?>
+			<p><button type="button" class="button button-primary" disabled><?php esc_html_e( '✓ Approve', 'bhela-booking' ); ?></button></p>
+			<p class="bha-callout bha-callout--attention" style="margin:0 0 10px">
+				<?php esc_html_e( 'Set a Trip Date first. Approving locks the sheet, and without a date it would count towards no month and no year.', 'bhela-booking' ); ?>
+			</p>
+		<?php endif; ?>
 		<p><a class="button" href="<?php echo esc_url( $action( 'return' ) ); ?>"><?php esc_html_e( '↩ Return to preparer', 'bhela-booking' ); ?></a></p>
 	<?php endif; ?>
 
@@ -1188,6 +1265,15 @@ function bhela_bm_cost_transition() {
 	$status = bhela_bm_cost_status( $sheet_id );
 	if ( ! in_array( $status, $t['from'], true ) ) {
 		wp_die( esc_html__( 'This sheet is no longer in a state where that action applies.', 'bhela-booking' ), 409 );
+	}
+
+	// Approval is the point of no return: the sheet locks, and from then on it
+	// is what the statement and the yearly report read. Without a trip date it
+	// belongs to no month, so approving it would file a final, uneditable sheet
+	// into nowhere. Refuse, and send the preparer back to the field to fix.
+	if ( 'approved' === $t['to'] && ! bhela_bm_cost_can_approve( $sheet_id ) ) {
+		wp_safe_redirect( add_query_arg( 'bhela_cost_msg', 'nodate', get_edit_post_link( $sheet_id, 'raw' ) ) );
+		exit;
 	}
 
 	update_post_meta( $sheet_id, '_bhela_cost_status', $t['to'] );

@@ -338,6 +338,27 @@ function bhela_bm_yearly_page() {
 			<div><?php echo esc_html( $modes[ $mode ]['label'] . ' ' . $label ); ?></div>
 		</div>
 
+
+		<?php
+		// Sheets with no trip date are in no month and no year at all, so they
+		// cannot show up as a row anywhere below. Name them here or they are
+		// simply money that vanished.
+		$bhela_undated = function_exists( 'bhela_bm_cost_undated' ) ? bhela_bm_cost_undated() : array();
+		if ( $bhela_undated ) :
+			?>
+			<p class="bha-callout bha-callout--attention bha-callout--lead">
+				<strong>⚠️ <?php echo esc_html( sprintf(
+					/* translators: %d: number of cost sheets with no trip date */
+					_n( '%d cost sheet has no trip date.', '%d cost sheets have no trip date.', count( $bhela_undated ), 'bhela-booking' ),
+					count( $bhela_undated )
+				) ); ?></strong>
+				<?php esc_html_e( 'It counts towards no month and no year until a date is set — not here, and not on any other report.', 'bhela-booking' ); ?>
+				<?php foreach ( $bhela_undated as $bhela_u ) : ?>
+					<a href="<?php echo esc_url( get_edit_post_link( $bhela_u['id'] ) ); ?>"><?php echo esc_html( $bhela_u['title'] ?: sprintf( '#%d', $bhela_u['id'] ) ); ?></a>
+				<?php endforeach; ?>
+			</p>
+		<?php endif; ?>
+
 		<?php if ( $d['pending'] ) : ?>
 			<p class="bha-callout bha-callout--attention bha-callout--lead">
 				<strong>⚠️ <?php echo esc_html( sprintf(

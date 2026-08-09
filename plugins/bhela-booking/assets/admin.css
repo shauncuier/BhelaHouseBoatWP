@@ -17,6 +17,28 @@
  * @package BhelaBooking
  */
 
+/*
+ * The taka sign, and nothing else.
+ *
+ * Segoe UI *does* carry U+09F3 — it simply draws it badly: 8.26px wide against
+ * an 11.32px digit, a third too narrow, reading as a stray mark rather than a
+ * currency symbol. Because the glyph is present, normal font fallback never
+ * moves past Segoe UI, so appending a better face to the stack changes nothing
+ * (measured: "Segoe UI","Nirmala UI" still renders at 8.26px).
+ *
+ * A unicode-range face is the way to override one codepoint. It claims only
+ * U+09F3, so the symbol comes from Nirmala UI — Windows' Indic UI font, already
+ * installed, no download — while every digit and letter still renders in the
+ * admin's own font, untouched. src is local() only: nothing is fetched.
+ */
+@font-face {
+	font-family: "BHELA Taka";
+	src: local("Nirmala UI"), local("Noto Sans Bengali"), local("Hind Siliguri"),
+		local("Vrinda");
+	unicode-range: U+09F3;
+	font-display: swap;
+}
+
 .bhela-admin {
 	/* Brand. Used at full strength in exactly one place: the header band. */
 	--bha-ink: #0a2a2f;
@@ -56,6 +78,33 @@
 
 	--bha-radius: 10px;
 	--bha-gap: 12px;
+
+	/*
+	 * wp-admin's own stack, verbatim, with the taka face in front of it.
+	 *
+	 * Keeping the rest byte-identical to WordPress is what makes applying this
+	 * across the whole scope safe: the custom face claims one codepoint, so
+	 * every other character resolves exactly as it did before.
+	 */
+	--bha-font-money: "BHELA Taka", -apple-system, BlinkMacSystemFont, "Segoe UI",
+		Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+/*
+ * Apply it to the whole scope, not to the money components.
+ *
+ * Tagging the ten classes that render figures missed the list tables, whose
+ * money columns are plain <td>s with no class of ours — Cost Sheets showed a
+ * ৳3,318,506 total with the bad glyph while the cards above it were correct.
+ * Scoping it here cannot have that gap. Form controls are listed because
+ * browsers give them their own font rather than inheriting.
+ */
+.bhela-admin,
+.bhela-admin input,
+.bhela-admin select,
+.bhela-admin textarea,
+.bhela-admin button {
+	font-family: var(--bha-font-money);
 }
 
 /* Our own full-page screens. Not applied to list tables, which want the whole
@@ -1281,7 +1330,9 @@
 
 .bha-doc {
 	margin: 24px;
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	/* Standalone page, so it sets its own body font — and it prints, where a
+	   substituted taka sign is permanent. Same stack as the screen. */
+	font-family: var(--bha-font-money);
 	font-size: 12px;
 	color: #111;
 	background: #fff;

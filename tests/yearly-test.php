@@ -118,6 +118,52 @@ preg_match_all( '/\b\d{1,3}(,\d{3})+\b/u', $html, $plain );
 $bare = array_filter( $plain[0], fn( $n ) => false === strpos( $html, '৳' . $n ) );
 ok( ! $bare, 'every grouped figure carries the symbol', implode( ' ', array_slice( $bare, 0, 4 ) ) );
 
+echo "\n=== 8b. a sheet with no trip date ===\n";
+// Live sheet #257 held ৳3,318,506 with no date: counted by nothing, flagged by
+// nothing. Every report selects on the trip date, so it belonged to no month
+// and no year and no screen could ever have shown it.
+$un = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZY undated' ) );
+$made[] = $un;
+update_post_meta( $un, '_bhela_cost_status', 'checked' );
+update_post_meta( $un, '_bhela_cost_total', 3318506 );
+update_post_meta( $un, '_bhela_cost_earnings', 0 );
+
+ok( in_array( $un, wp_list_pluck( bhela_bm_cost_undated(), 'id' ), true ), 'bhela_bm_cost_undated() finds it' );
+
+// Its money must appear in no year, under either year shape. The three
+// approved fixtures above contribute ৳205,000 to FY2026 and CY2026 and nothing
+// elsewhere; the undated sheet must not move any of those figures.
+$expected = array(
+	'financial' => array( '2025' => 0, '2026' => 205000, '2027' => 0 ),
+	'calendar'  => array( '2025' => 0, '2026' => 205000, '2027' => 0 ),
+);
+$leaked = array();
+foreach ( $expected as $mode => $years ) {
+	foreach ( $years as $y => $want ) {
+		$got = (int) bhela_bm_yearly_data( (string) $y, $mode )['totals']['cost'];
+		if ( $got !== $want ) {
+			$leaked[] = sprintf( '%s %s: %d not %d', $mode, $y, $got, $want );
+		}
+	}
+}
+ok( ! $leaked, 'its ৳3,318,506 reaches no year, in either year shape', implode( ' | ', $leaked ) );
+
+// The approval guard. Tested through the predicate both the transition and the
+// sidebar call — invoking the transition itself would exit() and take the
+// harness with it.
+ok( ! bhela_bm_cost_can_approve( $un ), 'an undated sheet cannot be approved' );
+update_post_meta( $un, '_bhela_cost_trip_date', '   ' );
+ok( ! bhela_bm_cost_can_approve( $un ), 'whitespace is not a date either' );
+
+// With a real date the guard lifts, the flag clears, and the money lands.
+update_post_meta( $un, '_bhela_cost_trip_date', '2026-07-15' );
+update_post_meta( $un, '_bhela_cost_status', 'approved' );
+ok( bhela_bm_cost_can_approve( $un ), 'dating it allows approval — the guard is about the date, not a block' );
+ok( ! in_array( $un, wp_list_pluck( bhela_bm_cost_undated(), 'id' ), true ), 'and clears the undated flag' );
+ok( 205000 + 3318506 === (int) bhela_bm_yearly_data( '2026', 'financial' )['totals']['cost'],
+	'its cost now counts towards July 2026',
+	bhela_bm_money( bhela_bm_yearly_data( '2026', 'financial' )['totals']['cost'] ) );
+
 echo "\n=== 9. permissions ===\n";
 ok( get_role( 'bhela_manager' )->has_cap( 'bhela_view_statement' ), 'a manager with the statement permission can open it' );
 ok( ! get_role( 'bhela_booking_staff' )->has_cap( 'bhela_view_statement' ), 'booking staff cannot' );

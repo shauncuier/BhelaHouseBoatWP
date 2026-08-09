@@ -190,6 +190,47 @@ foreach ( $sels[1] as $sel ) {
 $collisions = array_keys( array_filter( $primary, fn( $n ) => $n > 1 ) );
 ok( ! $collisions, sprintf( 'each of the %d components is defined once', count( $primary ) ), implode( ', ', $collisions ) );
 
+echo "\n=== 8b. the taka sign has a font that can draw it ===\n";
+// wp-admin's stack has no U+09F3, so Chrome substitutes a narrow face and ৳
+// renders about a third thinner than the digits beside it. Every surface that
+// prints money has to name a Bengali-capable font.
+ok( false !== strpos( $css, '--bha-font-money' ), 'the money font token exists' );
+ok( preg_match( '/@font-face\s*\{[^}]*local\(\s*"Nirmala UI"\s*\)/si', $css ),
+	'the custom face sources Nirmala UI locally — nothing is downloaded' );
+
+// Applied across the whole scope rather than per component. Tagging the ten
+// money classes missed the list tables, whose money columns are plain <td>s —
+// Cost Sheets rendered a ৳3,318,506 total with the bad glyph while the cards
+// above it were right. Assert the scope rule, not the components.
+preg_match_all( '/([^{}]*)\{\s*font-family:\s*var\(--bha-font-money\)[^}]*\}/s', $css, $applied );
+$scope = implode( ' ', $applied[1] );
+ok( false !== strpos( $scope, '.bhela-admin,' ) || preg_match( '/\.bhela-admin\s*,/', $scope ),
+	'the money font is applied to the whole scope, not per component' );
+foreach ( array( 'input', 'select', 'textarea', 'button' ) as $ctl ) {
+	ok( false !== strpos( $scope, '.bhela-admin ' . $ctl ), "…and to $ctl, which does not inherit it" );
+}
+// The rest of the stack must stay byte-identical to wp-admin's, which is what
+// makes a scope-wide font-family safe.
+ok( preg_match( '/--bha-font-money:[^;]*-apple-system, BlinkMacSystemFont, "Segoe UI",\s*
+?\s*Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif/s', $css ),
+	'and the stack behind it matches wp-admin exactly' );
+ok( preg_match( '/@font-face\s*\{[^}]*unicode-range:\s*U\+09F3/si', $css ),
+	'the custom face claims only U+09F3, so nothing else can change' );
+
+// The three surfaces outside this stylesheet that also render taka.
+$plugin_dir = WP_PLUGIN_DIR . '/bhela-booking';
+foreach ( array(
+	'the cost-sheet print view' => array( $plugin_dir . '/assets/admin.css', '.bha-doc' ),
+	'the customer emails'       => array( $plugin_dir . '/includes/emails.php', '<body' ),
+	'the invoice'               => array( $plugin_dir . '/templates/invoice.php', 'body {' ),
+) as $what => list( $file, $needle ) ) {
+	$body = (string) file_get_contents( $file );
+	ok( false !== strpos( $body, 'Nirmala UI' ), "$what names a font that can draw ৳" );
+}
+// The print view inherits the token rather than restating a bare stack.
+ok( false === strpos( $css, 'font-family: -apple-system' ),
+	'no bare Segoe-only stack left in admin.css' );
+
 echo "\n=== 9. menu icons are unique ===\n";
 $icons = array();
 foreach ( array(
