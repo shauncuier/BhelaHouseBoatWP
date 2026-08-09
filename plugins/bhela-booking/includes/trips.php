@@ -155,6 +155,25 @@ function bhela_bm_trip_statuses() {
 }
 
 /**
+ * Trip status → the admin design system's tone name.
+ *
+ * The `color` above stays: the public calendar paints its own chips inline and
+ * has no access to the admin stylesheet. In wp-admin the tone is what we want,
+ * so a full boat is the same red as an unpaid balance.
+ *
+ * @param string $status available | filling | booked.
+ * @return string Tone name for bhela_bm_status_pill().
+ */
+function bhela_bm_trip_tone( $status ) {
+	$map = array(
+		'available' => 'good',
+		'filling'   => 'attention',
+		'booked'    => 'danger',
+	);
+	return $map[ $status ] ?? 'neutral';
+}
+
+/**
  * Cabin availability for a date.
  *
  * Effective booked = the owner's manual hold (the calendar's "Booked Cabins"
@@ -378,43 +397,21 @@ function bhela_bm_trips_page() {
 	$trips    = bhela_bm_get_trips();
 	$statuses = bhela_bm_trip_statuses();
 	?>
-	<div class="wrap">
-		<h1>📅 <?php esc_html_e( 'BHELA Trip Calendar', 'bhela-booking' ); ?></h1>
-		<p><?php esc_html_e( 'Manage departure dates here — the website schedule page and booking calendar update automatically. Empty date = row ignored.', 'bhela-booking' ); ?></p>
+	<div class="wrap bha-page">
+		<?php
+		bhela_bm_screen_header(
+			'📅',
+			__( 'Trip Calendar', 'bhela-booking' ),
+			__( 'Departure dates. The website schedule and the booking calendar follow this list — an empty date means the row is ignored.', 'bhela-booking' )
+		);
+		?>
 		<p class="description"><?php esc_html_e( 'Ticking "Holiday" removes the 20% weekday discount for that trip — the regular rate applies and the site shows it as a holiday.', 'bhela-booking' ); ?></p>
 		<p class="description"><?php esc_html_e( 'Booked Cabins is automatic: as soon as a booking is Advance Paid or Confirmed, that date loses a cabin on its own — you do not enter it here, and every manager and the website read the same live number. This box is only for manual holds, such as a phone booking or blocking the whole boat; holds are added on top of the online count.', 'bhela-booking' ); ?></p>
 		<p class="description"><?php esc_html_e( 'Leave End Date empty for the standard 2 days 1 night. Extend it for a Full Boat or a longer charter — the label, days and duration fill in automatically. Moving the Start Date keeps the trip the same length.', 'bhela-booking' ); ?></p>
 		<form method="post">
 			<?php wp_nonce_field( 'bhela_bm_trips', 'bhela_bm_trips_nonce' ); ?>
-			<style>
-				/* The label/days fields hold long Bangla strings — give them room and
-				   let the table scroll instead of squeezing the text out of sight. */
-				#bhela-trips-wrap { overflow-x: auto; }
-				#bhela-trips-table { min-width: 1220px; }
-				#bhela-trips-table input[type="text"] { width: 100%; min-width: 150px; }
-				#bhela-trips-table tr.is-past { opacity: .6; }
-				#bhela-trips-table .bhela-trip-dur { display: block; margin-top: 4px; font-size: 11px; color: #646970; }
-				#bhela-trips-table .bhela-hol { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-				#bhela-trips-table .bhela-hol span { font-size: 11px; color: #b45309; }
-				#bhela-trips-table .bhela-trip-dur.is-long { color: #b45309; font-weight: 600; }
-				#bhela-trips-table .bhela-past-tag {
-					display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 999px;
-					background: #f0f0f1; color: #646970; font-size: 11px; white-space: nowrap;
-				}
-					#bhela-trips-table .bhela-avail-cell { white-space: nowrap; }
-					#bhela-trips-table .bhela-hold { display: flex; align-items: center; gap: 6px; }
-					#bhela-trips-table .bhela-hold input[type="number"] { width: 56px; min-width: 56px; text-align: center; }
-					#bhela-trips-table .bhela-hold__cap { font-size: 11px; color: #787c82; }
-					#bhela-trips-table .bhela-avail-pill {
-						display: inline-block; margin-top: 6px; padding: 2px 10px; border-radius: 999px;
-						font-size: 11px; font-weight: 600; color: #fff; white-space: nowrap;
-					}
-					#bhela-trips-table .bhela-avail-pill.is-open { background: #1a7f37; }
-					#bhela-trips-table .bhela-avail-pill.is-full { background: #b32d2e; }
-					#bhela-trips-table .bhela-avail-note { display: block; margin-top: 3px; font-size: 11px; color: #787c82; }
-			</style>
-			<div id="bhela-trips-wrap">
-			<table class="widefat striped" id="bhela-trips-table">
+			<div class="bha-scroll">
+			<table class="widefat striped bha-tripgrid" id="bhela-trips-table">
 				<thead><tr>
 					<th style="width:140px"><?php esc_html_e( 'Start Date', 'bhela-booking' ); ?></th>
 					<th style="width:140px"><?php esc_html_e( 'End Date', 'bhela-booking' ); ?></th>
@@ -435,7 +432,7 @@ function bhela_bm_trips_page() {
 					<tr class="<?php echo $bm_is_past ? 'is-past' : ''; ?>">
 						<td><input type="date" class="bhela-trip-start" name="trip_date[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( $t['date'] ); ?>">
 							<?php if ( $bm_is_past ) : ?>
-								<span class="bhela-past-tag"><?php esc_html_e( 'Past — hidden on the site', 'bhela-booking' ); ?></span>
+								<?php echo bhela_bm_status_pill( __( 'Past — hidden on the site', 'bhela-booking' ), 'neutral' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes. ?>
 							<?php endif; ?>
 						</td>
 						<td><input type="date" class="bhela-trip-end" name="trip_end[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( bhela_bm_trip_end( $t ) ); ?>">
@@ -461,11 +458,15 @@ function bhela_bm_trips_page() {
 								<input type="text" inputmode="numeric" pattern="[0-9]*" maxlength="1" name="trip_booked[<?php echo esc_attr( $i ); ?>]" value="<?php echo esc_attr( (int) ( $t['booked'] ?? 0 ) ); ?>" title="<?php esc_attr_e( 'Manual hold — e.g. a phone booking or a full-boat block. Added on top of online bookings.', 'bhela-booking' ); ?>">
 								<span class="bhela-hold__cap"><?php esc_html_e( 'hold', 'bhela-booking' ); ?></span>
 							</div>
-							<span class="bhela-avail-pill <?php echo $bm_full ? 'is-full' : 'is-open'; ?>">
-								<?php echo $bm_full
-									? sprintf( esc_html__( 'Booked %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['booked'], (int) $bm_av['total'] )
-									: sprintf( esc_html__( 'Free %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['available'], (int) $bm_av['total'] ); ?>
-							</span>
+							<?php
+							echo bhela_bm_status_pill( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes.
+								$bm_full
+									? sprintf( __( 'Booked %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['booked'], (int) $bm_av['total'] )
+									: sprintf( __( 'Free %1$d/%2$d', 'bhela-booking' ), (int) $bm_av['available'], (int) $bm_av['total'] ),
+								$bm_full ? 'danger' : 'good',
+								true
+							);
+							?>
 							<?php if ( (int) $bm_av['counted'] > 0 ) : ?>
 								<span class="bhela-avail-note"><?php printf( esc_html__( 'online: %d', 'bhela-booking' ), (int) $bm_av['counted'] ); ?></span>
 							<?php endif; ?>

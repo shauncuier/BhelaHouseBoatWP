@@ -154,16 +154,22 @@ function bhela_bm_guide_page() {
 		),
 	);
 	?>
-	<div class="wrap">
-		<h1 style="font-size:1.8em">🛶 BHELA — Quick Management Guide</h1>
-		<p style="font-size:14px;max-width:720px">No coding needed. Click the button for whatever you want to do and follow the steps. If you get stuck anywhere, contact the developer: <a href="https://3s-soft.com" target="_blank">3s-Soft</a></p>
-		<div style="column-width:300px;column-gap:14px;max-width:1280px;margin-top:16px">
+	<div class="wrap bha-page">
+		<?php
+		bhela_bm_screen_header(
+			'🎯',
+			__( 'Quick Management Guide', 'bhela-booking' ),
+			__( 'No coding needed. Pick whatever you want to do and follow the steps.', 'bhela-booking' ),
+			'<a class="button" href="https://3s-soft.com" target="_blank" rel="noopener">' . esc_html__( 'Contact 3s-Soft', 'bhela-booking' ) . '</a>'
+		);
+		?>
+		<div class="bha-guide">
 			<?php foreach ( $cards as $c ) : ?>
-				<div style="background:#fff;border:1px solid #dcdcde;border-left:5px solid #137A74;border-radius:10px;padding:14px 16px;break-inside:avoid;-webkit-column-break-inside:avoid;margin-bottom:14px">
-					<h2 style="margin:0 0 8px;font-size:15px"><?php echo esc_html( $c['icon'] . ' ' . $c['title'] ); ?></h2>
-					<ol style="margin:0 0 12px;padding-left:20px;font-size:13px;line-height:1.6">
+				<div class="bha-guide__card">
+					<h2><?php echo esc_html( $c['icon'] . ' ' . $c['title'] ); ?></h2>
+					<ol>
 						<?php foreach ( $c['steps'] as $s ) : ?>
-							<li style="margin-bottom:2px"><?php echo esc_html( $s ); ?></li>
+							<li><?php echo esc_html( $s ); ?></li>
 						<?php endforeach; ?>
 					</ol>
 					<a class="button button-primary" href="<?php echo esc_url( $c['link'] ); ?>"><?php echo esc_html( $c['btn'] ); ?></a>

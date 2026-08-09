@@ -232,19 +232,12 @@ function bhela_bm_expense_meta_cb( $post ) {
 	$types   = bhela_bm_expense_types( true );
 	$methods = bhela_bm_expense_methods( true );
 	?>
-	<style>
-		.bhela-exp { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
-		.bhela-exp__f { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-		.bhela-exp__f label { font-size: 11px; font-weight: 600; color: #50575e; text-transform: uppercase; letter-spacing: .04em; }
-		.bhela-exp input, .bhela-exp select { width: 100%; height: 34px; box-sizing: border-box; margin: 0; }
-		.bhela-exp__wide { grid-column: 1 / -1; }
-	</style>
-	<div class="bhela-exp">
-		<div class="bhela-exp__f">
+	<div class="bha-grid">
+		<div class="bha-field bha-field--caps">
 			<label for="exp_date"><?php esc_html_e( 'Date', 'bhela-booking' ); ?></label>
 			<input type="date" id="exp_date" name="exp_date" value="<?php echo esc_attr( $e['date'] ); ?>" required>
 		</div>
-		<div class="bhela-exp__f">
+		<div class="bha-field bha-field--caps">
 			<label for="exp_type"><?php esc_html_e( 'Type', 'bhela-booking' ); ?></label>
 			<select id="exp_type" name="exp_type">
 				<?php foreach ( $types as $slug => $label ) : ?>
@@ -252,11 +245,11 @@ function bhela_bm_expense_meta_cb( $post ) {
 				<?php endforeach; ?>
 			</select>
 		</div>
-		<div class="bhela-exp__f">
+		<div class="bha-field bha-field--caps">
 			<label for="exp_amount"><?php esc_html_e( 'Amount (৳)', 'bhela-booking' ); ?></label>
 			<input type="number" id="exp_amount" name="exp_amount" min="0" step="1" value="<?php echo esc_attr( $e['amount'] ?: '' ); ?>">
 		</div>
-		<div class="bhela-exp__f">
+		<div class="bha-field bha-field--caps">
 			<label for="exp_method"><?php esc_html_e( 'Payment method', 'bhela-booking' ); ?></label>
 			<select id="exp_method" name="exp_method">
 				<option value="">—</option>
@@ -265,15 +258,15 @@ function bhela_bm_expense_meta_cb( $post ) {
 				<?php endforeach; ?>
 			</select>
 		</div>
-		<div class="bhela-exp__f">
+		<div class="bha-field bha-field--caps">
 			<label for="exp_paid_on"><?php esc_html_e( 'Payment date', 'bhela-booking' ); ?></label>
 			<input type="date" id="exp_paid_on" name="exp_paid_on" value="<?php echo esc_attr( $e['paid_on'] ); ?>">
 		</div>
-		<div class="bhela-exp__f">
+		<div class="bha-field bha-field--caps">
 			<label for="exp_verify"><?php esc_html_e( 'Means of verification', 'bhela-booking' ); ?></label>
 			<input type="text" id="exp_verify" name="exp_verify" value="<?php echo esc_attr( $e['verify'] ); ?>" placeholder="<?php esc_attr_e( 'Invoice, WhatsApp, screenshot…', 'bhela-booking' ); ?>">
 		</div>
-		<div class="bhela-exp__f bhela-exp__wide">
+		<div class="bha-field bha-field--caps bha-grid__wide">
 			<label for="exp_remark"><?php esc_html_e( 'Remark', 'bhela-booking' ); ?></label>
 			<input type="text" id="exp_remark" name="exp_remark" value="<?php echo esc_attr( $e['remark'] ); ?>">
 		</div>
@@ -353,13 +346,13 @@ function bhela_bm_expense_column( $column, $post_id ) {
 			echo esc_html( $types[ $e['type'] ] ?? $e['type'] ?: '—' );
 			break;
 		case 'examt':
-			echo '<strong>' . esc_html( bhela_bm_money( $e['amount'] ) ) . '</strong>';
+			echo '<strong class="bha-num">' . esc_html( bhela_bm_money( $e['amount'] ) ) . '</strong>';
 			break;
 		case 'exmeth':
 			$methods = bhela_bm_expense_methods( true );
 			echo esc_html( $methods[ $e['method'] ] ?? '—' );
 			if ( $e['paid_on'] ) {
-				echo '<br><span style="color:#787c82;font-size:11px">' . esc_html( mysql2date( 'j M', $e['paid_on'] ) ) . '</span>';
+				echo '<span class="bha-sub">' . esc_html( mysql2date( 'j M', $e['paid_on'] ) ) . '</span>';
 			}
 			break;
 		case 'exver':

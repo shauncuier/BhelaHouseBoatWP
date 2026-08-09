@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.22.0
+ * Version: 2.23.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.22.0' );
+define( 'BHELA_BM_VERSION', '2.23.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -558,6 +558,8 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/guide.php';
 }
 if ( is_admin() ) {
+	// The shared UI components come first — every screen below draws on them.
+	require_once BHELA_BM_PATH . 'includes/ui.php';
 	require_once BHELA_BM_PATH . 'includes/roles.php';
 	require_once BHELA_BM_PATH . 'includes/admin.php';
 	require_once BHELA_BM_PATH . 'includes/dashboard.php';
@@ -567,6 +569,76 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/statement.php';
 	require_once BHELA_BM_PATH . 'includes/salary.php';
 }
+
+/* =========================================================
+ * ADMIN STYLESHEET
+ * ========================================================= */
+
+if ( ! function_exists( 'bhela_bm_is_plugin_screen' ) ) {
+	/**
+	 * Is the screen we are rendering one of ours?
+	 *
+	 * Two families: the custom post types, which all carry the `bhela_` prefix,
+	 * and the standalone pages, which all use a `bhela-bm-` slug. Nothing else in
+	 * wp-admin matches either, so this stays true as screens are added.
+	 *
+	 * @return bool
+	 */
+	function bhela_bm_is_plugin_screen() {
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return false;
+		}
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return false;
+		}
+		if ( isset( $screen->post_type ) && 0 === strpos( (string) $screen->post_type, 'bhela_' ) ) {
+			return true;
+		}
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen check.
+		return 0 === strpos( $page, 'bhela-bm-' );
+	}
+}
+
+/**
+ * Load the design system, and only where it is used.
+ *
+ * It used to be ~298 lines of inline `<style>` spread over nine files: shipped
+ * on every render, never cached, and impossible to change without editing a
+ * template. As a real stylesheet it caches against BHELA_BM_VERSION, and the
+ * screen check keeps it off Posts, Media, Plugins and the WP dashboard.
+ */
+function bhela_bm_admin_styles() {
+	if ( ! bhela_bm_is_plugin_screen() ) {
+		return;
+	}
+	wp_enqueue_style(
+		'bhela-bm-admin',
+		BHELA_BM_URL . 'assets/admin.css',
+		array(),
+		BHELA_BM_VERSION
+	);
+}
+add_action( 'admin_enqueue_scripts', 'bhela_bm_admin_styles' );
+
+/**
+ * Scope the stylesheet by marking the body, not the page wrapper.
+ *
+ * The cost sheet and the salary sheet are meta boxes: their markup is emitted
+ * by WordPress inside `#poststuff`, well outside any container the plugin
+ * writes. A class on `<body>` is the only anchor that reaches every one of our
+ * screens — full pages, list tables and editors alike.
+ *
+ * @param string $classes Space-separated body classes.
+ * @return string
+ */
+function bhela_bm_admin_body_class( $classes ) {
+	if ( bhela_bm_is_plugin_screen() ) {
+		$classes .= ' bhela-admin';
+	}
+	return $classes;
+}
+add_filter( 'admin_body_class', 'bhela_bm_admin_body_class' );
 
 /* =========================================================
  * ACTIVATION

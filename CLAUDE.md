@@ -78,8 +78,10 @@ wp-content/                          ← Git root
 │   │   ├── statement.php            ← Monthly Statement: approved trips − month's expenses
 │   │   ├── salary.php               ← Staff roster + monthly salary sheet
 │   │   ├── roles.php                ← Staff roles, plugin capabilities, Team reference screen
+│   │   ├── ui.php                   ← Shared admin UI: screen header, status pill, tone map
 │   │   └── guide.php                ← Embedded admin guide
 │   ├── assets/
+│   │   ├── admin.css                ← wp-admin design system (tokens, header, ledger, pills)
 │   │   ├── booking.css              ← Booking form styles (29KB)
 │   │   └── booking.js               ← Booking form logic + stepper wizard (41KB)
 │   └── templates/
@@ -257,7 +259,11 @@ wp-content:   c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\
 
 - **Vanilla CSS** — no preprocessors, no Tailwind
 - Theme styles in `style.css` (44KB) — single-file approach
-- Plugin styles in `assets/booking.css` (29KB)
+- Plugin front-end styles in `assets/booking.css` (29KB)
+- Plugin **admin** styles in `assets/admin.css` — the design system for all sixteen wp-admin
+  screens. Scoped to `.bhela-admin` (set on `<body>` by `bhela_bm_admin_body_class()`) and
+  enqueued only where `bhela_bm_is_plugin_screen()` is true. **Never add an inline `<style>`
+  block to an admin template** — that is exactly the drift this file replaced.
 - CSS custom properties used for theming tokens
 
 ### 6.4 Bangla / i18n
@@ -330,6 +336,10 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_statement_data($month)` | `includes/statement.php` | A month's approved trips, deductions and gross profit |
 | `bhela_bm_salary_rows($id,$month)` | `includes/salary.php` | Payroll rows; trips default from approved sheets |
 | `bhela_bm_cost_transitions()` | `includes/costs.php` | Cost-sheet workflow: from-state → target + required capability |
+| `bhela_bm_screen_header()` | `includes/ui.php` | The teal banner every admin screen opens with (also emits `.wp-header-end`) |
+| `bhela_bm_status_pill()` | `includes/ui.php` | One pill for every status vocabulary — five tones × solid/soft |
+| `bhela_bm_status_tone()` | `includes/ui.php` | Booking status → tone + weight |
+| `bhela_bm_is_plugin_screen()` | `bhela-booking.php` | True on a BHELA admin screen; gates `admin.css` and the body class |
 | `bhela_bm_roles()` | `includes/roles.php` | Staff roles + capabilities — the single source the plugin reads |
 | `bhela_bm_permissions()` | `includes/roles.php` | Togglable permissions; also the allow-list for the Team screen |
 | `bhela_bm_role_defaults()` | `includes/roles.php` | Shipped baseline, overridden by the `bhela_bm_role_perms` option |
@@ -360,6 +370,17 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 1. Create `themes/bhela/page-templates/template-{name}.php`
 2. Add WordPress template header comment: `/* Template Name: {Name} */`
 3. Optionally add auto-creation in `functions.php` → `bhela_auto_create_pages()`
+
+### Add a new admin screen
+
+1. Open the page with `bhela_bm_screen_header( $icon, $title, $lead, $actions )` and wrap it in
+   `<div class="wrap bha-page">`
+2. Build from the existing classes: `.bha-bar` (filters), `.bha-cards` (summary figures),
+   `.bha-panel` (a section), `.bha-num` (every money column), `.bha-callout--attention`
+   (something needing action), `bhela_bm_status_pill()` (any status)
+3. Run every figure through `bhela_bm_money()` — including the print view
+4. Give the menu item an emoji **no other item uses**
+5. If a genuinely new component is needed, name it `bha-` and add it to `assets/admin.css`
 
 ### Add a new setting to the booking plugin
 

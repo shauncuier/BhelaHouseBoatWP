@@ -32,6 +32,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/otp.php` | Mobile verification on the booking form — send/verify endpoints, throttles, email fallback |
 | `includes/trips.php` | Trip calendar admin + shortcode + availability helper |
 | `includes/reviews.php` | Reviews CPT |
+| `includes/ui.php` | Shared admin UI — the screen header, the status pill, the booking-status tone map |
 | `includes/admin.php` | Bookings columns, edit meta box, Settings page, dashboard widget |
 | `includes/reports.php` | Trip Report screen — bookings for a date/range with advance, due and totals; print, WhatsApp text and CSV export |
 | `includes/costs.php` | Trip Cost Sheet CPT + prepare/check/approve workflow, editable heads, printable sheet |
@@ -39,6 +40,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/statement.php` | Monthly Statement — approved trips less the month's expenses |
 | `includes/salary.php` | Staff roster + monthly salary sheet |
 | `includes/roles.php` | Staff roles, every plugin capability, and the read-only Team reference screen |
+| `assets/admin.css` | The admin design system — tokens, screen header, cards, ledger, pills, print |
 | `templates/invoice.php` | Printable invoice |
 
 ## Key functions / extension points
@@ -55,7 +57,45 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_permissions()` — the togglable permission registry, and the allow-list for what the Team screen may grant.
 - `bhela_bm_normalise_perms( $perms )` — drops unknown keys, pulls in prerequisites.
 - `bhela_bm_calc_multi( $cabins, $date )` — authoritative per-cabin pricing.
+- `bhela_bm_screen_header( $icon, $title, $lead, $actions, $class )` — the banner every screen opens with.
+- `bhela_bm_status_pill( $label, $tone, $solid )` — one pill for every status vocabulary in the plugin.
+- `bhela_bm_is_plugin_screen()` — true on a BHELA admin screen; gates the stylesheet and the body class.
 - Notifications fire from `bhela_bm_process_submission()` (new booking) and `bhela_bm_save_booking()` (status change).
+
+## Admin design system
+
+Everything visual lives in `assets/admin.css`, loaded only where `bhela_bm_is_plugin_screen()`
+is true. It is scoped to `.bhela-admin`, which the plugin puts on `<body>` — not on the page
+wrapper, because the cost sheet and salary sheet are meta boxes whose markup sits outside
+anything we control.
+
+**Tokens.** Chrome (`--bha-surface`, `--bha-canvas`, `--bha-line`, `--bha-text`, `--bha-muted`)
+deliberately matches wp-admin's own greys rather than the website palette — a card floating on
+the admin canvas needs WordPress's line colour or it reads as a foreign object. Brand
+(`--bha-ink`, `--bha-teal`) appears at full strength in exactly one place: the header band.
+
+**Five semantic tones**, named once and used everywhere:
+
+| Token | Means |
+| --- | --- |
+| `--bha-neutral` | draft, none, not applicable |
+| `--bha-progress` | in flight — prepared, checked, advance paid |
+| `--bha-good` | settled — approved, confirmed, paid |
+| `--bha-attention` | needs a person — pending, low balance |
+| `--bha-danger` | money owed, failures, destructive |
+
+Pills carry a second axis: **solid means the state has landed, soft means it is still moving.**
+That is what lets five tones cover every vocabulary — booking status, cost-sheet workflow, trip
+availability — without inventing a sixth hue. The activity log is the one exception: its nine
+channels are a taxonomy rather than a status, so they use the `.bha-tag--*` set instead.
+
+**Adding a screen.** Open with `bhela_bm_screen_header()`, wrap the page in
+`<div class="wrap bha-page">`, and build from the existing classes — `.bha-bar` for filters,
+`.bha-cards` for summary figures, `.bha-panel` for a section, `.bha-num` for every money column,
+`.bha-callout--attention` for something the reader has to act on. Do not add an inline
+`<style>` block or a fifteenth class prefix; if a genuinely new component is needed, name it
+`bha-` and put it in `admin.css`. Every figure goes through `bhela_bm_money()`, including print
+views — the screen and the printout used to disagree on the same sheet.
 
 ## Mobile verification (OTP)
 
@@ -206,6 +246,11 @@ The `bhela` theme auto-creates the booking pages, trip calendar, and menu on act
 
 ## Changelog (recent)
 
+- **2.23.0** — Admin design system (`assets/admin.css`): one screen header, one status pill, one
+  ledger treatment across all sixteen screens; 12 inline `<style>` blocks and 58 hand-typed hex
+  values removed. Editable trip cost heads, Expenses, Monthly Statement and Staff Salary.
+  Security: staff roles no longer receive `upload_files`; the invoice link now sends
+  `no-store` and `X-Robots-Tag: noindex`.
 - **2.6.2** — Email Notifications settings (toggles, recipient, From/Reply-To, test send).
 - **2.6.1** — Fix double-encoded WhatsApp prefill URL.
 - **2.6.0** — SMS notifications (provider-agnostic; 3 triggers).

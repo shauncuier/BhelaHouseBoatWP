@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Bump when bhela_bm_role_defaults() or bhela_bm_permissions() changes, so
 // existing sites re-sync once against the new definition.
-define( 'BHELA_BM_ROLES_VERSION', 5 );
+define( 'BHELA_BM_ROLES_VERSION', 6 );
 
 /* =========================================================
  * CAPABILITY SETS
@@ -180,9 +180,34 @@ function bhela_bm_permissions() {
 	);
 }
 
-/** Capabilities every staff role gets, so they can reach wp-admin at all. */
+/**
+ * Capabilities every staff role gets, so they can reach wp-admin at all.
+ *
+ * `read` and nothing more. These roles used to carry `upload_files` too, which
+ * handed a cost preparer the entire Media Library — upload rights plus every
+ * file anyone else had ever uploaded, including invoice QR images. No staff
+ * flow needs it: the only screen that opens the media picker is Bulk Upload,
+ * which requires manage_options, and the gallery, review and spot editors run
+ * on `post` capabilities that staff deliberately do not have.
+ *
+ * @see bhela_bm_revoked_caps() for how it is taken back from installed roles.
+ */
 function bhela_bm_base_caps() {
-	return array( 'read', 'upload_files' );
+	return array( 'read' );
+}
+
+/**
+ * Capabilities the plugin once granted and no longer should.
+ *
+ * The role sync is only authoritative over capabilities the plugin owns
+ * (bhela_bm_owned_caps()). A core capability it granted in an earlier version
+ * would otherwise stay on the role for ever, because nothing takes it back.
+ * Anything retired from bhela_bm_base_caps() belongs here.
+ *
+ * @return string[]
+ */
+function bhela_bm_revoked_caps() {
+	return array( 'upload_files' );
 }
 
 /**
@@ -357,6 +382,13 @@ function bhela_bm_install_roles() {
 			}
 		}
 		foreach ( $owned as $cap ) {
+			if ( ! in_array( $cap, $def['caps'], true ) && $role->has_cap( $cap ) ) {
+				$role->remove_cap( $cap );
+			}
+		}
+		// Core capabilities an older version handed out. Not covered by $owned,
+		// so without this they would survive every future sync.
+		foreach ( bhela_bm_revoked_caps() as $cap ) {
 			if ( ! in_array( $cap, $def['caps'], true ) && $role->has_cap( $cap ) ) {
 				$role->remove_cap( $cap );
 			}
@@ -538,40 +570,17 @@ function bhela_bm_team_page() {
 		'invalid'  => array( 'error', __( 'That role does not exist.', 'bhela-booking' ) ),
 	);
 	?>
-	<style>
-		.bhela-team { max-width: 1140px; }
-		.bhela-team__card { background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 18px 20px; margin: 0 0 18px; }
-		.bhela-team__card h2 { margin: 0 0 4px; font-size: 15px; }
-		.bhela-team__card > p.bhela-team__blurb { margin: 0 0 14px; }
-		.bhela-team table.widefat { border-radius: 8px; overflow: hidden; }
-		.bhela-team table.widefat th,
-		.bhela-team table.widefat td { padding: 10px 12px; vertical-align: middle; }
-		.bhela-team__cell-actions { text-align: right; white-space: nowrap; }
-		.bhela-team__role { font-weight: 600; }
-		.bhela-team__blurb { color: #787c82; font-size: 12px; margin: 2px 0 0; }
-		.bhela-team__admin { color: #787c82; font-style: italic; }
-		.bhela-team__none { color: #b45309; font-weight: 600; }
-		.bhela-team__matrix th, .bhela-team__matrix td { text-align: center; }
-		.bhela-team__matrix th:first-child, .bhela-team__matrix td:first-child { text-align: left; width: 34%; }
-		.bhela-team__matrix thead th { vertical-align: bottom; line-height: 1.35; }
-		.bhela-team__matrix tbody td:not(:first-child) { font-size: 15px; }
-		.bhela-team__yes { color: #1a7f37; font-weight: 700; }
-		.bhela-team__no { color: #c3c4c7; }
-		.bhela-team__legend { margin: 14px 0 0; }
-		.bhela-team__legend p { margin: 0 0 6px; }
-		.bhela-team__matrix tbody td:first-child { line-height: 1.4; }
-		.bhela-team__matrix input[type=checkbox] { margin: 0; }
-		.bhela-team__save { display: flex; align-items: center; gap: 12px; margin: 14px 0 0; }
-		.bhela-team__selfwarn {
-			background: #fcf9e8; border-left: 3px solid #b45309; border-radius: 4px;
-			padding: 9px 12px; margin: 14px 0 0; font-size: 12px;
-		}
-		@media (max-width: 782px) { .bhela-team__cell-actions { text-align: left; } }
-	</style>
 
-	<div class="wrap bhela-team">
-		<h1>👥 <?php esc_html_e( 'Team', 'bhela-booking' ); ?></h1>
-		<p style="color:#50575e;margin:4px 0 16px"><?php esc_html_e( 'Who can use BHELA, and how much of it. Nobody here gets access to the rest of WordPress.', 'bhela-booking' ); ?></p>
+	<div class="wrap bha-page">
+		<?php
+		bhela_bm_screen_header(
+			'👥',
+			__( 'Team', 'bhela-booking' ),
+			__( 'Who can use BHELA, and how much of it. Nobody here gets access to the rest of WordPress.', 'bhela-booking' ),
+			'<a class="button" href="' . esc_url( admin_url( 'user-new.php' ) ) . '">' . esc_html__( 'Add New User', 'bhela-booking' ) . '</a>'
+			. ' <a class="button" href="' . esc_url( admin_url( 'users.php' ) ) . '">' . esc_html__( 'All Users', 'bhela-booking' ) . '</a>'
+		);
+		?>
 
 		<?php if ( isset( $notices[ $notice ] ) ) : ?>
 			<div class="notice notice-<?php echo esc_attr( $notices[ $notice ][0] ); ?> is-dismissible">
@@ -579,12 +588,10 @@ function bhela_bm_team_page() {
 			</div>
 		<?php endif; ?>
 
-		<div class="bhela-team__card">
-			<h2><?php esc_html_e( 'Current team', 'bhela-booking' ); ?></h2>
-			<p class="bhela-team__blurb">
+		<div class="bha-panel">
+			<h2 class="bha-panel__title"><?php esc_html_e( 'Current team', 'bhela-booking' ); ?></h2>
+			<p class="bha-sub">
 				<?php esc_html_e( 'Add someone, change a role or remove an account in Users — the BHELA roles are listed in its role dropdown.', 'bhela-booking' ); ?>
-				<a href="<?php echo esc_url( admin_url( 'user-new.php' ) ); ?>"><?php esc_html_e( 'Add New User', 'bhela-booking' ); ?></a> ·
-				<a href="<?php echo esc_url( admin_url( 'users.php' ) ); ?>"><?php esc_html_e( 'All Users', 'bhela-booking' ); ?></a>
 			</p>
 			<table class="widefat striped">
 				<thead>
@@ -593,7 +600,7 @@ function bhela_bm_team_page() {
 						<th style="width:26%"><?php esc_html_e( 'Email', 'bhela-booking' ); ?></th>
 						<th style="width:26%"><?php esc_html_e( 'BHELA role', 'bhela-booking' ); ?></th>
 						<th style="width:110px"><?php esc_html_e( 'Added', 'bhela-booking' ); ?></th>
-						<th style="width:90px" class="bhela-team__cell-actions"></th>
+						<th style="width:90px" class="bha-num bha-noprint"></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -604,20 +611,20 @@ function bhela_bm_team_page() {
 					<tr>
 						<td>
 							<strong><?php echo esc_html( $u->display_name ); ?></strong>
-							<div class="bhela-team__blurb"><?php echo esc_html( $u->user_login ); ?></div>
+							<div class="bha-sub"><?php echo esc_html( $u->user_login ); ?></div>
 						</td>
 						<td><?php echo esc_html( $u->user_email ); ?></td>
 						<td>
 							<?php if ( $is_admin ) : ?>
-								<span class="bhela-team__admin"><?php esc_html_e( 'Administrator — full access', 'bhela-booking' ); ?></span>
+								<span class="bha-muted-em"><?php esc_html_e( 'Administrator — full access', 'bhela-booking' ); ?></span>
 							<?php elseif ( $current ) : ?>
-								<span class="bhela-team__role"><?php echo esc_html( $roles[ $current ]['name'] ); ?></span>
+								<span class="bha-strong"><?php echo esc_html( $roles[ $current ]['name'] ); ?></span>
 							<?php else : ?>
-								<span class="bhela-team__none"><?php esc_html_e( 'No BHELA role', 'bhela-booking' ); ?></span>
+								<span class="bha-flag"><?php esc_html_e( 'No BHELA role', 'bhela-booking' ); ?></span>
 							<?php endif; ?>
 						</td>
 						<td><?php echo esc_html( mysql2date( 'j M Y', $u->user_registered ) ); ?></td>
-						<td class="bhela-team__cell-actions">
+						<td class="bha-num bha-noprint">
 							<a class="button" href="<?php echo esc_url( get_edit_user_link( $u->ID ) ); ?>"><?php esc_html_e( 'Edit', 'bhela-booking' ); ?></a>
 						</td>
 					</tr>
@@ -626,14 +633,14 @@ function bhela_bm_team_page() {
 			</table>
 		</div>
 
-		<div class="bhela-team__card">
-			<h2><?php esc_html_e( 'What each role can do', 'bhela-booking' ); ?></h2>
-			<p class="bhela-team__blurb"><?php esc_html_e( 'Tick what each role is allowed to do, then save. Changes apply immediately, including to people already signed in.', 'bhela-booking' ); ?></p>
+		<div class="bha-panel">
+			<h2 class="bha-panel__title"><?php esc_html_e( 'What each role can do', 'bhela-booking' ); ?></h2>
+			<p class="bha-sub"><?php esc_html_e( 'Tick what each role is allowed to do, then save. Changes apply immediately, including to people already signed in.', 'bhela-booking' ); ?></p>
 
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" id="bhela-perms-form">
 				<input type="hidden" name="action" value="bhela_bm_save_perms">
 				<?php wp_nonce_field( 'bhela_bm_save_perms' ); ?>
-				<table class="widefat striped bhela-team__matrix">
+				<table class="widefat striped bha-matrix">
 					<thead>
 						<tr>
 							<th><?php esc_html_e( 'Can', 'bhela-booking' ); ?></th>
@@ -648,7 +655,7 @@ function bhela_bm_team_page() {
 						<tr>
 							<td>
 								<?php echo esc_html( $perm['label'] ); ?>
-								<div class="bhela-team__blurb"><?php echo esc_html( $perm['help'] ); ?></div>
+								<div class="bha-sub"><?php echo esc_html( $perm['help'] ); ?></div>
 							</td>
 							<?php foreach ( $roles as $slug => $def ) : ?>
 								<td>
@@ -661,37 +668,37 @@ function bhela_bm_team_page() {
 										<?php checked( in_array( $key, $def['perms'], true ) ); ?>>
 								</td>
 							<?php endforeach; ?>
-							<td class="bhela-team__yes" title="<?php esc_attr_e( 'Administrators always have everything.', 'bhela-booking' ); ?>">✓</td>
+							<td class="bha-yes" title="<?php esc_attr_e( 'Administrators always have everything.', 'bhela-booking' ); ?>">✓</td>
 						</tr>
 					<?php endforeach; ?>
 						<tr>
 							<td><?php esc_html_e( 'Settings, SMS & email', 'bhela-booking' ); ?>
-								<div class="bhela-team__blurb"><?php esc_html_e( 'Administrator only — cannot be granted to staff.', 'bhela-booking' ); ?></div>
+								<div class="bha-sub"><?php esc_html_e( 'Administrator only — cannot be granted to staff.', 'bhela-booking' ); ?></div>
 							</td>
 							<?php foreach ( $roles as $def ) : ?>
-								<td class="bhela-team__no">—</td>
+								<td class="bha-no">—</td>
 							<?php endforeach; ?>
-							<td class="bhela-team__yes">✓</td>
+							<td class="bha-yes">✓</td>
 						</tr>
 					</tbody>
 				</table>
 
-				<div id="bhela-perms-warn" class="bhela-team__selfwarn" hidden>
+				<div id="bhela-perms-warn" class="bha-callout bha-callout--attention" hidden>
 					⚠️ <span></span>
 				</div>
 
-				<p class="bhela-team__save">
+				<p class="bha-actions" style="margin-top:14px">
 					<button type="submit" class="button button-primary"><?php esc_html_e( 'Save permissions', 'bhela-booking' ); ?></button>
-					<span class="bhela-team__blurb"><?php esc_html_e( 'Ticking a permission also ticks anything it depends on.', 'bhela-booking' ); ?></span>
+					<span class="bha-sub"><?php esc_html_e( 'Ticking a permission also ticks anything it depends on.', 'bhela-booking' ); ?></span>
 				</p>
 			</form>
 
-			<div class="bhela-team__legend">
+			<div class="bha-legend">
 				<?php foreach ( $roles as $slug => $def ) :
 					$custom = array_key_exists( $slug, bhela_bm_role_overrides() );
 					?>
-					<p class="bhela-team__blurb">
-						<strong class="bhela-team__role"><?php echo esc_html( $def['name'] ); ?></strong> — <?php echo esc_html( $def['blurb'] ); ?>
+					<p class="bha-sub">
+						<strong class="bha-strong"><?php echo esc_html( $def['name'] ); ?></strong> — <?php echo esc_html( $def['blurb'] ); ?>
 						<?php if ( $custom ) : ?>
 							<em><?php esc_html_e( '(customised)', 'bhela-booking' ); ?></em>
 							<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_reset_perms&role=' . $slug ), 'bhela_bm_reset_perms_' . $slug ) ); ?>"

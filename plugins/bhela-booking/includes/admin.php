@@ -46,7 +46,7 @@ function bhela_bm_table_column_content( $column, $post_id ) {
 			$verified = function_exists( 'bhela_bm_otp_record' ) ? bhela_bm_otp_record( $post_id ) : array();
 			if ( $verified ) {
 				printf(
-					'<br><span style="color:#1a7f37;font-size:11px;font-weight:600" title="%s">✅ %s</span>',
+					'<span class="bha-sub bha-settled" title="%s">✅ %s</span>',
 					esc_attr( sprintf(
 						/* translators: 1: sms|email, 2: date */
 						__( 'Verified by %1$s on %2$s', 'bhela-booking' ),
@@ -69,16 +69,11 @@ function bhela_bm_table_column_content( $column, $post_id ) {
 		case 'total':
 			$total = (int) get_post_meta( $post_id, '_bhela_total', true );
 			$paid  = (int) get_post_meta( $post_id, '_bhela_paid_amount', true );
-			echo $total ? esc_html( bhela_bm_money( $total ) ) . ' / <span style="color:#1a7f37">' . esc_html( bhela_bm_money( $paid ) ) . '</span>' : '—';
+			echo $total ? esc_html( bhela_bm_money( $total ) ) . ' / <span class="bha-settled">' . esc_html( bhela_bm_money( $paid ) ) . '</span>' : '—';
 			break;
 		case 'bstatus':
-			$status   = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
-			$statuses = bhela_bm_statuses();
-			printf(
-				'<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-weight:600;color:#fff;background:%s;font-size:11px;">%s</span>',
-				esc_attr( bhela_bm_status_color( $status ) ),
-				esc_html( $statuses[ $status ] ?? $status )
-			);
+			$status = get_post_meta( $post_id, '_bhela_status', true ) ?: 'pending';
+			echo bhela_bm_booking_pill( $status ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes.
 			break;
 	}
 }
@@ -136,39 +131,18 @@ function bhela_bm_discount_metabox( $post ) {
 	$full      = get_post_meta( $post->ID, '_bhela_full_boat', true );
 	$saving    = ( $offer && $base > $offer ) ? $base - $offer : 0;
 	?>
-	<style>
-	/* Scoped to real text fields — a blanket "input{width:100%}" also stretched
-	   the Apply checkbox into a full-width empty box. */
-	.bhela-disc .bhela-disc__f{margin:0 0 12px}
-	.bhela-disc label.bhela-disc__l{display:block;font-weight:600;margin:0 0 4px;font-size:12px;color:#1d2327}
-	.bhela-disc input[type=text]{width:100%;text-align:right;font-variant-numeric:tabular-nums}
-	.bhela-disc .bhela-disc__hint{color:#646970;font-size:11.5px;margin:3px 0 0;font-weight:400}
-	.bhela-disc .req{background:#FFF7E6;border:1px solid #F5C97B;border-radius:8px;padding:8px 10px;margin:0 0 12px;font-size:12.5px;line-height:1.6}
-	.bhela-disc__base{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:8px 10px;background:#f6f7f7;border-radius:8px;margin:0 0 14px}
-	.bhela-disc__base span{font-size:12px;color:#646970}
-	.bhela-disc__base strong{font-size:14px}
-	.bhela-disc__out{background:#EBF7EF;border:1px solid #A8DDBB;border-radius:8px;padding:10px;margin:0 0 12px}
-	.bhela-disc__out .row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-	.bhela-disc__out .row+.row{margin-top:4px}
-	.bhela-disc__out span{font-size:12px;color:#14532d}
-	.bhela-disc__out strong{font-size:17px;color:#137A74;line-height:1.2}
-	.bhela-disc__out .save strong{font-size:12.5px;color:#1a7f37;font-weight:600}
-	.bhela-disc__apply{display:flex;gap:8px;align-items:flex-start;background:#fff;border:1px solid #dcdcde;border-radius:8px;padding:10px;margin:0}
-	.bhela-disc__apply input[type=checkbox]{width:auto;margin:2px 0 0;flex:0 0 auto}
-	.bhela-disc__apply span{font-size:12.5px;line-height:1.5}
-	</style>
-	<div class="bhela-disc">
+	<div class="bha-disc">
 		<?php if ( $full ) : ?>
-			<p class="req">🚢 <strong><?php esc_html_e( 'Full Boat — custom quote requested.', 'bhela-booking' ); ?></strong> <?php esc_html_e( 'Set the price with Custom Total below.', 'bhela-booking' ); ?></p>
+			<p class="bha-callout bha-callout--attention bha-callout--lead">🚢 <strong><?php esc_html_e( 'Full Boat — custom quote requested.', 'bhela-booking' ); ?></strong> <?php esc_html_e( 'Set the price with Custom Total below.', 'bhela-booking' ); ?></p>
 		<?php endif; ?>
 		<?php if ( $requested || $disc_msg ) : ?>
-			<div class="req">💬 <strong><?php esc_html_e( 'Guest request', 'bhela-booking' ); ?></strong><br>
+			<div class="bha-callout bha-callout--attention bha-callout--lead">💬 <strong><?php esc_html_e( 'Guest request', 'bhela-booking' ); ?></strong><br>
 				<?php if ( $requested ) : ?><?php esc_html_e( 'Budget:', 'bhela-booking' ); ?> <strong><?php echo esc_html( bhela_bm_money( $requested ) ); ?></strong><br><?php endif; ?>
 				<?php if ( $disc_msg ) : ?><em><?php echo esc_html( $disc_msg ); ?></em><?php endif; ?>
 			</div>
 		<?php endif; ?>
 
-		<div class="bhela-disc__base">
+		<div class="bha-disc__base bha-disc__row">
 			<span><?php esc_html_e( 'Base Price', 'bhela-booking' ); ?></span>
 			<strong><?php echo esc_html( bhela_bm_money( $base ) ); ?></strong>
 		</div>
@@ -177,28 +151,28 @@ function bhela_bm_discount_metabox( $post ) {
 		// text + inputmode, not type=number: a Bangla-locale admin renders numeric
 		// spinners in Bengali digits (০, ২০০০), which then cast to 0 on save.
 		?>
-		<div class="bhela-disc__f">
-			<label class="bhela-disc__l" for="bhela_discount_percent"><?php esc_html_e( 'Discount %', 'bhela-booking' ); ?></label>
+		<div class="bha-disc__f">
+			<label  for="bhela_discount_percent"><?php esc_html_e( 'Discount %', 'bhela-booking' ); ?></label>
 			<input type="text" id="bhela_discount_percent" name="bhela_discount_percent" inputmode="decimal" pattern="[0-9.]*" placeholder="0" value="<?php echo esc_attr( $pct ); ?>">
 		</div>
-		<div class="bhela-disc__f">
-			<label class="bhela-disc__l" for="bhela_discount_flat"><?php esc_html_e( 'Flat Discount (৳)', 'bhela-booking' ); ?></label>
+		<div class="bha-disc__f">
+			<label  for="bhela_discount_flat"><?php esc_html_e( 'Flat Discount (৳)', 'bhela-booking' ); ?></label>
 			<input type="text" id="bhela_discount_flat" name="bhela_discount_flat" inputmode="numeric" pattern="[0-9]*" placeholder="0" value="<?php echo esc_attr( $flat ); ?>">
 		</div>
-		<div class="bhela-disc__f">
-			<label class="bhela-disc__l" for="bhela_custom_total"><?php esc_html_e( 'Custom Total (৳)', 'bhela-booking' ); ?></label>
+		<div class="bha-disc__f">
+			<label  for="bhela_custom_total"><?php esc_html_e( 'Custom Total (৳)', 'bhela-booking' ); ?></label>
 			<input type="text" id="bhela_custom_total" name="bhela_custom_total" inputmode="numeric" pattern="[0-9]*" placeholder="0" value="<?php echo esc_attr( $custom ); ?>">
-			<p class="bhela-disc__hint"><?php esc_html_e( 'Set this to name an exact price — it overrides both discounts above.', 'bhela-booking' ); ?></p>
+			<p class="bha-note"><?php esc_html_e( 'Set this to name an exact price — it overrides both discounts above.', 'bhela-booking' ); ?></p>
 		</div>
 
 		<?php if ( $offer ) : ?>
-			<div class="bhela-disc__out">
-				<div class="row">
+			<div class="bha-disc__out">
+				<div class="bha-disc__row">
 					<span><?php esc_html_e( 'Computed Offer', 'bhela-booking' ); ?></span>
 					<strong><?php echo esc_html( bhela_bm_money( $offer ) ); ?></strong>
 				</div>
 				<?php if ( $saving ) : ?>
-					<div class="row save">
+					<div class="bha-disc__row bha-disc__row--save">
 						<span><?php esc_html_e( 'Guest saves', 'bhela-booking' ); ?></span>
 						<strong><?php echo esc_html( bhela_bm_money( $saving ) ); ?></strong>
 					</div>
@@ -206,7 +180,7 @@ function bhela_bm_discount_metabox( $post ) {
 			</div>
 		<?php endif; ?>
 
-		<label class="bhela-disc__apply">
+		<label class="bha-disc__apply">
 			<input type="checkbox" name="bhela_apply_offer" value="1">
 			<span><strong><?php esc_html_e( 'Apply this offer as the booking Total when I save', 'bhela-booking' ); ?></strong><br>
 			<?php esc_html_e( 'Only changes the Total. The Advance stays exactly as you set it.', 'bhela-booking' ); ?></span>
@@ -226,8 +200,7 @@ function bhela_bm_details_metabox( $post ) {
 	$rates     = bhela_bm_get_rates();
 	$cabin_key = $m( '_bhela_cabin_key' );
 	?>
-	<style>.bhela-meta th{width:180px;text-align:left}.bhela-meta input[type=text],.bhela-meta input[type=email],.bhela-meta input[type=date],.bhela-meta input[type=number],.bhela-meta select,.bhela-meta textarea{width:100%;max-width:420px}</style>
-	<table class="form-table bhela-meta">
+	<table class="form-table bha-form">
 		<tr><th><?php esc_html_e( 'Phone', 'bhela-booking' ); ?> *</th>
 			<td><input type="text" name="bhela_phone" value="<?php echo esc_attr( $m( '_bhela_phone' ) ); ?>"></td></tr>
 		<tr><th><?php esc_html_e( 'Email', 'bhela-booking' ); ?></th>
@@ -786,99 +759,33 @@ function bhela_bm_settings_page() {
 		'staff'    => array( 'icon' => '👷', 'label' => __( 'Staff', 'bhela-booking' ) ),
 	);
 	?>
-	<div class="wrap bhela-set">
-		<style>
-		/* Scoped to .bhela-set so nothing here can leak into the rest of wp-admin. */
-		/* Full width: use whatever the admin area gives us, minus its right gutter. */
-		.bhela-set { max-width: none; margin-right: 20px; }
-		.bhela-set > h1 { display: none; } /* replaced by the branded header below */
-		.bhela-set__head {
-			display: flex; align-items: center; gap: 16px; margin: 16px 0 0;
-			padding: 22px 26px; border-radius: 14px 14px 0 0; color: #fff;
-			background: linear-gradient(135deg, #0A2A2F 0%, #137A74 100%);
-		}
-		.bhela-set__mark { font-size: 34px; line-height: 1; }
-		.bhela-set__head h1 { margin: 0; padding: 0; font-size: 22px; font-weight: 700; color: #fff; }
-		.bhela-set__head p { margin: 4px 0 0; font-size: 13px; color: #9fd8d2; }
+	<div class="wrap bha-set">
 
-		.bhela-set__tabs { display: flex; flex-wrap: wrap; gap: 2px; background: #0d3339; padding: 0 10px; }
-		.bhela-set__tab {
-			appearance: none; border: 0; cursor: pointer; background: transparent;
-			color: #9fd8d2; font: inherit; font-size: 13.5px; font-weight: 600;
-			padding: 13px 16px; border-bottom: 3px solid transparent; display: flex; align-items: center; gap: 7px;
-		}
-		.bhela-set__tab:hover { color: #fff; background: rgba(255,255,255,.05); }
-		.bhela-set__tab.is-active { color: #fff; border-bottom-color: #E5A400; background: rgba(255,255,255,.08); }
-		.bhela-set__tab:focus-visible { outline: 2px solid #E5A400; outline-offset: -3px; }
+		<?php
+		bhela_bm_screen_header(
+			'🛶',
+			__( 'BHELA Booking Settings', 'bhela-booking' ),
+			__( 'Business details, pricing and the notifications your guests receive.', 'bhela-booking' ),
+			'',
+			'bha-head--attached'
+		);
+		?>
 
-		.bhela-set__body { background: #fff; border: 1px solid #dcdcde; border-top: 0; border-radius: 0 0 14px 14px; padding: 4px 26px 26px; }
-		.bhela-set__panel { display: none; }
-		.bhela-set__panel.is-active { display: block; }
-		.bhela-set__panel h2 { font-size: 17px; margin: 22px 0 2px; padding-top: 4px; }
-		.bhela-set__panel > h2:first-child { margin-top: 18px; }
-		.bhela-set__lead { color: #646970; font-size: 13px; margin: 2px 0 6px; max-width: 760px; }
-
-		/* Field rows: label above value reads better than wp-admin's wide left column. */
-		.bhela-set .form-table th { width: 220px; padding: 16px 10px 16px 0; font-size: 13.5px; }
-		.bhela-set .form-table td { padding: 12px 10px; }
-		.bhela-set .form-table tr + tr { border-top: 1px solid #f0f0f1; }
-		.bhela-set .form-table .description { margin-top: 6px; }
-		.bhela-set input[type=text], .bhela-set input[type=email], .bhela-set input[type=url], .bhela-set textarea { border-radius: 6px; }
-		/* Let text fields use the wider page instead of wp-admin's fixed 25em. */
-		.bhela-set .form-table .regular-text,
-		.bhela-set .form-table input[type=email],
-		.bhela-set .form-table input[type=url],
-		.bhela-set .form-table textarea { width: 100%; max-width: 640px; }
-		.bhela-set .form-table .large-text { max-width: 900px; }
-		.bhela-set__sub, .bhela-set .widefat { max-width: 1100px !important; }
-		.bhela-set input:focus, .bhela-set textarea:focus, .bhela-set select:focus { border-color: #137A74; box-shadow: 0 0 0 1px #137A74; outline: none; }
-
-		.bhela-set__note { background: #F4F9F8; border: 1px solid #cfe5e2; border-left: 4px solid #137A74; border-radius: 8px; padding: 12px 16px; margin: 14px 0; font-size: 13px; }
-		.bhela-set__sub { border: 1px solid #dcdcde; border-radius: 10px; padding: 4px 18px 14px; background: #fbfbfc; margin: 16px 0; }
-		.bhela-set__sub h3 { font-size: 14.5px; margin: 14px 0 2px; }
-
-		/* Save bar sticks to the bottom so it is reachable from any tab. */
-		.bhela-set__save {
-			position: sticky; bottom: 0; z-index: 10; margin: 22px -26px -26px;
-			display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-			padding: 14px 26px; background: #fff; border-top: 1px solid #dcdcde; border-radius: 0 0 14px 14px;
-			box-shadow: 0 -4px 14px rgba(10,42,47,.06);
-		}
-		.bhela-set__save .button-primary { background: #137A74; border-color: #0f635e; }
-		.bhela-set__save .button-primary:hover { background: #0f635e; border-color: #0f635e; }
-		.bhela-set__save .spacer { flex: 1; }
-
-		@media (max-width: 782px) {
-			.bhela-set .form-table th { width: auto; display: block; padding-bottom: 0; }
-			.bhela-set .form-table td { display: block; }
-			.bhela-set__body { padding: 4px 16px 16px; }
-			.bhela-set__save { margin: 18px -16px -16px; padding: 12px 16px; }
-		}
-		</style>
-
-		<div class="bhela-set__head">
-			<span class="bhela-set__mark">🛶</span>
-			<div>
-				<h1><?php esc_html_e( 'BHELA Booking Settings', 'bhela-booking' ); ?></h1>
-				<p><?php esc_html_e( 'Business details, pricing and the notifications your guests receive.', 'bhela-booking' ); ?></p>
-			</div>
-		</div>
-
-		<div class="bhela-set__tabs" role="tablist">
+		<div class="bha-set__tabs" role="tablist">
 			<?php foreach ( $bhela_tabs as $key => $tab ) : ?>
-				<button type="button" class="bhela-set__tab" role="tab" data-tab="<?php echo esc_attr( $key ); ?>"
+				<button type="button" class="bha-set__tab" role="tab" data-tab="<?php echo esc_attr( $key ); ?>"
 					id="bhela-tab-<?php echo esc_attr( $key ); ?>" aria-controls="bhela-panel-<?php echo esc_attr( $key ); ?>" aria-selected="false">
 					<span aria-hidden="true"><?php echo esc_html( $tab['icon'] ); ?></span><?php echo esc_html( $tab['label'] ); ?>
 				</button>
 			<?php endforeach; ?>
 		</div>
 
-		<form method="post" class="bhela-set__body">
+		<form method="post" class="bha-set__body">
 			<?php wp_nonce_field( 'bhela_bm_settings', 'bhela_bm_settings_nonce' ); ?>
 
-			<div class="bhela-set__panel" id="bhela-panel-business" role="tabpanel" aria-labelledby="bhela-tab-business">
+			<div class="bha-set__panel" id="bhela-panel-business" role="tabpanel" aria-labelledby="bhela-tab-business">
 			<h2><?php esc_html_e( 'Business Information', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'These appear on the website, the booking form and every invoice.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'These appear on the website, the booking form and every invoice.', 'bhela-booking' ); ?></p>
 			<table class="form-table">
 				<tr><th>Business Name</th><td><input type="text" class="regular-text" name="business_name" value="<?php echo esc_attr( $s['business_name'] ); ?>"></td></tr>
 				<tr><th>Tagline</th><td><input type="text" class="regular-text" name="business_tagline" value="<?php echo esc_attr( $s['business_tagline'] ); ?>"></td></tr>
@@ -894,9 +801,9 @@ function bhela_bm_settings_page() {
 			</table>
 			</div><!-- /business -->
 
-			<div class="bhela-set__panel" id="bhela-panel-payment" role="tabpanel" aria-labelledby="bhela-tab-payment">
+			<div class="bha-set__panel" id="bhela-panel-payment" role="tabpanel" aria-labelledby="bhela-tab-payment">
 			<h2><?php esc_html_e( 'Payment Details', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'Shown on the invoice so guests know how to pay, plus the figures the pricing engine uses.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'Shown on the invoice so guests know how to pay, plus the figures the pricing engine uses.', 'bhela-booking' ); ?></p>
 			<table class="form-table">
 				<tr><th>bKash</th><td><input type="text" class="regular-text" name="bkash_number" value="<?php echo esc_attr( $s['bkash_number'] ); ?>"></td></tr>
 				<tr><th>Nagad</th><td><input type="text" class="regular-text" name="nagad_number" value="<?php echo esc_attr( $s['nagad_number'] ); ?>"></td></tr>
@@ -920,9 +827,9 @@ function bhela_bm_settings_page() {
 			</table>
 			</div><!-- /payment -->
 
-			<div class="bhela-set__panel" id="bhela-panel-pricing" role="tabpanel" aria-labelledby="bhela-tab-pricing">
+			<div class="bha-set__panel" id="bhela-panel-pricing" role="tabpanel" aria-labelledby="bhela-tab-pricing">
 			<h2><?php esc_html_e( 'Pricing Days', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'Which days charge the regular rate. Every other day gets the weekday rate, currently 20% less.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'Which days charge the regular rate. Every other day gets the weekday rate, currently 20% less.', 'bhela-booking' ); ?></p>
 			<?php if ( ! array_filter( (array) $s['weekend_days'], 'strlen' ) ) : ?>
 				<div class="notice notice-warning inline" style="margin:12px 0"><p>
 					<strong><?php esc_html_e( 'No weekend days are ticked.', 'bhela-booking' ); ?></strong>
@@ -942,9 +849,9 @@ function bhela_bm_settings_page() {
 			</table>
 			</div><!-- /pricing -->
 
-			<div class="bhela-set__panel" id="bhela-panel-rates" role="tabpanel" aria-labelledby="bhela-tab-rates">
+			<div class="bha-set__panel" id="bhela-panel-rates" role="tabpanel" aria-labelledby="bhela-tab-rates">
 			<h2><?php esc_html_e( 'Cabin Rates', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'Per person, for the 2 days 1 night package. The engine prices by how many people share a cabin, so the sharing number matters.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'Per person, for the 2 days 1 night package. The engine prices by how many people share a cabin, so the sharing number matters.', 'bhela-booking' ); ?></p>
 			<table class="widefat striped" style="max-width:900px">
 				<thead><tr><th>Cabin Label</th><th>Sharing</th><th>Regular/Holiday ৳</th><th>Weekday ৳</th></tr></thead>
 				<tbody>
@@ -961,9 +868,9 @@ function bhela_bm_settings_page() {
 
 			</div><!-- /rates -->
 
-			<div class="bhela-set__panel" id="bhela-panel-email" role="tabpanel" aria-labelledby="bhela-tab-email">
+			<div class="bha-set__panel" id="bhela-panel-email" role="tabpanel" aria-labelledby="bhela-tab-email">
 			<h2 id="bhela-email"><?php esc_html_e( 'Email Notifications', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'Emails go out on new bookings and status changes. The customer email uses your Business Email (Business tab) as the From address.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'Emails go out on new bookings and status changes. The customer email uses your Business Email (Business tab) as the From address.', 'bhela-booking' ); ?></p>
 			<table class="form-table">
 				<tr><th><?php esc_html_e( 'Enable emails', 'bhela-booking' ); ?></th><td><label><input type="checkbox" name="email_enabled" value="1" <?php checked( ! empty( $s['email_enabled'] ) ); ?>> <?php esc_html_e( 'Master switch — send booking emails', 'bhela-booking' ); ?></label></td></tr>
 				<tr><th><?php esc_html_e( 'Which emails', 'bhela-booking' ); ?></th><td>
@@ -996,9 +903,9 @@ function bhela_bm_settings_page() {
 			</p>
 			</div><!-- /email -->
 
-			<div class="bhela-set__panel" id="bhela-panel-sms" role="tabpanel" aria-labelledby="bhela-tab-sms">
+			<div class="bha-set__panel" id="bhela-panel-sms" role="tabpanel" aria-labelledby="bhela-tab-sms">
 			<h2 id="bhela-sms"><?php esc_html_e( 'SMS Notifications', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'Send an SMS on every new booking (to you and the customer) and when you change a booking status. Works with any Bangladesh SMS gateway.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'Send an SMS on every new booking (to you and the customer) and when you change a booking status. Works with any Bangladesh SMS gateway.', 'bhela-booking' ); ?></p>
 			<table class="form-table">
 				<tr><th><?php esc_html_e( 'Enable SMS', 'bhela-booking' ); ?></th><td><label><input type="checkbox" name="sms_enabled" value="1" <?php checked( ! empty( $s['sms_enabled'] ) ); ?>> <?php esc_html_e( 'Master switch — send SMS notifications', 'bhela-booking' ); ?></label></td></tr>
 				<?php
@@ -1007,9 +914,9 @@ function bhela_bm_settings_page() {
 					?>
 					<tr><th><?php esc_html_e( 'SMS credit', 'bhela-booking' ); ?></th><td>
 						<?php if ( null !== $bal['balance'] ) : ?>
-							<strong style="font-size:16px;<?php echo bhela_bm_sms_balance_low( $bal['balance'] ) ? 'color:#b32d2e' : ''; ?>"><?php echo esc_html( bhela_bm_money( $bal['balance'] ) ); ?></strong>
+							<strong style="font-size:16px" class="<?php echo bhela_bm_sms_balance_low( $bal['balance'] ) ? 'bha-owed' : ''; ?>"><?php echo esc_html( bhela_bm_money( $bal['balance'] ) ); ?></strong>
 						<?php else : ?>
-							<strong style="color:#b32d2e"><?php echo esc_html( $bal['error'] ); ?></strong>
+							<strong class="bha-owed"><?php echo esc_html( $bal['error'] ); ?></strong>
 						<?php endif; ?>
 						<a class="button button-small" style="margin-left:8px" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_sms_balance' ), 'bhela_bm_sms_balance' ) ); ?>"><?php esc_html_e( 'Refresh', 'bhela-booking' ); ?></a>
 						<p class="description"><?php esc_html_e( 'Read live from the gateway and cached for 15 minutes.', 'bhela-booking' ); ?></p>
@@ -1057,7 +964,7 @@ function bhela_bm_settings_page() {
 					<p class="description"><?php esc_html_e( 'Where new-booking alerts go. Blank = Phone 1.', 'bhela-booking' ); ?></p></td></tr>
 			</table>
 
-			<div style="border:1px solid #dcdcde;border-radius:6px;padding:4px 14px 14px;max-width:900px;background:#fbfbfc">
+			<div class="bha-set__sub" style="max-width:900px">
 				<h3><?php esc_html_e( 'Custom gateway mapping', 'bhela-booking' ); ?></h3>
 				<p class="description"><?php esc_html_e( 'Only needed for "Custom" — BulkSMSBD is auto-configured.', 'bhela-booking' ); ?></p>
 				<table class="form-table">
@@ -1105,9 +1012,9 @@ function bhela_bm_settings_page() {
 			</p>
 			</div><!-- /sms -->
 
-			<div class="bhela-set__panel" id="bhela-panel-heads" role="tabpanel" aria-labelledby="bhela-tab-heads">
+			<div class="bha-set__panel" id="bhela-panel-heads" role="tabpanel" aria-labelledby="bhela-tab-heads">
 			<h2><?php esc_html_e( 'Trip Cost Heads', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'The standing expense lines on every trip cost sheet. Rename them, reorder them, add your own. One-off items belong on the sheet itself, not here.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'The standing expense lines on every trip cost sheet. Rename them, reorder them, add your own. One-off items belong on the sheet itself, not here.', 'bhela-booking' ); ?></p>
 			<?php
 			$all_heads = bhela_bm_cost_heads( true );
 			$raw_heads = get_option( 'bhela_bm_cost_heads', array() );
@@ -1192,7 +1099,7 @@ function bhela_bm_settings_page() {
 				if ( ! $list['items'] ) { continue; }
 				?>
 				<h2 style="margin-top:32px"><?php echo esc_html( $list['title'] ); ?></h2>
-				<p class="bhela-set__lead"><?php echo esc_html( $list['lead'] ); ?></p>
+				<p class="bha-set__lead"><?php echo esc_html( $list['lead'] ); ?></p>
 				<table class="widefat striped" data-list="<?php echo esc_attr( $list_key ); ?>">
 					<thead>
 						<tr>
@@ -1235,9 +1142,9 @@ function bhela_bm_settings_page() {
 			</script>
 			</div><!-- /heads -->
 
-			<div class="bhela-set__panel" id="bhela-panel-staff" role="tabpanel" aria-labelledby="bhela-tab-staff">
+			<div class="bha-set__panel" id="bhela-panel-staff" role="tabpanel" aria-labelledby="bhela-tab-staff">
 			<h2><?php esc_html_e( 'Staff Roster', 'bhela-booking' ); ?></h2>
-			<p class="bhela-set__lead"><?php esc_html_e( 'Who gets paid, and how. Trip-based crew are multiplied by the number of approved trips in the month; monthly staff get a flat amount. The salary sheet fills the rest in.', 'bhela-booking' ); ?></p>
+			<p class="bha-set__lead"><?php esc_html_e( 'Who gets paid, and how. Trip-based crew are multiplied by the number of approved trips in the month; monthly staff get a flat amount. The salary sheet fills the rest in.', 'bhela-booking' ); ?></p>
 			<?php
 			$staff_rows = function_exists( 'bhela_bm_staff' ) ? bhela_bm_staff( true ) : array();
 			$emp_types  = function_exists( 'bhela_bm_employment_types' ) ? bhela_bm_employment_types() : array();
@@ -1307,7 +1214,7 @@ function bhela_bm_settings_page() {
 			</script>
 			</div><!-- /staff -->
 
-			<div class="bhela-set__save">
+			<div class="bha-set__save">
 				<button type="submit" class="button button-primary button-large"><?php esc_html_e( 'Save Settings', 'bhela-booking' ); ?></button>
 				<span class="spacer"></span>
 				<span class="description"><?php esc_html_e( 'Saving applies every tab at once.', 'bhela-booking' ); ?></span>
@@ -1332,9 +1239,9 @@ function bhela_bm_settings_page() {
 
 		<script>
 		(function () {
-			var wrap = document.querySelector('.bhela-set');
+			var wrap = document.querySelector('.bha-set');
 			if (!wrap) { return; }
-			var tabs = wrap.querySelectorAll('.bhela-set__tab');
+			var tabs = wrap.querySelectorAll('.bha-set__tab');
 			var KEY = 'bhelaSettingsTab';
 
 			function show(name) {
@@ -1363,9 +1270,9 @@ function bhela_bm_settings_page() {
 			if (!start || !show(start)) { show(tabs[0].dataset.tab); }
 
 			// A test result renders inside its own panel — make sure it is visible.
-			var notice = wrap.querySelector('.bhela-set__panel .notice');
+			var notice = wrap.querySelector('.bha-set__panel .notice');
 			if (notice) {
-				var owner = notice.closest('.bhela-set__panel');
+				var owner = notice.closest('.bha-set__panel');
 				if (owner && !owner.classList.contains('is-active')) {
 					show(owner.id.replace('bhela-panel-', ''));
 				}
@@ -1379,20 +1286,22 @@ function bhela_bm_settings_page() {
 /** Mask a secret for display (keep last 4). */
 /* ---------- Admin footer credit ---------- */
 
-/** True on any screen belonging to this plugin. */
-function bhela_bm_is_plugin_screen() {
-	if ( ! function_exists( 'get_current_screen' ) ) {
-		return false;
+if ( ! function_exists( 'bhela_bm_is_plugin_screen' ) ) {
+	/** True on any screen belonging to this plugin. */
+	function bhela_bm_is_plugin_screen() {
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return false;
+		}
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return false;
+		}
+		if ( isset( $screen->post_type ) && 0 === strpos( (string) $screen->post_type, 'bhela_' ) ) {
+			return true;
+		}
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only screen check.
+		return 0 === strpos( $page, 'bhela-bm-' );
 	}
-	$screen = get_current_screen();
-	if ( ! $screen ) {
-		return false;
-	}
-	if ( in_array( $screen->post_type, array( 'bhela_booking', 'bhela_review', 'bhela_gallery', 'bhela_spot' ), true ) ) {
-		return true;
-	}
-	$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
-	return 0 === strpos( $page, 'bhela-bm-' );
 }
 
 /**

@@ -391,7 +391,7 @@ function bhela_bm_gallery_bulk_menu() {
 	add_submenu_page(
 		'edit.php?post_type=bhela_booking',
 		__( 'Bulk Photo Upload', 'bhela-booking' ),
-		__( '🖼️ Bulk Upload', 'bhela-booking' ),
+		__( '⬆️ Bulk Upload', 'bhela-booking' ),
 		'manage_options',
 		'bhela-bm-gallery-bulk',
 		'bhela_bm_gallery_bulk_page'
@@ -578,7 +578,7 @@ function bhela_bm_gallery_import_notice() {
 		'<div class="notice notice-info"><p>%s <a class="button button-primary" href="%s" style="margin-left:6px">%s</a></p></div>',
 		esc_html__( 'Want to add lots of photos at once?', 'bhela-booking' ),
 		esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-gallery-bulk' ), admin_url( 'edit.php' ) ) ),
-		esc_html__( '🖼️ Bulk Upload', 'bhela-booking' )
+		esc_html__( '⬆️ Bulk Upload', 'bhela-booking' )
 	);
 
 	$count = wp_count_posts( 'bhela_gallery' );

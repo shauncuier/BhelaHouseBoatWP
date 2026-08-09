@@ -233,26 +233,13 @@ function bhela_bm_salary_meta_cb( $post ) {
 	$trips  = bhela_bm_salary_trip_count( $month );
 	$types  = bhela_bm_employment_types();
 	?>
-	<style>
-		.bhela-sal__top { display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 16px; }
-		.bhela-sal__f { display: flex; flex-direction: column; gap: 5px; }
-		.bhela-sal__f label { font-size: 11px; font-weight: 600; color: #50575e; text-transform: uppercase; letter-spacing: .04em; }
-		.bhela-sal table { width: 100%; }
-		.bhela-sal td, .bhela-sal th { padding: 6px 8px; vertical-align: middle; }
-		.bhela-sal input[type=number] { width: 100%; text-align: right; }
-		.bhela-sal input[type=text] { width: 100%; }
-		.bhela-sal .n { text-align: right; white-space: nowrap; }
-		.bhela-sal tfoot td { background: #f6f7f7; font-weight: 700; border-top: 2px solid #c3c4c7; }
-		.bhela-sal__hint { color: #787c82; font-size: 12px; }
-		.bhela-sal__empty { background: #FFFBEB; border-left: 3px solid #b45309; padding: 10px 12px; }
-	</style>
-	<div class="bhela-sal">
-		<div class="bhela-sal__top">
-			<div class="bhela-sal__f">
+	<div class="bha-sheet">
+		<div class="bha-bar" style="margin-top:0">
+			<div class="bha-field bha-field--caps">
 				<label for="sal_month"><?php esc_html_e( 'Month', 'bhela-booking' ); ?></label>
 				<input type="month" id="sal_month" name="sal_month" value="<?php echo esc_attr( $month ); ?>">
 			</div>
-			<p class="bhela-sal__hint" style="margin:0">
+			<p class="bha-note" style="margin:0">
 				<?php
 				printf(
 					/* translators: %d: number of approved trips */
@@ -265,23 +252,24 @@ function bhela_bm_salary_meta_cb( $post ) {
 		</div>
 
 		<?php if ( ! $rows ) : ?>
-			<p class="bhela-sal__empty">
+			<p class="bha-callout bha-callout--attention bha-callout--lead">
 				<?php esc_html_e( 'No staff on the roster yet.', 'bhela-booking' ); ?>
 				<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings#bhela-panel-staff' ) ); ?>"><?php esc_html_e( 'Add staff in Settings → Staff', 'bhela-booking' ); ?></a>
 			</p>
 		<?php else : ?>
+		<div class="bha-scroll">
 		<table class="widefat striped">
 			<thead>
 				<tr>
 					<th><?php esc_html_e( 'Staff', 'bhela-booking' ); ?></th>
 					<th style="width:100px"><?php esc_html_e( 'Type', 'bhela-booking' ); ?></th>
-					<th style="width:90px" class="n"><?php esc_html_e( 'Rate', 'bhela-booking' ); ?></th>
-					<th style="width:80px" class="n"><?php esc_html_e( 'Trips', 'bhela-booking' ); ?></th>
-					<th style="width:100px" class="n"><?php esc_html_e( 'Sub-total', 'bhela-booking' ); ?></th>
-					<th style="width:100px" class="n"><?php esc_html_e( 'Monthly', 'bhela-booking' ); ?></th>
-					<th style="width:105px" class="n"><?php esc_html_e( 'Payable', 'bhela-booking' ); ?></th>
-					<th style="width:100px" class="n"><?php esc_html_e( 'Advance', 'bhela-booking' ); ?></th>
-					<th style="width:105px" class="n"><?php esc_html_e( 'After advance', 'bhela-booking' ); ?></th>
+					<th style="width:90px" class="bha-num"><?php esc_html_e( 'Rate', 'bhela-booking' ); ?></th>
+					<th style="width:80px" class="bha-num"><?php esc_html_e( 'Trips', 'bhela-booking' ); ?></th>
+					<th style="width:100px" class="bha-num"><?php esc_html_e( 'Sub-total', 'bhela-booking' ); ?></th>
+					<th style="width:100px" class="bha-num"><?php esc_html_e( 'Monthly', 'bhela-booking' ); ?></th>
+					<th style="width:105px" class="bha-num"><?php esc_html_e( 'Payable', 'bhela-booking' ); ?></th>
+					<th style="width:100px" class="bha-num"><?php esc_html_e( 'Advance', 'bhela-booking' ); ?></th>
+					<th style="width:105px" class="bha-num"><?php esc_html_e( 'After advance', 'bhela-booking' ); ?></th>
 					<th style="width:110px"><?php esc_html_e( 'Settlement', 'bhela-booking' ); ?></th>
 					<th style="width:140px"><?php esc_html_e( 'Adjustment', 'bhela-booking' ); ?></th>
 					<th style="width:130px"><?php esc_html_e( 'Verification', 'bhela-booking' ); ?></th>
@@ -292,7 +280,7 @@ function bhela_bm_salary_meta_cb( $post ) {
 				<tr>
 					<td>
 						<strong><?php echo esc_html( $r['name'] ); ?></strong>
-						<div class="bhela-sal__hint"><?php echo esc_html( $r['designation'] ); ?><?php echo $r['account'] ? ' · ' . esc_html( $r['account'] ) : ''; ?></div>
+						<div class="bha-sub"><?php echo esc_html( $r['designation'] ); ?><?php echo $r['account'] ? ' · ' . esc_html( $r['account'] ) : ''; ?></div>
 						<?php // Snapshot the roster details onto the sheet, so a later pay rise
 						      // cannot rewrite a month that has already been paid. ?>
 						<?php foreach ( array( 'name', 'designation', 'type', 'account', 'rate', 'monthly' ) as $f ) : ?>
@@ -300,13 +288,13 @@ function bhela_bm_salary_meta_cb( $post ) {
 						<?php endforeach; ?>
 					</td>
 					<td><?php echo esc_html( $types[ $r['type'] ] ?? $r['type'] ); ?></td>
-					<td class="n"><?php echo esc_html( $r['rate'] ? bhela_bm_money( $r['rate'] ) : '—' ); ?></td>
+					<td class="bha-num"><?php echo esc_html( $r['rate'] ? bhela_bm_money( $r['rate'] ) : '—' ); ?></td>
 					<td><input type="number" min="0" name="sal_rows[<?php echo esc_attr( $id ); ?>][trips]" value="<?php echo esc_attr( $r['trips'] ); ?>"></td>
-					<td class="n"><?php echo esc_html( bhela_bm_money( $r['sub'] ) ); ?></td>
-					<td class="n"><?php echo esc_html( $r['monthly'] ? bhela_bm_money( $r['monthly'] ) : '—' ); ?></td>
-					<td class="n"><strong><?php echo esc_html( bhela_bm_money( $r['payable'] ) ); ?></strong></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['sub'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( $r['monthly'] ? bhela_bm_money( $r['monthly'] ) : '—' ); ?></td>
+					<td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $r['payable'] ) ); ?></strong></td>
 					<td><input type="number" min="0" name="sal_rows[<?php echo esc_attr( $id ); ?>][advance]" value="<?php echo esc_attr( $r['advance'] ?: '' ); ?>"></td>
-					<td class="n"><strong><?php echo esc_html( bhela_bm_money( $r['after'] ) ); ?></strong></td>
+					<td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $r['after'] ) ); ?></strong></td>
 					<td><input type="text" name="sal_rows[<?php echo esc_attr( $id ); ?>][settlement]" value="<?php echo esc_attr( $r['settlement'] ); ?>" placeholder="PAID"></td>
 					<td><input type="text" name="sal_rows[<?php echo esc_attr( $id ); ?>][adjustment]" value="<?php echo esc_attr( $r['adjustment'] ); ?>" placeholder="<?php esc_attr_e( 'No Adjustment', 'bhela-booking' ); ?>"></td>
 					<td><input type="text" name="sal_rows[<?php echo esc_attr( $id ); ?>][verify]" value="<?php echo esc_attr( $r['verify'] ); ?>"></td>
@@ -316,16 +304,17 @@ function bhela_bm_salary_meta_cb( $post ) {
 			<tfoot>
 				<tr>
 					<td colspan="4"><?php esc_html_e( 'Total', 'bhela-booking' ); ?></td>
-					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['sub'] ) ); ?></td>
-					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['monthly'] ) ); ?></td>
-					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['payable'] ) ); ?></td>
-					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['advance'] ) ); ?></td>
-					<td class="n"><?php echo esc_html( bhela_bm_money( $totals['after'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $totals['sub'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $totals['monthly'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $totals['payable'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $totals['advance'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $totals['after'] ) ); ?></td>
 					<td colspan="3"></td>
 				</tr>
 			</tfoot>
 		</table>
-		<p class="bhela-sal__hint"><?php esc_html_e( 'Sub-total is rate × trips. Payable adds any monthly salary. Save to recalculate.', 'bhela-booking' ); ?></p>
+		</div>
+		<p class="bha-note"><?php esc_html_e( 'Sub-total is rate × trips. Payable adds any monthly salary. Save to recalculate.', 'bhela-booking' ); ?></p>
 		<?php endif; ?>
 	</div>
 	<?php

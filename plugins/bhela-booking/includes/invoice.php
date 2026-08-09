@@ -49,6 +49,16 @@ function bhela_bm_maybe_render_invoice() {
 		wp_die( esc_html__( 'You are not allowed to view this invoice.', 'bhela-booking' ), 403 );
 	}
 
+	// This page carries a guest's name, phone, email and payment details behind
+	// nothing but a query string. Most BD hosting runs a page cache (LiteSpeed,
+	// WP Rocket) that keys on the URL and, depending on its configuration, may
+	// ignore query args entirely — which would let it serve one guest's invoice
+	// to the next visitor. Say no-store explicitly rather than trusting that.
+	// The template also carries a robots meta tag; the header covers the case
+	// where a crawler reads headers but not the body.
+	nocache_headers();
+	header( 'X-Robots-Tag: noindex, nofollow', true );
+
 	$settings = bhela_bm_get_settings();
 	$m        = function ( $k ) use ( $booking_id ) {
 		return get_post_meta( $booking_id, $k, true );

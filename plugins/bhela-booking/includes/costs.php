@@ -324,13 +324,19 @@ function bhela_bm_cost_header_fields() {
 	);
 }
 
-/** Workflow states, in order, with the colour used for the status pill. */
+/**
+ * Workflow states, in order, with the pill each one renders as.
+ *
+ * The weight tracks the workflow rather than repeating the colour: the three
+ * states still in motion are soft, and only Approved — the one that locks the
+ * sheet — is filled.
+ */
 function bhela_bm_cost_statuses() {
 	return array(
-		'draft'    => array( 'label' => 'Draft', 'color' => '#787c82' ),
-		'prepared' => array( 'label' => 'Prepared', 'color' => '#b45309' ),
-		'checked'  => array( 'label' => 'Checked', 'color' => '#1d4ed8' ),
-		'approved' => array( 'label' => 'Approved', 'color' => '#1a7f37' ),
+		'draft'    => array( 'label' => 'Draft', 'tone' => 'neutral', 'solid' => false ),
+		'prepared' => array( 'label' => 'Prepared', 'tone' => 'attention', 'solid' => false ),
+		'checked'  => array( 'label' => 'Checked', 'tone' => 'progress', 'solid' => false ),
+		'approved' => array( 'label' => 'Approved', 'tone' => 'good', 'solid' => true ),
 	);
 }
 
@@ -590,19 +596,14 @@ function bhela_bm_cost_column_content( $column, $post_id ) {
 		case 'profit':
 			$p = (int) get_post_meta( $post_id, '_bhela_cost_earnings', true ) - (int) get_post_meta( $post_id, '_bhela_cost_total', true );
 			printf(
-				'<strong style="color:%s">%s</strong>',
-				esc_attr( $p < 0 ? '#b32d2e' : '#1a7f37' ),
+				'<span class="%s">%s</span>',
+				esc_attr( $p < 0 ? 'bha-owed' : 'bha-settled' ),
 				esc_html( bhela_bm_money( $p ) )
 			);
 			break;
 		case 'cstatus':
-			$s   = bhela_bm_cost_status( $post_id );
-			$def = bhela_bm_cost_statuses()[ $s ];
-			printf(
-				'<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-weight:600;color:#fff;background:%s;font-size:11px;">%s</span>',
-				esc_attr( $def['color'] ),
-				esc_html( $def['label'] )
-			);
+			$def = bhela_bm_cost_statuses()[ bhela_bm_cost_status( $post_id ) ];
+			echo bhela_bm_status_pill( $def['label'], $def['tone'], ! empty( $def['solid'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes.
 			break;
 		case 'signoff':
 			foreach ( array( 'prepared' => 'Prepared', 'checked' => 'Checked', 'approved' => 'Approved' ) as $key => $label ) {
@@ -612,7 +613,7 @@ function bhela_bm_cost_column_content( $column, $post_id ) {
 				}
 				$u = get_userdata( $by );
 				printf(
-					'<div style="font-size:11px;color:#50575e">%s: <strong>%s</strong></div>',
+					'<span class="bha-sub">%s: <strong>%s</strong></span>',
 					esc_html( $label ),
 					esc_html( $u ? $u->display_name : '#' . $by )
 				);
@@ -684,33 +685,39 @@ function bhela_bm_cost_workflow_cb( $post ) {
 	};
 	?>
 	<p style="margin-top:0">
-		<span style="display:inline-block;padding:3px 12px;border-radius:12px;font-weight:600;color:#fff;background:<?php echo esc_attr( $def['color'] ); ?>"><?php echo esc_html( $def['label'] ); ?></span>
+		<?php
+		echo bhela_bm_status_pill( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes.
+			$def['label'],
+			$def['tone'],
+			! empty( $def['solid'] )
+		);
+		?>
 	</p>
 
-	<table style="width:100%;font-size:12px;border-collapse:collapse">
-		<?php foreach ( array( 'prepared' => 'Prepared by', 'checked' => 'Checked by', 'approved' => 'Approved by' ) as $key => $label ) :
-			$by = (int) get_post_meta( $post->ID, '_bhela_cost_' . $key . '_by', true );
-			$at = get_post_meta( $post->ID, '_bhela_cost_' . $key . '_at', true );
-			$u  = $by ? get_userdata( $by ) : null;
-			?>
-			<tr>
-				<td style="padding:5px 0;color:#50575e"><?php echo esc_html( $label ); ?></td>
-				<td style="padding:5px 0;text-align:right">
-					<?php if ( $u ) : ?>
-						<strong><?php echo esc_html( $u->display_name ); ?></strong><br>
-						<span style="color:#787c82"><?php echo esc_html( mysql2date( 'j M, g:i a', $at ) ); ?></span>
-					<?php else : ?>
-						<span style="color:#a7aaad">—</span>
-					<?php endif; ?>
-				</td>
-			</tr>
-		<?php endforeach; ?>
-	</table>
+	<div class="bha-panel" style="padding:0;border:0">
+		<table>
+			<?php foreach ( array( 'prepared' => 'Prepared by', 'checked' => 'Checked by', 'approved' => 'Approved by' ) as $key => $label ) :
+				$by = (int) get_post_meta( $post->ID, '_bhela_cost_' . $key . '_by', true );
+				$at = get_post_meta( $post->ID, '_bhela_cost_' . $key . '_at', true );
+				$u  = $by ? get_userdata( $by ) : null;
+				?>
+				<tr>
+					<td><?php echo esc_html( $label ); ?></td>
+					<td class="bha-num">
+						<?php if ( $u ) : ?>
+							<strong><?php echo esc_html( $u->display_name ); ?></strong>
+							<span class="bha-sub"><?php echo esc_html( mysql2date( 'j M, g:i a', $at ) ); ?></span>
+						<?php else : ?>
+							<span style="color:#a7aaad">—</span>
+						<?php endif; ?>
+					</td>
+				</tr>
+			<?php endforeach; ?>
+		</table>
+	</div>
 
 	<?php if ( $note ) : ?>
-		<p style="background:#fcf9e8;border-left:3px solid #b45309;padding:8px 10px;font-size:12px;margin:12px 0 0">
-			<?php echo esc_html( $note ); ?>
-		</p>
+		<p class="bha-callout bha-callout--attention"><?php echo esc_html( $note ); ?></p>
 	<?php endif; ?>
 
 	<hr style="margin:14px 0">
@@ -731,7 +738,7 @@ function bhela_bm_cost_workflow_cb( $post ) {
 	<?php endif; ?>
 
 	<?php if ( 'approved' === $status ) : ?>
-		<p style="color:#1a7f37;font-weight:600;margin:0 0 10px">🔒 <?php esc_html_e( 'Locked. Figures can no longer be edited.', 'bhela-booking' ); ?></p>
+		<p class="bha-callout bha-callout--good" style="margin:0 0 10px">🔒 <?php esc_html_e( 'Locked. Figures can no longer be edited.', 'bhela-booking' ); ?></p>
 		<?php if ( current_user_can( 'bhela_cost_approve' ) ) : ?>
 			<p><a class="button" href="<?php echo esc_url( $action( 'unlock' ) ); ?>"
 				onclick="return confirm('<?php echo esc_js( __( 'Unlock this sheet? It goes back to Prepared and the check and approval are cleared.', 'bhela-booking' ) ); ?>')"><?php esc_html_e( '🔓 Unlock for editing', 'bhela-booking' ); ?></a></p>
@@ -770,36 +777,17 @@ function bhela_bm_cost_sheet_cb( $post ) {
 		}
 	}
 	?>
-	<style>
-		.bhela-cs input[type=number] { width: 100%; text-align: right; }
-		.bhela-cs input[type=text] { width: 100%; }
-		.bhela-cs__head { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 18px; }
-		.bhela-cs__f { display: flex; flex-direction: column; gap: 4px; }
-		.bhela-cs__f label { font-size: 11px; font-weight: 600; color: #50575e; text-transform: uppercase; letter-spacing: .04em; }
-		.bhela-cs table.widefat td, .bhela-cs table.widefat th { padding: 6px 8px; }
-		.bhela-cs__sub { text-align: right; font-weight: 700; white-space: nowrap; }
-		.bhela-cs__sum { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
-		.bhela-cs__sum > div { flex: 1; min-width: 160px; background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 12px 14px; }
-		.bhela-cs__sum span { display: block; color: #50575e; font-size: 12px; }
-		.bhela-cs__sum b { font-size: 21px; }
-		.bhela-cs__hint { color: #787c82; font-size: 12px; margin: 6px 0 0; }
-		.bhela-cs__warn { background: #fcf9e8; border-left: 3px solid #b45309; padding: 8px 10px; font-size: 12px; margin: 8px 0 0; }
-		.bhela-cs__locked { background: #edfaef; border-left: 3px solid #1a7f37; padding: 10px 12px; margin: 0 0 16px; font-weight: 600; }
-		.bhela-cs__addrow { display: flex; align-items: center; gap: 10px; margin: 10px 0 0; }
-		.bhela-cs__sl { color: #787c82; }
-	</style>
-
-	<div class="bhela-cs">
+	<div class="bha-sheet" id="bhela-cs">
 		<?php if ( $locked ) : ?>
-			<p class="bhela-cs__locked">🔒 <?php esc_html_e( 'This sheet is approved and locked. An administrator must unlock it before anything can change.', 'bhela-booking' ); ?></p>
+			<p class="bha-callout bha-callout--good bha-callout--lead">🔒 <?php esc_html_e( 'This sheet is approved and locked. An administrator must unlock it before anything can change.', 'bhela-booking' ); ?></p>
 		<?php endif; ?>
 
-		<div class="bhela-cs__head">
-			<div class="bhela-cs__f">
+		<div class="bha-grid">
+			<div class="bha-field bha-field--caps">
 				<label for="bhela_cost_trip_date"><?php esc_html_e( 'Trip Date', 'bhela-booking' ); ?></label>
 				<input type="date" id="bhela_cost_trip_date" name="bhela_cost_trip_date" value="<?php echo esc_attr( $date ); ?>"<?php echo $ro; ?>>
 				<?php if ( $trip_dates && ! $locked ) : ?>
-					<select id="bhela_cost_trip_pick" style="margin-top:4px">
+					<select id="bhela_cost_trip_pick">
 						<option value=""><?php esc_html_e( '— pick from Trip Calendar —', 'bhela-booking' ); ?></option>
 						<?php foreach ( $trip_dates as $d => $lab ) : ?>
 							<option value="<?php echo esc_attr( $d ); ?>" <?php selected( $date === $d ); ?>><?php echo esc_html( $lab ); ?></option>
@@ -808,7 +796,7 @@ function bhela_bm_cost_sheet_cb( $post ) {
 				<?php endif; ?>
 			</div>
 			<?php foreach ( bhela_bm_cost_header_fields() as $key => $f ) : ?>
-				<div class="bhela-cs__f">
+				<div class="bha-field bha-field--caps">
 					<label for="bhela_cost_h_<?php echo esc_attr( $key ); ?>"><?php echo esc_html( $f['label'] ); ?></label>
 					<input type="<?php echo esc_attr( $f['type'] ); ?>" id="bhela_cost_h_<?php echo esc_attr( $key ); ?>"
 						name="bhela_cost_header[<?php echo esc_attr( $key ); ?>]"
@@ -817,6 +805,7 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			<?php endforeach; ?>
 		</div>
 
+		<div class="bha-scroll">
 		<table class="widefat striped">
 			<thead>
 				<tr>
@@ -825,14 +814,14 @@ function bhela_bm_cost_sheet_cb( $post ) {
 					<th style="width:120px"><?php esc_html_e( '1st Payment', 'bhela-booking' ); ?></th>
 					<th style="width:120px"><?php esc_html_e( '2nd Payment', 'bhela-booking' ); ?></th>
 					<th style="width:120px"><?php esc_html_e( '3rd Payment', 'bhela-booking' ); ?></th>
-					<th style="width:110px;text-align:right"><?php esc_html_e( 'Sub-Total', 'bhela-booking' ); ?></th>
+					<th class="bha-num" style="width:110px"><?php esc_html_e( 'Sub-Total', 'bhela-booking' ); ?></th>
 					<th style="width:220px"><?php esc_html_e( 'Remark', 'bhela-booking' ); ?></th>
 				</tr>
 			</thead>
 			<tbody id="bhela-cs-rows">
 				<?php foreach ( $lines as $i => $l ) : $k = $l['key']; ?>
 					<tr>
-						<td class="bhela-cs__sl"><?php echo esc_html( $i + 1 ); ?></td>
+						<td class="bha-sheet__sl"><?php echo esc_html( $i + 1 ); ?></td>
 						<td>
 							<?php if ( $l['fixed'] ) : ?>
 								<?php echo esc_html( $l['label'] ); ?>
@@ -842,34 +831,35 @@ function bhela_bm_cost_sheet_cb( $post ) {
 							<?php endif; ?>
 						</td>
 						<?php foreach ( array( 'p1', 'p2', 'p3' ) as $p ) : ?>
-							<td><input type="number" min="0" step="1" class="bhela-cs__p"
+							<td><input type="number" min="0" step="1" data-amount
 								name="bhela_cost_lines[<?php echo esc_attr( $k ); ?>][<?php echo esc_attr( $p ); ?>]"
 								value="<?php echo esc_attr( $l[ $p ] ?: '' ); ?>"<?php echo $ro; ?>></td>
 						<?php endforeach; ?>
-						<td class="bhela-cs__sub" data-sub><?php echo esc_html( bhela_bm_money( $l['sub'] ) ); ?></td>
+						<td class="bha-num" data-sub><?php echo esc_html( bhela_bm_money( $l['sub'] ) ); ?></td>
 						<td><input type="text" name="bhela_cost_lines[<?php echo esc_attr( $k ); ?>][remark]"
 							value="<?php echo esc_attr( $l['remark'] ); ?>"<?php echo $ro; ?>></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
 		</table>
+		</div>
 
 		<?php if ( ! $locked ) : ?>
-			<p class="bhela-cs__addrow">
+			<p class="bha-sheet__add">
 				<button type="button" class="button" id="bhela-cs-add">+ <?php esc_html_e( 'Add row', 'bhela-booking' ); ?></button>
-				<span class="bhela-cs__hint"><?php esc_html_e( 'For a one-off this trip. To change the standing list of heads, use Settings.', 'bhela-booking' ); ?></span>
+				<span class="bha-note"><?php esc_html_e( 'For a one-off this trip. To change the standing list of heads, use Settings.', 'bhela-booking' ); ?></span>
 			</p>
 		<?php endif; ?>
 
-		<div class="bhela-cs__sum">
-			<div>
-				<span><?php esc_html_e( 'Total Cost for This Trip', 'bhela-booking' ); ?></span>
-				<b id="bhela-cs-total"><?php echo esc_html( bhela_bm_money( $total ) ); ?></b>
+		<div class="bha-cards" style="margin-top:18px">
+			<div class="bha-card">
+				<span class="bha-card__label"><?php esc_html_e( 'Total Cost for This Trip', 'bhela-booking' ); ?></span>
+				<span class="bha-card__value" id="bhela-cs-total"><?php echo esc_html( bhela_bm_money( $total ) ); ?></span>
 			</div>
-			<div>
-				<span><?php esc_html_e( 'Total Earnings from This Trip', 'bhela-booking' ); ?></span>
-				<input type="number" step="1" id="bhela-cs-earn" name="bhela_cost_earnings" value="<?php echo esc_attr( $earnings ); ?>" style="font-size:19px;font-weight:700"<?php echo $ro; ?>>
-				<p class="bhela-cs__hint" id="bhela-cs-hint">
+			<div class="bha-card" style="flex-basis:280px">
+				<span class="bha-card__label"><?php esc_html_e( 'Total Earnings from This Trip', 'bhela-booking' ); ?></span>
+				<input type="number" step="1" class="bha-card__input" id="bhela-cs-earn" name="bhela_cost_earnings" value="<?php echo esc_attr( $earnings ); ?>"<?php echo $ro; ?>>
+				<p class="bha-note" id="bhela-cs-hint">
 					<?php
 					if ( ! $date ) {
 						esc_html_e( 'Pick a trip date to pull its bookings.', 'bhela-booking' );
@@ -885,21 +875,21 @@ function bhela_bm_cost_sheet_cb( $post ) {
 					}
 					?>
 				</p>
-				<p class="bhela-cs__warn" id="bhela-cs-warn"<?php echo ( $locked || $earnings === (int) $book['total'] ) ? ' hidden' : ''; ?>>
+				<p class="bha-callout bha-callout--attention" id="bhela-cs-warn"<?php echo ( $locked || $earnings === (int) $book['total'] ) ? ' hidden' : ''; ?>>
 					<?php esc_html_e( 'This differs from the booking total.', 'bhela-booking' ); ?>
 					<a href="#" id="bhela-cs-reset" data-v="<?php echo esc_attr( $book['total'] ); ?>"><?php esc_html_e( 'Use booking figure', 'bhela-booking' ); ?></a>
 				</p>
 			</div>
-			<div>
-				<span><?php esc_html_e( 'Total Profit from This Trip', 'bhela-booking' ); ?></span>
-				<b id="bhela-cs-profit" style="color:<?php echo $profit < 0 ? '#b32d2e' : '#1a7f37'; ?>"><?php echo esc_html( bhela_bm_money( $profit ) ); ?></b>
+			<div class="bha-card">
+				<span class="bha-card__label"><?php esc_html_e( 'Total Profit from This Trip', 'bhela-booking' ); ?></span>
+				<span class="bha-card__value <?php echo $profit < 0 ? 'is-danger' : 'is-good'; ?>" id="bhela-cs-profit"><?php echo esc_html( bhela_bm_money( $profit ) ); ?></span>
 			</div>
 		</div>
 	</div>
 
 	<script>
 	(function () {
-		var wrap = document.querySelector('.bhela-cs');
+		var wrap = document.getElementById('bhela-cs');
 		if (!wrap) return;
 
 		var dateEl = document.getElementById('bhela_cost_trip_date');
@@ -969,7 +959,7 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			var total = 0;
 			wrap.querySelectorAll('tbody tr').forEach(function (tr) {
 				var sub = 0;
-				tr.querySelectorAll('.bhela-cs__p').forEach(function (inp) {
+				tr.querySelectorAll('[data-amount]').forEach(function (inp) {
 					sub += parseInt(inp.value, 10) || 0;
 				});
 				var cell = tr.querySelector('[data-sub]');
@@ -981,7 +971,10 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			var pEl = document.getElementById('bhela-cs-profit');
 			if (pEl) {
 				pEl.textContent = money(earn - total);
-				pEl.style.color = (earn - total) < 0 ? '#b32d2e' : '#1a7f37';
+				// Tone classes, not a hex — so a loss reads the same red here as
+				// it does in the list table and on the statement.
+				pEl.classList.toggle('is-danger', (earn - total) < 0);
+				pEl.classList.toggle('is-good', (earn - total) >= 0);
 			}
 			// Surface the mismatch live, not only on the next page load.
 			if (warn && reset && !locked) {
@@ -990,7 +983,7 @@ function bhela_bm_cost_sheet_cb( $post ) {
 		}
 
 		wrap.addEventListener('input', function (e) {
-			if (e.target.classList.contains('bhela-cs__p') || e.target.id === 'bhela-cs-earn') recalc();
+			if (e.target.hasAttribute('data-amount') || e.target.id === 'bhela-cs-earn') recalc();
 		});
 
 		if (reset) {
@@ -1017,12 +1010,12 @@ function bhela_bm_cost_sheet_cb( $post ) {
 				var key = 'custom_' + Date.now().toString(36);
 				var tr = document.createElement('tr');
 				tr.innerHTML =
-					'<td class="bhela-cs__sl"></td>' +
+					'<td class="bha-sheet__sl"></td>' +
 					'<td><input type="text" name="bhela_cost_lines[' + key + '][label]" placeholder="<?php echo esc_js( __( 'Other item…', 'bhela-booking' ) ); ?>"></td>' +
 					['p1', 'p2', 'p3'].map(function (p) {
-						return '<td><input type="number" min="0" step="1" class="bhela-cs__p" name="bhela_cost_lines[' + key + '][' + p + ']"></td>';
+						return '<td><input type="number" min="0" step="1" data-amount name="bhela_cost_lines[' + key + '][' + p + ']"></td>';
 					}).join('') +
-					'<td class="bhela-cs__sub" data-sub>৳0</td>' +
+					'<td class="bha-num" data-sub>৳0</td>' +
 					'<td><input type="text" name="bhela_cost_lines[' + key + '][remark]"></td>';
 				body.appendChild(tr);
 				renumber();
@@ -1032,7 +1025,7 @@ function bhela_bm_cost_sheet_cb( $post ) {
 
 		function renumber() {
 			var n = 0;
-			document.querySelectorAll('#bhela-cs-rows .bhela-cs__sl').forEach(function (td) {
+			document.querySelectorAll('#bhela-cs-rows .bha-sheet__sl').forEach(function (td) {
 				n += 1;
 				td.textContent = n;
 			});
@@ -1288,34 +1281,17 @@ function bhela_bm_cost_print() {
 <head>
 	<meta charset="<?php bloginfo( 'charset' ); ?>">
 	<title><?php echo esc_html( get_the_title( $post_id ) ); ?></title>
-	<style>
-		body { font-family: -apple-system, "Segoe UI", Roboto, sans-serif; color: #111; margin: 24px; font-size: 12px; }
-		h1 { font-size: 18px; margin: 0 0 2px; }
-		.sub { color: #555; margin-bottom: 16px; }
-		table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
-		th, td { border: 1px solid #999; padding: 5px 7px; text-align: left; }
-		th { background: #f0f0f0; }
-		td.n { text-align: right; white-space: nowrap; }
-		.head { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-		.head div { border: 1px solid #ccc; padding: 5px 7px; }
-		.head span { display: block; font-size: 10px; color: #666; text-transform: uppercase; }
-		.sum { display: flex; gap: 10px; margin: 16px 0 26px; }
-		.sum div { flex: 1; border: 1px solid #999; padding: 8px 10px; }
-		.sum b { font-size: 16px; display: block; }
-		.sign { display: flex; gap: 24px; margin-top: 34px; }
-		.sign div { flex: 1; border-top: 1px solid #333; padding-top: 6px; font-size: 11px; }
-		@media print { body { margin: 0; } .noprint { display: none; } }
-	</style>
+	<link rel="stylesheet" href="<?php echo esc_url( BHELA_BM_URL . 'assets/admin.css?ver=' . BHELA_BM_VERSION ); ?>">
 </head>
-<body onload="window.print()">
-	<button class="noprint" onclick="window.print()" style="float:right">Print</button>
+<body class="bhela-admin bha-doc" onload="window.print()">
+	<button class="bha-noprint" onclick="window.print()" style="float:right">Print</button>
 	<h1><?php echo esc_html( $s['business_name'] ); ?> — Trip-wise Cost Sheet</h1>
-	<div class="sub">
+	<div class="bha-doc__sub">
 		<?php echo $date ? esc_html( mysql2date( 'j F Y', $date ) ) : '—'; ?>
 		· <?php echo esc_html( bhela_bm_cost_statuses()[ $status ]['label'] ); ?>
 	</div>
 
-	<div class="head">
+	<div class="bha-doc__facts">
 		<div><span>Trip Date</span><?php echo $date ? esc_html( mysql2date( 'j M Y', $date ) ) : '—'; ?></div>
 		<?php foreach ( bhela_bm_cost_header_fields() as $key => $f ) : ?>
 			<div><span><?php echo esc_html( $f['label'] ); ?></span><?php echo esc_html( $header[ $key ] ?? '—' ); ?></div>
@@ -1323,29 +1299,29 @@ function bhela_bm_cost_print() {
 	</div>
 
 	<table>
-		<tr><th style="width:28px">SL</th><th>Particulars</th><th class="n">1st</th><th class="n">2nd</th><th class="n">3rd</th><th class="n">Sub-Total</th><th>Remark</th></tr>
+		<tr><th style="width:28px">SL</th><th>Particulars</th><th class="bha-num">1st</th><th class="bha-num">2nd</th><th class="bha-num">3rd</th><th class="bha-num">Sub-Total</th><th>Remark</th></tr>
 		<?php foreach ( $lines as $i => $l ) : ?>
 			<?php if ( ! $l['fixed'] && ! $l['label'] && ! $l['sub'] ) { continue; } ?>
 			<tr>
 				<td><?php echo esc_html( $i + 1 ); ?></td>
 				<td><?php echo esc_html( $l['label'] ); ?></td>
-				<td class="n"><?php echo $l['p1'] ? esc_html( number_format( $l['p1'] ) ) : ''; ?></td>
-				<td class="n"><?php echo $l['p2'] ? esc_html( number_format( $l['p2'] ) ) : ''; ?></td>
-				<td class="n"><?php echo $l['p3'] ? esc_html( number_format( $l['p3'] ) ) : ''; ?></td>
-				<td class="n"><strong><?php echo esc_html( number_format( $l['sub'] ) ); ?></strong></td>
+				<td class="bha-num"><?php echo $l['p1'] ? esc_html( bhela_bm_money( $l['p1'] ) ) : ''; ?></td>
+				<td class="bha-num"><?php echo $l['p2'] ? esc_html( bhela_bm_money( $l['p2'] ) ) : ''; ?></td>
+				<td class="bha-num"><?php echo $l['p3'] ? esc_html( bhela_bm_money( $l['p3'] ) ) : ''; ?></td>
+				<td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $l['sub'] ) ); ?></strong></td>
 				<td><?php echo esc_html( $l['remark'] ); ?></td>
 			</tr>
 		<?php endforeach; ?>
-		<tr><td colspan="5"><strong>Total Cost for this Trip</strong></td><td class="n"><strong><?php echo esc_html( number_format( $total ) ); ?></strong></td><td></td></tr>
+		<tr><td colspan="5"><strong>Total Cost for this Trip</strong></td><td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $total ) ); ?></strong></td><td></td></tr>
 	</table>
 
-	<div class="sum">
+	<div class="bha-doc__sum">
 		<div><span>Total Earnings from This Trip</span><b><?php echo esc_html( bhela_bm_money( $earn ) ); ?></b></div>
 		<div><span>Total Cost for This Trip</span><b><?php echo esc_html( bhela_bm_money( $total ) ); ?></b></div>
 		<div><span>Total Profit from This Trip</span><b><?php echo esc_html( bhela_bm_money( $earn - $total ) ); ?></b></div>
 	</div>
 
-	<div class="sign">
+	<div class="bha-doc__sign">
 		<?php foreach ( array( 'prepared' => 'Prepared by', 'checked' => 'Checked by', 'approved' => 'Approved by' ) as $key => $label ) :
 			$by = (int) get_post_meta( $post_id, '_bhela_cost_' . $key . '_by', true );
 			$at = get_post_meta( $post_id, '_bhela_cost_' . $key . '_at', true );

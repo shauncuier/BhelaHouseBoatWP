@@ -20,18 +20,24 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'BHELA_BM_LOG_OPTION', 'bhela_bm_log' );
 define( 'BHELA_BM_LOG_MAX', 300 );
 
-/** Log entry types → label + colour, used by the admin table. */
+/**
+ * Log entry types.
+ *
+ * These are channels, not statuses — "Email" is not better or worse than
+ * "SMS" — so each gets its own hue from the .bha-tag-- set in admin.css rather
+ * than one of the five semantic tones. The key doubles as the class suffix.
+ */
 function bhela_bm_log_types() {
 	return array(
-		'booking'  => array( 'label' => 'Bookings', 'color' => '#137A74' ),
-		'status'   => array( 'label' => 'Status', 'color' => '#0A2A2F' ),
-		'email'    => array( 'label' => 'Email', 'color' => '#1a7f37' ),
-		'sms'      => array( 'label' => 'SMS', 'color' => '#7c3aed' ),
-		'trips'    => array( 'label' => 'Trip Calendar', 'color' => '#b45309' ),
-		'cost'     => array( 'label' => 'Cost Sheets', 'color' => '#9333ea' ),
-		'settings' => array( 'label' => 'Settings', 'color' => '#5E7472' ),
-		'gallery'  => array( 'label' => 'Gallery', 'color' => '#0891b2' ),
-		'error'    => array( 'label' => 'Problems', 'color' => '#b32d2e' ),
+		'booking'  => array( 'label' => 'Bookings' ),
+		'status'   => array( 'label' => 'Status' ),
+		'email'    => array( 'label' => 'Email' ),
+		'sms'      => array( 'label' => 'SMS' ),
+		'trips'    => array( 'label' => 'Trip Calendar' ),
+		'cost'     => array( 'label' => 'Cost Sheets' ),
+		'settings' => array( 'label' => 'Settings' ),
+		'gallery'  => array( 'label' => 'Gallery' ),
+		'error'    => array( 'label' => 'Problems' ),
 	);
 }
 
@@ -116,15 +122,20 @@ function bhela_bm_log_page() {
 	$types  = bhela_bm_log_types();
 	$filter = isset( $_GET['ltype'] ) ? sanitize_key( $_GET['ltype'] ) : '';
 	?>
-	<div class="wrap">
-		<h1>📋 <?php esc_html_e( 'Activity Log', 'bhela-booking' ); ?></h1>
-		<p><?php esc_html_e( 'A record of what the site actually did — bookings received, emails and SMS sent or failed, and every change to the trip calendar. Newest first.', 'bhela-booking' ); ?></p>
+	<div class="wrap bha-page">
+		<?php
+		bhela_bm_screen_header(
+			'📋',
+			__( 'Activity Log', 'bhela-booking' ),
+			__( 'What the site actually did — bookings received, emails and SMS sent or failed, and every change to the trip calendar. Newest first.', 'bhela-booking' )
+		);
+		?>
 
 		<?php if ( isset( $_GET['cleared'] ) ) : ?>
 			<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Log cleared.', 'bhela-booking' ); ?></p></div>
 		<?php endif; ?>
 
-		<p>
+		<p class="bha-buttons">
 			<a href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-log' ), admin_url( 'edit.php' ) ) ); ?>"
 				class="button<?php echo '' === $filter ? ' button-primary' : ''; ?>"><?php esc_html_e( 'All', 'bhela-booking' ); ?></a>
 			<?php foreach ( $types as $key => $t ) : ?>
@@ -151,11 +162,11 @@ function bhela_bm_log_page() {
 						continue;
 					}
 					$shown++;
-					$t = $types[ $row['type'] ] ?? array( 'label' => $row['type'], 'color' => '#5E7472' );
+					$t = $types[ $row['type'] ] ?? array( 'label' => $row['type'] );
 					?>
 					<tr>
 						<td><?php echo esc_html( mysql2date( 'j M Y, g:i a', $row['time'] ) ); ?></td>
-						<td><span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:11px;font-weight:600;color:#fff;background:<?php echo esc_attr( $t['color'] ); ?>"><?php echo esc_html( $t['label'] ); ?></span></td>
+						<td><span class="bha-pill bha-pill--tag bha-tag--<?php echo esc_attr( $row['type'] ); ?>"><?php echo esc_html( $t['label'] ); ?></span></td>
 						<td><?php echo empty( $row['ok'] ) ? '❌ ' : '✅ '; ?><?php echo esc_html( $row['msg'] ); ?></td>
 						<td><?php echo esc_html( $row['user'] ); ?></td>
 					</tr>

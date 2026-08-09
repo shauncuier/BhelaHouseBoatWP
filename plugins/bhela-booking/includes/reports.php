@@ -320,63 +320,36 @@ function bhela_bm_reports_page() {
 			}
 		}
 	}
+	// The three things you do with a finished report, in the band beside the
+	// title: print it, paste it into the ops group, or open it in a spreadsheet.
+	$actions = '<button type="button" class="button" onclick="window.print()">🖨️ ' . esc_html__( 'Print / PDF', 'bhela-booking' ) . '</button>'
+		. ' <button type="button" class="button" id="bhela-bm-report-copy">💬 ' . esc_html__( 'Copy for WhatsApp', 'bhela-booking' ) . '</button>'
+		. ' <a class="button" href="' . esc_url( $csv_url ) . '">📊 ' . esc_html__( 'Download CSV', 'bhela-booking' ) . '</a>';
 	?>
-	<style>
-		.bhela-rep { max-width: 1240px; }
-		.bhela-rep__bar { background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 14px 16px; margin: 12px 0 18px; }
-		.bhela-rep__bar form { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
-		.bhela-rep__f { display: flex; flex-direction: column; gap: 4px; }
-		.bhela-rep__f label { font-size: 12px; color: #50575e; font-weight: 600; }
-		.bhela-rep__chk { display: flex; align-items: center; gap: 6px; font-size: 13px; padding-bottom: 6px; }
-		.bhela-rep__sum { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
-		.bhela-rep__sum > div { flex: 1; min-width: 130px; background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 12px 14px; }
-		.bhela-rep__sum b { font-size: 21px; display: block; line-height: 1.3; }
-		.bhela-rep__sum span { color: #50575e; font-size: 12px; }
-		.bhela-rep table.widefat { border-radius: 10px; overflow: hidden; }
-		.bhela-rep td, .bhela-rep th { vertical-align: middle; }
-		.bhela-rep__due { font-weight: 700; color: #b32d2e; }
-		.bhela-rep__clear { font-weight: 700; color: #1a7f37; }
-		.bhela-rep__pill { display: inline-block; padding: 2px 9px; border-radius: 12px; color: #fff; font-size: 11px; font-weight: 600; }
-		.bhela-rep tfoot td { background: #f6f7f7; font-weight: 700; border-top: 2px solid #c3c4c7; }
-		.bhela-rep__row--cancelled td { opacity: .55; }
-		.bhela-rep__print { display: none; }
-		.bhela-rep__note { color: #787c82; font-size: 12px; margin-top: 10px; }
-		.bhela-rep__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+	<div class="wrap bha-page">
+		<?php
+		bhela_bm_screen_header(
+			'📄',
+			__( 'Trip Report', 'bhela-booking' ),
+			__( 'Bookings, advances and dues for a travel date — ready to hand to the operations manager.', 'bhela-booking' ),
+			$actions
+		);
+		?>
 
-		/* Print: drop the admin chrome so the sheet is the whole page. */
-		@media print {
-			#adminmenumain, #wpadminbar, #wpfooter, .bhela-rep__bar, .bhela-rep__actions,
-			.notice, .update-nag, #screen-meta, #screen-meta-links, .bhela-rep__col-action { display: none !important; }
-			#wpcontent, #wpbody-content { margin: 0 !important; padding: 0 !important; }
-			html.wp-toolbar { padding-top: 0 !important; }
-			.bhela-rep { max-width: none; }
-			.bhela-rep__print { display: block; margin-bottom: 14px; }
-			.bhela-rep__print h2 { margin: 0 0 4px; font-size: 18px; }
-			.bhela-rep table.widefat { border: 1px solid #333; }
-			.bhela-rep td, .bhela-rep th { border: 1px solid #999 !important; font-size: 11px; padding: 5px 6px !important; }
-			.bhela-rep__sum > div { border: 1px solid #999; }
-			a { text-decoration: none !important; color: #000 !important; }
-		}
-	</style>
-
-	<div class="wrap bhela-rep">
-		<h1>📄 <?php esc_html_e( 'Trip Report', 'bhela-booking' ); ?></h1>
-		<p style="color:#50575e;margin:4px 0 0"><?php esc_html_e( 'Bookings, advances and dues for a travel date — ready to hand to the operations manager.', 'bhela-booking' ); ?></p>
-
-		<div class="bhela-rep__bar">
+		<div class="bha-bar">
 			<form method="get">
 				<input type="hidden" name="post_type" value="bhela_booking">
 				<input type="hidden" name="page" value="bhela-bm-reports">
-				<div class="bhela-rep__f">
+				<div class="bha-field">
 					<label for="bhela-from"><?php esc_html_e( 'From', 'bhela-booking' ); ?></label>
 					<input type="date" id="bhela-from" name="from" value="<?php echo esc_attr( $from ); ?>">
 				</div>
-				<div class="bhela-rep__f">
+				<div class="bha-field">
 					<label for="bhela-to"><?php esc_html_e( 'To', 'bhela-booking' ); ?></label>
 					<input type="date" id="bhela-to" name="to" value="<?php echo esc_attr( $to ); ?>">
 				</div>
 				<?php if ( $trip_dates ) : ?>
-					<div class="bhela-rep__f">
+					<div class="bha-field">
 						<label for="bhela-trip"><?php esc_html_e( 'Or pick a trip', 'bhela-booking' ); ?></label>
 						<select id="bhela-trip">
 							<option value=""><?php esc_html_e( '— Trip Calendar —', 'bhela-booking' ); ?></option>
@@ -386,7 +359,7 @@ function bhela_bm_reports_page() {
 						</select>
 					</div>
 				<?php endif; ?>
-				<label class="bhela-rep__chk">
+				<label class="bha-check">
 					<input type="checkbox" name="cancelled" value="1" <?php checked( $with_cancelled ); ?>>
 					<?php esc_html_e( 'Include cancelled', 'bhela-booking' ); ?>
 				</label>
@@ -394,27 +367,22 @@ function bhela_bm_reports_page() {
 			</form>
 		</div>
 
-		<div class="bhela-rep__actions">
-			<button type="button" class="button" onclick="window.print()">🖨️ <?php esc_html_e( 'Print / PDF', 'bhela-booking' ); ?></button>
-			<button type="button" class="button" id="bhela-rep-copy">💬 <?php esc_html_e( 'Copy for WhatsApp', 'bhela-booking' ); ?></button>
-			<a class="button" href="<?php echo esc_url( $csv_url ); ?>">📊 <?php esc_html_e( 'Download CSV', 'bhela-booking' ); ?></a>
-		</div>
-
-		<!-- Print-only heading: on screen the <h1> and filter bar already say this. -->
-		<div class="bhela-rep__print">
+		<!-- Print-only heading: on screen the band and filter bar already say this. -->
+		<div class="bha-printonly">
 			<h2><?php echo esc_html( $s['business_name'] ); ?> — <?php esc_html_e( 'Trip Report', 'bhela-booking' ); ?></h2>
 			<div><?php echo esc_html( $label ); ?></div>
 		</div>
 
-		<div class="bhela-rep__sum">
-			<div><span><?php esc_html_e( 'Bookings', 'bhela-booking' ); ?></span><b><?php echo esc_html( $t['bookings'] ); ?></b></div>
-			<div><span><?php esc_html_e( 'Cabins', 'bhela-booking' ); ?></span><b><?php echo esc_html( $t['cabins'] ); ?></b></div>
-			<div><span><?php esc_html_e( 'Guests', 'bhela-booking' ); ?></span><b><?php echo esc_html( $t['guests'] ); ?></b></div>
-			<div><span><?php esc_html_e( 'Total', 'bhela-booking' ); ?></span><b><?php echo esc_html( bhela_bm_money( $t['total'] ) ); ?></b></div>
-			<div><span><?php esc_html_e( 'Paid', 'bhela-booking' ); ?></span><b style="color:#1a7f37"><?php echo esc_html( bhela_bm_money( $t['paid'] ) ); ?></b></div>
-			<div><span><?php esc_html_e( 'Due', 'bhela-booking' ); ?></span><b style="color:#b32d2e"><?php echo esc_html( bhela_bm_money( max( 0, $t['due'] ) ) ); ?></b></div>
+		<div class="bha-cards">
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Bookings', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( $t['bookings'] ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Cabins', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( $t['cabins'] ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Guests', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( $t['guests'] ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Total', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $t['total'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Paid', 'bhela-booking' ); ?></span><span class="bha-card__value is-good"><?php echo esc_html( bhela_bm_money( $t['paid'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Due', 'bhela-booking' ); ?></span><span class="bha-card__value is-danger"><?php echo esc_html( bhela_bm_money( max( 0, $t['due'] ) ) ); ?></span></div>
 		</div>
 
+		<div class="bha-scroll">
 		<table class="widefat striped">
 			<thead>
 				<tr>
@@ -427,11 +395,11 @@ function bhela_bm_reports_page() {
 					<?php endif; ?>
 					<th><?php esc_html_e( 'Cabins', 'bhela-booking' ); ?></th>
 					<th><?php esc_html_e( 'Guests', 'bhela-booking' ); ?></th>
-					<th style="text-align:right"><?php esc_html_e( 'Total', 'bhela-booking' ); ?></th>
-					<th style="text-align:right"><?php esc_html_e( 'Paid', 'bhela-booking' ); ?></th>
-					<th style="text-align:right"><?php esc_html_e( 'Due', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Total', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Paid', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Due', 'bhela-booking' ); ?></th>
 					<th><?php esc_html_e( 'Status', 'bhela-booking' ); ?></th>
-					<th class="bhela-rep__col-action"></th>
+					<th class="bha-noprint"></th>
 				</tr>
 			</thead>
 			<tbody>
@@ -439,7 +407,7 @@ function bhela_bm_reports_page() {
 					<tr><td colspan="12"><em><?php esc_html_e( 'No bookings for this date.', 'bhela-booking' ); ?></em></td></tr>
 				<?php endif; ?>
 				<?php $i = 0; foreach ( $rows as $r ) : $i++; ?>
-					<tr class="<?php echo 'cancelled' === $r['status'] ? 'bhela-rep__row--cancelled' : ''; ?>">
+					<tr class="<?php echo 'cancelled' === $r['status'] ? 'bha-row--muted' : ''; ?>">
 						<td><?php echo esc_html( $i ); ?></td>
 						<td>
 							<?php if ( $r['invoice_no'] ) : ?>
@@ -449,7 +417,7 @@ function bhela_bm_reports_page() {
 						<td>
 							<a href="<?php echo esc_url( get_edit_post_link( $r['id'] ) ); ?>"><strong><?php echo esc_html( $r['name'] ); ?></strong></a>
 							<?php if ( $r['cabin_type'] ) : ?>
-								<br><span style="color:#787c82;font-size:11px"><?php echo esc_html( $r['cabin_type'] ); ?></span>
+								<span class="bha-sub"><?php echo esc_html( $r['cabin_type'] ); ?></span>
 							<?php endif; ?>
 						</td>
 						<td><?php echo $r['phone'] ? '<a href="tel:' . esc_attr( $r['phone'] ) . '">' . esc_html( $r['phone'] ) . '</a>' : '—'; ?></td>
@@ -458,18 +426,18 @@ function bhela_bm_reports_page() {
 						<?php endif; ?>
 						<td><?php echo esc_html( $r['cabins'] ); ?></td>
 						<td><?php echo esc_html( $r['guests'] ); ?></td>
-						<td style="text-align:right"><?php echo esc_html( bhela_bm_money( $r['total'] ) ); ?></td>
-						<td style="text-align:right"><?php echo esc_html( bhela_bm_money( $r['paid'] ) ); ?></td>
-						<td style="text-align:right" class="<?php echo $r['due'] > 0 ? 'bhela-rep__due' : 'bhela-rep__clear'; ?>">
+						<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['total'] ) ); ?></td>
+						<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['paid'] ) ); ?></td>
+						<td class="bha-num <?php echo $r['due'] > 0 ? 'bha-num--due' : 'bha-num--clear'; ?>">
 							<?php echo esc_html( bhela_bm_money( max( 0, $r['due'] ) ) ); ?>
 						</td>
 						<td>
-							<span class="bhela-rep__pill" style="background:<?php echo esc_attr( bhela_bm_status_color( $r['status'] ) ); ?>"><?php echo esc_html( $statuses[ $r['status'] ] ?? $r['status'] ); ?></span>
+							<?php echo bhela_bm_booking_pill( $r['status'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper escapes. ?>
 							<?php if ( $r['pay_method'] ) : ?>
-								<br><span style="color:#787c82;font-size:11px"><?php echo esc_html( $methods[ $r['pay_method'] ] ?? $r['pay_method'] ); ?><?php echo $r['txn_id'] ? ' · ' . esc_html( $r['txn_id'] ) : ''; ?></span>
+								<span class="bha-sub"><?php echo esc_html( $methods[ $r['pay_method'] ] ?? $r['pay_method'] ); ?><?php echo $r['txn_id'] ? ' · ' . esc_html( $r['txn_id'] ) : ''; ?></span>
 							<?php endif; ?>
 						</td>
-						<td class="bhela-rep__col-action">
+						<td class="bha-noprint">
 							<?php if ( $r['phone'] ) : ?>
 								<a class="button button-small" target="_blank" rel="noopener"
 									href="https://wa.me/<?php echo esc_attr( preg_replace( '/\D/', '', $r['phone'] ) ); ?>">💬</a>
@@ -484,17 +452,18 @@ function bhela_bm_reports_page() {
 						<td colspan="<?php echo $from !== $to ? 5 : 4; ?>"><?php esc_html_e( 'TOTAL', 'bhela-booking' ); ?> (<?php echo esc_html( $t['bookings'] ); ?>)</td>
 						<td><?php echo esc_html( $t['cabins'] ); ?></td>
 						<td><?php echo esc_html( $t['guests'] ); ?></td>
-						<td style="text-align:right"><?php echo esc_html( bhela_bm_money( $t['total'] ) ); ?></td>
-						<td style="text-align:right;color:#1a7f37"><?php echo esc_html( bhela_bm_money( $t['paid'] ) ); ?></td>
-						<td style="text-align:right;color:#b32d2e"><?php echo esc_html( bhela_bm_money( max( 0, $t['due'] ) ) ); ?></td>
+						<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['total'] ) ); ?></td>
+						<td class="bha-num bha-num--clear"><?php echo esc_html( bhela_bm_money( $t['paid'] ) ); ?></td>
+						<td class="bha-num bha-num--due"><?php echo esc_html( bhela_bm_money( max( 0, $t['due'] ) ) ); ?></td>
 						<td colspan="2"></td>
 					</tr>
 				</tfoot>
 			<?php endif; ?>
 		</table>
+		</div>
 
 		<?php if ( $with_cancelled ) : ?>
-			<p class="bhela-rep__note"><?php esc_html_e( 'Cancelled bookings are listed for reference but left out of the totals.', 'bhela-booking' ); ?></p>
+			<p class="bha-note"><?php esc_html_e( 'Cancelled bookings are listed for reference but left out of the totals.', 'bhela-booking' ); ?></p>
 		<?php endif; ?>
 	</div>
 
@@ -511,7 +480,7 @@ function bhela_bm_reports_page() {
 			});
 		}
 
-		var copy = document.getElementById('bhela-rep-copy');
+		var copy = document.getElementById('bhela-bm-report-copy');
 		var text = <?php echo wp_json_encode( bhela_bm_report_text( $rows, $t, $label ) ); ?>;
 		if (copy) {
 			copy.addEventListener('click', function () {

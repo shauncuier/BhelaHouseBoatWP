@@ -1,0 +1,1440 @@
+/**
+ * BHELA admin design system.
+ *
+ * Every BHELA screen is dates and money. This file makes money read the same
+ * way on all of them, and gives each screen the same chrome, so sixteen pages
+ * built at sixteen different times look like one product.
+ *
+ * Scoped to `.bhela-admin`, which the plugin puts on `<body>` for its own
+ * screens only, so nothing here can leak into the rest of wp-admin. It has to
+ * be the body rather than the `.wrap`, because the cost sheet and salary
+ * screens are meta boxes — their markup sits outside any wrapper we control.
+ *
+ * The rule for what lives here: adopt whatever WordPress already does well —
+ * .button, .widefat, .notice, form-table, the 782px breakpoint — and own only
+ * the surfaces that are ours.
+ *
+ * @package BhelaBooking
+ */
+
+.bhela-admin {
+	/* Brand. Used at full strength in exactly one place: the header band. */
+	--bha-ink: #0a2a2f;
+	--bha-teal: #137a74;
+
+	/* Chrome. These deliberately match wp-admin's own values rather than the
+	   website palette — a card floating on the admin canvas needs WordPress's
+	   line colour, not BHELA's, or it reads as a foreign object. */
+	--bha-surface: #fff;
+	--bha-canvas: #f0f0f1;
+	--bha-line: #dcdcde;
+	--bha-line-strong: #c3c4c7;
+	--bha-text: #1d2327;
+	--bha-muted: #646970;
+
+	/* Semantics. Five tones, named once. Before this file the same three hex
+	   values were retyped 58 times across nine files, which is why "done" and
+	   "needs attention" drifted apart from screen to screen. */
+	--bha-neutral: #646970;   /* draft, none, not applicable */
+	--bha-progress: #1d4ed8;  /* in flight: prepared, checked, advance paid */
+	--bha-good: #1a7f37;      /* settled: approved, confirmed, paid */
+	--bha-attention: #b45309; /* needs a person: pending, low balance */
+	--bha-danger: #b32d2e;    /* money owed, failures, destructive */
+
+	/* Tints, for soft pills and row washes. Each pairs with its ink below at
+	   AA or better. */
+	--bha-neutral-bg: #f0f0f1;
+	--bha-neutral-ink: #50575e;
+	--bha-progress-bg: #eaf0ff;
+	--bha-progress-ink: #1d4ed8;
+	--bha-good-bg: #e8f5ec;
+	--bha-good-ink: #14682d;
+	--bha-attention-bg: #fdf3e3;
+	--bha-attention-ink: #8a4108;
+	--bha-danger-bg: #fdeceb;
+	--bha-danger-ink: #93211f;
+
+	--bha-radius: 10px;
+	--bha-gap: 12px;
+}
+
+/* Our own full-page screens. Not applied to list tables, which want the whole
+   width WordPress gives them. */
+.bhela-admin .bha-page {
+	max-width: 1240px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Screen header
+ *
+ * The one deliberate brand move. A coloured band costs nothing in usability
+ * and makes it unmistakable which area of wp-admin you are standing in — worth
+ * more here than on most plugins, because sixteen sibling screens all look
+ * alike from the menu.
+ * ------------------------------------------------------------------------ */
+
+.bha-head {
+	display: flex;
+	align-items: center;
+	gap: 14px;
+	flex-wrap: wrap;
+	margin: 16px 0 0;
+	padding: 16px 20px;
+	border-radius: var(--bha-radius);
+	background: linear-gradient(100deg, var(--bha-ink) 0%, var(--bha-teal) 100%);
+	color: #fff;
+}
+
+.bha-head__icon {
+	font-size: 26px;
+	line-height: 1;
+	flex: none;
+}
+
+.bha-head__text {
+	flex: 1 1 260px;
+	min-width: 0;
+}
+
+.bha-head h1,
+.bha-head .bha-head__title {
+	margin: 0;
+	padding: 0;
+	font-size: 20px;
+	font-weight: 600;
+	line-height: 1.3;
+	color: #fff;
+}
+
+.bha-head__lead {
+	margin: 3px 0 0;
+	font-size: 13px;
+	line-height: 1.5;
+	/* Not a flat opacity: translucent white over the gradient stays legible at
+	   both ends of it, where a fixed grey would not. */
+	color: rgba(255, 255, 255, .82);
+}
+
+.bha-head__actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	align-items: center;
+}
+
+/* Buttons sitting on the band need their own treatment — the default grey
+   button disappears against teal. */
+.bha-head__actions .button,
+.bha-head__actions .button-secondary {
+	background: rgba(255, 255, 255, .14);
+	border-color: rgba(255, 255, 255, .45);
+	color: #fff;
+	text-shadow: none;
+}
+
+.bha-head__actions .button:hover,
+.bha-head__actions .button:focus {
+	background: rgba(255, 255, 255, .26);
+	border-color: #fff;
+	color: #fff;
+}
+
+.bha-head__actions .button-primary {
+	background: #fff;
+	border-color: #fff;
+	color: var(--bha-ink);
+}
+
+.bha-head__actions .button-primary:hover,
+.bha-head__actions .button-primary:focus {
+	background: #f0f6f5;
+	border-color: #fff;
+	color: var(--bha-ink);
+}
+
+.bha-head__actions .button:focus {
+	box-shadow: 0 0 0 2px var(--bha-ink), 0 0 0 4px #fff;
+	outline: 2px solid transparent;
+}
+
+/* WordPress hangs admin notices off this marker. Without it, common.js drops
+   them after the first h1 it finds — which is inside the band. */
+.bhela-admin .wp-header-end {
+	visibility: hidden;
+	margin: 0;
+	border: 0;
+	height: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Surfaces
+ * ------------------------------------------------------------------------ */
+
+.bha-panel,
+.bha-bar {
+	background: var(--bha-surface);
+	border: 1px solid var(--bha-line);
+	border-radius: var(--bha-radius);
+	padding: 14px 16px;
+}
+
+.bha-panel {
+	margin: 0 0 16px;
+}
+
+.bha-panel__title {
+	margin: 0 0 10px;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--bha-text);
+}
+
+/* A panel that wants the reader to do something — low SMS credit, an
+   unapproved sheet. Tinted rather than shouting; the copy carries the urgency. */
+.bha-panel--alert {
+	border-color: var(--bha-attention);
+	background: var(--bha-attention-bg);
+}
+
+/* A panel whose content reads across rather than down — a headline figure
+   beside the sentence that explains it. */
+.bha-panel--row {
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	flex-wrap: wrap;
+}
+
+.bha-panel__note {
+	flex: 1;
+	min-width: 240px;
+	font-size: 12px;
+	line-height: 1.6;
+	color: var(--bha-muted);
+}
+
+.bha-panel__note a {
+	margin-left: 6px;
+}
+
+/* Compact key/value rows inside a panel. Not .widefat: these are lists that
+   happen to have two columns, not tables of records. */
+.bha-panel table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.bha-panel td {
+	padding: 7px 0;
+	border-bottom: 1px solid var(--bha-canvas);
+	font-size: 13px;
+}
+
+.bha-panel tr:last-child td {
+	border-bottom: 0;
+}
+
+.bha-list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.bha-list li {
+	padding: 7px 0;
+	border-bottom: 1px solid var(--bha-canvas);
+	font-size: 13px;
+}
+
+.bha-list li:last-child {
+	border-bottom: 0;
+}
+
+/* Reading column beside a narrower sidebar. */
+.bha-cols {
+	display: grid;
+	grid-template-columns: 1.3fr 1fr;
+	gap: 20px;
+	align-items: start;
+}
+
+@media (max-width: 900px) {
+	.bha-cols {
+		grid-template-columns: 1fr;
+	}
+}
+
+/* A row of buttons that wraps rather than overflowing. */
+.bha-buttons .button {
+	margin: 0 6px 8px 0;
+}
+
+.bha-foot {
+	margin-top: 18px;
+	color: #a7aaad;
+	font-size: 12px;
+}
+
+/* Filter bar — the row of date/status controls that opens most screens. */
+.bha-bar {
+	margin: 14px 0 18px;
+}
+
+.bha-bar form {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bha-gap);
+	align-items: flex-end;
+}
+
+.bha-field {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.bha-field > label {
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--bha-muted);
+}
+
+.bha-check {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 13px;
+	padding-bottom: 6px;
+}
+
+.bha-actions {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	align-items: center;
+	margin: 0 0 14px;
+}
+
+.bha-note {
+	margin: 10px 0 0;
+	font-size: 12px;
+	color: var(--bha-muted);
+}
+
+/* Something the reader has to weigh before moving on. The colour is the
+   signal; the copy carries the actual urgency. */
+.bha-callout {
+	margin: 8px 0 0;
+	padding: 9px 12px;
+	font-size: 12px;
+	line-height: 1.6;
+	border-left: 3px solid var(--bha-neutral);
+	background: var(--bha-neutral-bg);
+}
+
+.bha-callout--attention {
+	border-left-color: var(--bha-attention);
+	background: var(--bha-attention-bg);
+	color: var(--bha-attention-ink);
+}
+
+.bha-callout--good {
+	border-left-color: var(--bha-good);
+	background: var(--bha-good-bg);
+	color: var(--bha-good-ink);
+	font-weight: 600;
+}
+
+/* A callout that opens a screen rather than annotating a field. */
+.bha-callout--lead {
+	margin: 0 0 16px;
+	font-size: 13px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Editable sheets
+ *
+ * The cost sheet and the salary sheet are grids of inputs rather than tables
+ * of records. Same ledger rules — figures right, tabular numerals — but the
+ * cells are typed into, so they need the tighter padding and full-width
+ * inputs that a read-only table does not.
+ * ------------------------------------------------------------------------ */
+
+.bha-sheet input[type="number"] {
+	width: 100%;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-sheet input[type="text"] {
+	width: 100%;
+}
+
+.bha-sheet table.widefat td,
+.bha-sheet table.widefat th {
+	padding: 6px 8px;
+}
+
+.bha-sheet__sl {
+	color: #787c82;
+}
+
+/* A row's running sub-total. Weighted in CSS rather than a <strong>, because
+   the live recalculation rewrites the cell's text on every keystroke. */
+.bha-sheet [data-sub] {
+	font-weight: 700;
+}
+
+.bha-sheet__add {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 10px 0 0;
+	flex-wrap: wrap;
+}
+
+.bha-sheet__add .bha-note {
+	margin: 0;
+}
+
+/* The block of trip facts above a sheet: date, duration, guest count. */
+.bha-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+	gap: 14px;
+	margin: 0 0 18px;
+}
+
+.bha-grid > .bha-field {
+	min-width: 0;
+}
+
+.bha-grid input,
+.bha-grid select {
+	width: 100%;
+	box-sizing: border-box;
+	margin: 0;
+}
+
+/* A field that needs the full row — a remark, a note. */
+.bha-grid__wide {
+	grid-column: 1 / -1;
+}
+
+.bha-field--caps > label {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+
+/* ---------------------------------------------------------------------------
+ * Summary cards
+ * ------------------------------------------------------------------------ */
+
+.bha-cards {
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--bha-gap);
+	margin: 0 0 18px;
+}
+
+.bha-card {
+	flex: 1 1 130px;
+	min-width: 130px;
+	background: var(--bha-surface);
+	border: 1px solid var(--bha-line);
+	border-radius: var(--bha-radius);
+	padding: 12px 14px;
+}
+
+.bha-card__label {
+	display: block;
+	font-size: 12px;
+	color: var(--bha-muted);
+}
+
+.bha-card__value {
+	display: block;
+	font-size: 21px;
+	font-weight: 600;
+	line-height: 1.3;
+	font-variant-numeric: tabular-nums;
+	color: var(--bha-text);
+}
+
+/* Clickable counters — the dashboard's status tiles. Same card, plus the
+   affordance that it goes somewhere. */
+.bha-tiles {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+	gap: var(--bha-gap);
+	margin: 0 0 20px;
+}
+
+.bha-tile {
+	display: block;
+	background: var(--bha-surface);
+	border: 1px solid var(--bha-line);
+	border-radius: var(--bha-radius);
+	padding: 14px 16px;
+	text-decoration: none;
+	transition: box-shadow .15s, transform .15s;
+}
+
+.bha-tile:hover,
+.bha-tile:focus {
+	box-shadow: 0 4px 14px rgba(0, 0, 0, .08);
+	transform: translateY(-2px);
+}
+
+.bha-tile__value {
+	display: block;
+	font-size: 30px;
+	font-weight: 700;
+	line-height: 1.1;
+	font-variant-numeric: tabular-nums;
+	color: var(--bha-text);
+}
+
+.bha-tile__value.is-good { color: var(--bha-good); }
+.bha-tile__value.is-danger { color: var(--bha-danger); }
+.bha-tile__value.is-attention { color: var(--bha-attention); }
+.bha-tile__value.is-progress { color: var(--bha-progress); }
+.bha-tile__value.is-neutral { color: var(--bha-neutral); }
+
+.bha-tile__label {
+	display: block;
+	margin-top: 4px;
+	font-size: 12px;
+	color: var(--bha-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.bha-tile {
+		transition: none;
+	}
+
+	.bha-tile:hover,
+	.bha-tile:focus {
+		transform: none;
+	}
+}
+
+/* A card whose figure is typed rather than read — the earnings box on a cost
+   sheet. Matches the weight of the values beside it so the row reads level. */
+.bha-card input[type="number"].bha-card__input {
+	width: 100%;
+	font-size: 19px;
+	font-weight: 700;
+	text-align: left;
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-card__value.is-good { color: var(--bha-good); }
+.bha-card__value.is-danger { color: var(--bha-danger); }
+.bha-card__value.is-attention { color: var(--bha-attention); }
+.bha-card__value.is-progress { color: var(--bha-progress); }
+.bha-card__value.is-neutral { color: var(--bha-neutral); }
+
+/* ---------------------------------------------------------------------------
+ * The ledger
+ *
+ * Trip Report, Cost Sheets, Expenses, the Monthly Statement and Salary are all
+ * tables of taka. One treatment for all of them: figures right-aligned in
+ * tabular numerals so columns line up and digits do not jitter when a total
+ * updates, and a heavier rule above the total row.
+ * ------------------------------------------------------------------------ */
+
+.bhela-admin table.widefat {
+	border-radius: var(--bha-radius);
+	overflow: hidden;
+}
+
+.bhela-admin table.widefat td,
+.bhela-admin table.widefat th {
+	vertical-align: middle;
+}
+
+.bha-num {
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+	white-space: nowrap;
+}
+
+.bha-num--due,
+.bha-owed {
+	font-weight: 700;
+	color: var(--bha-danger);
+}
+
+.bha-num--clear,
+.bha-settled {
+	font-weight: 700;
+	color: var(--bha-good);
+}
+
+.bhela-admin table.widefat tfoot td,
+.bhela-admin table.widefat tfoot th {
+	background: #f6f7f7;
+	font-weight: 700;
+	border-top: 2px solid var(--bha-line-strong);
+}
+
+/* A row kept on screen for reference but excluded from the totals. */
+.bha-row--muted td {
+	opacity: .55;
+}
+
+/* Something taken off the sub-total, and the figure the whole sheet resolves
+   to. Tinted rather than ruled, so the eye lands on the last line. */
+.bha-row--deduct td {
+	background: var(--bha-attention-bg);
+}
+
+.bha-row--total td {
+	background: var(--bha-good-bg);
+	font-size: 15px;
+}
+
+/* Signature strip on a document someone signs off. */
+.bha-sign {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 26px;
+	margin-top: 26px;
+}
+
+.bha-sign div {
+	flex: 1;
+	min-width: 180px;
+	border-top: 1px solid #333;
+	padding-top: 6px;
+	font-size: 12px;
+}
+
+.bha-sub {
+	display: block;
+	font-size: 11px;
+	color: #787c82;
+}
+
+/* An inline link to something waiting on a person. */
+.bha-flag {
+	font-weight: 600;
+	color: var(--bha-attention-ink);
+}
+
+/* Wide ledgers scroll inside their own box rather than pushing the page. */
+.bha-scroll {
+	overflow-x: auto;
+	-webkit-overflow-scrolling: touch;
+}
+
+/* ---------------------------------------------------------------------------
+ * Status pills
+ *
+ * One shape for booking status, cost-sheet workflow, expense type, phone
+ * verification and SMS balance. Weight carries meaning alongside colour: solid
+ * is a state that has landed, soft is one still moving. Five tones × two
+ * weights covers every vocabulary on the plugin without inventing a sixth hue.
+ * ------------------------------------------------------------------------ */
+
+.bha-pill {
+	display: inline-block;
+	padding: 2px 9px;
+	border-radius: 12px;
+	border: 1px solid transparent;
+	font-size: 11px;
+	font-weight: 600;
+	line-height: 1.7;
+	white-space: nowrap;
+}
+
+.bha-pill--neutral { background: var(--bha-neutral-bg); color: var(--bha-neutral-ink); border-color: var(--bha-line-strong); }
+.bha-pill--progress { background: var(--bha-progress-bg); color: var(--bha-progress-ink); border-color: #c3d4fd; }
+.bha-pill--good { background: var(--bha-good-bg); color: var(--bha-good-ink); border-color: #b8e0c4; }
+.bha-pill--attention { background: var(--bha-attention-bg); color: var(--bha-attention-ink); border-color: #f3d9ae; }
+.bha-pill--danger { background: var(--bha-danger-bg); color: var(--bha-danger-ink); border-color: #f5c3c1; }
+
+/*
+ * Categorical tags — the activity log's channels. These are a taxonomy, not a
+ * status: "Email" is not better or worse than "SMS", so collapsing them into
+ * the five semantic tones would destroy the only thing the colour is for. They
+ * get their own hues, named here rather than typed into the template.
+ */
+.bha-pill--tag { color: #fff; border-color: transparent; background: var(--bha-neutral); }
+.bha-tag--booking { background: var(--bha-teal); }
+.bha-tag--status { background: var(--bha-ink); }
+.bha-tag--email { background: #1a7f37; }
+.bha-tag--sms { background: #7c3aed; }
+.bha-tag--trips { background: #b45309; }
+.bha-tag--cost { background: #9333ea; }
+.bha-tag--settings { background: #5e7472; }
+.bha-tag--gallery { background: #0891b2; }
+.bha-tag--error { background: var(--bha-danger); }
+
+.bha-pill.is-solid { color: #fff; border-color: transparent; }
+.bha-pill--neutral.is-solid { background: var(--bha-neutral); }
+.bha-pill--progress.is-solid { background: var(--bha-progress); }
+.bha-pill--good.is-solid { background: var(--bha-good); }
+.bha-pill--attention.is-solid { background: var(--bha-attention); }
+.bha-pill--danger.is-solid { background: var(--bha-danger); }
+
+/* ---------------------------------------------------------------------------
+ * Settings
+ *
+ * The one screen with a tab strip. The strip joins the header band directly,
+ * which is why the band squares its bottom corners here and the whole thing
+ * reads as a single card: band, tabs, body, sticky save bar.
+ * ------------------------------------------------------------------------ */
+
+.bha-set {
+	/* Settings has the most content of any screen — let it use the full admin
+	   width rather than the 1240px reading measure. */
+	max-width: none;
+	margin-right: 20px;
+}
+
+.bha-head--attached {
+	margin-bottom: 0;
+	padding: 22px 26px;
+	border-radius: 14px 14px 0 0;
+}
+
+.bha-head--attached h1 {
+	font-size: 22px;
+	font-weight: 700;
+}
+
+.bha-head--attached .bha-head__icon {
+	font-size: 34px;
+}
+
+.bha-set__tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	padding: 0 10px;
+	background: #0d3339;
+}
+
+.bha-set__tab {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	appearance: none;
+	border: 0;
+	border-bottom: 3px solid transparent;
+	background: transparent;
+	cursor: pointer;
+	padding: 13px 16px;
+	font: inherit;
+	font-size: 13.5px;
+	font-weight: 600;
+	color: #9fd8d2;
+}
+
+.bha-set__tab:hover {
+	color: #fff;
+	background: rgba(255, 255, 255, .05);
+}
+
+.bha-set__tab.is-active {
+	color: #fff;
+	background: rgba(255, 255, 255, .08);
+	border-bottom-color: #e5a400;
+}
+
+.bha-set__tab:focus-visible {
+	outline: 2px solid #e5a400;
+	outline-offset: -3px;
+}
+
+.bha-set__body {
+	background: var(--bha-surface);
+	border: 1px solid var(--bha-line);
+	border-top: 0;
+	border-radius: 0 0 14px 14px;
+	padding: 4px 26px 26px;
+}
+
+.bha-set__panel {
+	display: none;
+}
+
+.bha-set__panel.is-active {
+	display: block;
+}
+
+.bha-set__panel h2 {
+	margin: 22px 0 2px;
+	padding-top: 4px;
+	font-size: 17px;
+}
+
+.bha-set__panel > h2:first-child {
+	margin-top: 18px;
+}
+
+.bha-set__lead {
+	margin: 2px 0 6px;
+	max-width: 760px;
+	font-size: 13px;
+	color: var(--bha-muted);
+}
+
+/* Field rows: a narrower label column than wp-admin's default, and text
+   fields that use the wider page instead of the fixed 25em. */
+.bha-set .form-table th {
+	width: 220px;
+	padding: 16px 10px 16px 0;
+	font-size: 13.5px;
+}
+
+.bha-set .form-table td {
+	padding: 12px 10px;
+}
+
+.bha-set .form-table tr + tr {
+	border-top: 1px solid var(--bha-canvas);
+}
+
+.bha-set .form-table .description {
+	margin-top: 6px;
+}
+
+.bha-set input[type="text"],
+.bha-set input[type="email"],
+.bha-set input[type="url"],
+.bha-set textarea {
+	border-radius: 6px;
+}
+
+.bha-set .form-table .regular-text,
+.bha-set .form-table input[type="email"],
+.bha-set .form-table input[type="url"],
+.bha-set .form-table textarea {
+	width: 100%;
+	max-width: 640px;
+}
+
+.bha-set .form-table .large-text {
+	max-width: 900px;
+}
+
+.bha-set__sub,
+.bha-set .widefat {
+	max-width: 1100px !important;
+}
+
+.bha-set input:focus,
+.bha-set textarea:focus,
+.bha-set select:focus {
+	border-color: var(--bha-teal);
+	box-shadow: 0 0 0 1px var(--bha-teal);
+	outline: none;
+}
+
+.bha-set__note {
+	margin: 14px 0;
+	padding: 12px 16px;
+	background: #f4f9f8;
+	border: 1px solid #cfe5e2;
+	border-left: 4px solid var(--bha-teal);
+	border-radius: 8px;
+	font-size: 13px;
+}
+
+.bha-set__sub {
+	margin: 16px 0;
+	padding: 4px 18px 14px;
+	background: #fbfbfc;
+	border: 1px solid var(--bha-line);
+	border-radius: var(--bha-radius);
+}
+
+.bha-set__sub h3 {
+	margin: 14px 0 2px;
+	font-size: 14.5px;
+}
+
+/* The save bar sticks to the bottom so it is reachable from any tab. */
+.bha-set__save {
+	position: sticky;
+	bottom: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 14px;
+	margin: 22px -26px -26px;
+	padding: 14px 26px;
+	background: var(--bha-surface);
+	border-top: 1px solid var(--bha-line);
+	border-radius: 0 0 14px 14px;
+	box-shadow: 0 -4px 14px rgba(10, 42, 47, .06);
+}
+
+.bha-set__save .button-primary {
+	background: var(--bha-teal);
+	border-color: #0f635e;
+}
+
+.bha-set__save .button-primary:hover {
+	background: #0f635e;
+	border-color: #0f635e;
+}
+
+.bha-set__save .spacer {
+	flex: 1;
+}
+
+@media (max-width: 782px) {
+	.bha-set .form-table th {
+		display: block;
+		width: auto;
+		padding-bottom: 0;
+	}
+
+	.bha-set .form-table td {
+		display: block;
+	}
+
+	.bha-set__body {
+		padding: 4px 16px 16px;
+	}
+
+	.bha-set__save {
+		margin: 18px -16px -16px;
+		padding: 12px 16px;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * Booking editor
+ * ------------------------------------------------------------------------ */
+
+/* Keep the meta fields to a readable measure. A phone number in a 900px input
+   is harder to scan than one in a 420px input. */
+.bha-form th {
+	width: 180px;
+	text-align: left;
+}
+
+.bha-form input[type="text"],
+.bha-form input[type="email"],
+.bha-form input[type="date"],
+.bha-form input[type="number"],
+.bha-form select,
+.bha-form textarea {
+	width: 100%;
+	max-width: 420px;
+}
+
+/*
+ * The discount panel. Three figures the admin types, one the plugin computes,
+ * and a checkbox that commits it — so the computed offer is the only thing
+ * given the teal treatment.
+ */
+.bha-disc__f {
+	margin: 0 0 12px;
+}
+
+.bha-disc__f > label {
+	display: block;
+	margin: 0 0 4px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--bha-text);
+}
+
+/* Right-aligned because these are amounts, matching every other figure in the
+   plugin. Text inputs rather than number: a Bangla-locale admin renders numeric
+   spinners in Bengali digits, which cast to 0 on save. */
+.bha-disc input[type="text"] {
+	width: 100%;
+	text-align: right;
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-disc__row {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.bha-disc__row + .bha-disc__row {
+	margin-top: 4px;
+}
+
+.bha-disc__row span {
+	font-size: 12px;
+	color: var(--bha-muted);
+}
+
+.bha-disc__base {
+	margin: 0 0 14px;
+	padding: 8px 10px;
+	background: #f6f7f7;
+	border-radius: 8px;
+}
+
+.bha-disc__base strong {
+	font-size: 14px;
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-disc__out {
+	margin: 0 0 12px;
+	padding: 10px;
+	background: var(--bha-good-bg);
+	border: 1px solid #b8e0c4;
+	border-radius: 8px;
+}
+
+.bha-disc__out span {
+	color: var(--bha-good-ink);
+}
+
+.bha-disc__out strong {
+	font-size: 17px;
+	line-height: 1.2;
+	color: var(--bha-teal);
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-disc__row--save strong {
+	font-size: 12.5px;
+	font-weight: 600;
+	color: var(--bha-good);
+}
+
+.bha-disc__apply {
+	display: flex;
+	align-items: flex-start;
+	gap: 8px;
+	margin: 0;
+	padding: 10px;
+	background: var(--bha-surface);
+	border: 1px solid var(--bha-line);
+	border-radius: 8px;
+}
+
+.bha-disc__apply input[type="checkbox"] {
+	flex: 0 0 auto;
+	width: auto;
+	margin: 2px 0 0;
+}
+
+.bha-disc__apply span {
+	font-size: 12.5px;
+	line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+ * Quick Guide
+ *
+ * Independent recipe cards, so they flow in newspaper columns rather than a
+ * grid — a short card should not leave a tall gap under it.
+ * ------------------------------------------------------------------------ */
+
+.bha-guide {
+	column-width: 300px;
+	column-gap: 14px;
+	max-width: 1280px;
+	margin-top: 16px;
+}
+
+.bha-guide__card {
+	margin-bottom: 14px;
+	padding: 14px 16px;
+	background: var(--bha-surface);
+	border: 1px solid var(--bha-line);
+	border-left: 5px solid var(--bha-teal);
+	border-radius: var(--bha-radius);
+	break-inside: avoid;
+	-webkit-column-break-inside: avoid;
+}
+
+.bha-guide__card h2 {
+	margin: 0 0 8px;
+	font-size: 15px;
+}
+
+.bha-guide__card ol {
+	margin: 0 0 12px;
+	padding-left: 20px;
+	font-size: 13px;
+	line-height: 1.6;
+}
+
+.bha-guide__card li {
+	margin-bottom: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Permission matrix (Team)
+ *
+ * The one grid in the plugin that is read down a column rather than across a
+ * row: "what can a Cost Checker do". Everything but the first column centres
+ * so the ticks form a scannable field.
+ * ------------------------------------------------------------------------ */
+
+.bha-matrix th,
+.bha-matrix td {
+	text-align: center;
+}
+
+.bha-matrix th:first-child,
+.bha-matrix td:first-child {
+	width: 34%;
+	text-align: left;
+	line-height: 1.4;
+}
+
+.bha-matrix thead th {
+	vertical-align: bottom;
+	line-height: 1.35;
+}
+
+.bha-matrix tbody td:not(:first-child) {
+	font-size: 15px;
+}
+
+.bha-matrix input[type="checkbox"] {
+	margin: 0;
+}
+
+.bha-yes {
+	font-weight: 700;
+	color: var(--bha-good);
+}
+
+.bha-no {
+	color: var(--bha-line-strong);
+}
+
+.bha-strong {
+	font-weight: 600;
+}
+
+/* Someone whose access is not ours to describe — an administrator. */
+.bha-muted-em {
+	font-style: italic;
+	color: #787c82;
+}
+
+.bha-legend {
+	margin: 14px 0 0;
+}
+
+.bha-legend p {
+	margin: 0 0 6px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Trip calendar editor
+ *
+ * Twelve editable columns holding long Bangla strings. It gets a minimum width
+ * and scrolls rather than compressing the text out of readability.
+ * ------------------------------------------------------------------------ */
+
+.bha-tripgrid {
+	min-width: 1220px;
+}
+
+.bha-tripgrid input[type="text"] {
+	width: 100%;
+	min-width: 150px;
+}
+
+.bha-tripgrid tr.is-past {
+	opacity: .6;
+}
+
+.bha-tripgrid .bhela-trip-dur {
+	display: block;
+	margin-top: 4px;
+	font-size: 11px;
+	color: var(--bha-muted);
+}
+
+.bha-tripgrid .bhela-trip-dur.is-long {
+	font-weight: 600;
+	color: var(--bha-attention);
+}
+
+.bha-tripgrid .bhela-hol {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	white-space: nowrap;
+}
+
+.bha-tripgrid .bhela-hol span {
+	font-size: 11px;
+	color: var(--bha-attention);
+}
+
+.bha-tripgrid .bhela-avail-cell {
+	white-space: nowrap;
+}
+
+.bha-tripgrid .bhela-hold {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+}
+
+.bha-tripgrid .bhela-hold input[type="number"] {
+	width: 56px;
+	min-width: 56px;
+	text-align: center;
+}
+
+.bha-tripgrid .bhela-hold__cap,
+.bha-tripgrid .bhela-avail-note {
+	font-size: 11px;
+	color: #787c82;
+}
+
+.bha-tripgrid .bhela-avail-note {
+	display: block;
+	margin-top: 3px;
+}
+
+.bha-tripgrid .bha-pill {
+	margin-top: 6px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Responsive
+ *
+ * 782px is where WordPress itself switches the admin to touch sizing, so the
+ * plugin changes shape at the same width rather than inventing its own.
+ * ------------------------------------------------------------------------ */
+
+@media screen and (max-width: 782px) {
+	.bha-head {
+		padding: 14px 16px;
+	}
+
+	.bha-head h1,
+	.bha-head .bha-head__title {
+		font-size: 18px;
+	}
+
+	.bha-head__actions {
+		flex-basis: 100%;
+	}
+
+	.bha-bar form {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.bha-field input,
+	.bha-field select {
+		width: 100%;
+	}
+
+	.bha-card {
+		flex-basis: calc(50% - var(--bha-gap));
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * Standalone documents
+ *
+ * The cost sheet's print view is its own HTML page, not a wp-admin screen —
+ * it renders and exits, so none of WordPress's styles are present. It links
+ * this file directly and sets `.bhela-admin .bha-doc` on the body, which is
+ * why these rules restate the basics the admin would otherwise supply.
+ * ------------------------------------------------------------------------ */
+
+.bha-doc {
+	margin: 24px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 12px;
+	color: #111;
+	background: #fff;
+}
+
+.bha-doc h1 {
+	margin: 0 0 2px;
+	font-size: 18px;
+}
+
+.bha-doc__sub {
+	margin-bottom: 16px;
+	color: #555;
+}
+
+.bha-doc table {
+	width: 100%;
+	border-collapse: collapse;
+	margin-bottom: 14px;
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-doc th,
+.bha-doc td {
+	border: 1px solid #999;
+	padding: 5px 7px;
+	text-align: left;
+}
+
+.bha-doc th {
+	background: #f0f0f0;
+}
+
+.bha-doc .bha-num {
+	text-align: right;
+}
+
+.bha-doc__facts {
+	display: grid;
+	grid-template-columns: repeat(4, 1fr);
+	gap: 8px;
+	margin-bottom: 16px;
+}
+
+.bha-doc__facts div {
+	border: 1px solid #ccc;
+	padding: 5px 7px;
+}
+
+.bha-doc__facts span {
+	display: block;
+	font-size: 10px;
+	text-transform: uppercase;
+	color: #666;
+}
+
+.bha-doc__sum {
+	display: flex;
+	gap: 10px;
+	margin: 16px 0 26px;
+}
+
+.bha-doc__sum div {
+	flex: 1;
+	border: 1px solid #999;
+	padding: 8px 10px;
+}
+
+.bha-doc__sum span {
+	display: block;
+	font-size: 10px;
+	text-transform: uppercase;
+	color: #666;
+}
+
+.bha-doc__sum b {
+	display: block;
+	font-size: 16px;
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-doc__sign {
+	display: flex;
+	gap: 24px;
+	margin-top: 34px;
+}
+
+.bha-doc__sign div {
+	flex: 1;
+	border-top: 1px solid #333;
+	padding-top: 6px;
+	font-size: 11px;
+}
+
+@media print {
+	.bha-doc {
+		margin: 0;
+	}
+}
+
+/* ---------------------------------------------------------------------------
+ * Print
+ *
+ * Several screens are working documents that get printed and carried onto the
+ * boat. Print rules live here rather than inline in each template so a cost
+ * sheet and a trip report come out of the printer looking related.
+ * ------------------------------------------------------------------------ */
+
+.bha-printonly {
+	display: none;
+}
+
+@media print {
+	#adminmenumain,
+	#wpadminbar,
+	#wpfooter,
+	#screen-meta,
+	#screen-meta-links,
+	.notice,
+	.update-nag,
+	.bha-bar,
+	.bha-actions,
+	.bha-noprint {
+		display: none !important;
+	}
+
+	#wpcontent,
+	#wpbody-content {
+		margin: 0 !important;
+		padding: 0 !important;
+	}
+
+	html.wp-toolbar {
+		padding-top: 0 !important;
+	}
+
+	.bhela-admin .bha-page {
+		max-width: none;
+	}
+
+	/* The band is a screen device; on paper it wastes toner and the printed
+	   heading below says the same thing in black. */
+	.bha-head {
+		display: none !important;
+	}
+
+	.bha-printonly {
+		display: block;
+		margin: 0 0 14px;
+	}
+
+	.bha-printonly h2 {
+		margin: 0 0 4px;
+		font-size: 18px;
+	}
+
+	.bhela-admin table.widefat {
+		border: 1px solid #333;
+	}
+
+	.bhela-admin table.widefat td,
+	.bhela-admin table.widefat th {
+		border: 1px solid #999 !important;
+		font-size: 11px;
+		padding: 5px 6px !important;
+	}
+
+	.bha-card {
+		border: 1px solid #999;
+	}
+
+	.bha-pill {
+		border: 1px solid #999 !important;
+		background: none !important;
+		color: #000 !important;
+	}
+
+	a {
+		text-decoration: none !important;
+		color: #000 !important;
+	}
+}
