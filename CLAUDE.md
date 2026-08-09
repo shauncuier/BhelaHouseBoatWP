@@ -76,6 +76,7 @@ wp-content/                          ← Git root
 │   │   ├── costs.php                ← Trip Cost Sheet CPT + prepare/check/approve workflow
 │   │   ├── expenses.php             ← Expense CPT + editable types/methods (marketing, renovation)
 │   │   ├── statement.php            ← Monthly Statement: approved trips − month's expenses
+│   │   ├── yearly.php               ← Yearly Report: 12 monthly statements + season totals
 │   │   ├── salary.php               ← Staff roster + monthly salary sheet
 │   │   ├── roles.php                ← Staff roles, plugin capabilities, Team reference screen
 │   │   ├── ui.php                   ← Shared admin UI: screen header, status pill, tone map
@@ -109,6 +110,7 @@ wp-content/                          ← Git root
 │
 ├── .claude/                         ← Claude Code
 │   ├── skills/bhela-test/           ← Run the regression suite (committed, syncs across machines)
+│   ├── settings.json                ← Version-sync hook (committed, team-wide)
 │   └── settings.local.json          ← Permission grants (git-ignored)
 │
 ├── graphify-out/                    ← Knowledge graph output (auto-generated)
@@ -285,7 +287,7 @@ wp-content:   c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\
 
 ## 7. Version Management
 
-### Version File Locations — **all five move together**
+### Version File Locations — **all six move together**
 
 | File | Line | What to update |
 |---|---|---|
@@ -294,15 +296,20 @@ wp-content:   c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\
 | `themes/bhela/functions.php` | 12 | `define( 'BHELA_VERSION', 'X.Y.Z' );` — **theme asset cache-buster; forgetting this ships stale CSS/JS** |
 | `plugins/bhela-booking/bhela-booking.php` | 5 | ` * Version: X.Y.Z` |
 | `plugins/bhela-booking/bhela-booking.php` | 16 | `define( 'BHELA_BM_VERSION', 'X.Y.Z' );` |
+| `plugins/bhela-booking/README.md` | 5 | `- **Version:** X.Y.Z` — added after it silently sat a release behind |
 
 ### Versioning Rules
 
-- **Theme and Plugin share ONE version number.** A release bumps all five fields above to the same `X.Y.Z`, even if only one component changed. (History: they used to be versioned independently — that caused `BHELA_VERSION` to lag `style.css` and serve stale assets. Never again.)
+- **Theme and Plugin share ONE version number.** A release bumps all six fields above to the same `X.Y.Z`, even if only one component changed. (History: they used to be versioned independently — that caused `BHELA_VERSION` to lag `style.css` and serve stale assets. Never again.)
 - **Major** (X.0.0): breaking changes, full redesign
 - **Minor** (X.Y.0): new features, templates, shortcodes
 - **Patch** (X.Y.Z): bug fixes, style tweaks, copy changes
 
-> ⚠️ **CRITICAL:** All five version fields MUST always match. The two theme constants (`BHELA_VERSION` in `functions.php`, `BHELA_BM_VERSION` in the plugin) are asset cache-busters — a mismatch is invisible in the header but breaks browser caching.
+A `PostToolUse` hook in `.claude/settings.json` warns as soon as they diverge, and
+`tests/version-test.py` fails the suite if they are still out of sync at release. Both run the
+same checker.
+
+> ⚠️ **CRITICAL:** All six version fields MUST always match. The two theme constants (`BHELA_VERSION` in `functions.php`, `BHELA_BM_VERSION` in the plugin) are asset cache-busters — a mismatch is invisible in the header but breaks browser caching.
 
 ---
 
@@ -426,8 +433,9 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Nine headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
-cost heads, the save round trip, every admin screen, WCAG contrast, OTP and the SMS gateway.
+Eleven headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+cost heads, the save round trip, every admin screen, WCAG contrast, OTP, the SMS gateway and
+the five version fields, and the yearly rollup.
 Exits non-zero on failure. Any PHP 8.x binary works — `run.php` loads the extensions each
 harness needs, so never hand-build a `php -d extension=…` command. The site must be running.
 
@@ -450,7 +458,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all nine harnesses
+- [ ] `php tests/run.php` passes — all eleven harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)

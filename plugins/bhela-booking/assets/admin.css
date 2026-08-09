@@ -624,6 +624,32 @@
 	color: var(--bha-attention-ink);
 }
 
+/*
+ * A proportion, drawn. Used on the Yearly Report so the shape of a season is
+ * readable without reading twelve figures. Width is set inline because it *is*
+ * the datum; everything else lives here. Decorative — the figure it represents
+ * is always in the adjacent cell, so it carries aria-hidden.
+ */
+/*
+ * NOT .bha-bar — that name was already the filter bar at the top of this file,
+ * and reusing it here silently flattened the filter bar on Trip Report, the
+ * Monthly Statement, Salary and this screen into a 10px teal strip with its
+ * controls spilling out. Later rule wins; nothing warns you.
+ */
+.bha-meter {
+	display: block;
+	min-width: 2px;
+	height: 10px;
+	border-radius: 5px;
+	background: var(--bha-teal);
+}
+
+/* A month that lost money. Length is its magnitude, so a bad month is as
+   visible as a good one rather than reading as an empty row. */
+.bha-meter--loss {
+	background: var(--bha-danger);
+}
+
 /* Wide ledgers scroll inside their own box rather than pushing the page. */
 .bha-scroll {
 	overflow-x: auto;

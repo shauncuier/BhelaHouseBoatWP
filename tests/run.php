@@ -50,6 +50,26 @@ if ( $missing ) {
 
 $filters = array_slice( $argv, 1 );
 $files   = glob( __DIR__ . '/*-test.php' );
+
+// A harness may be a Python file when PHP is the wrong tool for it — the
+// version check also runs from a PostToolUse hook, in a shell where neither
+// php nor jq exists. Skipped with a note if python is absent rather than
+// silently dropped, since a check nobody notices missing is worse than none.
+$python = null;
+foreach ( array( 'python3', 'python' ) as $candidate ) {
+	$probe = shell_exec( escapeshellarg( $candidate ) . ' --version 2>&1' );
+	if ( $probe && preg_match( '/^Python 3/', trim( $probe ) ) ) {
+		$python = $candidate;
+		break;
+	}
+}
+$py_files = glob( __DIR__ . '/*-test.py' );
+if ( $python ) {
+	$files = array_merge( $files, $py_files );
+} elseif ( $py_files ) {
+	printf( "  SKIPPED (no python3 on PATH): %s\n\n", implode( ', ', array_map( 'basename', $py_files ) ) );
+}
+
 sort( $files );
 if ( $filters ) {
 	$files = array_values( array_filter( $files, function ( $f ) use ( $filters ) {
@@ -83,10 +103,13 @@ $results = array();
 $started = microtime( true );
 
 foreach ( $files as $file ) {
-	$name = basename( $file, '.php' );
-	$cmd  = escapeshellarg( PHP_BINARY ) . ' '
-		. implode( ' ', array_map( 'escapeshellarg', $flags ) ) . ' '
-		. escapeshellarg( $file );
+	$is_py = '.py' === substr( $file, -3 );
+	$name  = basename( $file, $is_py ? '.py' : '.php' );
+	$cmd   = $is_py
+		? escapeshellarg( $python ) . ' ' . escapeshellarg( $file )
+		: escapeshellarg( PHP_BINARY ) . ' '
+			. implode( ' ', array_map( 'escapeshellarg', $flags ) ) . ' '
+			. escapeshellarg( $file );
 
 	$t0 = microtime( true );
 	exec( $cmd . ' 2>&1', $out, $code );

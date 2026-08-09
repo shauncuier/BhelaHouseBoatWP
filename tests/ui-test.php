@@ -158,6 +158,38 @@ $defined = array_unique( $d[1] );
 $orphans = array_values( array_diff( array_unique( $emitted[1] ), $defined ) );
 ok( ! $orphans, 'no class emitted without a rule', implode( ', ', $orphans ) );
 
+// One component, one primary rule. Reusing a name silently redefines whatever
+// held it — `.bha-bar` was the filter bar, got reused for a chart bar, and
+// flattened the filter on four screens into a 10px teal strip. Later rule
+// wins and nothing warns you. Overrides inside @media are legitimate, so the
+// media blocks come out before counting.
+$base  = preg_replace( '!/\*.*?\*/!s', '', $css );
+$depth = 0;
+$flat  = '';
+for ( $i = 0; $i < strlen( $base ); $i++ ) {
+	if ( 0 === $depth && preg_match( '/\G@media[^{]*\{/', $base, $mm, 0, $i ) ) {
+		$i    += strlen( $mm[0] ) - 1;
+		$depth = 1;
+		continue;
+	}
+	if ( $depth > 0 ) {
+		if ( '{' === $base[ $i ] ) { $depth++; }
+		if ( '}' === $base[ $i ] ) { $depth--; }
+		continue;
+	}
+	$flat .= $base[ $i ];
+}
+preg_match_all( '/([^{}]+)\{/', $flat, $sels );
+$primary = array();
+foreach ( $sels[1] as $sel ) {
+	$sel = trim( $sel );
+	if ( preg_match( '/^\.(bha-[a-z0-9_-]+)$/', $sel ) ) {
+		$primary[ $sel ] = ( $primary[ $sel ] ?? 0 ) + 1;
+	}
+}
+$collisions = array_keys( array_filter( $primary, fn( $n ) => $n > 1 ) );
+ok( ! $collisions, sprintf( 'each of the %d components is defined once', count( $primary ) ), implode( ', ', $collisions ) );
+
 echo "\n=== 9. menu icons are unique ===\n";
 $icons = array();
 foreach ( array(

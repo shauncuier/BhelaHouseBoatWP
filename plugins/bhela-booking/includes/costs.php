@@ -949,8 +949,12 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			dateEl.addEventListener('change', function () { lookup(dateEl.value); });
 		}
 
+		// Mirrors bhela_bm_money(): the sign goes before the symbol, so a trip
+		// that lost money reads "-৳5,000" here and on the saved sheet alike.
 		var money = function (n) {
-			return '৳' + Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+			var v = Math.round(n);
+			return (v < 0 ? '-' : '') + '৳' +
+				Math.abs(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 		};
 
 		// Live preview only — every figure is summed again server-side on save,

@@ -49,6 +49,20 @@ php tests/run.php security ui
 | `contrast-test` | Every colour pair in `admin.css` meets WCAG AA. No database needed |
 | `otp-test` | Send, verify, throttles, the server-side submission gate, and that an OTP stays one GSM-7 segment |
 | `balance-test` | Live gateway balance, the cache, and the low-credit threshold. Makes one real API call; sends no SMS |
+| `version-test` | All five version fields agree. Python, not PHP — see below. No database needed |
+
+## The version harness is Python
+
+`version-test.py` has a second caller: a `PostToolUse` hook in `.claude/settings.json` runs it
+after any edit to one of the five version files, so drift surfaces while you are still editing
+rather than at release time. That hook runs in a shell where neither `php` nor `jq` exists, which
+is why the check is Python and why it does its own path filtering.
+
+`run.php` picks up `*-test.py` alongside the PHP harnesses when `python3` is on PATH, and prints
+a SKIPPED line when it is not. One implementation, two triggers.
+
+The hook only ever warns. Blocking would fire on every release — the five fields are necessarily
+out of step between the first edit and the fifth.
 
 ## Writing another one
 

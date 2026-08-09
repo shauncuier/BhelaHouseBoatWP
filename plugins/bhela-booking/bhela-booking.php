@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.23.0
+ * Version: 2.24.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.23.0' );
+define( 'BHELA_BM_VERSION', '2.24.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -392,8 +392,21 @@ function bhela_bm_calc_price( $cabin_key, $guests, $date ) {
 	);
 }
 
+/**
+ * A taka figure, formatted for display.
+ *
+ * The sign goes before the symbol. Concatenating number_format() onto the
+ * symbol put it after — a loss printed as "৳-215,200", which reads as a
+ * currency called "৳-" before it reads as negative money. Every screen that
+ * can show a loss was affected: the monthly statement, the yearly report, a
+ * cost sheet whose trip lost money, and the profit column of the sheet list.
+ *
+ * @param int|float|string $amount Taka. Negative is a loss.
+ * @return string e.g. "৳1,490,000" or "-৳215,200".
+ */
 function bhela_bm_money( $amount ) {
-	return '৳' . number_format( (float) $amount );
+	$amount = (float) $amount;
+	return ( $amount < 0 ? '-' : '' ) . '৳' . number_format( abs( $amount ) );
 }
 
 /**
@@ -567,6 +580,7 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/costs.php';
 	require_once BHELA_BM_PATH . 'includes/expenses.php';
 	require_once BHELA_BM_PATH . 'includes/statement.php';
+	require_once BHELA_BM_PATH . 'includes/yearly.php';
 	require_once BHELA_BM_PATH . 'includes/salary.php';
 }
 

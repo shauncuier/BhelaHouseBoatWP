@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.22.0
+- **Version:** 2.24.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -38,6 +38,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/costs.php` | Trip Cost Sheet CPT + prepare/check/approve workflow, editable heads, printable sheet |
 | `includes/expenses.php` | Expense CPT (advertising, renovation…), editable types and payment methods |
 | `includes/statement.php` | Monthly Statement — approved trips less the month's expenses |
+| `includes/yearly.php` | Yearly Report — twelve monthly statements, season totals, expense mix |
 | `includes/salary.php` | Staff roster + monthly salary sheet |
 | `includes/roles.php` | Staff roles, every plugin capability, and the read-only Team reference screen |
 | `assets/admin.css` | The admin design system — tokens, screen header, cards, ledger, pills, print |
@@ -52,6 +53,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_cost_heads( $include_retired )` — the trip cost heads in force, slug => label.
 - `bhela_bm_expense_rows( $from, $to )` → expenses in a range, totalled per type.
 - `bhela_bm_statement_data( $month )` → a month's approved trips, deductions and gross profit.
+- `bhela_bm_yearly_data( $year, $mode )` → twelve months rolled up, plus totals, margin and the year's expense mix. Built by calling the monthly statement twelve times rather than re-querying, so a yearly figure can never disagree with the month it summarises. `$mode` is `financial` (July–June, the default and what Bangladesh uses) or `calendar`.
 - `bhela_bm_cost_transitions()` — the workflow state machine (from-state, target, required capability).
 - `bhela_bm_roles()` — staff roles with their capabilities; the single source of truth the rest of the plugin reads.
 - `bhela_bm_permissions()` — the togglable permission registry, and the allow-list for what the Team screen may grant.
@@ -245,6 +247,12 @@ Business info · payment details (bKash/Nagad/bank/QR) · advance % · invoice p
 The `bhela` theme auto-creates the booking pages, trip calendar, and menu on activation — and once per released version via a capability-gated `admin_init` check (skips AJAX/cron). Nothing to run manually; configure under **Bookings → Settings**.
 
 ## Changelog (recent)
+
+- **2.24.0** — Yearly Report: twelve monthly statements side by side, season totals, margin,
+  profit-per-month chart and the year's expense mix. Financial year (Jul–Jun) or calendar.
+  Fixes `bhela_bm_money()` printing a loss as `৳-215,200` — the sign now precedes the symbol,
+  on every screen that can show one. Fixes the filter bar collapsing on Trip Report, Monthly
+  Statement, Salary and Yearly (a CSS class-name collision), now guarded by a test.
 
 - **2.23.0** — Admin design system (`assets/admin.css`): one screen header, one status pill, one
   ledger treatment across all sixteen screens; 12 inline `<style>` blocks and 58 hand-typed hex
