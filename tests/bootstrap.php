@@ -137,6 +137,58 @@ if ( ! function_exists( 'bhela_bm_get_settings' ) ) {
 	exit( 1 );
 }
 
+/* ---------- Isolation ---------- */
+
+/**
+ * Hide every record the harness did not create.
+ *
+ * The harnesses assert on aggregates — "July 2026 totals ৳498,214", "13
+ * approved trips" — computed by the plugin's own query functions. That works
+ * only while the harness owns everything those queries can see. The moment a
+ * demo dataset was seeded into the site, eleven real cost sheets landed in the
+ * same months and six harnesses went red: July reported 430 guests instead of
+ * 335, the yearly rollup counted 14 approved trips instead of 3. Nothing was
+ * broken; the tests were simply reading someone else's data.
+ *
+ * Every harness prefixes its fixtures with ZZ, so restricting our post types to
+ * that prefix makes a run independent of whatever else is in the database. It
+ * lives here rather than in each harness because the queries being filtered
+ * belong to the plugin, not to the tests — no test could scope them itself.
+ *
+ * Only WP_Query-backed reads pass through `posts_where`; get_post() and
+ * get_post_meta() by ID are direct lookups and stay untouched, which is what
+ * lets a harness still read back the fixture it just created.
+ */
+function bhela_test_isolate() {
+	$ours = array( 'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking', 'bhela_review' );
+
+	// get_posts() sets suppress_filters => true, which skips posts_where
+	// entirely — the plugin reads almost everything through get_posts(), so a
+	// posts_where filter alone silently does nothing. pre_get_posts fires
+	// either way, so turn filtering back on for our own post types there.
+	add_action( 'pre_get_posts', function ( $query ) use ( $ours ) {
+		if ( array_intersect( (array) $query->get( 'post_type' ), $ours ) ) {
+			$query->set( 'suppress_filters', false );
+		}
+	} );
+
+	add_filter( 'posts_where', function ( $where, $query ) use ( $ours ) {
+		global $wpdb;
+		if ( ! array_intersect( (array) $query->get( 'post_type' ), $ours ) ) {
+			return $where;
+		}
+		return $where . " AND {$wpdb->posts}.post_title LIKE 'ZZ%'";
+	}, 10, 2 );
+}
+
+// On by default: a harness that reads real data is not a test of anything.
+// BHELA_TEST_NO_ISOLATE=1 in the environment turns it off, which is how you
+// reproduce the failure it prevents — run the suite that way against a site
+// holding real records and six harnesses go red on other people's numbers.
+if ( ! getenv( 'BHELA_TEST_NO_ISOLATE' ) ) {
+	bhela_test_isolate();
+}
+
 /* ---------- Assertions ---------- */
 
 /**

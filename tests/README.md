@@ -49,20 +49,47 @@ php tests/run.php security ui
 | `contrast-test` | Every colour pair in `admin.css` meets WCAG AA. No database needed |
 | `otp-test` | Send, verify, throttles, the server-side submission gate, and that an OTP stays one GSM-7 segment |
 | `balance-test` | Live gateway balance, the cache, and the low-credit threshold. Makes one real API call; sends no SMS |
-| `version-test` | All five version fields agree. Python, not PHP — see below. No database needed |
+| `version-test` | All six version fields agree. Python, not PHP — see below. No database needed |
+| `yearly-test` | The yearly rollup agrees with the twelve statements it summarises; undated sheets reach no year and cannot be approved |
 
 ## The version harness is Python
 
 `version-test.py` has a second caller: a `PostToolUse` hook in `.claude/settings.json` runs it
-after any edit to one of the five version files, so drift surfaces while you are still editing
+after any edit to one of the version files, so drift surfaces while you are still editing
 rather than at release time. That hook runs in a shell where neither `php` nor `jq` exists, which
 is why the check is Python and why it does its own path filtering.
 
 `run.php` picks up `*-test.py` alongside the PHP harnesses when `python3` is on PATH, and prints
 a SKIPPED line when it is not. One implementation, two triggers.
 
-The hook only ever warns. Blocking would fire on every release — the five fields are necessarily
-out of step between the first edit and the fifth.
+The hook only ever warns. Blocking would fire on every release — the fields are necessarily out of
+step between the first edit of a bump and the last.
+
+## Isolation
+
+A run sees only the records it created. `bootstrap.php` restricts every query against the
+plugin's post types to titles beginning `ZZ`, which is the prefix all fixtures use.
+
+This is not tidiness. The harnesses assert on aggregates the plugin computes — "July totals
+৳498,214", "13 approved trips" — so they are only meaningful while the harness owns everything
+those queries can see. When a demo dataset was seeded into this site, eleven real cost sheets
+landed in the same months and six harnesses went red: July reported 430 guests instead of 335.
+Nothing was broken; the tests were reading someone else's data.
+
+Reproduce that with:
+
+```bash
+BHELA_TEST_NO_ISOLATE=1 php tests/run.php july yearly salary
+```
+
+Against a site with real records that goes 0 of 3; with isolation on, 3 of 3.
+
+Two consequences worth knowing when writing a harness:
+
+- **`get_posts()` sets `suppress_filters => true`**, which skips `posts_where`. Isolation works
+  by flipping that off in `pre_get_posts` first. A filter alone would have done nothing, silently.
+- **Reads by ID are untouched** — `get_post()` and `get_post_meta()` are direct lookups, so a
+  fixture can always be read back even though aggregate queries cannot see past the prefix.
 
 ## Writing another one
 

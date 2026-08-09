@@ -102,9 +102,15 @@ ok( false === strpos( $all, 'style="text-align:right"' ), 'no inline alignment' 
 foreach ( array( '#1a7f37', '#b32d2e', '#b45309', '#dcdcde' ) as $hex ) {
 	ok( false === strpos( $all, $hex ), "no hand-typed $hex" );
 }
-preg_match_all( '/\b\d{1,3}(,\d{3})+\b/u', $all, $plain );
-$bare = array_filter( $plain[0], function ( $n ) use ( $all ) {
-	return false === strpos( $all, '৳' . $n );
+// Scan the rendered text, not the markup. Over raw HTML a figure whose leading
+// digit sits in its own tag — "<strong>1</strong>,064,000" — cannot match from
+// the 1, so the pattern matches "064,000" instead and reports a symbol-less
+// figure that no reader ever sees. Stripping tags first tests what is actually
+// on screen, which is what the assertion is about.
+$text = wp_strip_all_tags( $all );
+preg_match_all( '/(?<![\d,])\d{1,3}(?:,\d{3})+(?![\d,])/u', $text, $plain );
+$bare = array_filter( $plain[0], function ( $n ) use ( $text ) {
+	return false === strpos( $text, '৳' . $n );
 } );
 ok( ! $bare, 'every grouped figure carries the ৳ symbol', implode( ' ', array_slice( $bare, 0, 5 ) ) );
 
