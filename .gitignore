@@ -30,4 +30,7 @@
 !/themes/index.php
 !/themes/bhela/
 
-.claude/*
+# Claude Code: share the skills, keep the machine-local permissions out.
+!/.claude/
+/.claude/*
+!/.claude/skills/

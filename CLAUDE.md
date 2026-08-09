@@ -87,6 +87,14 @@ wp-content/                          ← Git root
 │   └── templates/
 │       └── invoice.php              ← Printable invoice template
 │
+├── tests/                           ← Regression suites (outside themes/ & plugins/, never shipped)
+│   ├── README.md                    ← How to run and how to add a harness
+│   ├── run.php                      ← CLI runner — loads the PHP extensions each harness needs
+│   ├── bootstrap.php                ← Boots WP, resolves the LocalWP DB port, provides ok()
+│   ├── sweep.php                    ← Clears ZZ* fixtures left by a crashed run
+│   ├── *-test.php                   ← 9 headless harnesses
+│   └── bhela-tests.php              ← Older browser suite (open as an admin)
+│
 ├── docs/
 │   ├── BHELA-Owner-Manual.md        ← Non-technical owner guide (Bangla-friendly)
 │   └── plans/                       ← Feature implementation plans (historical)
@@ -99,8 +107,9 @@ wp-content/                          ← Git root
 │   ├── rules/graphify.md            ← Knowledge graph rules
 │   └── workflows/graphify.md        ← Graphify workflow
 │
-├── .claude/                         ← Claude Code local settings (git-ignored)
-│   └── settings.local.json          ← Permission grants
+├── .claude/                         ← Claude Code
+│   ├── skills/bhela-test/           ← Run the regression suite (committed, syncs across machines)
+│   └── settings.local.json          ← Permission grants (git-ignored)
 │
 ├── graphify-out/                    ← Knowledge graph output (auto-generated)
 │
@@ -411,6 +420,25 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 
 ## 11. Testing & Verification
 
+### Regression suite (run this first)
+
+```bash
+php tests/run.php
+```
+
+Nine headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+cost heads, the save round trip, every admin screen, WCAG contrast, OTP and the SMS gateway.
+Exits non-zero on failure. Any PHP 8.x binary works — `run.php` loads the extensions each
+harness needs, so never hand-build a `php -d extension=…` command. The site must be running.
+
+`DIED EARLY` is not a test failure: it means a harness stopped before finishing, almost always
+because the site is not up. A run with no final summary is a failure, never a pass.
+
+`tests/bhela-tests.php` is the older browser suite — open it while logged in as an
+administrator. It covers pricing and availability; the CLI suite covers everything else.
+
+See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skill wraps all of this.
+
 ### Local Testing
 
 - **Site check:** Visit http://bhela-house-boat.local/
@@ -422,6 +450,7 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 
 ### Pre-Release Checks
 
+- [ ] `php tests/run.php` passes — all nine harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -496,6 +525,9 @@ git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" pull 
 
 # Push to GitHub
 git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" push origin main
+
+# Run the regression suite
+php tests/run.php
 
 # Validate JS syntax
 node --check "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\plugins\bhela-booking\assets\booking.js"
