@@ -540,7 +540,7 @@ function bhela_bm_ajax_submit() {
 	}
 
 	// Per-IP throttle: each submit publishes a post and sends up to 2 emails.
-	$ip   = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$ip   = bhela_bm_client_ip();
 	$key  = 'bhela_bm_submit_' . md5( $ip );
 	$hits = (int) get_transient( $key );
 	if ( $hits >= 10 ) {
@@ -566,7 +566,7 @@ function bhela_bm_ajax_availability() {
 	check_ajax_referer( 'bhela_bm_booking', 'nonce' );
 
 	// Per-IP throttle, matching the submit/track endpoints — blunts scraping.
-	$ip  = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$ip  = bhela_bm_client_ip();
 	$key = 'bhela_bm_avail_' . md5( $ip );
 	$hits = (int) get_transient( $key );
 	if ( $hits >= 60 ) {
@@ -606,6 +606,37 @@ function bhela_bm_ajax_availability() {
 }
 add_action( 'wp_ajax_bhela_bm_availability', 'bhela_bm_ajax_availability' );
 add_action( 'wp_ajax_nopriv_bhela_bm_availability', 'bhela_bm_ajax_availability' );
+
+/**
+ * Issue a fresh booking nonce.
+ *
+ * The form's nonce is printed into the page by wp_localize_script(), and a
+ * nonce is only valid for 12–24 hours. That is fine on an uncached site, where
+ * every visitor gets a page rendered seconds earlier. Put a full-page cache in
+ * front — which any busy site needs — and visitors are served HTML built days
+ * ago, carrying a nonce that expired long before they arrived. Every AJAX call
+ * then fails at check_ajax_referer(): availability, submit, tracker, OTP. The
+ * symptom is "caching breaks the booking form", and the usual response is to
+ * turn caching off and live with a slow site.
+ *
+ * This endpoint hands out a current one, so the cached HTML no longer has to
+ * carry a time-limited value. It is deliberately unauthenticated and needs no
+ * nonce of its own: anyone can already obtain a nonce by loading the public
+ * booking page, so this grants nothing new. What the nonce still does — prove
+ * a request came from a browser that visited this site, rather than from a
+ * form posted somewhere else — is unchanged.
+ *
+ * Never cache admin-ajax.php. It is excluded by default in every cache plugin
+ * worth using.
+ */
+function bhela_bm_ajax_nonce() {
+	nocache_headers();
+	wp_send_json_success( array(
+		'nonce' => wp_create_nonce( 'bhela_bm_booking' ),
+	) );
+}
+add_action( 'wp_ajax_bhela_bm_nonce', 'bhela_bm_ajax_nonce' );
+add_action( 'wp_ajax_nopriv_bhela_bm_nonce', 'bhela_bm_ajax_nonce' );
 
 /* ---------- Booking tracking ---------- */
 
@@ -688,7 +719,7 @@ function bhela_bm_ajax_track() {
 	// entropy, not the guessable invoice number), so this just blunts blind
 	// guessing/abuse. A customer re-checking their own real booking always
 	// succeeds and is never counted — important behind shared/CGNAT IPs.
-	$ip  = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$ip  = bhela_bm_client_ip();
 	$key = 'bhela_bm_track_' . md5( $ip );
 	if ( (int) get_transient( $key ) >= 30 ) {
 		wp_send_json_error( array( 'message' => __( 'অনেকবার চেষ্টা হয়েছে — কিছুক্ষণ পর আবার চেষ্টা করুন।', 'bhela-booking' ) ) );

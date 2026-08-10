@@ -8,6 +8,76 @@
 	document.addEventListener('DOMContentLoaded', function () {
 		if (typeof bhelaBM === 'undefined') return;
 
+		/* ================= Nonce, refreshed for cached pages =================
+		 *
+		 * bhelaBM.nonce is printed into the HTML, and a nonce lasts 12–24 hours.
+		 * Behind a full-page cache the visitor gets HTML built days ago, so the
+		 * nonce is already dead and every call below fails at the server. That is
+		 * the "caching breaks the booking form" problem; the fix is to stop
+		 * trusting the value baked into the page.
+		 *
+		 * One request on load replaces it. If a call is still rejected — the page
+		 * sat open past the expiry, say — refresh once and retry, so the guest
+		 * never sees a failure they cannot act on.
+		 */
+		var noncePromise = null;
+
+		function refreshNonce() {
+			if (noncePromise) return noncePromise;
+			var p = new URLSearchParams();
+			p.append('action', 'bhela_bm_nonce');
+			noncePromise = fetch(bhelaBM.ajaxUrl, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+				body: p.toString()
+			}).then(function (r) { return r.json(); }).then(function (res) {
+				if (res && res.success && res.data && res.data.nonce) {
+					bhelaBM.nonce = res.data.nonce;
+				}
+				noncePromise = null;
+				return bhelaBM.nonce;
+			}).catch(function () {
+				// Offline or blocked: keep whatever we have and let the call fail
+				// on its own terms rather than swallowing the action here.
+				noncePromise = null;
+				return bhelaBM.nonce;
+			});
+			return noncePromise;
+		}
+
+		// check_ajax_referer() dies with a bare "-1", so a stale nonce arrives as
+		// unparseable text rather than as {success:false}. That distinction
+		// matters: retrying every failed call would re-send a booking whenever
+		// the server refused it for a real reason — a full date, a bad phone —
+		// burning the submit throttle twice per attempt. Only the -1 is retried.
+		function postWithNonce(params) {
+			var send = function () {
+				params.set('nonce', bhelaBM.nonce);
+				return fetch(bhelaBM.ajaxUrl, {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+					body: params.toString()
+				}).then(function (r) { return r.text(); });
+			};
+			var parse = function (text) {
+				try { return JSON.parse(text); } catch (e) { return null; }
+			};
+			return send().then(function (text) {
+				var stale = '-1' === text.trim() || '0' === text.trim();
+				if (!stale) {
+					var res = parse(text);
+					if (res) return res;
+				}
+				return refreshNonce().then(send).then(function (retry) {
+					var res = parse(retry);
+					if (res) return res;
+					throw new Error('Unreadable response from the server.');
+				});
+			});
+		}
+
+		refreshNonce();
+
 		/* ================= Booking tracking (works standalone + in the tab) ================= */
 
 		function fmt(n) { return '৳' + Number(n).toLocaleString('en-IN'); }
@@ -23,13 +93,8 @@
 		function fetchTrack(q) {
 			var params = new URLSearchParams();
 			params.append('action', 'bhela_bm_track');
-			params.append('nonce', bhelaBM.nonce);
 			params.append('q', q);
-			return fetch(bhelaBM.ajaxUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: params.toString()
-			}).then(function (r) { return r.json(); });
+			return postWithNonce(params);
 		}
 
 		function trackChip(label, color) {
@@ -709,14 +774,8 @@
 			{
 				var params = new URLSearchParams();
 				params.append('action', 'bhela_bm_availability');
-				params.append('nonce', bhelaBM.nonce);
 				params.append('date', dateEl.value);
-				fetch(bhelaBM.ajaxUrl, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: params.toString()
-				})
-					.then(function (r) { return r.json(); })
+				postWithNonce(params)
 					.then(function (data) {
 						availBox.hidden = false;
 						if (data.success) {
@@ -972,14 +1031,9 @@
 			function otpPost(action, extra) {
 				var params = new URLSearchParams();
 				params.append('action', action);
-				params.append('nonce', bhelaBM.nonce);
 				params.append('phone', phoneField ? phoneField.value : '');
 				Object.keys(extra || {}).forEach(function (k) { params.append(k, extra[k]); });
-				return fetch(bhelaBM.ajaxUrl, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-					body: params.toString()
-				}).then(function (r) { return r.json(); });
+				return postWithNonce(params);
 			}
 
 			function countdown(seconds) {
@@ -1118,7 +1172,6 @@
 			var fd = new FormData(form);
 			var params = new URLSearchParams();
 			params.append('action', 'bhela_bm_submit');
-			params.append('nonce', bhelaBM.nonce);
 			['name', 'phone', 'email', 'date', 'message', 'bhela_bm_hp'].forEach(function (f) {
 				params.append(f, fd.get(f) || '');
 			});
@@ -1127,12 +1180,7 @@
 			params.append('requested_price', fd.get('requested_price') || '');
 			params.append('discount_msg', fd.get('discount_msg') || '');
 
-			fetch(bhelaBM.ajaxUrl, {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: params.toString()
-			})
-				.then(function (r) { return r.json(); })
+			postWithNonce(params)
 				.then(function (data) {
 					if (data.success) {
 						var d = data.data;

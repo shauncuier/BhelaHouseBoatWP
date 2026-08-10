@@ -484,7 +484,8 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ## 13. Gotchas & Known Issues
 
-1. **LocalWP emails:** Local sites don't send real mail. Use WP Mail SMTP or FluentSMTP plugin in production.
+1. **Caching:** exclude `admin-ajax.php` and `?bhela_invoice=` — see `docs/CACHING.md`. Behind a CDN, set `BHELA_TRUSTED_PROXIES` in wp-config.php or every visitor shares one rate-limit bucket.
+2. **LocalWP emails:** Local sites don't send real mail. Use WP Mail SMTP or FluentSMTP plugin in production.
 2. **Compress-Archive backslash bug:** Never use PowerShell's `Compress-Archive` for release ZIPs (see §8).
 3. **Elementor override:** If Elementor is used on a page, the theme's coded sections for that page disappear entirely — by design.
 4. **Homepage editor content:** Adding any Gutenberg blocks to the front page REPLACES the coded homepage design. Leave it empty to keep the designed homepage.

@@ -111,7 +111,7 @@ function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 	);
 	$out = array(
 		'months' => array(), 'totals' => $totals, 'by_type' => array(),
-		'pending' => 0, 'best' => null, 'worst' => null,
+		'pending' => 0, 'stale' => 0, 'best' => null, 'worst' => null,
 	);
 	if ( ! $year || ! function_exists( 'bhela_bm_statement_data' ) ) {
 		return $out;
@@ -141,6 +141,7 @@ function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 		$out['totals']['expenses'] += $row['expenses'];
 		$out['totals']['gross']    += $row['gross'];
 		$out['pending']            += $row['pending'];
+		$out['stale']              += count( $d['stale'] );
 
 		// Expense mix for the whole year, so a single heavy month does not
 		// have to be opened to see what it was spent on.
@@ -356,6 +357,18 @@ function bhela_bm_yearly_page() {
 				<?php foreach ( $bhela_undated as $bhela_u ) : ?>
 					<a href="<?php echo esc_url( get_edit_post_link( $bhela_u['id'] ) ); ?>"><?php echo esc_html( $bhela_u['title'] ?: sprintf( '#%d', $bhela_u['id'] ) ); ?></a>
 				<?php endforeach; ?>
+			</p>
+		<?php endif; ?>
+
+
+		<?php if ( $d['stale'] ) : ?>
+			<p class="bha-callout bha-callout--attention bha-callout--lead">
+				<strong>⚠️ <?php echo esc_html( sprintf(
+					/* translators: %d: number of approved sheets whose bookings changed */
+					_n( '%d approved sheet no longer matches its bookings.', '%d approved sheets no longer match their bookings.', $d['stale'], 'bhela-booking' ),
+					$d['stale']
+				) ); ?></strong>
+				<?php esc_html_e( 'Bookings changed after those sheets were signed off, so the earnings below are the signed figures rather than the current ones. Open the month to see which.', 'bhela-booking' ); ?>
 			</p>
 		<?php endif; ?>
 

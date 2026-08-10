@@ -251,6 +251,21 @@ function bhela_bm_salary_meta_cb( $post ) {
 			</p>
 		</div>
 
+		<?php if ( $rows && 0 === (int) $trips ) : ?>
+			<?php
+			// Trip pay is rate × trips, and the count comes from approved cost
+			// sheets. Before any are approved that count is zero, so every
+			// trip-based crew member silently reads ৳0 payable. A sheet printed
+			// in that state underpays the whole crew, and nothing on the page
+			// said why the figures were empty.
+			?>
+			<p class="bha-callout bha-callout--attention bha-callout--lead">
+				<strong>⚠️ <?php esc_html_e( 'No approved cost sheets for this month yet, so every trip-based figure below is ৳0.', 'bhela-booking' ); ?></strong>
+				<?php esc_html_e( 'Approve this month\'s cost sheets first, then re-save this sheet — or type each person\'s trip count by hand. Do not pay from this sheet as it stands.', 'bhela-booking' ); ?>
+				<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=bhela_cost' ) ); ?>"><?php esc_html_e( 'Open Cost Sheets', 'bhela-booking' ); ?></a>
+			</p>
+		<?php endif; ?>
+
 		<?php if ( ! $rows ) : ?>
 			<p class="bha-callout bha-callout--attention bha-callout--lead">
 				<?php esc_html_e( 'No staff on the roster yet.', 'bhela-booking' ); ?>

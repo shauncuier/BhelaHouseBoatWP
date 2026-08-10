@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.25.0
+ * Version: 2.25.1
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.25.0' );
+define( 'BHELA_BM_VERSION', '2.25.1' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -582,6 +582,100 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/statement.php';
 	require_once BHELA_BM_PATH . 'includes/yearly.php';
 	require_once BHELA_BM_PATH . 'includes/salary.php';
+}
+
+/* =========================================================
+ * CLIENT IDENTITY (rate limiting)
+ * ========================================================= */
+
+/**
+ * The visitor's IP, as far as it can be trusted.
+ *
+ * Every throttle in this plugin keys on this — booking submits, availability
+ * lookups, the tracker, OTP sends, review submissions — so getting it wrong
+ * breaks in both directions at once:
+ *
+ *   Behind a CDN (Cloudflare and BunnyCDN are both common in Bangladesh),
+ *   REMOTE_ADDR is the edge node. Every visitor shares one value, so the first
+ *   handful of bookings exhaust the quota and the form closes for everybody.
+ *
+ *   Behind CGNAT, which is how most BD mobile networks hand out addresses,
+ *   thousands of subscribers share an address. Five OTP sends and the whole
+ *   carrier is locked out.
+ *
+ * X-Forwarded-For fixes both, but only when something trustworthy sets it —
+ * otherwise a client simply forges the header and every limit becomes
+ * bypassable. So the proxy must be named explicitly, in wp-config.php:
+ *
+ *     define( 'BHELA_TRUSTED_PROXIES', array( '203.0.113.10', '198.51.100.0/24' ) );
+ *
+ * With nothing configured this returns REMOTE_ADDR, exactly as before.
+ *
+ * @return string IP address, or '' when there is none.
+ */
+function bhela_bm_client_ip() {
+	$clean  = function ( $ip ) {
+		$ip = trim( (string) $ip );
+		return filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '';
+	};
+	$remote = $clean( $_SERVER['REMOTE_ADDR'] ?? '' );
+
+	$trusted = defined( 'BHELA_TRUSTED_PROXIES' ) ? (array) BHELA_TRUSTED_PROXIES : array();
+	if ( ! $remote || ! $trusted || empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+		return $remote;
+	}
+	if ( ! bhela_bm_ip_in_list( $remote, $trusted ) ) {
+		// The request did not come from a proxy we named, so its forwarding
+		// header is just user input.
+		return $remote;
+	}
+
+	// Leftmost entry is the original client. Everything after it is a hop.
+	$parts = explode( ',', (string) $_SERVER['HTTP_X_FORWARDED_FOR'] );
+	$first = $clean( $parts[0] );
+	return $first ?: $remote;
+}
+
+/**
+ * Is an IP one of these addresses or CIDR ranges?
+ *
+ * @param string $ip   Address to test.
+ * @param array  $list Addresses and/or CIDR blocks.
+ * @return bool
+ */
+function bhela_bm_ip_in_list( $ip, $list ) {
+	$packed = @inet_pton( $ip ); // phpcs:ignore WordPress.PHP.NoSilencedErrors -- invalid input is simply not a match.
+	if ( false === $packed ) {
+		return false;
+	}
+	foreach ( $list as $entry ) {
+		$entry = trim( (string) $entry );
+		if ( false === strpos( $entry, '/' ) ) {
+			if ( $entry === $ip ) {
+				return true;
+			}
+			continue;
+		}
+		list( $subnet, $bits ) = array_pad( explode( '/', $entry, 2 ), 2, '' );
+		$net = @inet_pton( $subnet ); // phpcs:ignore WordPress.PHP.NoSilencedErrors -- as above.
+		if ( false === $net || strlen( $net ) !== strlen( $packed ) ) {
+			continue;
+		}
+		$bits  = (int) $bits;
+		$bytes = intdiv( $bits, 8 );
+		$rem   = $bits % 8;
+		if ( $bytes && 0 !== substr_compare( $packed, $net, 0, $bytes ) ) {
+			continue;
+		}
+		if ( $rem ) {
+			$mask = chr( 0xFF << ( 8 - $rem ) & 0xFF );
+			if ( ( $packed[ $bytes ] & $mask ) !== ( $net[ $bytes ] & $mask ) ) {
+				continue;
+			}
+		}
+		return true;
+	}
+	return false;
 }
 
 /* =========================================================

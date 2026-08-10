@@ -164,6 +164,56 @@ ok( 205000 + 3318506 === (int) bhela_bm_yearly_data( '2026', 'financial' )['tota
 	'its cost now counts towards July 2026',
 	bhela_bm_money( bhela_bm_yearly_data( '2026', 'financial' )['totals']['cost'] ) );
 
+echo "\n=== 8c. earnings that went stale after sign-off ===\n";
+// Earnings are captured when the sheet is saved. Cancel a booking afterwards
+// and the approved sheet keeps the old figure, which the statement keeps
+// reporting — a trip that lost money still shows it, with nothing to say so.
+$st = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZY stale' ) );
+$made[] = $st;
+update_post_meta( $st, '_bhela_cost_trip_date', '2026-10-10' );
+update_post_meta( $st, '_bhela_cost_status', 'approved' );
+update_post_meta( $st, '_bhela_cost_total', 50000 );
+// The booking that existed when the sheet was signed off.
+$bk = wp_insert_post( array( 'post_type' => 'bhela_booking', 'post_status' => 'publish', 'post_title' => 'ZZY guest' ) );
+$made[] = $bk;
+update_post_meta( $bk, '_bhela_travel_date', '2026-10-10' );
+update_post_meta( $bk, '_bhela_status', 'confirmed' );
+update_post_meta( $bk, '_bhela_total', 200000 );
+
+// Saved from that booking, and never edited by hand.
+update_post_meta( $st, '_bhela_cost_earnings', 200000 );
+update_post_meta( $st, '_bhela_cost_earnings_auto', 200000 );
+
+ok( ! bhela_bm_cost_earnings_drift( $st )['stale'], 'no drift while the bookings still agree' );
+
+// The guest cancels after sign-off. Cancelled bookings stop counting, so the
+// trip is now worth 174,000 while the signed sheet still says 200,000.
+update_post_meta( $bk, '_bhela_status', 'cancelled' );
+$bk2 = wp_insert_post( array( 'post_type' => 'bhela_booking', 'post_status' => 'publish', 'post_title' => 'ZZY guest two' ) );
+$made[] = $bk2;
+update_post_meta( $bk2, '_bhela_travel_date', '2026-10-10' );
+update_post_meta( $bk2, '_bhela_status', 'confirmed' );
+update_post_meta( $bk2, '_bhela_total', 174000 );
+
+$d1 = bhela_bm_cost_earnings_drift( $st );
+ok( $d1['stale'], 'drift detected once the bookings no longer match the signed figure' );
+ok( 200000 === $d1['stored'], 'the signed figure is reported unchanged', bhela_bm_money( $d1['stored'] ) );
+ok( 174000 === $d1['live'], 'alongside what the bookings now say', bhela_bm_money( $d1['live'] ) );
+
+// A hand-typed figure is a decision, not a cache — it must never be flagged.
+update_post_meta( $st, '_bhela_cost_earnings', 190000 );
+ok( ! bhela_bm_cost_earnings_drift( $st )['stale'], 'a manually overridden figure is left alone' );
+update_post_meta( $st, '_bhela_cost_earnings', 200000 );
+
+// The statement reports it without altering the total it counts.
+$oct = bhela_bm_statement_data( '2026-10' );
+ok( 1 === count( $oct['stale'] ), 'the statement lists it', (string) count( $oct['stale'] ) );
+ok( 200000 === (int) $oct['earnings'], 'and still counts the signed figure, not the live one', bhela_bm_money( $oct['earnings'] ) );
+
+// The yearly rollup inherits the count, since it is twelve statements.
+ok( 1 === bhela_bm_yearly_data( '2026', 'financial' )['stale'], 'the yearly report carries it through' );
+
+
 echo "\n=== 9. permissions ===\n";
 ok( get_role( 'bhela_manager' )->has_cap( 'bhela_view_statement' ), 'a manager with the statement permission can open it' );
 ok( ! get_role( 'bhela_booking_staff' )->has_cap( 'bhela_view_statement' ), 'booking staff cannot' );

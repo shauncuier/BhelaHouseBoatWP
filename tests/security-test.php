@@ -87,8 +87,23 @@ foreach ( glob( WP_PLUGIN_DIR . '/bhela-booking/includes/*.php' ) as $f ) {
 	$plugin .= file_get_contents( $f );
 }
 preg_match_all( "/add_action\(\s*'(wp_ajax_(?!nopriv)[a-z_]+|admin_post_(?!nopriv)[a-z_]+)'\s*,\s*'([a-z_]+)'/", $plugin, $m, PREG_SET_ORDER );
+// Endpoints a logged-out visitor is meant to reach. Everything not listed here
+// must carry a nonce and a capability check, so adding a public endpoint is a
+// deliberate edit to this line rather than something that slips through.
+//
+// bhela_bm_ajax_nonce is the one that needs justifying: it issues a booking
+// nonce and cannot itself demand one, or a visitor on a cached page could
+// never obtain a valid one. It grants nothing new — the same nonce is already
+// printed into the public booking page — and it reads no data and writes none.
 $public = array( 'bhela_bm_ajax_submit', 'bhela_bm_ajax_availability', 'bhela_bm_ajax_track',
-	'bhela_bm_otp_ajax_send', 'bhela_bm_otp_ajax_verify', 'bhela_bm_review_submit' );
+	'bhela_bm_otp_ajax_send', 'bhela_bm_otp_ajax_verify', 'bhela_bm_review_submit',
+	'bhela_bm_ajax_nonce' );
+// A separate, narrower exemption. Being public is not a reason to skip the
+// nonce — every other endpoint above still checks one. Only an endpoint whose
+// job is to *hand out* the nonce can be excused from presenting one, and there
+// is exactly one of those.
+$nonceless = array( 'bhela_bm_ajax_nonce' );
+
 $bad = array();
 foreach ( $m as $row ) {
 	$fn = $row[2];
@@ -97,14 +112,48 @@ foreach ( $m as $row ) {
 		continue;
 	}
 	$body = substr( $plugin, $i, 2200 );
-	if ( ! preg_match( '/check_ajax_referer|check_admin_referer|wp_verify_nonce/', $body ) ) {
+	if ( ! in_array( $fn, $nonceless, true )
+		&& ! preg_match( '/check_ajax_referer|check_admin_referer|wp_verify_nonce/', $body ) ) {
 		$bad[] = "$fn: no nonce";
 	}
 	if ( ! in_array( $fn, $public, true ) && ! preg_match( '/current_user_can/', $body ) ) {
 		$bad[] = "$fn: no capability check";
 	}
 }
+// The exemption must stay a single, deliberate hole.
+ok( 1 === count( $nonceless ), 'exactly one endpoint is excused from presenting a nonce',
+	implode( ', ', $nonceless ) );
 ok( ! $bad, sprintf( 'all %d privileged endpoints guarded', count( $m ) ), implode( ' | ', $bad ) );
+
+echo "\n=== 7b. client IP behind a proxy ===\n";
+// Bangladesh mobile networks are CGNAT and CDNs are common, so REMOTE_ADDR is
+// shared by thousands of people. Every throttle keys on this; getting it wrong
+// locks real customers out of booking.
+$_SERVER['REMOTE_ADDR'] = '203.0.113.9';
+unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+ok( '203.0.113.9' === bhela_bm_client_ip(), 'with no proxy configured it is REMOTE_ADDR', bhela_bm_client_ip() );
+
+// A forged header must be ignored when the request did not come from a proxy
+// we named — otherwise every limit is one header away from being bypassed.
+$_SERVER['HTTP_X_FORWARDED_FOR'] = '9.9.9.9';
+ok( '203.0.113.9' === bhela_bm_client_ip(), 'an unsolicited X-Forwarded-For is ignored', bhela_bm_client_ip() );
+
+ok( bhela_bm_ip_in_list( '198.51.100.7', array( '198.51.100.0/24' ) ), 'CIDR match' );
+ok( ! bhela_bm_ip_in_list( '198.51.101.7', array( '198.51.100.0/24' ) ), 'CIDR non-match' );
+ok( bhela_bm_ip_in_list( '203.0.113.9', array( '203.0.113.9' ) ), 'exact match' );
+ok( ! bhela_bm_ip_in_list( 'not-an-ip', array( '203.0.113.9' ) ), 'garbage is not a match' );
+ok( ! bhela_bm_ip_in_list( '203.0.113.9', array( '2001:db8::/32' ) ), 'v4 does not match a v6 range' );
+
+// Every throttle must go through the helper, or one of them keeps the bug.
+$throttled = '';
+foreach ( array( 'frontend', 'otp', 'reviews' ) as $mod ) {
+	$throttled .= (string) file_get_contents( WP_PLUGIN_DIR . "/bhela-booking/includes/$mod.php" );
+}
+ok( false === strpos( $throttled, 'REMOTE_ADDR' ), 'no throttle reads REMOTE_ADDR directly any more' );
+ok( substr_count( $throttled, 'bhela_bm_client_ip()' ) >= 5, 'all five throttles use the helper',
+	(string) substr_count( $throttled, 'bhela_bm_client_ip()' ) );
+$_SERVER['REMOTE_ADDR'] = '127.0.0.1';
+unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );
 
 echo "\n=== 8. no secret is committed ===\n";
 $tracked = shell_exec( 'git -C "' . ABSPATH . '/wp-content" ls-files plugins/bhela-booking themes/bhela' );

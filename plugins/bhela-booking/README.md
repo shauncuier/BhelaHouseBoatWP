@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.25.0
+- **Version:** 2.25.1
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -247,6 +247,14 @@ Business info · payment details (bKash/Nagad/bank/QR) · advance % · invoice p
 The `bhela` theme auto-creates the booking pages, trip calendar, and menu on activation — and once per released version via a capability-gated `admin_init` check (skips AJAX/cron). Nothing to run manually; configure under **Bookings → Settings**.
 
 ## Changelog (recent)
+
+- **2.25.1** — The booking form now survives a full-page cache. The nonce is no
+  longer printed into the HTML (it expires in 12–24h, so a cached page broke every
+  AJAX call); the browser fetches a fresh one and retries once. Rate limits read the
+  real client IP behind a CDN or CGNAT via `BHELA_TRUSTED_PROXIES`. Approved cost
+  sheets whose bookings changed after sign-off are flagged on both reports. A salary
+  sheet warns when no cost sheets are approved yet, instead of silently showing ৳0.
+  See `docs/CACHING.md`.
 
 - **2.25.0** — Fixes the ৳ sign, which Segoe UI carries but draws a third too narrow; a
   `unicode-range` face now sources it from Nirmala UI on every admin screen, the printed cost

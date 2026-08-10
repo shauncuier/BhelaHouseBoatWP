@@ -113,6 +113,28 @@ ok( ! get_role( 'bhela_booking_staff' )->has_cap( 'edit_bhela_salaries' ), 'book
 ok( ! get_role( 'bhela_cost_preparer' )->has_cap( 'edit_bhela_salaries' ), 'cost preparer cannot' );
 if ( $saved_override ) { update_option( 'bhela_bm_role_perms', $saved_override ); bhela_bm_install_roles(); }
 
+echo "\n=== 8b. a month with nothing approved yet says so ===\n";
+// Trip pay is rate x trips and the count comes from approved cost sheets, so
+// before any are approved every trip-based crew member silently reads zero. A
+// sheet printed in that state underpays the whole crew.
+$empty = wp_insert_post( array( 'post_type' => 'bhela_salary', 'post_status' => 'publish', 'post_title' => 'ZZS empty month' ) );
+$made[] = $empty;
+update_post_meta( $empty, '_bhela_salary_month', '2026-12' );
+ok( 0 === bhela_bm_salary_trip_count( '2026-12' ), 'no approved sheets in that month', (string) bhela_bm_salary_trip_count( '2026-12' ) );
+
+$_GET = array();
+ob_start(); bhela_bm_salary_meta_cb( get_post( $empty ) ); $warn = ob_get_clean();
+ok( false !== strpos( $warn, 'No approved cost sheets for this month yet' ),
+	'the sheet warns before anyone pays from it' );
+ok( false !== strpos( $warn, 'bha-callout--attention' ), 'and it is styled as something to act on' );
+
+// It must stay quiet on a month that does have trips, or it becomes noise
+// people learn to scroll past.
+ok( 13 === bhela_bm_salary_trip_count( '2026-07' ), 'July still has its 13 approved trips', (string) bhela_bm_salary_trip_count( '2026-07' ) );
+ob_start(); bhela_bm_salary_meta_cb( get_post( $sheet ) ); $ok_month = ob_get_clean();
+ok( false === strpos( $ok_month, 'No approved cost sheets for this month yet' ),
+	'and stays quiet on a month that has them' );
+
 echo "\n=== 9. screen renders ===\n";
 ob_start(); bhela_bm_salary_meta_cb( get_post( $sheet ) ); $html = ob_get_clean();
 foreach ( array( 'Fatal error', 'Warning:', 'Notice:' ) as $bad ) { ok( false === strpos( $html, $bad ), "no '$bad'" ); }

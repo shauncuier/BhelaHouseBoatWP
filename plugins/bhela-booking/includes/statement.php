@@ -50,7 +50,7 @@ function bhela_bm_statement_data( $month ) {
 		'guests' => 0, 'earnings' => 0, 'cost' => 0, 'profit' => 0,
 		'expenses' => array( 'rows' => array(), 'by_type' => array(), 'total' => 0 ),
 		'gross' => 0, 'cost_pp' => 0.0, 'profit_pp' => 0.0,
-		'signoff' => array(),
+		'signoff' => array(), 'stale' => array(),
 	);
 	if ( ! $month ) {
 		return $out;
@@ -97,6 +97,21 @@ function bhela_bm_statement_data( $month ) {
 			$out['pending'][] = $row;
 			continue;
 		}
+		// An approved sheet whose bookings have changed since sign-off is still
+		// counted — it is the signed figure, and quietly substituting a new one
+		// would make the statement disagree with the sheet it cites — but the
+		// screen has to be able to say so.
+		$drift = function_exists( 'bhela_bm_cost_earnings_drift' ) ? bhela_bm_cost_earnings_drift( $id ) : array( 'stale' => false );
+		if ( ! empty( $drift['stale'] ) ) {
+			$out['stale'][] = array(
+				'id'     => $id,
+				'date'   => $row['date'],
+				'stored' => (int) $drift['stored'],
+				'live'   => (int) $drift['live'],
+				'diff'   => (int) $drift['diff'],
+			);
+		}
+
 		$out['trips'][]   = $row;
 		$out['guests']   += $row['guests'];
 		$out['earnings'] += $row['earnings'];
@@ -186,6 +201,28 @@ function bhela_bm_statement_page() {
 				<?php esc_html_e( 'It counts towards no month and no year until a date is set — not here, and not on any other report.', 'bhela-booking' ); ?>
 				<?php foreach ( $bhela_undated as $bhela_u ) : ?>
 					<a href="<?php echo esc_url( get_edit_post_link( $bhela_u['id'] ) ); ?>"><?php echo esc_html( $bhela_u['title'] ?: sprintf( '#%d', $bhela_u['id'] ) ); ?></a>
+				<?php endforeach; ?>
+			</p>
+		<?php endif; ?>
+
+
+		<?php if ( ! empty( $d['stale'] ) ) : ?>
+			<p class="bha-callout bha-callout--attention bha-callout--lead">
+				<strong>⚠️ <?php echo esc_html( sprintf(
+					/* translators: %d: number of approved sheets whose bookings changed */
+					_n( '%d approved sheet no longer matches its bookings.', '%d approved sheets no longer match their bookings.', count( $d['stale'] ), 'bhela-booking' ),
+					count( $d['stale'] )
+				) ); ?></strong>
+				<?php esc_html_e( 'A booking was added, cancelled or refunded after the sheet was signed off. The signed figure is what counts below — unlock the sheet, re-save and re-approve to bring it up to date.', 'bhela-booking' ); ?>
+				<?php foreach ( $d['stale'] as $bhela_s ) : ?>
+					<a href="<?php echo esc_url( get_edit_post_link( $bhela_s['id'] ) ); ?>"><?php
+						printf(
+							'%s: %s → %s',
+							esc_html( mysql2date( 'j M', $bhela_s['date'] ) ),
+							esc_html( bhela_bm_money( $bhela_s['stored'] ) ),
+							esc_html( bhela_bm_money( $bhela_s['live'] ) )
+						);
+					?></a>
 				<?php endforeach; ?>
 			</p>
 		<?php endif; ?>

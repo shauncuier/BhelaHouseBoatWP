@@ -495,7 +495,7 @@ function bhela_bm_review_submit() {
 	}
 
 	// Per-IP throttle — this endpoint writes posts and accepts files.
-	$ip   = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$ip   = bhela_bm_client_ip();
 	$key  = 'bhela_bm_review_' . md5( $ip );
 	$hits = (int) get_transient( $key );
 	if ( $hits >= 5 ) {

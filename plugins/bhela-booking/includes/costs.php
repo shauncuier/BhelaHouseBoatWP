@@ -389,6 +389,48 @@ function bhela_bm_cost_undated() {
 }
 
 /**
+ * Has this sheet's earnings figure gone stale since it was written?
+ *
+ * Earnings are captured when the sheet is saved. If a booking on that date is
+ * later cancelled, refunded or added, the sheet keeps the old number and the
+ * statement keeps reporting it — a trip that lost a ৳26,000 booking still
+ * shows the money.
+ *
+ * Deliberately reports rather than corrects. An approved sheet is signed off,
+ * and silently rewriting a figure three people put their name to would be
+ * worse than showing it is out of date; the fix is to unlock, adjust and
+ * re-approve, which the workflow already supports.
+ *
+ * A sheet whose earnings were typed by hand is left alone — a manual figure is
+ * a decision, not a cached value. That is what `_bhela_cost_earnings_auto`
+ * distinguishes: it is what the bookings said at the moment of saving.
+ *
+ * @param int $post_id Cost sheet.
+ * @return array{stale:bool,stored:int,live:int,diff:int}
+ */
+function bhela_bm_cost_earnings_drift( $post_id ) {
+	$stored = (int) get_post_meta( $post_id, '_bhela_cost_earnings', true );
+	$auto   = get_post_meta( $post_id, '_bhela_cost_earnings_auto', true );
+	$out    = array( 'stale' => false, 'stored' => $stored, 'live' => $stored, 'diff' => 0 );
+
+	// No auto figure recorded (a sheet saved before this existed), or the
+	// stored value was overridden by hand — either way, nothing to compare.
+	if ( '' === $auto || (int) $auto !== $stored ) {
+		return $out;
+	}
+	$date = (string) get_post_meta( $post_id, '_bhela_cost_trip_date', true );
+	if ( '' === $date ) {
+		return $out;
+	}
+
+	$live         = (int) bhela_bm_cost_booking_earnings( $date )['total'];
+	$out['live']  = $live;
+	$out['diff']  = $live - $stored;
+	$out['stale'] = $live !== $stored;
+	return $out;
+}
+
+/**
  * May this sheet be approved?
  *
  * Approval is the point of no return: the sheet locks, and from then on it is

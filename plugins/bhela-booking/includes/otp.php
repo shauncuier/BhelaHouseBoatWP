@@ -128,7 +128,7 @@ function bhela_bm_otp_ajax_send() {
 	$email = sanitize_email( wp_unslash( $_POST['email'] ?? '' ) );
 
 	// Per-IP ceiling, matching the other public endpoints.
-	$ip     = preg_replace( '/[^0-9a-fA-F:.]/', '', (string) ( $_SERVER['REMOTE_ADDR'] ?? '' ) );
+	$ip     = bhela_bm_client_ip();
 	$ip_key = 'bhela_bm_otpip_' . md5( $ip );
 	$ip_hits = (int) get_transient( $ip_key );
 	if ( $ip_hits >= 20 ) {
