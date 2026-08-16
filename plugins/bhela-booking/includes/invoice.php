@@ -59,12 +59,29 @@ function bhela_bm_maybe_render_invoice() {
 	nocache_headers();
 	header( 'X-Robots-Tag: noindex, nofollow', true );
 
+	$invoice = bhela_bm_invoice_data( $booking_id );
+
+	include BHELA_BM_PATH . 'templates/invoice.php';
+	exit;
+}
+
+/**
+ * Everything the printable template needs, for one booking.
+ *
+ * Split out of bhela_bm_maybe_render_invoice() so the invoice can be rendered
+ * without a request that ends in exit() — the render path is the only place the
+ * PAID stamp and the day-type label can actually be proved.
+ *
+ * @param int $booking_id Booking post ID.
+ * @return array
+ */
+function bhela_bm_invoice_data( $booking_id ) {
 	$settings = bhela_bm_get_settings();
 	$m        = function ( $k ) use ( $booking_id ) {
 		return get_post_meta( $booking_id, $k, true );
 	};
 
-	$invoice = array(
+	return array(
 		'settings'    => $settings,
 		'booking_id'  => $booking_id,
 		'invoice_no'  => $m( '_bhela_invoice_no' ),
@@ -75,7 +92,9 @@ function bhela_bm_maybe_render_invoice() {
 		'travel_date' => $m( '_bhela_travel_date' ),
 		'cabin'       => $m( '_bhela_cabin_type' ),
 		'guests'      => (int) $m( '_bhela_guests' ),
-		'day_type'    => $m( '_bhela_day_type' ),
+		// Derived from the travel date, never read raw: the stored meta is a cache
+		// and it has been stale in production. See bhela_bm_booking_day_type().
+		'day_type'    => bhela_bm_booking_day_type( $booking_id ),
 		'per_person'  => (int) $m( '_bhela_per_person' ),
 		'lines'       => is_array( json_decode( (string) $m( '_bhela_lines' ), true ) ) ? json_decode( (string) $m( '_bhela_lines' ), true ) : array(),
 		'total'       => (int) $m( '_bhela_total' ),
@@ -87,8 +106,5 @@ function bhela_bm_maybe_render_invoice() {
 		'status'      => $m( '_bhela_status' ) ? $m( '_bhela_status' ) : 'pending',
 		'message'     => $m( '_bhela_message' ),
 	);
-
-	include BHELA_BM_PATH . 'templates/invoice.php';
-	exit;
 }
 add_action( 'template_redirect', 'bhela_bm_maybe_render_invoice' );

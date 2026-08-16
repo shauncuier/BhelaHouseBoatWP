@@ -106,6 +106,9 @@ function bhela_bm_report_rows( $from, $to, $with_cancelled = false ) {
 			'guests'     => (int) get_post_meta( $id, '_bhela_guests', true ),
 			'total'      => $total,
 			'paid'       => $paid,
+			// Unclamped on purpose — this is the one surface that must NOT use
+			// bhela_bm_balance(): a negative figure here is how the owner spots an
+			// overpayment, which every guest-facing document clamps away.
 			'due'        => $total - $paid,
 			'status'     => $status,
 			'pay_method' => get_post_meta( $id, '_bhela_pay_method', true ),

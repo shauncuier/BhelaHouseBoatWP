@@ -336,7 +336,12 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | Function | File | Purpose |
 |---|---|---|
 | `bhela_bm_default_settings()` | `bhela-booking.php` | Returns all default settings array |
-| `bhela_bm_calc_multi($cabins, $date)` | `bhela-booking.php` | Authoritative multi-cabin pricing |
+| `bhela_bm_calc_multi($cabins, $date)` | `includes/frontend.php` | Authoritative multi-cabin pricing |
+| `bhela_bm_balance($total,$paid)` | `bhela-booking.php` | Due + `settled` — the one reading every guest-facing surface shares |
+| `bhela_bm_booking_day_type($id)` | `bhela-booking.php` | Day type derived from the travel date; the stored meta is only a fallback |
+| `bhela_bm_full_boat_label()` | `bhela-booking.php` | The whole-boat `_bhela_cabin_type` string — one copy for admin and form |
+| `bhela_bm_sanitize_weekend_days($raw)` | `bhela-booking.php` | `date('w')` numbers, whitelisted 0–6 (Sunday is 0, so the filter is explicit) |
+| `bhela_bm_invoice_data($id)` | `includes/invoice.php` | Everything the printable template needs — split out so the invoice is renderable in a test |
 | `bhela_bm_process_submission()` | `includes/frontend.php` | Processes new booking AJAX submit |
 | `bhela_bm_trip_availability($date)` | `includes/trips.php` | Returns `total/booked/available/status` |
 | `bhela_bm_send_sms($number, $msg)` | `includes/sms.php` | Send via configured gateway |
@@ -433,9 +438,10 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Eleven headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
-cost heads, the save round trip, every admin screen, WCAG contrast, OTP, the SMS gateway and
-the five version fields, and the yearly rollup.
+Thirteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+cost heads, the cost-sheet save round trip, the booking save handler, every admin screen, WCAG
+contrast, the front end behind a page cache, OTP, the SMS gateway, the six version fields, and
+the yearly rollup.
 Exits non-zero on failure. Any PHP 8.x binary works — `run.php` loads the extensions each
 harness needs, so never hand-build a `php -d extension=…` command. The site must be running.
 
@@ -458,7 +464,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all eleven harnesses
+- [ ] `php tests/run.php` passes — all thirteen harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -492,6 +498,8 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 5. **Plugin-first activation:** Always activate the booking plugin BEFORE the theme, or auto-page creation may fail.
 6. **settings.local.json is git-ignored:** The `.claude/` directory is excluded from git. Claude Code permissions need to be re-granted on each new machine.
 7. **Bengali text in source:** Many strings are hardcoded in Bengali — no translation files exist.
+8. **`_bhela_day_type` is a derived label, not stored truth.** Read it through `bhela_bm_booking_day_type()`. The raw meta is a cache and it went stale in production: a booking whose Travel Date was moved to a Monday kept printing "Weekend" on the invoice, because the only writers are the two repricing branches of `bhela_bm_save_booking()` and a booking taken online can reach neither.
+9. **A ৳0 booking is not a paid one.** `bhela_bm_balance()` requires a positive total before it calls a balance settled — a Full Boat sits at ৳0 until an admin prices it, and `0 − 0 = 0` would otherwise stamp an unpriced enquiry PAID.
 
 ---
 

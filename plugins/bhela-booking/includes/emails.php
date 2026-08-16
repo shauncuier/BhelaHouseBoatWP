@@ -25,7 +25,7 @@ function bhela_bm_booking_summary_text( $booking_id ) {
 	$lines[] = 'Cabin: ' . $m( '_bhela_cabin_type' );
 	$lines[] = 'Guests: ' . $m( '_bhela_guests' );
 	if ( $m( '_bhela_total' ) ) {
-		$lines[] = 'Per Person: ' . bhela_bm_money( $m( '_bhela_per_person' ) ) . ' (' . $m( '_bhela_day_type' ) . ')';
+		$lines[] = 'Per Person: ' . bhela_bm_money( $m( '_bhela_per_person' ) ) . ' (' . bhela_bm_booking_day_type( $booking_id ) . ')';
 		$lines[] = 'Total: ' . bhela_bm_money( $m( '_bhela_total' ) );
 		$lines[] = 'Advance (' . bhela_bm_advance_pct( $m( '_bhela_advance' ), $m( '_bhela_total' ) ) . '%): ' . bhela_bm_money( $m( '_bhela_advance' ) );
 		$lines[] = 'Paid: ' . bhela_bm_money( $m( '_bhela_paid_amount' ) );
@@ -101,8 +101,11 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	$invoice_no = $m( '_bhela_invoice_no' );
 	$total      = (int) $m( '_bhela_total' );
 	$advance    = (int) $m( '_bhela_advance' );
-	$paid       = (int) $m( '_bhela_paid_amount' );
-	$due        = max( 0, $total - $paid );
+	// Shared with the invoice deliberately: this email and that page are read side
+	// by side, and two copies of the same arithmetic is how they drift apart.
+	$bal        = bhela_bm_balance( $total, $m( '_bhela_paid_amount' ) );
+	$paid       = $bal['paid'];
+	$due        = $bal['due'];
 	$inv_url    = bhela_bm_invoice_url( $booking_id );
 	$wa_url     = bhela_bm_wa_url( $settings['whatsapp'], 'আসসালামু আলাইকুম। আমার বুকিং নম্বর: ' . $invoice_no );
 

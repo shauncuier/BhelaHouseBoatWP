@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.25.1
+ * Version: 2.26.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.25.1' );
+define( 'BHELA_BM_VERSION', '2.26.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -147,6 +147,23 @@ function bhela_bm_max_guests() {
 }
 
 /**
+ * The `_bhela_cabin_type` label a whole-boat booking carries.
+ *
+ * Extracted so wp-admin and the booking form cannot drift. This string is what
+ * the invoice, both emails, the SMS {cabin} placeholder and the Trip Report all
+ * print; a second hand-written copy in the save handler would have shown a guest
+ * one wording on the invoice and another in the text message.
+ */
+function bhela_bm_full_boat_label() {
+	return sprintf(
+		/* translators: 1: total cabins, 2: total guests */
+		__( 'Full Boat — কাস্টম কোট (%1$d কেবিন / %2$d জন)', 'bhela-booking' ),
+		bhela_bm_max_cabins(),
+		bhela_bm_max_guests()
+	);
+}
+
+/**
  * The rate row for a given cabin occupancy (falls back to the nearest larger,
  * then nearest smaller, tier if an exact one is not configured).
  */
@@ -271,6 +288,70 @@ function bhela_bm_day_type( $date ) {
 		return 'weekend';
 	}
 	return 'weekday';
+}
+
+/**
+ * A booking's day type, derived at read time from its travel date.
+ *
+ * `_bhela_day_type` is a cached derivation and it went stale. It is rewritten
+ * only by the two repricing branches of bhela_bm_save_booking() — and a booking
+ * taken online can enter neither: bhela_bm_process_submission() stamps
+ * `_bhela_manual_price = '1'` and never writes `_bhela_cabin_key`, so both
+ * conditions guarding the single-cabin reprice are permanently true, and the
+ * combination branch needs a checkbox nobody ticks. Moving the Travel Date on
+ * such a booking rewrote `_bhela_travel_date` and left the old label behind:
+ * 3 August 2026, a Monday, printed "Weekend" on a guest's invoice.
+ *
+ * Deriving from the date makes the label self-correcting on every read — for the
+ * records already in the database as much as for new ones. The stored meta is
+ * kept only as the fallback for a booking whose date is missing or malformed,
+ * where bhela_bm_day_type() would answer 'weekend' purely because strtotime()
+ * failed.
+ *
+ * @param int $booking_id Booking post ID.
+ * @return string 'holiday'|'weekend'|'weekday', or '' when nothing is known.
+ */
+function bhela_bm_booking_day_type( $booking_id ) {
+	$date  = (string) get_post_meta( $booking_id, '_bhela_travel_date', true );
+	$valid = DateTime::createFromFormat( 'Y-m-d', $date );
+	// The round-trip comparison is what rejects the shapes createFromFormat()
+	// accepts loosely — 2026-8-3, 2026-02-31 — rather than quietly answering for
+	// a different day. Same guard as bhela_bm_process_submission().
+	if ( $valid && $valid->format( 'Y-m-d' ) === $date ) {
+		return bhela_bm_day_type( $date );
+	}
+	return (string) get_post_meta( $booking_id, '_bhela_day_type', true );
+}
+
+/**
+ * The weekend-day list, as date('w') numbers.
+ *
+ * Whitelisted to 0–6 because nothing else can ever match date('w'), and an
+ * out-of-range value fails silently: it simply never matches, so that day drops
+ * off the regular rate and quietly bills at the 20% weekday discount.
+ *
+ * Two traps this sidesteps, both of which look like the obvious one-liner:
+ * array_filter() with no callback would throw Sunday away every single time it
+ * was ticked, because Sunday is 0. And mapping intval() over the input before
+ * range-checking it turns anything non-numeric INTO Sunday — 'x' becomes 0,
+ * which is inside the range and would silently tick Sunday as a weekend. So the
+ * numeric test comes first, and the loop is written out rather than chained.
+ *
+ * @param mixed $raw Whatever the form posted.
+ * @return int[] Unique day numbers, 0–6, in the order given.
+ */
+function bhela_bm_sanitize_weekend_days( $raw ) {
+	$days = array();
+	foreach ( (array) $raw as $d ) {
+		if ( ! is_numeric( $d ) ) {
+			continue;
+		}
+		$n = (int) $d;
+		if ( $n >= 0 && $n <= 6 && ! in_array( $n, $days, true ) ) {
+			$days[] = $n;
+		}
+	}
+	return $days;
 }
 
 /**
@@ -436,6 +517,35 @@ function bhela_bm_advance_pct( $advance, $total ) {
 	// number_format() always emits the decimal point, and that point stops the
 	// first rtrim() from eating a whole number's own zeros (100.00 → 100, not 1).
 	return rtrim( rtrim( number_format( $advance / $total * 100, 2, '.', '' ), '0' ), '.' );
+}
+
+/**
+ * What a booking still owes, and whether that balance is settled.
+ *
+ * Five places computed max(0, total − paid) on their own, and they already
+ * disagreed in one respect: the Trip Report keeps the sign, because an
+ * overpayment is something the owner needs to see, while every guest-facing
+ * surface clamps at zero. This owns the clamped reading and the one question
+ * none of them could answer: is the balance actually settled?
+ *
+ * "Settled" deliberately requires a positive total. A full-boat custom-quote
+ * request sits at ৳0 until an admin prices it, and 0 − 0 = 0 would otherwise
+ * stamp an unpriced enquiry PAID. And >= rather than ===, so a guest who rounded
+ * up — ৳50,000 against a ৳45,000 trip — is settled too, not one taka short of it.
+ *
+ * @param int|string $total Booking total.
+ * @param int|string $paid  Amount received.
+ * @return array{total:int,paid:int,due:int,settled:bool}
+ */
+function bhela_bm_balance( $total, $paid ) {
+	$total = (int) $total;
+	$paid  = (int) $paid;
+	return array(
+		'total'   => $total,
+		'paid'    => $paid,
+		'due'     => max( 0, $total - $paid ),
+		'settled' => ( $total > 0 && $paid >= $total ),
+	);
 }
 
 /**

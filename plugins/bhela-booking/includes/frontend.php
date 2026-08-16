@@ -425,7 +425,7 @@ function bhela_bm_process_submission( $data ) {
 			'advance'  => 0,
 			'due'      => 0,
 		);
-		$cabin_summary = sprintf( __( 'Full Boat — কাস্টম কোট (%1$d কেবিন / %2$d জন)', 'bhela-booking' ), bhela_bm_max_cabins(), bhela_bm_max_guests() );
+		$cabin_summary = bhela_bm_full_boat_label();
 	} else {
 		$price = is_array( $cabins )
 			? bhela_bm_calc_multi( $cabins, $date )

@@ -1284,6 +1284,20 @@
 }
 
 /* ---------------------------------------------------------------------------
+ * Booking editor
+ *
+ * The cabin combination, switched off. A Full Boat is sold as one unit, so the
+ * per-cabin table stops meaning anything — dimmed and inert rather than hidden,
+ * because unticking Full Boat must restore exactly what was there. Applied by
+ * the metabox's own script, so it never appears in the server-rendered markup.
+ * ------------------------------------------------------------------------ */
+
+.bha-combo-off {
+	opacity: .45;
+	pointer-events: none;
+}
+
+/* ---------------------------------------------------------------------------
  * Responsive
  *
  * 782px is where WordPress itself switches the admin to touch sizing, so the

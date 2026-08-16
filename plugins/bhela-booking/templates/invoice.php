@@ -10,7 +10,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 $s        = $invoice['settings'];
 $statuses = bhela_bm_statuses();
-$due      = max( 0, (int) $invoice['total'] - (int) $invoice['paid'] );
+$bal      = bhela_bm_balance( $invoice['total'], $invoice['paid'] );
+$due      = $bal['due'];
 // A discounted booking keeps the pre-discount figure in base_price, while the
 // line items still add up to it — so without an explicit discount row the guest
 // sees the items total one number and the summary total another.
@@ -76,6 +77,21 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.totals .row.paid strong { color:#1a7f37; }
 	.totals .row.discount strong { color:#1a7f37; }
 	.totals .row.subtotal-net { border-top:1px solid #d9dde0; font-weight:600; }
+	/* PAID stamp — the guest's one-glance answer to "do I still owe anything?".
+	   Built from a border and foreground text only, never a fill: the browser
+	   default is print-color-adjust:economy, which drops background-color and
+	   background-image, so a filled green badge prints as nothing at all. An
+	   outline survives ink-saving mode, greyscale, and a photocopy. */
+	.paid-stamp { display:flex; align-items:center; gap:14px; margin-top:16px;
+		padding:12px 18px; border:3px solid #1a7f37; border-radius:10px;
+		color:#1a7f37; transform:rotate(-3deg); }
+	.paid-stamp__tick { font-size:26px; line-height:1; flex:none; }
+	.paid-stamp__en { font-size:22px; font-weight:700; letter-spacing:2px;
+		text-transform:uppercase; line-height:1.1; }
+	.paid-stamp__bn { font-size:13px; font-weight:600; letter-spacing:.3px; }
+	/* Settled: the alarm colour has nothing left to warn about. */
+	.totals .row.due.is-settled strong { color:#1a7f37; }
+	@media (max-width:560px) { .paid-stamp { transform:none; } }
 	.pay-info { background:#F8F5EF; border-radius:10px; padding:18px 22px; margin:26px 0; line-height:1.9; }
 	.pay-info h3 { color:#14676B; font-size:14px; margin-bottom:6px; }
 	.pay-qrs { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; margin-top:16px; padding-top:16px; border-top:1px dashed #d8cfbc; }
@@ -210,7 +226,21 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<?php endif; ?>
 				<div class="row"><span>Advance (<?php echo esc_html( bhela_bm_advance_pct( $invoice['advance'], $invoice['total'] ) ); ?>%)</span><strong><?php echo esc_html( bhela_bm_money( $invoice['advance'] ) ); ?></strong></div>
 				<div class="row paid"><span>Paid</span><strong><?php echo esc_html( bhela_bm_money( $invoice['paid'] ) ); ?><?php echo $invoice['pay_method'] ? ' (' . esc_html( strtoupper( $invoice['pay_method'] ) ) . ( $invoice['txn_id'] ? ' — ' . esc_html( $invoice['txn_id'] ) : '' ) . ')' : ''; ?></strong></div>
-				<div class="row grand due"><span>Balance Due</span><strong><?php echo esc_html( bhela_bm_money( $due ) ); ?></strong></div>
+				<div class="row grand due<?php echo $bal['settled'] ? ' is-settled' : ''; ?>"><span>Balance Due</span><strong><?php echo esc_html( bhela_bm_money( $due ) ); ?></strong></div>
+				<?php
+				// The row stays even when it reads ৳0 — a guest comparing an unpaid
+				// copy with a settled one should see the same lines saying different
+				// things, not one document missing a line.
+				if ( $bal['settled'] ) :
+					?>
+					<div class="paid-stamp">
+						<span class="paid-stamp__tick" aria-hidden="true">✓</span>
+						<span>
+							<span class="paid-stamp__en">Paid</span><br>
+							<span class="paid-stamp__bn">সম্পূর্ণ পরিশোধিত</span>
+						</span>
+					</div>
+				<?php endif; ?>
 			</div>
 
 			<div class="pay-info">

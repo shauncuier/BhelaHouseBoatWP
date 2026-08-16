@@ -133,7 +133,20 @@ function bhela_bm_discount_metabox( $post ) {
 	?>
 	<div class="bha-disc">
 		<?php if ( $full ) : ?>
-			<p class="bha-callout bha-callout--attention bha-callout--lead">🚢 <strong><?php esc_html_e( 'Full Boat — custom quote requested.', 'bhela-booking' ); ?></strong> <?php esc_html_e( 'Set the price with Custom Total below.', 'bhela-booking' ); ?></p>
+			<?php $fb_total = (int) get_post_meta( $post->ID, '_bhela_total', true ); ?>
+			<p class="bha-callout bha-callout--attention bha-callout--lead">🚢 <strong><?php esc_html_e( 'Full Boat — the whole boat, priced by hand.', 'bhela-booking' ); ?></strong>
+				<?php if ( $fb_total < 1 ) : ?>
+					<?php esc_html_e( 'No price set yet — name it with Custom Total below, or in the Total field.', 'bhela-booking' ); ?>
+				<?php else : ?>
+					<?php
+					printf(
+						/* translators: %s: money amount */
+						esc_html__( 'Agreed price: %s.', 'bhela-booking' ),
+						esc_html( bhela_bm_money( $fb_total ) )
+					);
+					?>
+				<?php endif; ?>
+			</p>
 		<?php endif; ?>
 		<?php if ( $requested || $disc_msg ) : ?>
 			<div class="bha-callout bha-callout--attention bha-callout--lead">💬 <strong><?php esc_html_e( 'Guest request', 'bhela-booking' ); ?></strong><br>
@@ -222,6 +235,21 @@ function bhela_bm_details_metabox( $post ) {
 		<tr><th><?php esc_html_e( 'Total (৳)', 'bhela-booking' ); ?></th>
 			<td><input type="number" name="bhela_total" value="<?php echo esc_attr( $m( '_bhela_total' ) ); ?>">
 			<label style="margin-left:8px"><input type="checkbox" name="bhela_manual_price" value="1" <?php checked( $m( '_bhela_manual_price' ), '1' ); ?>> <?php esc_html_e( 'Manual price override', 'bhela-booking' ); ?></label></td></tr>
+		<?php
+		// Beside the Total, because typing the Total is how a whole boat gets its
+		// price — and in the same table as the cabin fields it overrides, rather
+		// than in the Discount box, where the cause and its effect would be in two
+		// separately-collapsible panels.
+		?>
+		<tr><th><?php esc_html_e( 'Full Boat', 'bhela-booking' ); ?></th>
+			<td><label><input type="checkbox" name="bhela_full_boat" id="bhela_full_boat" value="1" <?php checked( $m( '_bhela_full_boat' ), '1' ); ?>>
+				<strong>🚢 <?php printf(
+					/* translators: 1: cabin count, 2: guest capacity */
+					esc_html__( 'Whole-boat booking — takes all %1$d cabins (up to %2$d guests)', 'bhela-booking' ),
+					(int) bhela_bm_max_cabins(),
+					(int) bhela_bm_max_guests()
+				); ?></strong></label>
+			<p class="description"><?php esc_html_e( 'The cabin combination below is ignored — the boat is sold as one unit, and the price is whatever you type in Total above (or name with Custom Total in the Discount box). Put the real head count in Guests: it goes on the invoice and in the SMS. Untick to go back to per-cabin pricing.', 'bhela-booking' ); ?></p></td></tr>
 		<tr><th><?php esc_html_e( 'Advance (৳)', 'bhela-booking' ); ?></th>
 			<?php
 			$adv_total = (int) $m( '_bhela_total' );
@@ -264,6 +292,17 @@ function bhela_bm_details_metabox( $post ) {
 	?>
 	<h4 style="margin:14px 0 6px"><?php esc_html_e( '🛏️ Cabin Combination (edit & recalculate)', 'bhela-booking' ); ?></h4>
 	<p class="description" style="margin:0 0 8px"><?php printf( esc_html__( 'Each cabin = %1$d–%2$d people. Tick "Recalculate" to reprice from this combination on save (occupancy-based; 0–4 infants free).', 'bhela-booking' ), 2, (int) $max_cap ); ?></p>
+	<?php
+	// Shown by the script below whenever Full Boat is ticked. A dimmed table still
+	// looks like the place to type a head count — one admin put 25 in the Adults
+	// cell, where the per-cabin maximum of 6 then refused to let the page save.
+	?>
+	<p class="bha-callout bha-callout--attention" id="bhela-combo-off-note" style="max-width:520px" hidden>🚢 <?php printf(
+		/* translators: 1: the bolded "Guests" field label, 2: guest capacity */
+		esc_html__( 'Full Boat is on, so this combination is ignored and locked. The head count goes in %1$s above (up to %2$d).', 'bhela-booking' ),
+		'<strong>' . esc_html__( 'Guests', 'bhela-booking' ) . '</strong>',
+		(int) bhela_bm_max_guests()
+	); ?></p>
 	<table class="widefat" id="bhela-combo-table" style="max-width:520px">
 		<thead><tr><th><?php esc_html_e( 'Cabin', 'bhela-booking' ); ?></th><th><?php esc_html_e( 'Adults (9+)', 'bhela-booking' ); ?></th><th><?php esc_html_e( 'Child 4–8', 'bhela-booking' ); ?></th><th><?php esc_html_e( 'Infant 0–4', 'bhela-booking' ); ?></th><th></th></tr></thead>
 		<tbody>
@@ -302,6 +341,33 @@ function bhela_bm_details_metabox( $post ) {
 				if (rows.length > 1) { e.target.closest('tr').remove(); renum(); }
 			}
 		});
+
+		// Full Boat sells the boat as one unit, so the combination above stops
+		// meaning anything. Disabled rather than emptied: unticking must put the
+		// admin back exactly where they were, and the server ignores these rows
+		// while the flag is set regardless of what the browser did.
+		//
+		// `disabled` is load-bearing, not decoration. Dimming alone left the number
+		// inputs live, so their max="6" still ran through HTML5 constraint
+		// validation and refused to submit the page at all — an admin who typed the
+		// head count into the Adults cell got "Value must be less than or equal
+		// to 6" and could not save the booking. A disabled control is skipped by
+		// validation and is not posted.
+		var fb     = document.getElementById('bhela_full_boat');
+		var recalc = document.querySelector('input[name="bhela_combo_recalc"]');
+		var addBtn = document.getElementById('bhela-combo-add');
+		var offNote = document.getElementById('bhela-combo-off-note');
+		function syncFullBoat() {
+			var on = !!(fb && fb.checked);
+			tbl.classList.toggle('bha-combo-off', on);
+			tbl.querySelectorAll('input, button').forEach(function (el) { el.disabled = on; });
+			if (addBtn) { addBtn.disabled = on; }
+			// A disabled checkbox is not posted either — a second layer behind the
+			// server-side guard, and it stops a leftover tick from looking armed.
+			if (recalc) { recalc.disabled = on; if (on) { recalc.checked = false; } }
+			if (offNote) { offNote.hidden = !on; }
+		}
+		if (fb) { fb.addEventListener('change', syncFullBoat); syncFullBoat(); }
 	})();
 	</script>
 	<?php
@@ -375,6 +441,10 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	// move (into a possibly-full date) from a plain status change.
 	$old_date = get_post_meta( $post_id, '_bhela_travel_date', true );
 
+	// And the pre-save footprint, for the same reason: ticking Full Boat grows a
+	// booking from one or two cabins to six without moving status or date.
+	$old_cabins = (int) bhela_bm_booking_cabin_count( $post_id );
+
 	$fields = array(
 		'_bhela_phone'        => sanitize_text_field( $_POST['bhela_phone'] ?? '' ),
 		'_bhela_email'        => sanitize_email( $_POST['bhela_email'] ?? '' ),
@@ -386,9 +456,33 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		'_bhela_message'      => sanitize_textarea_field( $_POST['bhela_message'] ?? '' ),
 		'_bhela_paid_amount'  => max( 0, (int) ( $_POST['bhela_paid_amount'] ?? 0 ) ),
 		'_bhela_manual_price' => isset( $_POST['bhela_manual_price'] ) ? '1' : '',
+		// Going through the loop below is the whole un-tick contract: an absent
+		// checkbox writes '', on every save, so the flag can never get stuck on.
+		'_bhela_full_boat'    => isset( $_POST['bhela_full_boat'] ) ? '1' : '',
 	);
 	foreach ( $fields as $key => $value ) {
 		update_post_meta( $post_id, $key, $value );
+	}
+
+	// `_bhela_day_type` is a label, not a price, so unlike the Total it is safe —
+	// and necessary — to refresh on every save. It used to be written only by the
+	// two repricing branches below, neither of which a booking taken online can
+	// reach, so moving the Travel Date left the old label in place and the invoice
+	// printed "Weekend" against a Monday. Written here: after the loop above, so
+	// the new travel date is already stored, and ahead of those branches, which
+	// then restate the identical value from the same engine.
+	update_post_meta( $post_id, '_bhela_day_type', bhela_bm_booking_day_type( $post_id ) );
+
+	$full_boat = '1' === $fields['_bhela_full_boat'];
+
+	// A whole-boat booking is priced by hand, always — there is no per-cabin rate
+	// for "the boat". Forcing the override here rather than trusting the admin to
+	// tick two boxes is what stops the reprice branch below from valuing the boat as
+	// a single cabin the moment a cabin type is picked in the dropdown. The local
+	// array is updated as well as the meta, because that is what the branch reads.
+	if ( $full_boat && '1' !== $fields['_bhela_manual_price'] ) {
+		$fields['_bhela_manual_price'] = '1';
+		update_post_meta( $post_id, '_bhela_manual_price', '1' );
 	}
 
 	if ( ! get_post_meta( $post_id, '_bhela_invoice_no', true ) ) {
@@ -397,7 +491,9 @@ function bhela_bm_save_booking( $post_id, $post ) {
 
 	$cabin_key = $fields['_bhela_cabin_key'];
 	if ( '1' === $fields['_bhela_manual_price'] || ! $cabin_key ) {
-		update_post_meta( $post_id, '_bhela_per_person', (int) ( $_POST['bhela_per_person'] ?? 0 ) );
+		// A lump sum has no per-person rate, and templates/invoice.php would print
+		// one if it were left there. Mirrors bhela_bm_process_submission().
+		update_post_meta( $post_id, '_bhela_per_person', $full_boat ? 0 : (int) ( $_POST['bhela_per_person'] ?? 0 ) );
 		update_post_meta( $post_id, '_bhela_total', (int) ( $_POST['bhela_total'] ?? 0 ) );
 	} else {
 		$price = bhela_bm_calc_price( $cabin_key, $fields['_bhela_guests'], $fields['_bhela_travel_date'] );
@@ -409,8 +505,12 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		}
 	}
 
-	// Cabin combination editor → reprice via the occupancy engine.
-	if ( ! empty( $_POST['bhela_combo_recalc'] ) ) {
+	// Cabin combination editor → reprice via the occupancy engine. A whole-boat
+	// booking has no per-cabin price, so the combination is ignored entirely:
+	// otherwise a "Recalculate" tick left over from before the boat was sold as one
+	// unit would overwrite the agreed lump sum with the price of whatever rows
+	// happen to still be in the table.
+	if ( ! $full_boat && ! empty( $_POST['bhela_combo_recalc'] ) ) {
 		$adults_in = (array) ( $_POST['bhela_cabin_adults'] ?? array() );
 		$c48_in    = (array) ( $_POST['bhela_cabin_c48'] ?? array() );
 		$c04_in    = (array) ( $_POST['bhela_cabin_c04'] ?? array() );
@@ -450,7 +550,22 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	// field is written on every save, so a stale value there would otherwise
 	// overwrite the real total and go out in the SMS and emails — an invoice
 	// listing four people alongside a text reading "Guests: 1".
-	if ( isset( $_POST['bhela_cabin_adults'] ) && is_array( $_POST['bhela_cabin_adults'] ) ) {
+	if ( $full_boat ) {
+		// Sold as one unit: it takes every cabin, whatever the combination table
+		// happens to show. The cabin count is what the capacity guard below reads,
+		// so getting this wrong would let a full boat be confirmed onto a date that
+		// already has cabins sold.
+		update_post_meta( $post_id, '_bhela_cabin_count', bhela_bm_max_cabins() );
+		update_post_meta( $post_id, '_bhela_cabin_type', bhela_bm_full_boat_label() );
+		// The head count stays the admin's, unlike on the booking form, which has to
+		// assume a full 36: an admin has the real number in front of them, and it is
+		// what goes on the invoice and in the SMS. Clamped anyway, because the
+		// input's max attribute is only advice.
+		update_post_meta( $post_id, '_bhela_guests', min(
+			bhela_bm_max_guests(),
+			max( 1, (int) ( $_POST['bhela_guests'] ?? 1 ) )
+		) );
+	} elseif ( isset( $_POST['bhela_cabin_adults'] ) && is_array( $_POST['bhela_cabin_adults'] ) ) {
 		$adults_c = (array) $_POST['bhela_cabin_adults'];
 		$c48_c    = (array) ( $_POST['bhela_cabin_c48'] ?? array() );
 		$c04_c    = (array) ( $_POST['bhela_cabin_c04'] ?? array() );
@@ -492,6 +607,15 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		update_post_meta( $post_id, '_bhela_manual_price', '1' );
 	}
 
+	// Checked after the discount panel, so an applied Custom Total counts as a
+	// price. A full boat at ৳0 is an unpriced quote — legitimate when the guest
+	// created it, almost certainly a forgotten field when an admin did. Nothing
+	// else on the screen would say so: the invoice would go out with a ৳0 total,
+	// and it would not print PAID either.
+	if ( $full_boat && (int) get_post_meta( $post_id, '_bhela_total', true ) < 1 ) {
+		set_transient( 'bhela_bm_fb_warn_' . $post_id, 1, 45 );
+	}
+
 	// The Advance is the admin's decision, never a formula. 50% is only the
 	// suggestion a *new* booking is created with (see bhela_bm_process_submission);
 	// from then on this field is the single source of truth and no repricing path
@@ -515,8 +639,13 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	// date still has room. Block by default; the "Overbook" checkbox forces it
 	// through for Full Boat / exceptions.
 	$consuming   = array( 'advance_paid', 'confirmed', 'completed' );
+	// The third arm catches a booking that grew: ticking Full Boat on an already
+	// confirmed, same-date two-cabin booking triples its footprint without moving
+	// status or date, and the first two arms would never have looked.
 	$is_entering = in_array( $new_status, $consuming, true )
-		&& ( ! in_array( $old_status, $consuming, true ) || $new_date !== $old_date );
+		&& ( ! in_array( $old_status, $consuming, true )
+			|| $new_date !== $old_date
+			|| bhela_bm_booking_cabin_count( $post_id ) > $old_cabins );
 	$override    = ! empty( $_POST['bhela_overbook'] );
 	$cap_blocked = false;
 
@@ -610,6 +739,16 @@ function bhela_bm_combo_error_notice() {
 		delete_transient( 'bhela_bm_cap_err_' . $post->ID );
 		echo '<div class="notice notice-error is-dismissible"><p>⚠️ ' . esc_html( $cap ) . '</p></div>';
 	}
+	// A Full Boat with no price is legitimate when a guest asked for a quote, and
+	// almost certainly a forgotten field when an admin typed the booking in.
+	if ( get_transient( 'bhela_bm_fb_warn_' . $post->ID ) ) {
+		delete_transient( 'bhela_bm_fb_warn_' . $post->ID );
+		printf(
+			'<div class="notice notice-warning is-dismissible"><p><strong>%s</strong> %s</p></div>',
+			esc_html__( 'Full Boat saved with no price.', 'bhela-booking' ),
+			esc_html__( 'The invoice will show ৳0 and no balance due. Type the agreed amount in Total (or Custom Total) and save again.', 'bhela-booking' )
+		);
+	}
 }
 add_action( 'admin_notices', 'bhela_bm_combo_error_notice' );
 
@@ -660,7 +799,7 @@ function bhela_bm_settings_page() {
 		// day — and with none set, every date silently falls to the discounted
 		// weekday rate. A marker field tells the two cases apart.
 		if ( isset( $_POST['bhela_pricing_days_present'] ) ) {
-			$s['weekend_days'] = array_map( 'intval', (array) ( $_POST['weekend_days'] ?? array() ) );
+			$s['weekend_days'] = bhela_bm_sanitize_weekend_days( $_POST['weekend_days'] ?? array() );
 		}
 
 		// Guest review submissions — caps on the only public upload surface.

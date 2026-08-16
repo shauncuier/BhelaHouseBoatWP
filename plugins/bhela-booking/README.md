@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.25.1
+- **Version:** 2.26.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -15,7 +15,8 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - **Trip calendar** — shortcode `[bhela_trip_calendar]`: admin-managed dates + per-date cabin inventory (X/6 available).
 - **Reviews** — shortcode `[bhela_reviews]`.
 - **Cabin inventory** — `booked` count per trip; frontend + form respect remaining cabins; server rejects over-capacity submits.
-- **Invoices** — secure per-booking link (`wp_hash` + `hash_equals`), per-cabin per-person line items, bKash/Nagad/bank/QR.
+- **Invoices** — secure per-booking link (`wp_hash` + `hash_equals`), per-cabin per-person line items, bKash/Nagad/bank/QR. A settled invoice carries a **PAID / সম্পূর্ণ পরিশোধিত** stamp drawn as an outline, so it survives printing with backgrounds off; an unpriced ৳0 quote never gets one.
+- **Full Boat** — bookable from the form *and* creatable in wp-admin: takes all 6 cabins, priced by hand, and cannot be confirmed onto a date with any other cabin sold unless "Overbook" is ticked. Saving one with no price warns rather than blocks.
 - **Booking tracker** — customers look up status by phone/email (not the guessable invoice number).
 - **Email notifications** — per-type toggles, owner recipient, From-name, Reply-To, test send.
 - **SMS notifications** — provider-agnostic (BulkSMSBD preset + custom-gateway mapping), 3 triggers, test send. Off by default.
@@ -59,6 +60,11 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 - `bhela_bm_permissions()` — the togglable permission registry, and the allow-list for what the Team screen may grant.
 - `bhela_bm_normalise_perms( $perms )` — drops unknown keys, pulls in prerequisites.
 - `bhela_bm_calc_multi( $cabins, $date )` — authoritative per-cabin pricing.
+- `bhela_bm_balance( $total, $paid )` → `total / paid / due / settled`. The one reading every guest-facing surface shares. `settled` requires a positive total, so an unpriced ৳0 quote is never treated as paid.
+- `bhela_bm_booking_day_type( $booking_id )` — the day type derived from the booking's travel date. Always use this instead of reading `_bhela_day_type`, which is a cache and has been stale in production.
+- `bhela_bm_full_boat_label()` — the `_bhela_cabin_type` string a whole-boat booking carries, so wp-admin and the booking form cannot drift.
+- `bhela_bm_sanitize_weekend_days( $raw )` — `date('w')` numbers whitelisted to 0–6.
+- `bhela_bm_invoice_data( $booking_id )` — everything `templates/invoice.php` needs, without a request that ends in `exit()`.
 - `bhela_bm_screen_header( $icon, $title, $lead, $actions, $class )` — the banner every screen opens with.
 - `bhela_bm_status_pill( $label, $tone, $solid )` — one pill for every status vocabulary in the plugin.
 - `bhela_bm_is_plugin_screen()` — true on a BHELA admin screen; gates the stylesheet and the body class.
