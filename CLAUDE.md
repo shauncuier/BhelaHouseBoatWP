@@ -19,8 +19,13 @@
 **GitHub:** https://github.com/shauncuier/BhelaHouseBoatWP
 **Branch:** `main`
 **Author/Dev:** 3s-Soft (https://3s-soft.com)
-**Local dev:** LocalWP (Local by Flywheel) — site name `bhela-house-boat`
-**Local URL:** http://bhela-house-boat.local/
+**Local dev:** LocalWP (Local by Flywheel) — current site name `bhela`
+**Local URL:** http://bhela.local/ · admin at http://bhela.local/wp-admin/
+
+> The site name is **per-machine and it has changed before** — an earlier `bhela-house-boat`
+> site is still registered in LocalWP, so a hardcoded path can quietly point at a
+> different database. Never hardcode the repo path: resolve it with
+> `git rev-parse --show-toplevel`. See §5.1.
 
 ---
 
@@ -217,11 +222,24 @@ Bookings are stored as a **private Custom Post Type** (`bhela_booking`) with pos
 ### 5.1 Local Setup (LocalWP)
 
 ```
-Site name:    bhela-house-boat
-Local URL:    http://bhela-house-boat.local/
-WP root:      c:\Users\jashe\Local Sites\bhela-house-boat\app\public\
-wp-content:   c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\  ← Git root
+Site name:    bhela                        ← per-machine, do not depend on it
+Local URL:    http://bhela.local/
+WP root:      <LocalWP site>\app\public\
+wp-content:   <LocalWP site>\app\public\wp-content\   ← Git root
 ```
+
+On the current machine that resolves to `C:\Users\jashe\Local Sites\bhela\app\public\wp-content`,
+but **do not write that path into a script.** A stale `bhela-house-boat` path survived a site
+rename in this file and in the release skill, and both still exist in LocalWP — so the wrong one
+answers, on a different database, with no error. Resolve the root instead:
+
+```powershell
+$root = (git rev-parse --show-toplevel).Replace('/', '\')   # git answers with forward slashes
+```
+
+Two BHELA sites are registered locally. `tests/bootstrap.php` already handles this correctly:
+it matches the LocalWP site whose recorded path **contains this checkout** rather than trusting a
+name, which is why the harnesses reach the right database on either machine.
 
 ### 5.2 Setting Up on a New Computer
 
@@ -455,7 +473,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Local Testing
 
-- **Site check:** Visit http://bhela-house-boat.local/
+- **Site check:** Visit http://bhela.local/
 - **Booking test:** Submit a test booking → verify AJAX response + booking in admin
 - **Invoice test:** Open invoice link → verify rendering + print layout
 - **Email test:** Use "Send Test Email" button in Bookings → Settings
@@ -513,7 +531,7 @@ When working on this project as an AI assistant:
 - **Follow WordPress coding standards** — proper escaping, nonce verification, capability checks
 - **Keep pricing logic in sync** between `bhela-booking.php` (PHP) and `booking.js` (JS)
 - **Prefix all functions** with `bhela_` (theme) or `bhela_bm_` (plugin)
-- **Test changes locally** at http://bhela-house-boat.local/
+- **Test changes locally** at http://bhela.local/
 - **Run `graphify update .`** after modifying code files
 - **Preserve existing comments** and docstrings unless specifically asked to change them
 
@@ -530,30 +548,39 @@ When working on this project as an AI assistant:
 
 ## 15. Quick Commands
 
+Run these from anywhere inside the repo — they are deliberately path-free, so they cannot
+end up pointed at the wrong LocalWP site (see §5.1).
+
 ```powershell
 # Check git status
-git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" status
+git status --short
 
 # View recent commits
-git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" log --oneline -10
+git log --oneline -10
 
 # Pull latest from GitHub
-git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" pull origin main
+git pull origin main
 
 # Push to GitHub
-git -C "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content" push origin main
+git push origin main
 
-# Run the regression suite
+# Run the regression suite (thirteen harnesses)
 php tests/run.php
 
 # Validate JS syntax
-node --check "c:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\plugins\bhela-booking\assets\booking.js"
+node --check plugins/bhela-booking/assets/booking.js
 
 # Update knowledge graph
 graphify update .
 
 # Check site is running
-curl -s -o /dev/null -w "site: %{http_code}\n" --max-time 12 "http://bhela-house-boat.local/"
+curl -s -o /dev/null -w "site: %{http_code}\n" --max-time 12 "http://bhela.local/"
+```
+
+If you need the repo root as a variable (building release ZIPs, for instance):
+
+```powershell
+$root = (git rev-parse --show-toplevel).Replace('/', '\')
 ```
 
 ---
