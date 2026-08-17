@@ -44,11 +44,18 @@ if ( ! defined( 'ABSPATH' ) ) {
  * takes a single capability and cannot express that, so the OR is evaluated in
  * bhela_bm_menu_visible() instead.
  *
- * `slug` doubles as the group's landing page, so clicking the parent opens the
- * screen someone actually wants rather than an index page nobody maintains.
- * WordPress renders one row when a child's slug equals its parent's. Every slug
- * keeps the `bhela-bm-` prefix, because that is what bhela_bm_is_plugin_screen()
- * matches on to load admin.css — a menu slug without it would render unstyled.
+ * `slug` is the group's identity and its registered callback, so the parent is a
+ * real screen rather than an index page nobody maintains — WordPress renders one
+ * row when a child's slug equals its parent's.
+ *
+ * It is NOT necessarily where clicking the parent lands. _wp_menu_output() builds a
+ * top-level's href from its FIRST submenu row, so the landing screen is whatever
+ * bhela_bm_menu_layout() lists first for that group — Cost Sheets for Accounts,
+ * Item Register for Store. bhela_bm_menu_landing() reports it, and ui-test pins it.
+ *
+ * Every slug keeps the `bhela-bm-` prefix, because that is what
+ * bhela_bm_is_plugin_screen() matches on to load admin.css — a menu slug without
+ * it would render unstyled.
  *
  * Bookings is deliberately absent: it belongs to the bhela_booking post type and
  * is not created here. Moving it would mean rewriting the ~40 places that build a
@@ -131,6 +138,22 @@ function bhela_bm_menu_parent( $group ) {
 	return ( $slug && bhela_bm_menu_visible( $group ) ) ? $slug : bhela_bm_menu_bookings_parent();
 }
 
+/**
+ * Where clicking a top-level menu actually lands.
+ *
+ * _wp_menu_output() builds a top-level's href from `$submenu[$parent][0][2]` — its
+ * first row — not from the parent's own slug. So this is a property of
+ * bhela_bm_menu_layout()'s ordering, and reordering a group silently changes where
+ * its menu goes. It went wrong once: with 📊 Dashboard listed first, clicking
+ * "Bookings" opened the dashboard instead of the booking list.
+ *
+ * @param string $group Group key.
+ * @return string First slug in the group, or '' if the group has no rows.
+ */
+function bhela_bm_menu_landing( $group ) {
+	return bhela_bm_menu_layout()[ $group ][0] ?? '';
+}
+
 /** Which group owns a page slug. Drives bhela_bm_admin_url() and the legacy shim. */
 function bhela_bm_menu_page_group( $page ) {
 	static $map = null;
@@ -160,9 +183,13 @@ function bhela_bm_menu_page_group( $page ) {
 function bhela_bm_menu_layout() {
 	return array(
 		'bookings' => array(
-			'bhela-bm-dashboard',                     // 📊 Dashboard
+			// All Bookings first, and not for tidiness: WordPress builds a top-level
+			// menu's own href from its FIRST submenu row. With Dashboard here, clicking
+			// "Bookings" went to admin.php?page=bhela-bm-dashboard — which does resolve,
+			// but is not the booking list anyone clicking "Bookings" is asking for.
 			'edit.php?post_type=bhela_booking',       // All Bookings
 			'post-new.php?post_type=bhela_booking',   // Add New Booking
+			'bhela-bm-dashboard',                     // 📊 Dashboard
 			'bhela-bm-reports',                       // 📄 Trip Report
 			'bhela-bm-trips',                         // 📅 Trip Calendar
 			'edit.php?post_type=bhela_review',        // ⭐ Reviews

@@ -118,6 +118,12 @@ $GLOBALS['finished'] = false;
 // with the handler registered afterwards it never ran, every harness "passed",
 // and the runner reported 9 of 9 green against a database it had never
 // reached. A suite that goes green when nothing ran is worse than no suite.
+// Registered BEFORE the summary handler above, and that ordering is the whole trick:
+// the summary handler ends in exit(), and an exit() inside a shutdown function cancels
+// every shutdown function registered after it. The first version of this guard sat
+// further down the file, never ran, and a green suite still left six fixture months in
+// the live period index with the real August sheet overwritten.
+register_shutdown_function( 'bhela_test_restore_period_index' );
 bhela_test_register_shutdown();
 
 require_once $bhela_wp_root . '/wp-load.php';
@@ -188,6 +194,52 @@ function bhela_test_isolate() {
 if ( ! getenv( 'BHELA_TEST_NO_ISOLATE' ) ) {
 	bhela_test_isolate();
 }
+
+/**
+ * Put the stock period index back exactly as it was found.
+ *
+ * `bhela_bm_inv_periods` is the live `YYYY-MM` => post-ID map, and the uniqueness
+ * constraint behind one-sheet-per-month. It is the one piece of production state a
+ * harness cannot avoid touching: minting a fixture period writes to it, and deleting
+ * that fixture afterwards does NOT remove the entry — leaving the index pointing at a
+ * post that no longer exists.
+ *
+ * Both consequences bite real data. A real month whose entry has been dropped or
+ * overwritten reads as "this month has not been opened yet" with its figures still in
+ * the database, and `bhela_bm_inv_period_id( $month, true )` will mint a second sheet
+ * on top of it. That happened: a real August 2026 sheet went missing after a green run.
+ *
+ * This lives in the bootstrap rather than in a harness because both harnesses that
+ * mint periods need it and only one of them knew.
+ *
+ * Restoring the snapshot verbatim, not rebuilding from posts:
+ * bhela_bm_inv_period_reindex() reads through get_posts(), which the isolation above
+ * has scoped to `post_title LIKE 'ZZ%'` — so a rebuild inside a harness would index
+ * the fixtures and drop every real month.
+ */
+function bhela_test_restore_period_index() {
+	// sweep.php rewrites this index on purpose — that is its job, and restoring a
+	// snapshot over the top would undo the repair it just made.
+	if ( defined( 'BHELA_TEST_INDEX_WRITER' ) && BHELA_TEST_INDEX_WRITER ) {
+		return;
+	}
+	// Nothing to restore if we never got far enough to take the snapshot.
+	if ( ! array_key_exists( 'bhela_periods_before', $GLOBALS ) || ! function_exists( 'update_option' ) ) {
+		return;
+	}
+	$before = $GLOBALS['bhela_periods_before'];
+	if ( get_option( 'bhela_bm_inv_periods', array() ) === $before ) {
+		return;
+	}
+	if ( $before ) {
+		update_option( 'bhela_bm_inv_periods', $before, false );
+	} else {
+		delete_option( 'bhela_bm_inv_periods' );
+	}
+}
+
+// Taken here, after WordPress is up and before any harness code runs.
+$GLOBALS['bhela_periods_before'] = get_option( 'bhela_bm_inv_periods', array() );
 
 /* ---------- Assertions ---------- */
 

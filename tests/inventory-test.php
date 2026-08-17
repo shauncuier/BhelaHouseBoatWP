@@ -30,6 +30,13 @@ $plugin = WP_PLUGIN_DIR . '/bhela-booking';
 // Start from a known state. A crashed earlier run can leave the period index
 // pointing at posts that no longer exist, and this harness is entirely about
 // balances carried between months — so it must not inherit anyone else's.
+//
+// Clearing it here is safe only because bhela_test_guard_period_index() in the
+// bootstrap snapshots the live index and puts it back on shutdown. Without that,
+// this line orphans every real stock month — the figures stay in the database while
+// the screen reports "this month has not been opened yet", and
+// bhela_bm_inv_period_id( $month, true ) will mint a SECOND sheet on top of it. That
+// is not hypothetical: a real August 2026 sheet went missing after a green run.
 delete_option( 'bhela_bm_inv_periods' );
 delete_option( 'bhela_bm_inv_seq' );
 
@@ -468,11 +475,32 @@ ok( $c1 < 30, 'a month reads in under 30 queries', (string) $c1 );
 ok( $c2 <= $c1 + 2, 'and doubling the register does not add queries per item', $c1 . ' → ' . $c2 );
 unset( $bulk );
 
+echo "\n=== 16. closing stock is worth something ===\n";
+// Found with real data in the browser, not here: the sheet has no rate column, so
+// the figure has to come from the item register. The first save built its line from
+// bhela_bm_inv_blank_line() (rate 0) and wrote that, and because month_data() only
+// seeds a rate for a line that does not exist yet, nothing ever put it back —
+// closing value read ৳0 for every item, for good.
+$val_item   = iv_item( 'Valued plate', 'inventory', 'kitchen', 180 );
+$val_period = iv_period( '2026-12' );
+iv_save( $val_period, array( $val_item => array( 'add' => 60, 'use' => 4, 'good' => 50, 'dam' => 6, 'count' => 56 ) ) );
+$val_lines = bhela_bm_inv_stored_lines( $val_period );
+$val_line  = $val_lines[ bhela_bm_inv_line_key( $val_item ) ] ?? array();
+ok( 180 === (int) ( $val_line['rate'] ?? 0 ), 'a first save takes the rate from the item register', 'rate: ' . (int) ( $val_line['rate'] ?? 0 ) );
+ok( 10080 === (int) bhela_bm_inv_period_totals( $val_period )['value'], 'closing value is 56 × ৳180', (string) bhela_bm_inv_period_totals( $val_period )['value'] );
+
+// And the snapshot holds: repricing the item must not restate a month already saved.
+update_post_meta( $val_item, '_bhela_inv_rate', 250 );
+iv_save( $val_period, array( $val_item => array( 'add' => 60, 'use' => 4, 'good' => 50, 'dam' => 6, 'count' => 56 ) ) );
+$val_line = bhela_bm_inv_stored_lines( $val_period )[ bhela_bm_inv_line_key( $val_item ) ] ?? array();
+ok( 180 === (int) ( $val_line['rate'] ?? 0 ), 'a later price rise does not restate the saved month', 'rate: ' . (int) ( $val_line['rate'] ?? 0 ) );
+
 echo "\n=== cleanup ===\n";
 foreach ( $made as $id ) {
 	bhela_test_delete( $id );
 }
-delete_option( 'bhela_bm_inv_periods' );
+// Not deleted, and not restored here either: bhela_test_guard_period_index() in the
+// bootstrap puts the live index back on shutdown. See the note at the top of this file.
 delete_option( 'bhela_bm_inv_seq' );
 global $wpdb;
 // The harness's own rows are removed here, from the test — never from the plugin,

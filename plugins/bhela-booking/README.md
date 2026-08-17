@@ -21,8 +21,8 @@ it**, so a storekeeper sees Store and nothing else.
 | **Store** | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
 | **Setup** | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
 
-Clicking a menu's own name opens its most-used screen: Accounts → Monthly Statement, Store →
-Monthly Stock, Setup → Settings.
+Clicking a menu's own name opens its first row: Bookings → All Bookings, Accounts → Cost Sheets,
+Store → Item Register, Setup → Settings.
 
 Everything used to live under **Bookings** as 22 rows. Old links of the form
 `edit.php?post_type=bhela_booking&page=…` still work — a permanent redirect keeps them alive,

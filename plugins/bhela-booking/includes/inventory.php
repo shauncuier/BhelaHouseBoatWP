@@ -1528,6 +1528,15 @@ function bhela_bm_inv_apply_lines( $id, $posted, $can_adjust ) {
 				$line[ $field ] = max( 0, (int) $row[ $field ] );
 			}
 		}
+		// The sheet has no rate column — the figure comes from the item register — so a
+		// line saved for the first time would otherwise keep the blank line's rate of 0
+		// and value its closing stock at nothing, permanently: once the line exists,
+		// bhela_bm_inv_month_data() stops seeding it too. Seed on first write only.
+		// Never overwrite a rate already on the line, which is the whole point of
+		// snapshotting it: a price rise must not restate a month already closed.
+		if ( empty( $line['rate'] ) ) {
+			$line['rate'] = max( 0, (int) get_post_meta( $item_id, '_bhela_inv_rate', true ) );
+		}
 		// A blank count is "not counted", which is not the same as counted zero.
 		if ( array_key_exists( 'count', $row ) ) {
 			$raw            = trim( (string) $row['count'] );

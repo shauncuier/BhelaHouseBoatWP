@@ -332,6 +332,29 @@ foreach ( array( 'bhela-bm-statement' => 'Accounts', 'bhela-bm-inv-month' => 'St
 }
 ok( ! empty( $sub[ $bookings ] ), 'Bookings keeps its own rows' );
 
+// _wp_menu_output() takes a top-level's href from its FIRST submenu row, not from
+// the parent's own slug — so reordering a group silently moves where its menu goes.
+// Caught in the browser: with Dashboard listed first, clicking "Bookings" opened
+// admin.php?page=bhela-bm-dashboard rather than the booking list.
+foreach ( array(
+	'bookings' => 'edit.php?post_type=bhela_booking',
+	'accounts' => 'edit.php?post_type=bhela_cost',
+	'store'    => 'edit.php?post_type=bhela_inv_item',
+	'setup'    => 'bhela-bm-settings',
+) as $group => $expected ) {
+	ok( bhela_bm_menu_landing( $group ) === $expected, "clicking $group opens $expected",
+		'declared: ' . bhela_bm_menu_landing( $group ) );
+	// And what the layout declares is what WordPress will actually use. Skipped for
+	// Bookings: All Bookings and Add New are added by wp-admin/menu.php, a file rather
+	// than an action, so they are absent here and the first row LOOKS like Dashboard.
+	// Verified in a real request instead — that is where the bug showed up.
+	if ( 'bookings' === $group ) {
+		continue;
+	}
+	$first = $sub[ bhela_bm_menu_groups()[ $group ]['slug'] ][0][2] ?? '';
+	ok( $first === $expected, "$group's first rendered row is $expected", "rendered: $first" );
+}
+
 // The wall of 22 is the thing this change set out to fix.
 $counts = array();
 foreach ( array( $bookings, 'bhela-bm-statement', 'bhela-bm-inv-month', 'bhela-bm-settings' ) as $p ) {

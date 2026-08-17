@@ -230,8 +230,13 @@ to Quick Guide. `includes/menu.php` splits that into four, grouped by the job so
 | **Store** | `bhela-bm-inv-month` | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
 | **Setup** | `bhela-bm-settings` | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
 
-Each group's `slug` **is** its most-used page, so the parent row and its first child are one row
-rather than an index screen nobody asked for. Bookings deliberately did not move:
+Each group's `slug` is a real screen rather than an index page nobody maintains, so the parent
+row and its first child collapse into one. **Where clicking the parent lands is a separate
+question:** `_wp_menu_output()` takes a top-level's href from its *first submenu row*, not from
+the parent's own slug — so Accounts opens Cost Sheets and Store opens Item Register. That is why
+All Bookings is listed first under Bookings; with 📊 Dashboard first, clicking "Bookings" went to
+`admin.php?page=bhela-bm-dashboard` instead of the booking list. `bhela_bm_menu_landing()` reports
+the real landing slug and `ui-test.php` §9 pins all four. Bookings deliberately did not move:
 `post_type=bhela_booking` appears in built URLs, form inputs and URLs already sent to customers.
 
 Five functions carry the whole thing, and every one of them exists because the alternative
