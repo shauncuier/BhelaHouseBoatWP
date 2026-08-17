@@ -534,10 +534,7 @@ function bhela_bm_install_roles() {
 
 /** Back to the Team screen with a one-word result. */
 function bhela_bm_perms_redirect( $msg ) {
-	wp_safe_redirect( add_query_arg(
-		array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-team', 'bhela_msg' => $msg ),
-		admin_url( 'edit.php' )
-	) );
+	wp_safe_redirect( bhela_bm_admin_url( 'bhela-bm-team', array( 'bhela_msg' => $msg ) ) );
 	exit;
 }
 
@@ -625,7 +622,7 @@ add_action( 'admin_init', 'bhela_bm_maybe_install_roles', 5 );
 
 function bhela_bm_team_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'setup' ),
 		__( 'Team', 'bhela-booking' ),
 		__( '👥 Team', 'bhela-booking' ),
 		'manage_options',

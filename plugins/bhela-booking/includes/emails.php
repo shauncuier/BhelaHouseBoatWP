@@ -60,7 +60,7 @@ function bhela_bm_email_test_send() {
 		array( 'From: ' . ( $s['email_from_name'] ? $s['email_from_name'] : $s['business_name'] ) . ' <' . ( $s['email'] ? $s['email'] : get_option( 'admin_email' ) ) . '>' )
 	);
 	set_transient( 'bhela_bm_email_test_result', array( 'ok' => (bool) $ok, 'to' => $to ), 60 );
-	wp_safe_redirect( admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings#bhela-email' ) );
+	wp_safe_redirect( bhela_bm_admin_url( 'bhela-bm-settings' ) . '#bhela-email' );
 	exit;
 }
 add_action( 'admin_post_bhela_bm_email_test', 'bhela_bm_email_test_send' );

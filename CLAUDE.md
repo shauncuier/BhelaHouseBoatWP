@@ -88,6 +88,7 @@ wp-content/                          ← Git root
 │   │   ├── inventory-core.php       ← Stock post types + the lock. Loads on EVERY request (see §3.8)
 │   │   ├── inventory.php            ← Stock lists, quantity model, monthly carry-forward, close workflow, screens
 │   │   ├── inventory-import.php     ← Column-mapped CSV importer: upload → map → dry run → commit
+│   │   ├── menu.php                 ← The four admin menus: group registry, URL helper, legacy shim (§3.9)
 │   │   ├── ui.php                   ← Shared admin UI: screen header, status pill, tone map
 │   │   └── guide.php                ← Embedded admin guide
 │   ├── assets/
@@ -216,6 +217,44 @@ Two stores, deliberately different:
 Both of the log's affordances are correct for diagnostics and disqualifying for audit, which is why the register did not extend it. There is exactly **one** SQL writer (`bhela_bm_audit()`), it only ever `INSERT`s, and there is no `uninstall.php` and no `register_uninstall_hook` — `tests/inventory-test.php` asserts all of that at source level. Do not add a delete path.
 
 Bookings are stored as a **private Custom Post Type** (`bhela_booking`) with post meta for each field.
+
+### 3.9 Four admin menus, and why the parent is asked for rather than written down
+
+Everything used to hang off one **Bookings** menu — 22 rows, from Add New Booking to Audit Trail
+to Quick Guide. `includes/menu.php` splits that into four, grouped by the job someone is doing:
+
+| Menu | Slug / landing page | Rows |
+|---|---|---|
+| **Bookings** | `edit.php?post_type=bhela_booking` | All Bookings · Add New · 📊 Dashboard · 📄 Trip Report · 📅 Trip Calendar · ⭐ Reviews |
+| **Accounts** | `bhela-bm-statement` | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report |
+| **Store** | `bhela-bm-inv-month` | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
+| **Setup** | `bhela-bm-settings` | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
+
+Each group's `slug` **is** its most-used page, so the parent row and its first child are one row
+rather than an index screen nobody asked for. Bookings deliberately did not move:
+`post_type=bhela_booking` appears in built URLs, form inputs and URLs already sent to customers.
+
+Five functions carry the whole thing, and every one of them exists because the alternative
+fails quietly:
+
+| Function | Why it is not a literal |
+|---|---|
+| `bhela_bm_menu_groups()` | The registry. `caps` is an **OR** — hold any one and the menu appears. `add_menu_page()` takes a single capability and cannot express that, so the OR is evaluated at `admin_menu` |
+| `bhela_bm_menu_parent($group)` | What every `add_submenu_page()` call passes. Falls back to the Bookings parent when a group is hidden, never `''` — an empty parent orphans the page instead of hiding it |
+| `bhela_bm_menu_layout()` | Parent ⇒ ordered slug list. One list doing two jobs: display order, and **which group owns a page**, which is what the URL helper and the redirect shim read |
+| `bhela_bm_admin_url($page,$args)` | Returns `edit.php?post_type=…&page=…` for a Bookings page, `admin.php?page=…` otherwise. ~25 call sites used to hand-build these; a wrong one does not error, it just goes somewhere else |
+| `bhela_bm_menu_legacy_redirect()` | Permanent, not transitional — `emails.php` and `sms.php` have **already** put `edit.php?post_type=bhela_booking&page=bhela-bm-settings` into sent mail |
+
+**Visibility is decided at `admin_menu`, and it has to be.** `admin_menu` runs after the current
+user resolves; `init` does not, so `show_in_menu` can never ask `current_user_can()`. That is why
+the seven CPT rows are *moved* at priority 20 rather than registered against the right parent in
+the first place — their parent is fixed at `init`, before there is a user to ask about. Moving
+re-adds the existing row, keeping the emoji that lives in `labels['all_items']`.
+
+Splitting the menus also fixed a live bug: `bhela_bm_inv_menu()` added the four store screens
+under Bookings unconditionally while the old standalone menu removed only the CPT row, so a
+storekeeper or cost-checker saw **Monthly Stock, Inventory Report and Asset Report twice**.
+`tests/ui-test.php` §9 now pins that shut — no slug under two parents, and none twice under one.
 
 ---
 
@@ -415,6 +454,11 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_status_pill()` | `includes/ui.php` | One pill for every status vocabulary — five tones × solid/soft |
 | `bhela_bm_status_tone()` | `includes/ui.php` | Booking status → tone + weight |
 | `bhela_bm_is_plugin_screen()` | `bhela-booking.php` | True on a BHELA admin screen; gates `admin.css` and the body class |
+| `bhela_bm_menu_groups()` | `includes/menu.php` | The four menus and the capabilities that make each worth showing (OR, not AND) |
+| `bhela_bm_menu_parent($group)` | `includes/menu.php` | The parent every `add_submenu_page()` call passes. Never returns `''` |
+| `bhela_bm_menu_layout()` | `includes/menu.php` | Parent ⇒ ordered slugs. Also the ownership map the URL helper and shim read |
+| `bhela_bm_admin_url($page,$args)` | `includes/menu.php` | **The only way to build a link to a plugin screen.** Knows which parent a page hangs under |
+| `bhela_bm_menu_legacy_redirect()` | `includes/menu.php` | Keeps `edit.php?post_type=…&page=…` alive — that shape is already in sent email |
 | `bhela_bm_roles()` | `includes/roles.php` | Staff roles + capabilities — the single source the plugin reads |
 | `bhela_bm_permissions()` | `includes/roles.php` | Togglable permissions; also the allow-list for the Team screen |
 | `bhela_bm_role_defaults()` | `includes/roles.php` | Shipped baseline, overridden by the `bhela_bm_role_perms` option |
@@ -454,8 +498,16 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
    `.bha-panel` (a section), `.bha-num` (every money column), `.bha-callout--attention`
    (something needing action), `bhela_bm_status_pill()` (any status)
 3. Run every figure through `bhela_bm_money()` — including the print view
-4. Give the menu item an emoji **no other item uses**
-5. If a genuinely new component is needed, name it `bha-` and add it to `assets/admin.css`
+4. Pick a group and register against it: `add_submenu_page( bhela_bm_menu_parent( 'accounts' ), … )`.
+   Never hardcode a parent — see §3.9 for the four menus and why the parent is asked for
+5. Add the slug to that parent's list in `bhela_bm_menu_layout()`, or it sorts to the end
+6. Build every link to it with `bhela_bm_admin_url( $slug, $args )` — never a hand-built
+   `edit.php?post_type=…` string, which is what §3.9's shim exists to clean up after
+7. If the page has a GET filter form, it must **not** carry a hidden `post_type` input unless
+   the page is under Bookings. That is the silent failure: the filter lands on the Posts list
+8. Give the menu item an emoji **no other item uses** — `tests/ui-test.php` §9b reads the real
+   menu and fails on a duplicate or a missing one
+9. If a genuinely new component is needed, name it `bha-` and add it to `assets/admin.css`
 
 ### Add a new setting to the booking plugin
 
@@ -557,6 +609,9 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 10. **Staff salary is a cost, and gross profit deducts it.** `gross = trip profit − expenses − payroll`. It was omitted entirely until v2.27.0, which overstated every month's bottom line by the whole wage bill. Two rules: only a **saved** salary sheet counts (the roster alone is rates, not a commitment — an unsaved sheet must not deduct wages for a month nobody has done payroll for), and the figure deducted is `payable`, not `after`, because an advance already handed over is still part of the wage bill.
 11. **`bhela_bm_salary_month_total()` and `bhela_bm_statement_data()` can call each other.** Payroll prices trip-based crew from the month's trip count, and that count comes from the statement — so the statement passes its own already-computed count down (`bhela_bm_salary_month_total( $month, count( $out['trips'] ) )`). `bhela_bm_salary_trip_count()` also carries a re-entry guard returning 0, because a wrong answer that returns beats an infinite loop that hangs the request. Do not remove either half.
 12. **A ৳0 booking is not a paid one.** `bhela_bm_balance()` requires a positive total before it calls a balance settled — a Full Boat sits at ৳0 until an admin prices it, and `0 − 0 = 0` would otherwise stamp an unpriced enquiry PAID.
+13. **Never put an emoji in a top-level `$menu_title`.** `$admin_page_hooks[$slug]` is `sanitize_title($menu_title)`, and `sanitize_title('📦 Store')` is `'%f0%9f%93%a6-store'` — so every child's screen id becomes `%f0%9f%93%a6-store_page_bhela-bm-inv-month`. Accounts, Store and Setup therefore take **emoji-free titles with dashicons**, which is WordPress's own top-level convention. Emoji belong on submenu rows, which is where this plugin's convention and its tests both live. `ui-test.php` §9 asserts the three hooks are `accounts`, `store`, `setup`.
+14. **A GET filter form under an `admin.php` parent must not resubmit `post_type`.** Every filter form used to carry `<input type="hidden" name="post_type" value="bhela_booking">` because its page was a child of `edit.php`. Left in place on a moved page, the filter submits to the **Posts list** — no PHP error, no warning, just the wrong screen. Only `reports.php` still carries it, because Trip Report is the one filter form still under Bookings.
+15. **`wp_set_current_user()` returns the cached user when the id has not changed.** Swapping a role on the same account and re-setting it keeps the old capabilities, so a per-role test reports identical menus for every role and passes by luck. Go via `wp_set_current_user( 0 )` first — `ui-test.php`'s `zz_menu()` does, and three role assertions were silently wrong until it did.
 
 ---
 

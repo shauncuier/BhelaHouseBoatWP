@@ -303,7 +303,7 @@ function bhela_bm_sms_balance_refresh() {
 	}
 	check_admin_referer( 'bhela_bm_sms_balance' );
 	bhela_bm_sms_balance( true );
-	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-dashboard' ) );
+	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : bhela_bm_admin_url( 'bhela-bm-dashboard' ) );
 	exit;
 }
 add_action( 'admin_post_bhela_bm_sms_balance', 'bhela_bm_sms_balance_refresh' );
@@ -390,7 +390,7 @@ function bhela_bm_sms_test_send() {
 		'code' => $last['code'] ?? 0,
 		'body' => $last['body'] ?? '',
 	), 60 );
-	wp_safe_redirect( admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings#bhela-sms' ) );
+	wp_safe_redirect( bhela_bm_admin_url( 'bhela-bm-settings' ) . '#bhela-sms' );
 	exit;
 }
 add_action( 'admin_post_bhela_bm_sms_test', 'bhela_bm_sms_test_send' );

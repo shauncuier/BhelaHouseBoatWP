@@ -38,12 +38,11 @@ function bhela_bm_register_cost_cpt() {
 		'publicly_queryable'  => false,
 		'exclude_from_search' => true,
 		'show_ui'             => true,
-		// Always nested. Deciding this with current_user_can() would make the
-		// registration depend on who is asking — and `init` runs before the
-		// current user is reliably resolved in every context, so the menu came
-		// out wrong. Cost-only staff get a top-level entry from
-		// bhela_bm_cost_standalone_menu() instead, on `admin_menu`, where
-		// capability checks are trustworthy.
+		// Registered under Bookings and moved to Accounts on `admin_menu` by
+		// bhela_bm_menu_move_cpts(). It cannot be registered under Accounts
+		// directly: `init` runs before the current user resolves, so this value can
+		// never depend on who is asking, and the Accounts menu only exists for
+		// someone who can use it.
 		'show_in_menu'        => 'edit.php?post_type=bhela_booking',
 		'show_in_rest'        => false,
 		'rewrite'             => false,
@@ -56,33 +55,10 @@ function bhela_bm_register_cost_cpt() {
 }
 add_action( 'init', 'bhela_bm_register_cost_cpt' );
 
-/**
- * Cost sheets live under Bookings, which cost-only staff cannot see — so for
- * them the whole screen would be unreachable. Give that case its own top-level
- * menu item. Runs on `admin_menu`, where the current user is settled.
+/*
+ * There was a standalone Cost Sheets menu here, for a preparer with no Bookings
+ * to nest under. The Accounts menu in includes/menu.php now serves everyone.
  */
-function bhela_bm_cost_standalone_menu() {
-	if ( current_user_can( 'edit_bhela_bookings' ) || ! current_user_can( 'edit_bhela_costs' ) ) {
-		return;
-	}
-	// Detach it from Bookings first. WordPress promotes a parent menu whenever
-	// any of its children is visible, so leaving it nested would show these
-	// users a "Bookings" menu they cannot otherwise use — with Cost Sheets as
-	// its only item, duplicating the standalone entry added below.
-	remove_submenu_page( 'edit.php?post_type=bhela_booking', 'edit.php?post_type=bhela_cost' );
-	add_menu_page(
-		__( 'Cost Sheets', 'bhela-booking' ),
-		__( '🧾 Cost Sheets', 'bhela-booking' ),
-		'edit_bhela_costs',
-		'edit.php?post_type=bhela_cost',
-		'',
-		'dashicons-media-spreadsheet',
-		26
-	);
-}
-// Priority 20: core's _add_post_type_submenus() runs at 10, so the nested entry
-// has to exist before this can remove it.
-add_action( 'admin_menu', 'bhela_bm_cost_standalone_menu', 20 );
 
 /**
  * Cost-only staff have no booking capability, so wp-admin's Dashboard is a dead
@@ -257,7 +233,7 @@ function bhela_bm_reset_cost_heads() {
 	if ( function_exists( 'bhela_bm_log' ) ) {
 		bhela_bm_log( 'settings', 'Trip cost heads reset to the shipped list.' );
 	}
-	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings' ) );
+	wp_safe_redirect( wp_get_referer() ? wp_get_referer() : bhela_bm_admin_url( 'bhela-bm-settings' ) );
 	exit;
 }
 add_action( 'admin_post_bhela_bm_reset_cost_heads', 'bhela_bm_reset_cost_heads' );

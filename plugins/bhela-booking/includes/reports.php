@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function bhela_bm_reports_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'bookings' ),
 		__( 'Trip Report', 'bhela-booking' ),
 		__( '📄 Trip Report', 'bhela-booking' ),
 		'bhela_view_reports',

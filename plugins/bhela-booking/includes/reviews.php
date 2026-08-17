@@ -184,7 +184,11 @@ function bhela_bm_reviews_pending_count() {
 /** Pending bubble on the Reviews submenu, so a waiting review is never missed. */
 function bhela_bm_reviews_menu_bubble() {
 	global $submenu;
-	$parent  = 'edit.php?post_type=bhela_booking';
+	// Reviews stays under Bookings, so this resolves to the same parent it always
+	// did — but asked rather than assumed. A hardcoded parent here would not error
+	// if Reviews ever moved; the bubble would simply stop appearing, and a review
+	// nobody sees is the one failure this function exists to prevent.
+	$parent  = bhela_bm_menu_parent( 'bookings' );
 	$pending = bhela_bm_reviews_pending_count();
 	if ( ! $pending || empty( $submenu[ $parent ] ) ) {
 		return;

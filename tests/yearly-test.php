@@ -104,7 +104,7 @@ ok( $avail === array_values( array_reverse( array_unique( array_reverse( $avail 
 
 echo "\n=== 8. the screen renders ===\n";
 $_GET = array( 'page' => 'bhela-bm-yearly', 'year' => '2026', 'mode' => 'financial' );
-set_current_screen( 'bhela_booking_page_bhela-bm-yearly' );
+set_current_screen( 'accounts_page_bhela-bm-yearly' );
 ob_start();
 bhela_bm_yearly_page();
 $html = ob_get_clean();

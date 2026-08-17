@@ -16,7 +16,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function bhela_bm_statement_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'accounts' ),
 		__( 'Monthly Statement', 'bhela-booking' ),
 		__( '📈 Monthly Statement', 'bhela-booking' ),
 		'bhela_view_statement',
@@ -185,7 +185,8 @@ function bhela_bm_statement_page() {
 
 		<div class="bha-bar">
 			<form method="get">
-				<input type="hidden" name="post_type" value="bhela_booking">
+				<?php // No post_type: this page is a child of admin.php now, not edit.php.
+				// Leaving it in would send the filter to the Posts list, silently. ?>
 				<input type="hidden" name="page" value="bhela-bm-statement">
 				<div class="bha-field bha-field--caps">
 					<label for="st-month"><?php esc_html_e( 'Month', 'bhela-booking' ); ?></label>

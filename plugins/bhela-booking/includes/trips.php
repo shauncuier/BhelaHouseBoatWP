@@ -282,9 +282,9 @@ function bhela_bm_counted_booked_cabins( $date, $exclude_id = 0 ) {
 
 function bhela_bm_trips_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'bookings' ),
 		__( 'Trip Calendar', 'bhela-booking' ),
-		__( 'Trip Calendar', 'bhela-booking' ),
+		'📅 ' . __( 'Trip Calendar', 'bhela-booking' ),
 		'bhela_manage_trips',
 		'bhela-bm-trips',
 		'bhela_bm_trips_page'

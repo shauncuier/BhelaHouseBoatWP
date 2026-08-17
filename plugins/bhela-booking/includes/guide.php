@@ -11,7 +11,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function bhela_bm_guide_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'setup' ),
 		'Quick Guide',
 		'🎯 Quick Guide',
 		'edit_posts',
@@ -33,7 +33,7 @@ function bhela_bm_guide_page() {
 				'Start any job in one click from "Quick Actions"',
 				'Anything still showing ⬜ in the Setup Checklist needs finishing',
 			),
-			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-dashboard' ),
+			'link'  => bhela_bm_admin_url( 'bhela-bm-dashboard' ),
 			'btn'   => 'Open Dashboard',
 		),
 		array(
@@ -69,7 +69,7 @@ function bhela_bm_guide_page() {
 				'Tick "Holiday" for holiday departures — the regular rate applies, with no weekday discount',
 				'As it fills up set Status → Filling Fast / Booked; tick Delete to remove a row; then Save',
 			),
-			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-trips' ),
+			'link'  => bhela_bm_admin_url( 'bhela-bm-trips' ),
 			'btn'   => 'Open Trip Calendar',
 		),
 		array(
@@ -81,7 +81,7 @@ function bhela_bm_guide_page() {
 				'So do the bKash / Nagad numbers and the QR image URLs',
 				'Holidays are set on the Trip Calendar now, using the "Holiday" tick',
 			),
-			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings' ),
+			'link'  => bhela_bm_admin_url( 'bhela-bm-settings' ),
 			'btn'   => 'Open Settings',
 		),
 		array(
@@ -93,7 +93,7 @@ function bhela_bm_guide_page() {
 				'Caption = Title. Set the Category and the Order',
 				'Upload payment QR images to Media, then paste the URL into Settings',
 			),
-			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-gallery-bulk' ),
+			'link'  => bhela_bm_admin_url( 'bhela-bm-gallery-bulk' ),
 			'btn'   => 'Bulk upload photos',
 		),
 		array(
@@ -128,7 +128,7 @@ function bhela_bm_guide_page() {
 				'Every booking, email, SMS, trip and settings change is recorded here',
 				'✅ means it worked, ❌ means it failed — newest at the top',
 			),
-			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-log' ),
+			'link'  => bhela_bm_admin_url( 'bhela-bm-log' ),
 			'btn'   => 'Open Activity Log',
 		),
 		array(
@@ -149,7 +149,7 @@ function bhela_bm_guide_page() {
 				'Bookings → Settings, and edit the numbers there',
 				'The whole website, the booking form and invoices all update automatically',
 			),
-			'link'  => admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings' ),
+			'link'  => bhela_bm_admin_url( 'bhela-bm-settings' ),
 			'btn'   => 'Open Settings',
 		),
 	);

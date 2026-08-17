@@ -339,7 +339,7 @@ function bhela_bm_salary_meta_cb( $post ) {
 		<?php if ( ! $rows ) : ?>
 			<p class="bha-callout bha-callout--attention bha-callout--lead">
 				<?php esc_html_e( 'No staff on the roster yet.', 'bhela-booking' ); ?>
-				<a href="<?php echo esc_url( admin_url( 'edit.php?post_type=bhela_booking&page=bhela-bm-settings#bhela-panel-staff' ) ); ?>"><?php esc_html_e( 'Add staff in Settings → Staff', 'bhela-booking' ); ?></a>
+				<a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-settings' ) . '#bhela-panel-staff' ); ?>"><?php esc_html_e( 'Add staff in Settings → Staff', 'bhela-booking' ); ?></a>
 			</p>
 		<?php else : ?>
 		<div class="bha-scroll">

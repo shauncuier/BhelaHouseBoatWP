@@ -18,7 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function bhela_bm_dashboard_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'bookings' ),
 		__( 'BHELA Dashboard', 'bhela-booking' ),
 		__( '📊 Dashboard', 'bhela-booking' ),
 		'bhela_view_reports',
@@ -28,80 +28,10 @@ function bhela_bm_dashboard_menu() {
 }
 add_action( 'admin_menu', 'bhela_bm_dashboard_menu' );
 
-/**
- * WordPress builds the Bookings submenu in registration order, which reads as a
- * jumble (CPT items, then each module in load order). Reorder the whole thing
- * into a task-flow sequence: overview → bookings → money → schedule → media →
- * feedback → admin → help. Pure display order, no capability change.
- *
- * Nested post types (show_in_menu pointing at this parent) contribute exactly
- * one entry each — core's _add_post_type_submenus() adds the "All items" link
- * and nothing else. Only bhela_booking, which owns the top-level menu, also
- * gets an "Add New". That is why the list below is shorter than the number of
- * post types suggests.
+/*
+ * The submenu reorder used to live here, when there was one parent to sort. It
+ * is now bhela_bm_menu_order() in includes/menu.php, which sorts all four.
  */
-function bhela_bm_dashboard_menu_order() {
-	global $submenu;
-	$parent = 'edit.php?post_type=bhela_booking';
-	if ( empty( $submenu[ $parent ] ) ) {
-		return;
-	}
-	$order = array(
-		// Every day
-		'bhela-bm-dashboard',                     // 📊 Dashboard
-		'edit.php?post_type=bhela_booking',       // All Bookings
-		'post-new.php?post_type=bhela_booking',   // Add New Booking
-		// Money
-		'bhela-bm-reports',                       // 📄 Trip Report
-		'edit.php?post_type=bhela_cost',          // 🧾 Cost Sheets
-		'edit.php?post_type=bhela_expense',       // 💸 Expenses
-		'bhela-bm-statement',                     // 📈 Monthly Statement
-		'bhela-bm-yearly',                        // 📚 Yearly Report
-		'edit.php?post_type=bhela_salary',        // 👷 Salary
-		// Store
-		'edit.php?post_type=bhela_inv_item',      // 📦 Item Register
-		'bhela-bm-inv-import',                    // 🚚 Import Register
-		'bhela-bm-inv-month',                     // 🔧 Monthly Stock
-		'bhela-bm-inv-report',                    // 📐 Inventory Report
-		'bhela-bm-inv-assets',                    // 🏷️ Asset Report
-		// Planning
-		'bhela-bm-trips',                         // Trip Calendar
-		'edit.php?post_type=bhela_spot',          // 🗺️ Spots
-		// Content
-		'edit.php?post_type=bhela_gallery',       // 🖼️ Gallery
-		'bhela-bm-gallery-bulk',                  // ⬆️ Bulk Upload
-		'edit.php?post_type=bhela_review',        // ⭐ Reviews
-		// Administration
-		'bhela-bm-log',                           // 📋 Activity Log
-		'bhela-bm-audit',                         // 🔩 Audit Trail
-		'bhela-bm-team',                          // 👥 Team
-		'bhela-bm-settings',                      // ⚙️ Settings
-		'bhela-bm-guide',                         // 🎯 Quick Guide (help last)
-	);
-
-	// html_entity_decode covers slugs WordPress stores escaped (a taxonomy link
-	// carries &amp; between its query args), so a future one still matches.
-	$rank = array();
-	foreach ( $order as $i => $slug ) {
-		$rank[ $slug ]                       = $i;
-		$rank[ html_entity_decode( $slug ) ] = $i;
-	}
-
-	// Anything unrecognised (a page added by a future release) keeps its
-	// registration order at the end rather than being dropped or hidden.
-	$fallback = count( $order );
-	foreach ( $submenu[ $parent ] as $i => $item ) {
-		$submenu[ $parent ][ $i ]['bhela_rank'] = $rank[ $item[2] ] ?? ( $fallback + $i );
-	}
-	usort( $submenu[ $parent ], function ( $a, $b ) {
-		return $a['bhela_rank'] <=> $b['bhela_rank'];
-	} );
-	foreach ( $submenu[ $parent ] as $i => $item ) {
-		unset( $submenu[ $parent ][ $i ]['bhela_rank'] );
-	}
-	$submenu[ $parent ] = array_values( $submenu[ $parent ] );
-}
-add_action( 'admin_menu', 'bhela_bm_dashboard_menu_order', 999 );
 
 /* ---------- Small read helpers ---------- */
 
@@ -172,8 +102,11 @@ function bhela_bm_dashboard_page() {
 	$link = function ( $args ) {
 		return esc_url( add_query_arg( $args, admin_url( 'edit.php' ) ) );
 	};
+	// Not every tile below still points at a Bookings child — Monthly Statement and
+	// the stock screens moved to their own menus — so the parent comes from the
+	// registry rather than being assumed here.
 	$page = function ( $slug ) {
-		return esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => $slug ), admin_url( 'edit.php' ) ) );
+		return esc_url( bhela_bm_admin_url( $slug ) );
 	};
 
 	// Upcoming trips (future only).

@@ -94,9 +94,9 @@ function bhela_bm_get_log() {
 
 function bhela_bm_log_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'setup' ),
 		__( 'Activity Log', 'bhela-booking' ),
-		__( 'Activity Log', 'bhela-booking' ),
+		'📋 ' . __( 'Activity Log', 'bhela-booking' ),
 		'manage_options',
 		'bhela-bm-log',
 		'bhela_bm_log_page'
@@ -111,8 +111,8 @@ function bhela_bm_log_clear() {
 	check_admin_referer( 'bhela_bm_log_clear' );
 	update_option( BHELA_BM_LOG_OPTION, array(), false );
 	wp_safe_redirect( add_query_arg(
-		array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-log', 'cleared' => 1 ),
-		admin_url( 'edit.php' )
+		array( 'page' => 'bhela-bm-log', 'cleared' => 1 ),
+		admin_url( 'admin.php' )
 	) );
 	exit;
 }
@@ -140,10 +140,10 @@ function bhela_bm_log_page() {
 		<?php endif; ?>
 
 		<p class="bha-buttons">
-			<a href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-log' ), admin_url( 'edit.php' ) ) ); ?>"
+			<a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-log' ) ); ?>"
 				class="button<?php echo '' === $filter ? ' button-primary' : ''; ?>"><?php esc_html_e( 'All', 'bhela-booking' ); ?></a>
 			<?php foreach ( $types as $key => $t ) : ?>
-				<a href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-log', 'ltype' => $key ), admin_url( 'edit.php' ) ) ); ?>"
+				<a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-log', array( 'ltype' => $key ) ) ); ?>"
 					class="button<?php echo $filter === $key ? ' button-primary' : ''; ?>"><?php echo esc_html( $t['label'] ); ?></a>
 			<?php endforeach; ?>
 		</p>

@@ -81,25 +81,25 @@ bhela_bm_inv_write_lines( $period, array( $ikey => array_merge( bhela_bm_inv_bla
 $screens = array(
 	'Dashboard'        => array( 'bhela_booking_page_bhela-bm-dashboard', array( 'page' => 'bhela-bm-dashboard' ), fn() => bhela_bm_dashboard_page() ),
 	'Trip Report'      => array( 'bhela_booking_page_bhela-bm-reports', array( 'page' => 'bhela-bm-reports', 'from' => '2026-07-01', 'to' => '2026-07-31', 'cancelled' => 1 ), fn() => bhela_bm_reports_page() ),
-	'Monthly Statement' => array( 'bhela_booking_page_bhela-bm-statement', array( 'page' => 'bhela-bm-statement', 'month' => '2026-07' ), fn() => bhela_bm_statement_page() ),
+	'Monthly Statement' => array( 'toplevel_page_bhela-bm-statement', array( 'page' => 'bhela-bm-statement', 'month' => '2026-07' ), fn() => bhela_bm_statement_page() ),
 	// Was missing from this list entirely, which is how a column could be added to
 	// its table without anything checking the row widths still lined up.
-	'Yearly Report'    => array( 'bhela_booking_page_bhela-bm-yearly', array( 'page' => 'bhela-bm-yearly', 'year' => '2026' ), fn() => bhela_bm_yearly_page() ),
-	'Team'             => array( 'bhela_booking_page_bhela-bm-team', array( 'page' => 'bhela-bm-team' ), fn() => bhela_bm_team_page() ),
-	'Activity Log'     => array( 'bhela_booking_page_bhela-bm-log', array( 'page' => 'bhela-bm-log' ), fn() => bhela_bm_log_page() ),
-	'Quick Guide'      => array( 'bhela_booking_page_bhela-bm-guide', array( 'page' => 'bhela-bm-guide' ), fn() => bhela_bm_guide_page() ),
-	'Settings'         => array( 'bhela_booking_page_bhela-bm-settings', array( 'page' => 'bhela-bm-settings' ), fn() => bhela_bm_settings_page() ),
+	'Yearly Report'    => array( 'accounts_page_bhela-bm-yearly', array( 'page' => 'bhela-bm-yearly', 'year' => '2026' ), fn() => bhela_bm_yearly_page() ),
+	'Team'             => array( 'setup_page_bhela-bm-team', array( 'page' => 'bhela-bm-team' ), fn() => bhela_bm_team_page() ),
+	'Activity Log'     => array( 'setup_page_bhela-bm-log', array( 'page' => 'bhela-bm-log' ), fn() => bhela_bm_log_page() ),
+	'Quick Guide'      => array( 'setup_page_bhela-bm-guide', array( 'page' => 'bhela-bm-guide' ), fn() => bhela_bm_guide_page() ),
+	'Settings'         => array( 'toplevel_page_bhela-bm-settings', array( 'page' => 'bhela-bm-settings' ), fn() => bhela_bm_settings_page() ),
 	'Cost sheet'       => array( 'bhela_cost', array(), fn() => bhela_bm_cost_sheet_cb( get_post( $GLOBALS['zz_cost'] ) ) ),
 	'Cost approval'    => array( 'bhela_cost', array(), fn() => bhela_bm_cost_workflow_cb( get_post( $GLOBALS['zz_cost'] ) ) ),
 	'Expense'          => array( 'bhela_expense', array(), fn() => bhela_bm_expense_meta_cb( get_post( $GLOBALS['zz_exp'] ) ) ),
 	'Salary sheet'     => array( 'bhela_salary', array(), fn() => bhela_bm_salary_meta_cb( get_post( $GLOBALS['zz_sal'] ) ) ),
 	'Booking details'  => array( 'bhela_booking', array(), fn() => bhela_bm_details_metabox( get_post( $GLOBALS['zz_book'] ) ) ),
 	'Booking discount' => array( 'bhela_booking', array(), fn() => bhela_bm_discount_metabox( get_post( $GLOBALS['zz_book'] ) ) ),
-	'Monthly Stock'    => array( 'bhela_booking_page_bhela-bm-inv-month', array( 'page' => 'bhela-bm-inv-month', 'month' => '2026-07' ), fn() => bhela_bm_inv_month_page() ),
-	'Inventory Report' => array( 'bhela_booking_page_bhela-bm-inv-report', array( 'page' => 'bhela-bm-inv-report', 'month' => '2026-07' ), fn() => bhela_bm_inv_report_page() ),
-	'Asset Report'     => array( 'bhela_booking_page_bhela-bm-inv-assets', array( 'page' => 'bhela-bm-inv-assets', 'month' => '2026-07' ), fn() => bhela_bm_inv_asset_page() ),
-	'CSV Import'       => array( 'bhela_booking_page_bhela-bm-inv-import', array( 'page' => 'bhela-bm-inv-import' ), fn() => bhela_bm_inv_import_page() ),
-	'Audit Trail'      => array( 'bhela_booking_page_bhela-bm-audit', array( 'page' => 'bhela-bm-audit' ), fn() => bhela_bm_audit_page() ),
+	'Monthly Stock'    => array( 'toplevel_page_bhela-bm-inv-month', array( 'page' => 'bhela-bm-inv-month', 'month' => '2026-07' ), fn() => bhela_bm_inv_month_page() ),
+	'Inventory Report' => array( 'store_page_bhela-bm-inv-report', array( 'page' => 'bhela-bm-inv-report', 'month' => '2026-07' ), fn() => bhela_bm_inv_report_page() ),
+	'Asset Report'     => array( 'store_page_bhela-bm-inv-assets', array( 'page' => 'bhela-bm-inv-assets', 'month' => '2026-07' ), fn() => bhela_bm_inv_asset_page() ),
+	'CSV Import'       => array( 'store_page_bhela-bm-inv-import', array( 'page' => 'bhela-bm-inv-import' ), fn() => bhela_bm_inv_import_page() ),
+	'Audit Trail'      => array( 'store_page_bhela-bm-audit', array( 'page' => 'bhela-bm-audit' ), fn() => bhela_bm_audit_page() ),
 	'Item editor'      => array( 'bhela_inv_item', array(), fn() => bhela_bm_inv_item_meta_cb( get_post( $GLOBALS['zz_item'] ) ) ),
 );
 $GLOBALS['zz_cost'] = $cost;
@@ -272,21 +272,250 @@ foreach ( array(
 ok( false === strpos( $css, 'font-family: -apple-system' ),
 	'no bare Segoe-only stack left in admin.css' );
 
-echo "\n=== 9. menu icons are unique ===\n";
-$icons = array();
-foreach ( array(
-	'📊 Dashboard', '📄 Trip Report', '🧾 Cost Sheets', '💸 Expenses',
-	'📈 Monthly Statement', '📚 Yearly Report', '👷 Salary',
-	// The register's five, none of them already taken.
-	'📦 Item Register', '🚚 Import Register', '🔧 Monthly Stock', '📐 Inventory Report', '🏷️ Asset Report',
-	'📅 Trip Calendar', '🗺️ Spots',
-	'🖼️ Gallery', '⬆️ Bulk Upload', '⭐ Reviews', '📋 Activity Log',
-	'🔩 Audit Trail', '👥 Team', '⚙️ Settings', '🎯 Quick Guide',
-) as $label ) {
-	$icons[] = explode( ' ', $label )[0];
+/* =========================================================
+ * 9. THE MENU, READ FROM THE MENU
+ *
+ * This section used to be a hardcoded list of 22 labels checked against itself,
+ * which asserted nothing: it had already drifted from the code, claiming emoji
+ * for Trip Calendar, Activity Log and Settings that none of them registered.
+ * Everything below fires admin_menu and reads what actually came out.
+ * ========================================================= */
+
+require_once ABSPATH . 'wp-admin/includes/plugin.php';
+
+/**
+ * Build the menu as one user sees it.
+ *
+ * The globals are cleared first because admin_menu is not idempotent — firing it
+ * twice onto a populated $submenu registers every row again. Clearing makes each
+ * pass a clean build, which is what lets this run once per role.
+ *
+ * $menu holds no CPT top-levels here: WordPress creates those in
+ * wp-admin/menu.php, which is a file, not an action. So assertions about
+ * top-level presence below cover the three NEW menus only, and Bookings is
+ * checked through its submenu instead.
+ */
+function zz_menu( $user_id ) {
+	// Via 0 deliberately: wp_set_current_user() returns the cached WP_User when the
+	// id has not changed, so re-setting the same account after set_role() would keep
+	// the old capabilities and every role would report identical menus.
+	wp_set_current_user( 0 );
+	clean_user_cache( $user_id );
+	wp_set_current_user( $user_id );
+	$GLOBALS['menu'] = array();
+	$GLOBALS['submenu'] = array();
+	$GLOBALS['admin_page_hooks'] = array();
+	do_action( 'admin_menu', '' );
+	return array( $GLOBALS['menu'], $GLOBALS['submenu'], $GLOBALS['admin_page_hooks'] );
 }
-$dupes = array_keys( array_filter( array_count_values( $icons ), fn( $n ) => $n > 1 ) );
-ok( ! $dupes, 'no two menu items share an icon', implode( ' ', $dupes ) );
+
+/** First codepoint of a menu label, or '' when it opens with a letter or digit. */
+function zz_icon( $label ) {
+	$label = trim( wp_strip_all_tags( (string) $label ) );
+	$first = preg_split( '//u', $label, -1, PREG_SPLIT_NO_EMPTY )[0] ?? '';
+	return preg_match( '/[\p{L}\p{N}]/u', $first ) ? '' : $first;
+}
+
+echo "\n=== 9. the four menus ===\n";
+
+$admin_id = get_current_user_id();
+list( $m, $sub, $hooks ) = zz_menu( $admin_id );
+
+$bookings = 'edit.php?post_type=bhela_booking';
+$tops     = wp_list_pluck( $m, 2 );
+foreach ( array( 'bhela-bm-statement' => 'Accounts', 'bhela-bm-inv-month' => 'Store', 'bhela-bm-settings' => 'Setup' ) as $slug => $title ) {
+	ok( in_array( $slug, $tops, true ), "$title registers as a top-level menu" );
+	// An emoji in a top-level title would make sanitize_title() percent-encode it
+	// and every child's screen id with it, so the hook is asserted, not assumed.
+	ok( strtolower( $title ) === ( $hooks[ $slug ] ?? '' ),
+		"$title hook is '" . strtolower( $title ) . "', not percent-encoded", $hooks[ $slug ] ?? 'missing' );
+}
+ok( ! empty( $sub[ $bookings ] ), 'Bookings keeps its own rows' );
+
+// The wall of 22 is the thing this change set out to fix.
+$counts = array();
+foreach ( array( $bookings, 'bhela-bm-statement', 'bhela-bm-inv-month', 'bhela-bm-settings' ) as $p ) {
+	$counts[ $p ] = count( $sub[ $p ] ?? array() );
+}
+ok( max( $counts ) <= 8, 'no menu holds more than 8 rows', 'worst: ' . max( $counts ) );
+
+// The live duplication bug: bhela_bm_inv_menu() added the stock screens under
+// Bookings unconditionally while the standalone menu removed only the CPT row, so
+// a storekeeper saw Monthly Stock, Inventory Report and Asset Report twice.
+$where = array();
+foreach ( $sub as $parent => $rows ) {
+	foreach ( $rows as $r ) {
+		if ( isset( $r[2] ) && 0 === strpos( $r[2], 'bhela-bm-' ) ) {
+			$where[ $r[2] ][ $parent ] = true;
+		}
+	}
+}
+$twice = array();
+foreach ( $where as $slug => $parents ) {
+	if ( count( $parents ) > 1 ) {
+		$twice[] = $slug . ' (' . implode( ' + ', array_keys( $parents ) ) . ')';
+	}
+}
+ok( ! $twice, 'no page appears under two parents', implode( ', ', $twice ) );
+
+// Same slug listed twice under ONE parent — WordPress inserts a row for the
+// parent itself when the first child registered has a different slug.
+$dupe_rows = array();
+foreach ( $sub as $parent => $rows ) {
+	$seen = array();
+	foreach ( $rows as $r ) {
+		if ( isset( $seen[ $r[2] ] ) ) {
+			$dupe_rows[] = $parent . ' / ' . $r[2];
+		}
+		$seen[ $r[2] ] = true;
+	}
+}
+ok( ! $dupe_rows, 'no parent lists the same slug twice', implode( ', ', $dupe_rows ) );
+
+echo "\n=== 9b. menu icons, as registered ===\n";
+$icons = array();
+$plain = array();
+foreach ( array( $bookings, 'bhela-bm-statement', 'bhela-bm-inv-month', 'bhela-bm-settings' ) as $p ) {
+	foreach ( $sub[ $p ] ?? array() as $r ) {
+		$label = trim( wp_strip_all_tags( $r[0] ) );
+		// Core's own two rows on the Bookings menu (All Bookings, Add New) are not
+		// this plugin's to decorate.
+		if ( in_array( $r[2], array( 'edit.php?post_type=bhela_booking', 'post-new.php?post_type=bhela_booking' ), true ) ) {
+			continue;
+		}
+		$ic = zz_icon( $label );
+		if ( '' === $ic ) {
+			$plain[] = $label;
+			continue;
+		}
+		$icons[ $ic ][] = $label;
+	}
+}
+ok( ! $plain, 'every plugin menu row carries an icon', implode( ', ', $plain ) );
+$dupes = array();
+foreach ( $icons as $ic => $labels ) {
+	if ( count( $labels ) > 1 ) {
+		$dupes[] = $ic . ' → ' . implode( ' / ', $labels );
+	}
+}
+ok( ! $dupes, 'no two menu rows share an icon', implode( ', ', $dupes ) );
+
+echo "\n=== 9c. screen ids match the parents ===\n";
+// These strings are how this harness sets the screen before rendering, so a stale
+// one fails silently — nothing in production reads a screen id. Checked against
+// the menu that just registered.
+$checked = 0;
+foreach ( $screens as $name => list( $screen_id, $get ) ) {
+	$slug = $get['page'] ?? '';
+	if ( '' === $slug || ! isset( $where[ $slug ] ) ) {
+		continue;                                // a CPT metabox screen, not a page
+	}
+	$parent   = array_keys( $where[ $slug ] )[0];
+	$expected = $slug === $parent
+		? 'toplevel_page_' . $slug
+		: ( $hooks[ $parent ] ?? 'bhela_booking' ) . '_page_' . $slug;
+	ok( $screen_id === $expected, "$name screen id is current", "want $expected, have $screen_id" );
+	$checked++;
+}
+ok( $checked >= 13, 'every page screen in the list was cross-checked', "checked $checked" );
+
+echo "\n=== 9d. a menu nobody can use does not appear ===\n";
+// Visibility is decided at admin_menu, where the current user finally exists.
+// At init — where show_in_menu is fixed — it cannot be asked at all.
+$zz_user = wp_insert_user( array(
+	'user_login' => 'zz_menu_probe',
+	'user_pass'  => wp_generate_password(),
+	'user_email' => 'zz_menu_probe@example.invalid',
+	'role'       => 'bhela_booking_staff',
+) );
+if ( is_wp_error( $zz_user ) ) {
+	ok( false, 'probe user created', $zz_user->get_error_message() );
+} else {
+	foreach ( array(
+		'bhela_manager'       => array( 'accounts', 'store' ),
+		'bhela_booking_staff' => array(),
+		'bhela_cost_checker'  => array( 'accounts', 'store' ),
+		'bhela_cost_preparer' => array( 'accounts' ),
+		'bhela_storekeeper'   => array( 'store' ),
+	) as $role => $expect ) {
+		$u = new WP_User( $zz_user );
+		$u->set_role( $role );
+		list( $rm ) = zz_menu( $zz_user );
+		$got = array();
+		foreach ( array( 'accounts' => 'bhela-bm-statement', 'store' => 'bhela-bm-inv-month', 'setup' => 'bhela-bm-settings' ) as $g => $slug ) {
+			if ( in_array( $slug, wp_list_pluck( $rm, 2 ), true ) ) {
+				$got[] = $g;
+			}
+		}
+		sort( $got );
+		sort( $expect );
+		ok( $got === $expect, "$role sees " . ( $expect ? implode( ' + ', $expect ) : 'no extra menu' ),
+			'got: ' . ( $got ? implode( ' + ', $got ) : 'none' ) );
+	}
+	require_once ABSPATH . 'wp-admin/includes/user.php';
+	wp_delete_user( $zz_user );
+}
+zz_menu( $admin_id );                            // put the admin back
+
+echo "\n=== 9e. URLs and the legacy shim ===\n";
+foreach ( array( 'bhela-bm-dashboard', 'bhela-bm-reports', 'bhela-bm-trips' ) as $slug ) {
+	ok( false !== strpos( bhela_bm_admin_url( $slug ), 'edit.php?post_type=bhela_booking&page=' . $slug ),
+		"$slug URL stays under edit.php", bhela_bm_admin_url( $slug ) );
+}
+foreach ( array( 'bhela-bm-statement', 'bhela-bm-inv-month', 'bhela-bm-settings', 'bhela-bm-audit', 'bhela-bm-log', 'bhela-bm-yearly' ) as $slug ) {
+	$u = bhela_bm_admin_url( $slug );
+	ok( false !== strpos( $u, 'admin.php?page=' . $slug ) && false === strpos( $u, 'post_type' ),
+		"$slug URL is admin.php with no post_type", $u );
+}
+ok( bhela_bm_admin_url( 'bhela-bm-inv-month', array( 'month' => '2026-07' ) ) === bhela_bm_inv_month_url( '2026-07' ),
+	'bhela_bm_inv_month_url() delegates to the one helper' );
+ok( false !== strpos( bhela_bm_inv_import_url( array( 'step' => 2 ) ), 'admin.php?page=bhela-bm-inv-import' ),
+	'bhela_bm_inv_import_url() delegates too' );
+
+// The shim keeps a legacy link working, but a link this plugin renders TODAY should
+// not need it — a redirect on every click is a bug that merely does not show. $all
+// is the concatenated markup of every screen rendered in section 4.
+$legacy = array();
+foreach ( $where as $slug => $parents ) {
+	if ( 'bookings' === bhela_bm_menu_page_group( $slug ) ) {
+		continue;
+	}
+	if ( false !== strpos( $all, 'post_type=bhela_booking&#038;page=' . $slug )
+		|| false !== strpos( $all, 'post_type=bhela_booking&page=' . $slug ) ) {
+		$legacy[] = $slug;
+	}
+}
+ok( ! $legacy, 'no rendered link still points a moved page at edit.php', implode( ', ', $legacy ) );
+
+// Settings URLs of the old shape are already in email this plugin has sent, so the
+// shim is load-bearing. Throwing from the filter unwinds past the exit() that
+// follows wp_safe_redirect(), which is the only way to observe the target.
+ok( false !== has_action( 'admin_init', 'bhela_bm_menu_legacy_redirect' ), 'the shim is hooked' );
+$zz_catch = function ( $loc ) {
+	throw new RuntimeException( $loc );
+};
+add_filter( 'wp_redirect', $zz_catch );
+$zz_shim = function ( $get, $pagenow = 'edit.php' ) {
+	$_GET = $get;
+	$GLOBALS['pagenow'] = $pagenow;
+	try {
+		bhela_bm_menu_legacy_redirect();
+		return '';                               // no redirect
+	} catch ( RuntimeException $e ) {
+		return $e->getMessage();
+	}
+};
+$to = $zz_shim( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-statement', 'month' => '2026-07' ) );
+ok( false !== strpos( $to, 'admin.php?page=bhela-bm-statement' ) && false !== strpos( $to, 'month=2026-07' ),
+	'a legacy statement URL lands on the statement, filter intact', $to );
+ok( '' === $zz_shim( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-reports' ) ),
+	'Trip Report is not redirected — it never moved' );
+ok( '' === $zz_shim( array( 'post_type' => 'bhela_booking' ) ), 'the plain booking list is not redirected' );
+ok( '' === $zz_shim( array( 'post_type' => 'bhela_booking', 'page' => 'acf-options' ) ),
+	'another plugin\'s page is left alone' );
+ok( '' === $zz_shim( array( 'page' => 'bhela-bm-statement' ), 'admin.php' ), 'the new URL does not redirect to itself' );
+remove_filter( 'wp_redirect', $zz_catch );
+$_GET = array();
 
 echo "\n=== cleanup ===\n";
 foreach ( $made as $id ) { bhela_test_delete( $id ); }

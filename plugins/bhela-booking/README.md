@@ -2,12 +2,31 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.27.0
+- **Version:** 2.28.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
 > **Owner-facing guide:** `wp-content/docs/BHELA-Owner-Manual.md` (styled version published as an Artifact).
 > **Design/feature history:** `wp-content/docs/plans/`.
+
+## Where things are in wp-admin
+
+Four menus, grouped by the job you are doing. Each one is **hidden from anyone who cannot use
+it**, so a storekeeper sees Store and nothing else.
+
+| Menu | Rows |
+| --- | --- |
+| **Bookings** | All Bookings · Add New · 📊 Dashboard · 📄 Trip Report · 📅 Trip Calendar · ⭐ Reviews |
+| **Accounts** | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report |
+| **Store** | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
+| **Setup** | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
+
+Clicking a menu's own name opens its most-used screen: Accounts → Monthly Statement, Store →
+Monthly Stock, Setup → Settings.
+
+Everything used to live under **Bookings** as 22 rows. Old links of the form
+`edit.php?post_type=bhela_booking&page=…` still work — a permanent redirect keeps them alive,
+because URLs of that shape are already in email this plugin has sent.
 
 ## Features
 
@@ -47,6 +66,7 @@ Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pr
 | `includes/inventory-core.php` | The two stock post types and the lock. **Loads on every request**, so a closed month is closed against WP-CLI too |
 | `includes/inventory.php` | Stock lists, the quantity model, monthly periods and carry-forward, the close workflow, every register screen, CSV and the print view |
 | `includes/inventory-import.php` | The four-step column-mapped CSV importer: upload, map, dry run, commit |
+| `includes/menu.php` | The four menus: which group owns which page, `bhela_bm_admin_url()`, and the redirect that keeps old links alive |
 | `assets/admin.css` | The admin design system — tokens, screen header, cards, ledger, pills, print |
 | `templates/invoice.php` | Printable invoice |
 
@@ -112,7 +132,7 @@ views — the screen and the printout used to disagree on the same sheet.
 
 ## Mobile verification (OTP)
 
-`Bookings → Settings → SMS`. Off by default. When on, a booking cannot be submitted until the guest enters a code sent to the number they typed.
+`Setup → ⚙️ Settings → SMS`. Off by default. When on, a booking cannot be submitted until the guest enters a code sent to the number they typed.
 
 Message format, deliberately short: `Your BHELA OTP is 4821` — 22 characters, one SMS part.
 
@@ -142,7 +162,7 @@ The card only appears for a provider that publishes a balance endpoint (currentl
 
 ## Trip Cost Sheet
 
-`Bookings → 🧾 Cost Sheets`. One sheet per trip: the standing expense heads, each with 1st/2nd/3rd payment columns and a remark, plus spare rows for one-offs.
+`Accounts → 🧾 Cost Sheets`. One sheet per trip: the standing expense heads, each with 1st/2nd/3rd payment columns and a remark, plus spare rows for one-offs.
 
 ### Heads are the owner's, not the code's
 
@@ -169,9 +189,9 @@ An approved sheet is locked in the save handler, not just in the UI — a crafte
 
 ## Expenses & the Monthly Statement
 
-`Bookings → 💸 Expenses` records what is spent outside a trip — advertising, renovation, one-off purchases — with date, type, amount, payment method, payment date, means of verification and remark. It reproduces the "Digital Marketing & Renovation Report" kept by hand. Filter by month and type; the filter bar shows the month's total.
+`Accounts → 💸 Expenses` records what is spent outside a trip — advertising, renovation, one-off purchases — with date, type, amount, payment method, payment date, means of verification and remark. It reproduces the "Digital Marketing & Renovation Report" kept by hand. Filter by month and type; the filter bar shows the month's total.
 
-`Bookings → 📊 Monthly Statement` puts the two together: the month's **approved** cost sheets as trip rows, then one deduction row per expense type, then gross profit — plus cost and profit per person, and the sign-offs carried through from the sheets.
+`Accounts → 📈 Monthly Statement` puts the two together: the month's **approved** cost sheets as trip rows, then one deduction row per expense type, then gross profit — plus cost and profit per person, and the sign-offs carried through from the sheets.
 
 Types and payment methods are editable in `Settings → 🧾 Lists`, same defaults-plus-override shape as the cost heads. Because deductions are grouped by whatever types exist, **adding a type grows the statement with no code change**.
 
@@ -188,7 +208,7 @@ Two modelling notes that came out of that:
 
 ## Staff salary
 
-`Settings → 👷 Staff` holds the roster: name, designation, employment type (trip based / monthly / both), per-trip rate, monthly salary, account. `Bookings → 👷 Salary` is one sheet per month.
+`Setup → ⚙️ Settings → 👷 Staff` holds the roster: name, designation, employment type (trip based / monthly / both), per-trip rate, monthly salary, account. `Accounts → 👷 Salary` is one sheet per month.
 
 **Trips completed defaults to the number of approved cost sheets in that month**, and is editable per person for anyone who missed one. Sub-total is rate × trips; payable adds any monthly salary; advance is subtracted to give payment-after-advance. Settlement, adjustment and means of verification are typed, following the printed sheet.
 
@@ -200,7 +220,7 @@ Payroll is off for Booking Staff by default: pay rates are visible on this scree
 
 ## Team & roles
 
-`Bookings → 👥 Team` (administrators only) lists who has access and carries the **permission matrix** — a checkbox per permission per role, saved from the page.
+`Setup → 👥 Team` (administrators only) lists who has access and carries the **permission matrix** — a checkbox per permission per role, saved from the page.
 
 Creating users and assigning roles stays in **Users → Add New** — these are ordinary WordPress roles, so they appear in its dropdown with no extra code. This screen decides what those roles *may do*.
 
@@ -242,7 +262,7 @@ Upgrade note: bookings previously ran on generic `post` capabilities, so any rol
 
 ## Settings (`bhela_bm_settings` option)
 
-Business info · payment details (bKash/Nagad/bank/QR) · advance % · invoice prefix/note · weekend days · holidays · cabin rates (`bhela_bm_rates`) · trip calendar (`bhela_bm_trips`) · email notification toggles · SMS gateway config. Managed under **Bookings → Settings**.
+Business info · payment details (bKash/Nagad/bank/QR) · advance % · invoice prefix/note · weekend days · holidays · cabin rates (`bhela_bm_rates`) · trip calendar (`bhela_bm_trips`) · email notification toggles · SMS gateway config. Managed under **Setup → ⚙️ Settings**.
 
 ## Security
 
@@ -255,7 +275,7 @@ Business info · payment details (bKash/Nagad/bank/QR) · advance % · invoice p
 
 ## Provisioning
 
-The `bhela` theme auto-creates the booking pages, trip calendar, and menu on activation — and once per released version via a capability-gated `admin_init` check (skips AJAX/cron). Nothing to run manually; configure under **Bookings → Settings**.
+The `bhela` theme auto-creates the booking pages, trip calendar, and menu on activation — and once per released version via a capability-gated `admin_init` check (skips AJAX/cron). Nothing to run manually; configure under **Setup → ⚙️ Settings**.
 
 ## Changelog (recent)
 

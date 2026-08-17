@@ -328,7 +328,7 @@ function bhela_bm_audit_history( $type, $id, $limit = 200 ) {
 /** Menu entry. */
 function bhela_bm_audit_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'store' ),
 		__( 'Audit Trail', 'bhela-booking' ),
 		'🔩 ' . __( 'Audit Trail', 'bhela-booking' ),
 		'bhela_inv_audit',
@@ -378,7 +378,7 @@ function bhela_bm_audit_page() {
 	$actions = '<a class="button" href="' . esc_url( $csv ) . '">📊 ' . esc_html__( 'Download CSV', 'bhela-booking' ) . '</a>';
 
 	$base = add_query_arg( array_merge(
-		array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-audit' ),
+		array( 'page' => 'bhela-bm-audit' ),
 		array_filter( array( 'ref' => $filters['object_ref'], 'from' => $filters['from'], 'to' => $filters['to'] ) )
 	), admin_url( 'edit.php' ) );
 	?>
@@ -401,7 +401,8 @@ function bhela_bm_audit_page() {
 
 		<div class="bha-bar">
 			<form method="get">
-				<input type="hidden" name="post_type" value="bhela_booking">
+				<?php // No post_type: this page is a child of admin.php now, not edit.php.
+				// Leaving it in would send the filter to the Posts list, silently. ?>
 				<input type="hidden" name="page" value="bhela-bm-audit">
 				<input type="hidden" name="channel" value="<?php echo esc_attr( $filters['channel'] ); ?>">
 				<div class="bha-field">

@@ -1409,11 +1409,7 @@ function bhela_bm_inv_item_code( $item_id ) {
 
 /** URL of the Monthly Update screen for a month. */
 function bhela_bm_inv_month_url( $month, $args = array() ) {
-	return add_query_arg( array_merge( array(
-		'post_type' => 'bhela_booking',
-		'page'      => 'bhela-bm-inv-month',
-		'month'     => $month,
-	), $args ), admin_url( 'edit.php' ) );
+	return bhela_bm_admin_url( 'bhela-bm-inv-month', array_merge( array( 'month' => $month ), $args ) );
 }
 
 /* =========================================================
@@ -1600,9 +1596,9 @@ function bhela_bm_inv_apply_lines( $id, $posted, $can_adjust ) {
  * MENUS
  * ========================================================= */
 
-/** The register's screens, all nested under Bookings like every other module. */
+/** The register's screens, under the Store menu. */
 function bhela_bm_inv_menu() {
-	$parent = 'edit.php?post_type=bhela_booking';
+	$parent = bhela_bm_menu_parent( 'store' );
 
 	add_submenu_page( $parent, __( 'Monthly Stock Update', 'bhela-booking' ), '🔧 ' . __( 'Monthly Stock', 'bhela-booking' ), 'bhela_inv_count', 'bhela-bm-inv-month', 'bhela_bm_inv_month_page' );
 	add_submenu_page( $parent, __( 'Inventory Report', 'bhela-booking' ), '📐 ' . __( 'Inventory Report', 'bhela-booking' ), 'bhela_inv_view', 'bhela-bm-inv-report', 'bhela_bm_inv_report_page' );
@@ -1615,35 +1611,13 @@ function bhela_bm_inv_menu() {
 }
 add_action( 'admin_menu', 'bhela_bm_inv_menu' );
 
-/**
- * A storekeeper has no bookings, so the nested menu is unreachable for them.
- *
- * Same treatment the cost sheet gives a cost-only preparer: drop the nested entry
- * and give them a top-level one. Priority 20, because core's own
- * _add_post_type_submenus() runs at 10 and would otherwise re-add it after us.
+/*
+ * There was a standalone Stock menu here, for a storekeeper who has no Bookings
+ * to nest under. The Store menu in includes/menu.php now serves everyone, so it
+ * is gone -- and with it a bug: this function removed only the CPT row from
+ * Bookings, while bhela_bm_inv_menu() had already added four more there
+ * unconditionally, so a storekeeper saw Monthly Stock and both reports twice.
  */
-function bhela_bm_inv_standalone_menu() {
-	if ( current_user_can( 'edit_bhela_bookings' ) || ! current_user_can( 'bhela_inv_view' ) ) {
-		return;
-	}
-	remove_submenu_page( 'edit.php?post_type=bhela_booking', 'edit.php?post_type=bhela_inv_item' );
-
-	add_menu_page(
-		__( 'Item Register', 'bhela-booking' ),
-		'📦 ' . __( 'Stock', 'bhela-booking' ),
-		'bhela_inv_view',
-		'edit.php?post_type=bhela_inv_item',
-		'',
-		'dashicons-archive',
-		27
-	);
-	if ( current_user_can( 'bhela_inv_count' ) ) {
-		add_submenu_page( 'edit.php?post_type=bhela_inv_item', __( 'Monthly Stock Update', 'bhela-booking' ), '🔧 ' . __( 'Monthly Stock', 'bhela-booking' ), 'bhela_inv_count', 'bhela-bm-inv-month', 'bhela_bm_inv_month_page' );
-	}
-	add_submenu_page( 'edit.php?post_type=bhela_inv_item', __( 'Inventory Report', 'bhela-booking' ), '📐 ' . __( 'Inventory Report', 'bhela-booking' ), 'bhela_inv_view', 'bhela-bm-inv-report', 'bhela_bm_inv_report_page' );
-	add_submenu_page( 'edit.php?post_type=bhela_inv_item', __( 'Asset Report', 'bhela-booking' ), '🏷️ ' . __( 'Asset Report', 'bhela-booking' ), 'bhela_inv_view', 'bhela-bm-inv-assets', 'bhela_bm_inv_asset_page' );
-}
-add_action( 'admin_menu', 'bhela_bm_inv_standalone_menu', 20 );
 
 /**
  * Send a storekeeper somewhere useful.
@@ -2095,7 +2069,8 @@ function bhela_bm_inv_month_page() {
 
 		<div class="bha-bar">
 			<form method="get">
-				<input type="hidden" name="post_type" value="bhela_booking">
+				<?php // No post_type: this page is a child of admin.php now, not edit.php.
+				// Leaving it in would send the filter to the Posts list, silently. ?>
 				<input type="hidden" name="page" value="bhela-bm-inv-month">
 				<div class="bha-field bha-field--caps">
 					<label for="bhela-inv-month"><?php esc_html_e( 'Month', 'bhela-booking' ); ?></label>
@@ -2239,7 +2214,7 @@ function bhela_bm_inv_month_page() {
 								esc_html__( 'No items in the register yet. %1$s, or %2$s.', 'bhela-booking' ),
 								'<a href="' . esc_url( function_exists( 'bhela_bm_inv_import_url' )
 									? bhela_bm_inv_import_url()
-									: add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-inv-import' ), admin_url( 'edit.php' ) )
+									: bhela_bm_admin_url( 'bhela-bm-inv-import' )
 								) . '">' . esc_html__( 'import it from a spreadsheet', 'bhela-booking' ) . '</a>',
 								'<a href="' . esc_url( admin_url( 'post-new.php?post_type=bhela_inv_item' ) ) . '">' . esc_html__( 'add one by hand', 'bhela-booking' ) . '</a>'
 							);
@@ -2536,7 +2511,8 @@ function bhela_bm_inv_render_report( $kind, $icon, $title, $lead ) {
 
 		<div class="bha-bar">
 			<form method="get">
-				<input type="hidden" name="post_type" value="bhela_booking">
+				<?php // No post_type: this page is a child of admin.php now, not edit.php.
+				// Leaving it in would send the filter to the Posts list, silently. ?>
 				<input type="hidden" name="page" value="<?php echo esc_attr( 'asset' === $kind ? 'bhela-bm-inv-assets' : 'bhela-bm-inv-report' ); ?>">
 				<div class="bha-field bha-field--caps">
 					<label for="bhela-inv-rmonth"><?php esc_html_e( 'Month', 'bhela-booking' ); ?></label>

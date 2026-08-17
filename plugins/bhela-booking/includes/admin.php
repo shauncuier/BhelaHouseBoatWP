@@ -756,9 +756,9 @@ add_action( 'admin_notices', 'bhela_bm_combo_error_notice' );
 
 function bhela_bm_settings_menu() {
 	add_submenu_page(
-		'edit.php?post_type=bhela_booking',
+		bhela_bm_menu_parent( 'setup' ),
 		__( 'Booking Settings', 'bhela-booking' ),
-		__( 'Settings', 'bhela-booking' ),
+		'⚙️ ' . __( 'Settings', 'bhela-booking' ),
 		'manage_options',
 		'bhela-bm-settings',
 		'bhela_bm_settings_page'
@@ -988,7 +988,7 @@ function bhela_bm_settings_page() {
 				</td></tr>
 				<tr><th><?php esc_html_e( 'Holidays', 'bhela-booking' ); ?></th>
 					<td><p class="description"><?php esc_html_e( 'Holidays are set on the Trip Calendar now. Any trip ticked as a holiday is charged the regular rate (no 20% weekday discount). Every other non-weekend day gets the weekday rate.', 'bhela-booking' ); ?></p>
-					<p><a class="button" href="<?php echo esc_url( add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-trips' ), admin_url( 'edit.php' ) ) ); ?>">📅 <?php esc_html_e( 'Open Trip Calendar', 'bhela-booking' ); ?></a></p></td></tr>
+					<p><a class="button" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-trips' ) ); ?>">📅 <?php esc_html_e( 'Open Trip Calendar', 'bhela-booking' ); ?></a></p></td></tr>
 			</table>
 			</div><!-- /pricing -->
 

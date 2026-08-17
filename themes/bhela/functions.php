@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.27.0' );
+define( 'BHELA_VERSION', '2.28.0' );
 
 // Bump when bhela_menu_structure() changes: existing installs rebuild the
 // primary menu once, then it is left alone so owner edits stick.

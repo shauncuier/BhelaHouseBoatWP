@@ -285,10 +285,7 @@ function bhela_bm_inv_import_bail( $message ) {
 
 /** URL of the importer. */
 function bhela_bm_inv_import_url( $args = array() ) {
-	return add_query_arg( array_merge( array(
-		'post_type' => 'bhela_booking',
-		'page'      => 'bhela-bm-inv-import',
-	), $args ), admin_url( 'edit.php' ) );
+	return bhela_bm_admin_url( 'bhela-bm-inv-import', $args );
 }
 
 /**
