@@ -2,7 +2,7 @@
 /** Dev helper: render every BHELA admin screen and check the design system. */
 
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'salary', 'dashboard', 'guide', 'log' );
+bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'salary', 'dashboard', 'guide', 'log', 'audit', 'inventory-core', 'inventory', 'inventory-import' );
 wp_set_current_user( 1 );
 
 echo "=== 1. helpers ===\n";
@@ -27,6 +27,12 @@ foreach ( bhela_bm_cost_statuses() as $k => $def ) {
 	printf( "  cost    %-13s → %s\n", $k, end( $cs ) );
 }
 ok( count( $cs ) === count( array_unique( $cs ) ), 'all four cost-sheet states look different' );
+$iv = array();
+foreach ( bhela_bm_inv_statuses() as $k => $def ) {
+	$iv[] = $def['tone'] . ( ! empty( $def['solid'] ) ? '/solid' : '/soft' );
+	printf( "  stock   %-13s → %s\n", $k, end( $iv ) );
+}
+ok( count( $iv ) === count( array_unique( $iv ) ), 'all five stock-sheet states look different' );
 
 echo "\n=== 3. header emits the notice marker ===\n";
 ob_start(); bhela_bm_screen_header( '📄', 'Trip Report', 'Lead text.', '<button class="button">Go</button>' ); $head = ob_get_clean();
@@ -53,6 +59,25 @@ update_post_meta( $book, '_bhela_total', 60000 );
 update_post_meta( $book, '_bhela_paid_amount', 20000 );
 $made[] = $book;
 
+// An item and a month, so the register's screens have something real to draw.
+// The line deliberately does NOT reconcile, so the variance flag renders too.
+bhela_bm_audit_install();
+$item = wp_insert_post( array( 'post_type' => 'bhela_inv_item', 'post_status' => 'publish', 'post_title' => 'ZZUI life jacket' ) );
+update_post_meta( $item, '_bhela_inv_kind', 'asset' );
+update_post_meta( $item, '_bhela_inv_cat', 'safety_eq' );
+update_post_meta( $item, '_bhela_inv_code', 'BHELA-SAF-9999' );
+update_post_meta( $item, '_bhela_inv_location', 'upper' );
+update_post_meta( $item, '_bhela_inv_rate', 1200 );
+$made[] = $item;
+$period = bhela_bm_inv_period_id( '2026-07', true );
+$made[] = $period;
+$ikey = bhela_bm_inv_line_key( $item );
+bhela_bm_inv_meta_write( $period, '_bhela_inv_baseline', 1 );
+bhela_bm_inv_meta_write( $period, '_bhela_inv_opening', wp_json_encode( array( $ikey => 25 ), JSON_FORCE_OBJECT ) );
+bhela_bm_inv_write_lines( $period, array( $ikey => array_merge( bhela_bm_inv_blank_line(), array(
+	'open' => 25, 'add' => 10, 'good' => 20, 'dam' => 14, 'count' => 34, 'rate' => 1200,
+) ) ) );
+
 $screens = array(
 	'Dashboard'        => array( 'bhela_booking_page_bhela-bm-dashboard', array( 'page' => 'bhela-bm-dashboard' ), fn() => bhela_bm_dashboard_page() ),
 	'Trip Report'      => array( 'bhela_booking_page_bhela-bm-reports', array( 'page' => 'bhela-bm-reports', 'from' => '2026-07-01', 'to' => '2026-07-31', 'cancelled' => 1 ), fn() => bhela_bm_reports_page() ),
@@ -67,11 +92,18 @@ $screens = array(
 	'Salary sheet'     => array( 'bhela_salary', array(), fn() => bhela_bm_salary_meta_cb( get_post( $GLOBALS['zz_sal'] ) ) ),
 	'Booking details'  => array( 'bhela_booking', array(), fn() => bhela_bm_details_metabox( get_post( $GLOBALS['zz_book'] ) ) ),
 	'Booking discount' => array( 'bhela_booking', array(), fn() => bhela_bm_discount_metabox( get_post( $GLOBALS['zz_book'] ) ) ),
+	'Monthly Stock'    => array( 'bhela_booking_page_bhela-bm-inv-month', array( 'page' => 'bhela-bm-inv-month', 'month' => '2026-07' ), fn() => bhela_bm_inv_month_page() ),
+	'Inventory Report' => array( 'bhela_booking_page_bhela-bm-inv-report', array( 'page' => 'bhela-bm-inv-report', 'month' => '2026-07' ), fn() => bhela_bm_inv_report_page() ),
+	'Asset Report'     => array( 'bhela_booking_page_bhela-bm-inv-assets', array( 'page' => 'bhela-bm-inv-assets', 'month' => '2026-07' ), fn() => bhela_bm_inv_asset_page() ),
+	'CSV Import'       => array( 'bhela_booking_page_bhela-bm-inv-import', array( 'page' => 'bhela-bm-inv-import' ), fn() => bhela_bm_inv_import_page() ),
+	'Audit Trail'      => array( 'bhela_booking_page_bhela-bm-audit', array( 'page' => 'bhela-bm-audit' ), fn() => bhela_bm_audit_page() ),
+	'Item editor'      => array( 'bhela_inv_item', array(), fn() => bhela_bm_inv_item_meta_cb( get_post( $GLOBALS['zz_item'] ) ) ),
 );
 $GLOBALS['zz_cost'] = $cost;
 $GLOBALS['zz_exp']  = $exp;
 $GLOBALS['zz_sal']  = $sal;
 $GLOBALS['zz_book'] = $book;
+$GLOBALS['zz_item'] = $item;
 
 $all = '';
 foreach ( $screens as $name => list( $screen_id, $get, $render ) ) {
@@ -241,9 +273,12 @@ echo "\n=== 9. menu icons are unique ===\n";
 $icons = array();
 foreach ( array(
 	'📊 Dashboard', '📄 Trip Report', '🧾 Cost Sheets', '💸 Expenses',
-	'📈 Monthly Statement', '👷 Salary', '📅 Trip Calendar', '🗺️ Spots',
+	'📈 Monthly Statement', '📚 Yearly Report', '👷 Salary',
+	// The register's five, none of them already taken.
+	'📦 Item Register', '🔧 Monthly Stock', '📐 Inventory Report', '🏷️ Asset Report',
+	'📅 Trip Calendar', '🗺️ Spots',
 	'🖼️ Gallery', '⬆️ Bulk Upload', '⭐ Reviews', '📋 Activity Log',
-	'👥 Team', '⚙️ Settings', '🎯 Quick Guide',
+	'🔩 Audit Trail', '👥 Team', '⚙️ Settings', '🎯 Quick Guide',
 ) as $label ) {
 	$icons[] = explode( ' ', $label )[0];
 }
@@ -251,7 +286,7 @@ $dupes = array_keys( array_filter( array_count_values( $icons ), fn( $n ) => $n 
 ok( ! $dupes, 'no two menu items share an icon', implode( ' ', $dupes ) );
 
 echo "\n=== cleanup ===\n";
-foreach ( $made as $id ) { wp_delete_post( $id, true ); }
+foreach ( $made as $id ) { bhela_test_delete( $id ); }
 ok( true, 'fixtures removed' );
 
 bhela_test_done();

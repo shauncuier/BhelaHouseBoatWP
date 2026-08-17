@@ -748,6 +748,15 @@
 .bha-tag--gallery { background: #0891b2; }
 .bha-tag--error { background: var(--bha-danger); }
 
+/* Audit-trail channels. Separate from the log tags above because the two stores
+   are separate: the log is diagnostics and can be cleared, the audit trail is the
+   register's history and cannot. */
+.bha-tag--inventory { background: #0f766e; }
+.bha-tag--inv { background: #0f766e; }
+.bha-tag--period { background: #4338ca; }
+.bha-tag--lists { background: #a16207; }
+.bha-tag--import { background: #be185d; }
+
 .bha-pill.is-solid { color: #fff; border-color: transparent; }
 .bha-pill--neutral.is-solid { background: var(--bha-neutral); }
 .bha-pill--progress.is-solid { background: var(--bha-progress); }

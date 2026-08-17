@@ -232,26 +232,30 @@ function bhela_bm_report_csv() {
 		'Guests', 'Total', 'Paid', 'Due', 'Status', 'Payment Method', 'Txn ID',
 	) );
 
+	// Every free-text cell goes through bhela_bm_csv_cell(): a guest name or a
+	// transaction ID beginning = + - or @ is a formula to Excel, and this file is
+	// opened in Excel by definition. Figures are passed through untouched so the
+	// money and count columns stay sortable.
 	$i = 0;
 	foreach ( $data['rows'] as $r ) {
 		$i++;
 		fputcsv( $fh, array(
 			$i,
-			$r['invoice_no'],
-			$r['name'],
-			$r['phone'],
+			bhela_bm_csv_cell( $r['invoice_no'] ),
+			bhela_bm_csv_cell( $r['name'] ),
+			bhela_bm_csv_cell( $r['phone'] ),
 			$r['date'],
-			$r['cabin_type'],
+			bhela_bm_csv_cell( $r['cabin_type'] ),
 			$r['cabins'],
 			$r['guests'],
 			$r['total'],
 			$r['paid'],
 			$r['due'],
-			$statuses[ $r['status'] ] ?? $r['status'],
+			bhela_bm_csv_cell( $statuses[ $r['status'] ] ?? $r['status'] ),
 			// The screen shows an em dash for "not recorded"; a spreadsheet wants
 			// an empty cell so the column stays sortable and countable.
-			$r['pay_method'] ? ( $methods[ $r['pay_method'] ] ?? $r['pay_method'] ) : '',
-			$r['txn_id'],
+			bhela_bm_csv_cell( $r['pay_method'] ? ( $methods[ $r['pay_method'] ] ?? $r['pay_method'] ) : '' ),
+			bhela_bm_csv_cell( $r['txn_id'] ),
 		) );
 	}
 

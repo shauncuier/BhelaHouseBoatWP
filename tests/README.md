@@ -5,7 +5,7 @@ Two suites live here. They test different things and run in different places.
 | | `bhela-tests.php` | `run.php` + `*-test.php` |
 |---|---|---|
 | Runs in | a browser, logged in as an administrator | the command line |
-| Covers | pricing rules, availability, SMS templates | accounting, security, admin UI, bookings, OTP, gateway |
+| Covers | pricing rules, availability, SMS templates | accounting, security, admin UI, bookings, stock, OTP, gateway |
 | Use when | you want a quick visual check | before a release, or after touching roles/money/admin |
 
 Everything here sits outside `themes/` and `plugins/`, so the release ZIPs never carry it.
@@ -46,6 +46,7 @@ php tests/run.php security ui
 | `heads-test` | Owner-edited cost heads, and that a legacy positional sheet converts correctly on read |
 | `roundtrip-test` | The cost-sheet save handler survives a full save → read → save cycle |
 | `booking-test` | The booking save handler: the PAID predicate refuses an unpriced ৳0 quote; a Full Boat takes all six cabins and survives a leftover "Recalculate" tick; the day type is derived from the travel date, so a moved date can no longer print "Weekend" against a Monday |
+| `inventory-test` | The stock register: repair and damage move things between condition buckets without changing the count, while loss and disposal do; a month opens on the previous month's closing and that opening cannot be posted; when a prior month changes the disagreement is reported and the stored opening is left alone; a closed month refuses the form, a direct `update_post_meta()`, quick-edit, the trash and a hard delete — the last two even for an administrator; the audit trail has no DELETE anywhere near it; and reading a month does not add queries as the register grows |
 | `cache-test` | The front end behind a full-page cache — the tracker payload and what must never be cached |
 | `ui-test` | Every admin screen renders with no PHP notice, no inline `<style>`, no hand-typed hex; the stylesheet loads on our screens only |
 | `contrast-test` | Every colour pair in `admin.css` meets WCAG AA. No database needed |

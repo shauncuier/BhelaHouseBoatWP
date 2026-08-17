@@ -101,7 +101,7 @@ ok( count( $keys ) === count( array_unique( $keys ) ), 'keys are unique' );
 ok( in_array( 'engine_fuel', $keys, true ), 'head rows use the slug as key' );
 
 echo "\n=== cleanup ===\n";
-wp_delete_post( $old, true );
+bhela_test_delete( $old );
 if ( is_array( $restore ) ) { update_option( 'bhela_bm_cost_heads', $restore ); } else { delete_option( 'bhela_bm_cost_heads' ); }
 ok( true, 'restored' );
 

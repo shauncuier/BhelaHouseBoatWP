@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.26.0
+ * Version: 2.27.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.26.0' );
+define( 'BHELA_BM_VERSION', '2.27.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -491,6 +491,33 @@ function bhela_bm_money( $amount ) {
 }
 
 /**
+ * Neutralise a value that a spreadsheet would execute.
+ *
+ * Excel and LibreOffice treat a cell beginning =, +, - or @ as a formula, so a
+ * supplier named `=cmd|' /c calc'!A1` becomes code the moment the owner opens
+ * an export. Tab and CR are in the list because both are formula leaders once
+ * the cell is re-parsed.
+ *
+ * A leading apostrophe is the documented escape and every spreadsheet strips it
+ * again on import, so the value still reads correctly. Numbers are untouched, so
+ * a money or count column stays sortable — which is why this is not a blanket
+ * quote.
+ *
+ * Lives here rather than in a module so every export has it regardless of load
+ * order. Apply it to every free-text cell; never to a figure.
+ *
+ * @param int|float|string $value Raw cell value.
+ * @return string Safe to hand to fputcsv().
+ */
+function bhela_bm_csv_cell( $value ) {
+	$value = (string) $value;
+	if ( '' !== $value && false !== strpos( "=+-@\t\r", $value[0] ) ) {
+		$value = "'" . $value;
+	}
+	return $value;
+}
+
+/**
  * The advance expressed as a percentage of the booking total.
  *
  * Derived from the stored amount, NOT from the advance_percent setting: the
@@ -668,6 +695,13 @@ add_action( 'init', 'bhela_bm_register_cpt' );
  * ========================================================= */
 
 require_once BHELA_BM_PATH . 'includes/log.php';
+require_once BHELA_BM_PATH . 'includes/audit.php';
+// Post types and lock guards load on EVERY request, not just wp-admin. A closed
+// month that can still be deleted from WP-CLI or a cron job is not closed, and
+// wp_delete_post() from either never reaches an is_admin() block — so the guards
+// cannot live in inventory.php with the screens. This file therefore depends on
+// nothing above it.
+require_once BHELA_BM_PATH . 'includes/inventory-core.php';
 require_once BHELA_BM_PATH . 'includes/frontend.php';
 require_once BHELA_BM_PATH . 'includes/invoice.php';
 require_once BHELA_BM_PATH . 'includes/emails.php';
@@ -692,6 +726,8 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/statement.php';
 	require_once BHELA_BM_PATH . 'includes/yearly.php';
 	require_once BHELA_BM_PATH . 'includes/salary.php';
+	require_once BHELA_BM_PATH . 'includes/inventory.php';
+	require_once BHELA_BM_PATH . 'includes/inventory-import.php';
 }
 
 /* =========================================================

@@ -14,10 +14,10 @@
 
 define( 'BHELA_TEST_QUIET', true );
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'roles', 'costs', 'expenses', 'salary' );
+bhela_test_modules( 'roles', 'costs', 'expenses', 'salary', 'audit', 'inventory-core', 'inventory' );
 
 $removed = 0;
-foreach ( array( 'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking', 'bhela_review' ) as $type ) {
+foreach ( array( 'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking', 'bhela_review', 'bhela_inv_item', 'bhela_inv_period' ) as $type ) {
 	$posts = get_posts( array(
 		'post_type'      => $type,
 		'post_status'    => 'any',
@@ -28,9 +28,30 @@ foreach ( array( 'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking',
 		if ( 0 !== strpos( $post->post_title, 'ZZ' ) ) {
 			continue;
 		}
-		wp_delete_post( $post->ID, true );
+		bhela_test_delete( $post->ID );
 		$removed++;
 		printf( "  removed %s #%d %s\n", $type, $post->ID, $post->post_title );
+	}
+}
+
+// The register keeps a month => post-ID index and an ID counter in options. A
+// swept period leaves both pointing at nothing, and the next run would then carry
+// a previous run's opening balances forward into its own fixtures — which looks
+// exactly like a broken carry-forward. Rebuild rather than trust them.
+if ( function_exists( 'bhela_bm_inv_period_reindex' ) ) {
+	$index = get_option( 'bhela_bm_inv_periods', array() );
+	$live  = array();
+	foreach ( (array) $index as $month => $id ) {
+		if ( get_post( $id ) ) {
+			$live[ $month ] = (int) $id;
+		}
+	}
+	if ( $live !== (array) $index ) {
+		update_option( 'bhela_bm_inv_periods', $live, false );
+		printf( "  rebuilt the stock period index (%d stale entr%s dropped)\n",
+			count( (array) $index ) - count( $live ),
+			1 === count( (array) $index ) - count( $live ) ? 'y' : 'ies'
+		);
 	}
 }
 

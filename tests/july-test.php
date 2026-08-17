@@ -81,7 +81,7 @@ update_post_meta( $draft, '_bhela_cost_status', 'prepared' );
 $d2 = bhela_bm_statement_data( '2026-07' );
 ok( 1922500 === $d2['earnings'], 'a prepared sheet does NOT move the month', number_format( $d2['earnings'] ) );
 ok( 1 === count( $d2['pending'] ), 'it is reported as pending instead' );
-wp_delete_post( $draft, true );
+bhela_test_delete( $draft );
 
 echo "\n=== a new expense type appears with no code change ===\n";
 update_option( 'bhela_bm_expense_types', array(
@@ -100,7 +100,7 @@ $d3 = bhela_bm_statement_data( '2026-07' );
 ok( isset( $d3['expenses']['by_type']['legal'] ), 'new type became its own deduction row' );
 ok( $d3['gross'] === $d['gross'] - 5000, 'and it reduced gross profit', number_format( $d3['gross'] ) );
 delete_option( 'bhela_bm_expense_types' );
-wp_delete_post( $id, true );
+bhela_test_delete( $id );
 
 echo "\n=== the owner's bottom line, reproduced ===\n";
 $d = bhela_bm_statement_data( '2026-07' );
@@ -136,7 +136,7 @@ foreach ( array( 'Fatal error', 'Warning:', 'Notice:' ) as $bad ) { ok( false ==
 ok( false !== strpos( $html, 'Gross Profit' ), 'renders the gross profit row' );
 
 echo "\n=== cleanup ===\n";
-foreach ( $made as $id ) { wp_delete_post( $id, true ); }
+foreach ( $made as $id ) { bhela_test_delete( $id ); }
 ok( 0 === count( bhela_bm_statement_data( '2026-07' )['trips'] ), 'test data removed' );
 
 bhela_test_done();

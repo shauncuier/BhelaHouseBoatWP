@@ -84,6 +84,10 @@ wp-content/                          ← Git root
 │   │   ├── yearly.php               ← Yearly Report: 12 monthly statements + season totals
 │   │   ├── salary.php               ← Staff roster + monthly salary sheet
 │   │   ├── roles.php                ← Staff roles, plugin capabilities, Team reference screen
+│   │   ├── audit.php                ← Append-only audit trail: the one DB table, one writer, no clear button
+│   │   ├── inventory-core.php       ← Stock post types + the lock. Loads on EVERY request (see §3.8)
+│   │   ├── inventory.php            ← Stock lists, quantity model, monthly carry-forward, close workflow, screens
+│   │   ├── inventory-import.php     ← Column-mapped CSV importer: upload → map → dry run → commit
 │   │   ├── ui.php                   ← Shared admin UI: screen header, status pill, tone map
 │   │   └── guide.php                ← Embedded admin guide
 │   ├── assets/
@@ -191,6 +195,25 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 | `bhela_bm_cost_heads` | Owner-edited trip cost heads (slug => label, retired) |
 | `bhela_bm_expense_types` / `bhela_bm_expense_methods` | Owner-edited expense lists |
 | `bhela_bm_staff` | Staff roster (id => name, designation, type, rate, monthly, account) |
+| `bhela_bm_inv_categories` / `bhela_bm_inv_subcats` / `bhela_bm_inv_locations` | Owner-edited stock lists. A category's **code** is frozen — every Item ID contains it |
+| `bhela_bm_inv_periods` | `YYYY-MM` => period post ID. **This option is the uniqueness constraint** for one-sheet-per-month |
+| `bhela_bm_inv_seq` | Per-category Item ID counter (`KIT` => 42). Numbers are never reused |
+| `bhela_bm_audit_db` | Audit-table schema version, compared on `admin_init` priority 5 |
+
+The plugin owns exactly **one database table**, `{prefix}bhela_bm_audit` — see §3.7.
+
+### 3.7 The audit trail is not the activity log
+
+Two stores, deliberately different:
+
+| | `includes/log.php` | `includes/audit.php` |
+|---|---|---|
+| Answers | "did that email go out?" | "who changed this figure, from what, and why?" |
+| Storage | one `wp_options` row, 300-entry ring buffer | `{prefix}bhela_bm_audit`, a real table |
+| Shape | a message string | `old_value` / `new_value` / `reason` / `approval_ref` columns |
+| Retention | capped, and **clearable in one click** | never pruned, and there is **no clear button** |
+
+Both of the log's affordances are correct for diagnostics and disqualifying for audit, which is why the register did not extend it. There is exactly **one** SQL writer (`bhela_bm_audit()`), it only ever `INSERT`s, and there is no `uninstall.php` and no `register_uninstall_hook` — `tests/inventory-test.php` asserts all of that at source level. Do not add a delete path.
 
 Bookings are stored as a **private Custom Post Type** (`bhela_booking`) with post meta for each field.
 
@@ -360,6 +383,18 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_full_boat_label()` | `bhela-booking.php` | The whole-boat `_bhela_cabin_type` string — one copy for admin and form |
 | `bhela_bm_sanitize_weekend_days($raw)` | `bhela-booking.php` | `date('w')` numbers, whitelisted 0–6 (Sunday is 0, so the filter is explicit) |
 | `bhela_bm_invoice_data($id)` | `includes/invoice.php` | Everything the printable template needs — split out so the invoice is renderable in a test |
+| `bhela_bm_csv_cell($value)` | `bhela-booking.php` | Neutralises a cell a spreadsheet would execute. **Every free-text export cell goes through it**; never a figure |
+| `bhela_bm_audit($args)` | `includes/audit.php` | The ONLY writer to the audit table, and it only inserts. See §3.7 |
+| `bhela_bm_inv_line_check($line)` | `includes/inventory.php` | The quantity invariant: `good+rep+ur+dam === close`. Reports a mismatch, never rebalances it |
+| `bhela_bm_inv_line_key($item,$loc)` | `includes/inventory.php` | The line key. Returns the item ID today; the one place to change if stock ever splits by location |
+| `bhela_bm_inv_period_id($month,$create)` | `includes/inventory.php` | Resolves — or mints, behind an `add_option` mutex — the one record for a month |
+| `bhela_bm_inv_take_opening($id,$force)` | `includes/inventory.php` | Snapshots the predecessor's closings. A snapshot, not a live read, so a closed month keeps its figures |
+| `bhela_bm_inv_opening_drift($id)` | `includes/inventory.php` | Whether the month underneath moved since. **Reports, never corrects** |
+| `bhela_bm_inv_can_close($id)` | `includes/inventory.php` | The six things standing between a checked month and a closed one |
+| `bhela_bm_inv_apply_lines($id,$posted,$can_adjust)` | `includes/inventory.php` | The save rules, split from the request handler so they are testable |
+| `bhela_bm_inv_is_locked($id)` | `includes/inventory-core.php` | Loaded on every request, not just wp-admin — see §3.8 |
+| `bhela_bm_inv_meta_write($id,$k,$v)` | `includes/inventory.php` | The only legitimate way to write `_bhela_inv_*` on a locked sheet |
+| `bhela_bm_inv_mint_code($cat)` | `includes/inventory.php` | Next Item ID for a category. Skips a number already in use rather than colliding |
 | `bhela_bm_process_submission()` | `includes/frontend.php` | Processes new booking AJAX submit |
 | `bhela_bm_trip_availability($date)` | `includes/trips.php` | Returns `total/booked/available/status` |
 | `bhela_bm_send_sms($number, $msg)` | `includes/sms.php` | Send via configured gateway |
@@ -456,10 +491,10 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Thirteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
-cost heads, the cost-sheet save round trip, the booking save handler, every admin screen, WCAG
-contrast, the front end behind a page cache, OTP, the SMS gateway, the six version fields, and
-the yearly rollup.
+Fourteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+cost heads, the cost-sheet save round trip, the booking save handler, the stock register, every
+admin screen, WCAG contrast, the front end behind a page cache, OTP, the SMS gateway, the six
+version fields, and the yearly rollup.
 Exits non-zero on failure. Any PHP 8.x binary works — `run.php` loads the extensions each
 harness needs, so never hand-build a `php -d extension=…` command. The site must be running.
 
@@ -482,7 +517,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all thirteen harnesses
+- [ ] `php tests/run.php` passes — all fourteen harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -517,7 +552,8 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 6. **settings.local.json is git-ignored:** The `.claude/` directory is excluded from git. Claude Code permissions need to be re-granted on each new machine.
 7. **Bengali text in source:** Many strings are hardcoded in Bengali — no translation files exist.
 8. **`_bhela_day_type` is a derived label, not stored truth.** Read it through `bhela_bm_booking_day_type()`. The raw meta is a cache and it went stale in production: a booking whose Travel Date was moved to a Monday kept printing "Weekend" on the invoice, because the only writers are the two repricing branches of `bhela_bm_save_booking()` and a booking taken online can reach neither.
-9. **A ৳0 booking is not a paid one.** `bhela_bm_balance()` requires a positive total before it calls a balance settled — a Full Boat sits at ৳0 until an admin prices it, and `0 − 0 = 0` would otherwise stamp an unpriced enquiry PAID.
+9. **The stock lock is not only a wp-admin thing.** `includes/inventory-core.php` loads on *every* request and depends on nothing, because `wp_delete_post()` from WP-CLI or cron never reaches an `is_admin()` block — a closed month deletable from the command line is not closed. It closes four gaps the cost sheet still leaves open: direct `update_post_meta()`, trash, hard delete, and quick-edit. **A closed month cannot be deleted even by an administrator** — that is deliberate; reopen it first. A test fixture must therefore go through `bhela_test_delete()`, not `wp_delete_post()`.
+10. **A ৳0 booking is not a paid one.** `bhela_bm_balance()` requires a positive total before it calls a balance settled — a Full Boat sits at ৳0 until an admin prices it, and `0 − 0 = 0` would otherwise stamp an unpriced enquiry PAID.
 
 ---
 

@@ -160,7 +160,7 @@ if ( ! function_exists( 'bhela_bm_get_settings' ) ) {
  * lets a harness still read back the fixture it just created.
  */
 function bhela_test_isolate() {
-	$ours = array( 'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking', 'bhela_review' );
+	$ours = array( 'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking', 'bhela_review', 'bhela_inv_item', 'bhela_inv_period' );
 
 	// get_posts() sets suppress_filters => true, which skips posts_where
 	// entirely — the plugin reads almost everything through get_posts(), so a
@@ -212,6 +212,36 @@ function bhela_test_done() {
 }
 
 /**
+ * Delete a fixture that a lock would otherwise protect.
+ *
+ * An approved cost sheet and a closed inventory month both refuse deletion — a
+ * `before_delete_post` guard calls wp_die(), which in a CLI harness reads as
+ * "DIED EARLY" rather than as a failed assertion. That refusal is the feature, so
+ * a harness has to lift the lock first, exactly as an owner would: reopen, then
+ * remove. Cleaning up through this function is also a small standing proof that
+ * the documented route works.
+ *
+ * Plain wp_delete_post() is still correct for anything unlocked.
+ *
+ * @param int $id Post to remove.
+ */
+function bhela_test_delete( $id ) {
+	$id = (int) $id;
+	if ( ! $id ) {
+		return;
+	}
+	delete_post_meta( $id, '_bhela_cost_status' );
+	if ( function_exists( 'bhela_bm_inv_unlocking' ) ) {
+		// The meta guard blocks even this, so open the plugin's own window.
+		bhela_bm_inv_unlocking( true );
+		delete_post_meta( $id, '_bhela_inv_status' );
+		bhela_bm_inv_unlocking( false );
+	}
+	delete_post_meta( $id, '_bhela_inv_locked' );
+	wp_delete_post( $id, true );
+}
+
+/**
  * Load plugin modules and register the post types they define.
  *
  * @param string ...$modules File names under includes/, without .php.
@@ -225,6 +255,8 @@ function bhela_test_modules( ...$modules ) {
 		'bhela_bm_register_cost_cpt',
 		'bhela_bm_register_expense_cpt',
 		'bhela_bm_register_salary_cpt',
+		'bhela_bm_register_inv_item_cpt',
+		'bhela_bm_register_inv_period_cpt',
 	) as $fn ) {
 		if ( function_exists( $fn ) ) {
 			$fn();

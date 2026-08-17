@@ -58,6 +58,11 @@ function bhela_bm_dashboard_menu_order() {
 		'bhela-bm-statement',                     // 📈 Monthly Statement
 		'bhela-bm-yearly',                        // 📚 Yearly Report
 		'edit.php?post_type=bhela_salary',        // 👷 Salary
+		// Store
+		'edit.php?post_type=bhela_inv_item',      // 📦 Item Register
+		'bhela-bm-inv-month',                     // 🔧 Monthly Stock
+		'bhela-bm-inv-report',                    // 📐 Inventory Report
+		'bhela-bm-inv-assets',                    // 🏷️ Asset Report
 		// Planning
 		'bhela-bm-trips',                         // Trip Calendar
 		'edit.php?post_type=bhela_spot',          // 🗺️ Spots
@@ -67,6 +72,7 @@ function bhela_bm_dashboard_menu_order() {
 		'edit.php?post_type=bhela_review',        // ⭐ Reviews
 		// Administration
 		'bhela-bm-log',                           // 📋 Activity Log
+		'bhela-bm-audit',                         // 🔩 Audit Trail
 		'bhela-bm-team',                          // 👥 Team
 		'bhela-bm-settings',                      // ⚙️ Settings
 		'bhela-bm-guide',                         // 🎯 Quick Guide (help last)

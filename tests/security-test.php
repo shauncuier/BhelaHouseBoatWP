@@ -43,8 +43,8 @@ ok( get_role( 'bhela_cost_preparer' )->has_cap( 'read' ), '…and `read` survive
 ok( get_role( 'bhela_cost_preparer' )->has_cap( 'edit_bhela_costs' ), '…and the role still works' );
 
 echo "\n=== 4. the role sync re-runs on upgrade ===\n";
-ok( 6 === BHELA_BM_ROLES_VERSION, 'BHELA_BM_ROLES_VERSION bumped', (string) BHELA_BM_ROLES_VERSION );
-update_option( 'bhela_bm_roles_version', 5 );
+ok( 7 === BHELA_BM_ROLES_VERSION, 'BHELA_BM_ROLES_VERSION bumped', (string) BHELA_BM_ROLES_VERSION );
+update_option( 'bhela_bm_roles_version', 6 );
 get_role( 'bhela_manager' )->add_cap( 'upload_files' );
 bhela_bm_maybe_install_roles();
 ok( ! get_role( 'bhela_manager' )->has_cap( 'upload_files' ), 'an existing site is cleaned automatically' );
@@ -54,7 +54,7 @@ echo "\n=== 5. the Team screen cannot grant a core capability ===\n";
 $granted = array();
 foreach ( bhela_bm_permissions() as $key => $perm ) {
 	foreach ( $perm['caps'] as $cap ) {
-		if ( 0 !== strpos( $cap, 'bhela_' ) && ! preg_match( '/_bhela_(booking|cost|expense|salar)/', $cap ) ) {
+		if ( 0 !== strpos( $cap, 'bhela_' ) && ! preg_match( '/_bhela_(booking|cost|expense|salar|inv)/', $cap ) ) {
 			$granted[] = "$key => $cap";
 		}
 	}

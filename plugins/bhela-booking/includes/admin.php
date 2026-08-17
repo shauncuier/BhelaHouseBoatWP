@@ -820,6 +820,9 @@ function bhela_bm_settings_page() {
 
 		// Cost heads live in their own option, not in the settings blob — the
 		// cost sheet reads them on every render and they have their own reset.
+		if ( function_exists( 'bhela_bm_inv_save_lists' ) ) {
+			bhela_bm_inv_save_lists( wp_unslash( $_POST ) );
+		}
 		if ( isset( $_POST['cost_heads'] ) && function_exists( 'bhela_bm_save_cost_heads' ) ) {
 			bhela_bm_save_cost_heads( wp_unslash( $_POST['cost_heads'] ) );
 		}
@@ -895,6 +898,7 @@ function bhela_bm_settings_page() {
 		'email'    => array( 'icon' => '📧', 'label' => __( 'Email', 'bhela-booking' ) ),
 		'sms'      => array( 'icon' => '📱', 'label' => __( 'SMS', 'bhela-booking' ) ),
 		'heads'    => array( 'icon' => '🧾', 'label' => __( 'Lists', 'bhela-booking' ) ),
+		'store'    => array( 'icon' => '📦', 'label' => __( 'Store Lists', 'bhela-booking' ) ),
 		'staff'    => array( 'icon' => '👷', 'label' => __( 'Staff', 'bhela-booking' ) ),
 	);
 	?>
@@ -1280,6 +1284,17 @@ function bhela_bm_settings_page() {
 			})();
 			</script>
 			</div><!-- /heads -->
+
+			<div class="bha-set__panel" id="bhela-panel-store" role="tabpanel" aria-labelledby="bhela-tab-store">
+			<h2><?php esc_html_e( 'Categories, Sub-categories & Locations', 'bhela-booking' ); ?></h2>
+			<?php
+			// Lives here beside the cost heads and expense types, because "the lists"
+			// is one place an owner looks rather than three.
+			if ( function_exists( 'bhela_bm_inv_lists_panel' ) ) {
+				bhela_bm_inv_lists_panel();
+			}
+			?>
+			</div><!-- /store -->
 
 			<div class="bha-set__panel" id="bhela-panel-staff" role="tabpanel" aria-labelledby="bhela-tab-staff">
 			<h2><?php esc_html_e( 'Staff Roster', 'bhela-booking' ); ?></h2>

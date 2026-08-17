@@ -70,5 +70,5 @@ $locked_total = (int) get_post_meta( $sheet, '_bhela_cost_total', true );
 save( $sheet, array( 'engine_fuel' => array( 'p1' => 999999 ) ) );
 ok( $locked_total === (int) get_post_meta( $sheet, '_bhela_cost_total', true ), 'locked sheet unchanged' );
 
-wp_delete_post( $sheet, true );
+bhela_test_delete( $sheet );
 bhela_test_done();

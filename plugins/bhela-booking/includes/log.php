@@ -37,6 +37,10 @@ function bhela_bm_log_types() {
 		'cost'     => array( 'label' => 'Cost Sheets' ),
 		'settings' => array( 'label' => 'Settings' ),
 		'gallery'  => array( 'label' => 'Gallery' ),
+		// Operational noise from the register — "the month was closed". The
+		// permanent who-changed-what-from-what record is the Audit Trail, which is
+		// a separate store precisely because this one is capped and clearable.
+		'inventory' => array( 'label' => 'Stock & Assets' ),
 		'error'    => array( 'label' => 'Problems' ),
 	);
 }

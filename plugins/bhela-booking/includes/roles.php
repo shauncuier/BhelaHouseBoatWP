@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Bump when bhela_bm_role_defaults() or bhela_bm_permissions() changes, so
 // existing sites re-sync once against the new definition.
-define( 'BHELA_BM_ROLES_VERSION', 6 );
+define( 'BHELA_BM_ROLES_VERSION', 7 );
 
 /* =========================================================
  * CAPABILITY SETS
@@ -41,6 +41,20 @@ function bhela_bm_extra_caps() {
 		'bhela_cost_check'    => __( 'Check cost sheets', 'bhela-booking' ),
 		'bhela_cost_approve'  => __( 'Approve cost sheets', 'bhela-booking' ),
 		'bhela_view_statement' => __( 'Monthly Statement', 'bhela-booking' ),
+		// Inventory & Asset Register. bhela_inv_reopen is separate from
+		// bhela_inv_approve on purpose: reopening a closed month invalidates every
+		// later month's opening balance, which is a bigger act than closing one.
+		'bhela_inv_view'      => __( 'See the item register and its reports', 'bhela-booking' ),
+		'bhela_inv_items'     => __( 'Add and edit items', 'bhela-booking' ),
+		'bhela_inv_attach'    => __( 'Attach bills and photos to an item', 'bhela-booking' ),
+		'bhela_inv_lists'     => __( 'Edit categories and locations', 'bhela-booking' ),
+		'bhela_inv_import'    => __( 'Import the register from a CSV', 'bhela-booking' ),
+		'bhela_inv_count'     => __( 'Fill in the monthly stock sheet', 'bhela-booking' ),
+		'bhela_inv_check'     => __( 'Check the monthly stock sheet', 'bhela-booking' ),
+		'bhela_inv_approve'   => __( 'Close a month', 'bhela-booking' ),
+		'bhela_inv_adjust'    => __( 'Approve a stock adjustment', 'bhela-booking' ),
+		'bhela_inv_reopen'    => __( 'Reopen a closed month', 'bhela-booking' ),
+		'bhela_inv_audit'     => __( 'Audit Trail', 'bhela-booking' ),
 	);
 }
 
@@ -177,6 +191,82 @@ function bhela_bm_permissions() {
 			'help'  => __( 'The month\'s profit — every trip and every expense in one view.', 'bhela-booking' ),
 			'caps'  => array( 'bhela_view_statement' ),
 		),
+
+		/*
+		 * Inventory & Asset Register.
+		 *
+		 * Two chains hang off inventory_view: one for managing the register
+		 * (items → lists/import) and one for the monthly cycle (count → check →
+		 * approve → reopen), mirroring the cost-sheet ladder above. Keeping them
+		 * separate is what lets a storekeeper count stock without being able to
+		 * add items, and an accountant read everything without touching either.
+		 */
+		'inventory_view'    => array(
+			'label' => __( 'Inventory — view', 'bhela-booking' ),
+			'help'  => __( 'See the item register, the monthly sheets and both reports. Changes nothing.', 'bhela-booking' ),
+			'caps'  => array(
+				'bhela_inv_view',
+				'read_bhela_inv_item', 'read_private_bhela_inv_items',
+				'read_bhela_inv_period', 'read_private_bhela_inv_periods',
+			),
+		),
+		'inventory_items'   => array(
+			'label'    => __( 'Inventory — manage items', 'bhela-booking' ),
+			'help'     => __( 'Add items, correct their details, and attach purchase bills and photos.', 'bhela-booking' ),
+			'requires' => 'inventory_view',
+			'caps'     => array(
+				'bhela_inv_items', 'bhela_inv_attach',
+				'edit_bhela_inv_items', 'edit_others_bhela_inv_items', 'edit_published_bhela_inv_items',
+				'edit_private_bhela_inv_items', 'publish_bhela_inv_items',
+				'edit_bhela_inv_item',
+			),
+		),
+		'inventory_lists'   => array(
+			'label'    => __( 'Inventory — categories & locations', 'bhela-booking' ),
+			'help'     => __( 'Edit the category, sub-category and location lists every item is filed under.', 'bhela-booking' ),
+			'requires' => 'inventory_items',
+			'caps'     => array( 'bhela_inv_lists' ),
+		),
+		'inventory_import'  => array(
+			'label'    => __( 'Inventory — import from CSV', 'bhela-booking' ),
+			'help'     => __( 'Bulk-load the register from a spreadsheet. Creates and updates many items at once.', 'bhela-booking' ),
+			'requires' => 'inventory_items',
+			'caps'     => array( 'bhela_inv_import' ),
+		),
+		'inventory_count'   => array(
+			'label'    => __( 'Inventory — monthly count', 'bhela-booking' ),
+			'help'     => __( 'Fill in the month\'s movement and the physical count, and submit it for checking.', 'bhela-booking' ),
+			'requires' => 'inventory_view',
+			'caps'     => array(
+				'bhela_inv_count',
+				'edit_bhela_inv_periods', 'edit_others_bhela_inv_periods',
+				'edit_published_bhela_inv_periods', 'edit_private_bhela_inv_periods',
+				'publish_bhela_inv_periods', 'edit_bhela_inv_period',
+			),
+		),
+		'inventory_check'   => array(
+			'label'    => __( 'Inventory — check the count', 'bhela-booking' ),
+			'help'     => __( 'Review a submitted stock sheet and either mark it checked or return it for a recount.', 'bhela-booking' ),
+			'requires' => 'inventory_count',
+			'caps'     => array( 'bhela_inv_check' ),
+		),
+		'inventory_approve' => array(
+			'label'    => __( 'Inventory — close the month', 'bhela-booking' ),
+			'help'     => __( 'Close a checked month and approve the stock adjustments in it. A closed month locks and becomes the next month\'s opening.', 'bhela-booking' ),
+			'requires' => 'inventory_check',
+			'caps'     => array( 'bhela_inv_approve', 'bhela_inv_adjust' ),
+		),
+		'inventory_reopen'  => array(
+			'label'    => __( 'Inventory — reopen a closed month', 'bhela-booking' ),
+			'help'     => __( 'Unlock a month that was already closed. Every later month\'s opening then has to be re-taken, so this is deliberately separate from closing.', 'bhela-booking' ),
+			'requires' => 'inventory_approve',
+			'caps'     => array( 'bhela_inv_reopen' ),
+		),
+		'inventory_audit'   => array(
+			'label' => __( 'Audit Trail', 'bhela-booking' ),
+			'help'  => __( 'The permanent record of who changed which figure, from what to what, and why. Read-only for everyone.', 'bhela-booking' ),
+			'caps'  => array( 'bhela_inv_audit' ),
+		),
 	);
 }
 
@@ -222,8 +312,15 @@ function bhela_bm_role_defaults() {
 	return array(
 		'bhela_manager' => array(
 			'name'  => __( 'BHELA Manager', 'bhela-booking' ),
-			'blurb' => __( 'Runs day-to-day operations: bookings, trip calendar, reports, and checks cost sheets. Cannot approve costs or change settings.', 'bhela-booking' ),
-			'perms' => array( 'bookings_edit', 'bookings_delete', 'reports', 'trips', 'costs_own', 'costs_all', 'costs_check', 'expenses', 'statement', 'salary' ),
+			'blurb' => __( 'Runs day-to-day operations: bookings, trip calendar, reports, the item register and the monthly stock count, and checks cost sheets. Cannot approve costs, close a month, or change settings.', 'bhela-booking' ),
+			'perms' => array(
+				'bookings_edit', 'bookings_delete', 'reports', 'trips',
+				'costs_own', 'costs_all', 'costs_check', 'expenses', 'statement', 'salary',
+				// The spec's "Operational Manager" — prepares and checks the count,
+				// but closing the month stays with management.
+				'inventory_view', 'inventory_items', 'inventory_lists', 'inventory_import',
+				'inventory_count', 'inventory_check',
+			),
 		),
 		'bhela_booking_staff' => array(
 			'name'  => __( 'BHELA Booking Staff', 'bhela-booking' ),
@@ -232,8 +329,16 @@ function bhela_bm_role_defaults() {
 		),
 		'bhela_cost_checker' => array(
 			'name'  => __( 'BHELA Cost Checker', 'bhela-booking' ),
-			'blurb' => __( 'Reviews every cost sheet and marks it checked, or returns it. No booking access.', 'bhela-booking' ),
-			'perms' => array( 'costs_own', 'costs_all', 'costs_check' ),
+			'blurb' => __( 'Reviews cost sheets and monthly stock counts and marks them checked, or returns them. No booking access, and cannot close a month.', 'bhela-booking' ),
+			'perms' => array( 'costs_own', 'costs_all', 'costs_check', 'inventory_view', 'inventory_count', 'inventory_check' ),
+		),
+		// The spec's Storekeeper: the person who physically walks the boat and
+		// counts. Every other role either has bookings or has cost sheets, so
+		// there was no near-miss to extend — this one sees stock and nothing else.
+		'bhela_storekeeper' => array(
+			'name'  => __( 'BHELA Storekeeper', 'bhela-booking' ),
+			'blurb' => __( 'Counts stock and fills in the monthly inventory sheet. No money, no bookings, no cost sheets.', 'bhela-booking' ),
+			'perms' => array( 'inventory_view', 'inventory_count' ),
 		),
 		'bhela_cost_preparer' => array(
 			'name'  => __( 'BHELA Cost Preparer', 'bhela-booking' ),
@@ -334,6 +439,8 @@ function bhela_bm_admin_caps() {
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_cost', 'bhela_costs' ) );
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_expense', 'bhela_expenses' ) );
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_salary', 'bhela_salaries' ) );
+	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_inv_item', 'bhela_inv_items' ) );
+	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_inv_period', 'bhela_inv_periods' ) );
 	return array_values( array_unique( $caps ) );
 }
 
@@ -348,7 +455,9 @@ function bhela_bm_owned_caps() {
 		bhela_bm_cpt_caps( 'bhela_booking', 'bhela_bookings' ),
 		bhela_bm_cpt_caps( 'bhela_cost', 'bhela_costs' ),
 		bhela_bm_cpt_caps( 'bhela_expense', 'bhela_expenses' ),
-		bhela_bm_cpt_caps( 'bhela_salary', 'bhela_salaries' )
+		bhela_bm_cpt_caps( 'bhela_salary', 'bhela_salaries' ),
+		bhela_bm_cpt_caps( 'bhela_inv_item', 'bhela_inv_items' ),
+		bhela_bm_cpt_caps( 'bhela_inv_period', 'bhela_inv_periods' )
 	) ) );
 }
 

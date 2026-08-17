@@ -257,7 +257,9 @@ function bhela_bm_yearly_csv() {
 		fputcsv( $fh, array() );
 		fputcsv( $fh, array( 'Expenses by type' ) );
 		foreach ( $d['by_type'] as $slug => $amount ) {
-			fputcsv( $fh, array( $types[ $slug ] ?? $slug, $amount ) );
+			// The type label is owner-entered free text, so it goes through the
+			// spreadsheet-formula guard. The amount does not — it must stay a number.
+			fputcsv( $fh, array( bhela_bm_csv_cell( $types[ $slug ] ?? $slug ), $amount ) );
 		}
 	}
 	fclose( $fh );

@@ -219,7 +219,7 @@ ok( get_role( 'bhela_manager' )->has_cap( 'bhela_view_statement' ), 'a manager w
 ok( ! get_role( 'bhela_booking_staff' )->has_cap( 'bhela_view_statement' ), 'booking staff cannot' );
 
 echo "\n=== cleanup ===\n";
-foreach ( $made as $id ) { wp_delete_post( $id, true ); }
+foreach ( $made as $id ) { bhela_test_delete( $id ); }
 ok( 0 === bhela_bm_yearly_data( '2026', 'financial' )['totals']['trips'], 'fixtures removed' );
 
 bhela_test_done();

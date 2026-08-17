@@ -142,7 +142,7 @@ ok( false !== strpos( $html, 'Khairul Kaka' ), 'renders staff names' );
 ok( false !== strpos( $html, 'sal_rows' ), 'renders editable fields' );
 
 echo "\n=== cleanup ===\n";
-foreach ( $made as $id ) { wp_delete_post( $id, true ); }
+foreach ( $made as $id ) { bhela_test_delete( $id ); }
 if ( is_array( $restore_staff ) ) { update_option( 'bhela_bm_staff', $restore_staff ); } else { delete_option( 'bhela_bm_staff' ); }
 ok( true, 'restored' );
 
