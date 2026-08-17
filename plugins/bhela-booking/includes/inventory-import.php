@@ -114,6 +114,91 @@ function bhela_bm_inv_import_clean( $text ) {
 	return trim( $text );
 }
 
+/**
+ * A sample CSV, generated rather than shipped as a file.
+ *
+ * Generated for two reasons. It cannot drift from what the importer accepts,
+ * because the headers ARE the field registry's labels and the categories ARE the
+ * owner's current list — so a sample downloaded today maps itself perfectly and
+ * every category in it resolves. And a static file in the repo would quietly go
+ * stale the first time a field is added.
+ *
+ * The rows are deliberately a worked example rather than filler: one consumable,
+ * one asset carrying a condition split, one asset with a serial and warranty, and
+ * one row leaving every optional column empty to show that is allowed.
+ */
+function bhela_bm_inv_sample_csv() {
+	if ( ! current_user_can( 'bhela_inv_import' ) ) {
+		wp_die( esc_html__( 'You are not allowed to import the register.', 'bhela-booking' ), 403 );
+	}
+	check_admin_referer( 'bhela_bm_inv_sample_csv' );
+
+	$fields = bhela_bm_inv_import_fields();
+	$cats   = bhela_bm_inv_categories();
+	$locs   = bhela_bm_inv_locations();
+
+	// Pick real entries from the owner's own lists, so the sample round-trips.
+	$pick = function ( $list, $wanted, $fallback_index = 0 ) {
+		foreach ( (array) $wanted as $slug ) {
+			if ( isset( $list[ $slug ] ) ) {
+				return is_array( $list[ $slug ] ) ? $list[ $slug ]['label'] : $list[ $slug ];
+			}
+		}
+		$vals = array_values( $list );
+		$val  = $vals[ $fallback_index ] ?? reset( $vals );
+		return is_array( $val ) ? $val['label'] : $val;
+	};
+	$cat_kitchen = $pick( $cats, array( 'kitchen' ), 0 );
+	$cat_safety  = $pick( $cats, array( 'safety_eq' ), 1 );
+	$cat_fan     = $pick( $cats, array( 'fan', 'electrical' ), 2 );
+	$loc_kitchen = $pick( $locs, array( 'kitchen' ), 0 );
+	$loc_upper   = $pick( $locs, array( 'upper', 'rooftop' ), 1 );
+	$loc_cabin   = $pick( $locs, array( 'cabin_1' ), 2 );
+
+	$rows = array(
+		// name, kind, category, subcat, location, unit, item_code, asset_tag,
+		// barcode, open, good, rep, ur, dam, rate, supplier, bought_on, brand,
+		// model, serial, remark
+		array( 'Noodles Bowl', 'Inventory', $cat_kitchen, '', $loc_kitchen, 'PCS', '', '', '', 39, 39, 0, 0, 0, 180, 'Sunamganj Crockery', '2026-05-12', '', '', '', '' ),
+		array( 'Life Jacket', 'Asset', $cat_safety, '', $loc_upper, 'PCS', '', 'TAG-LJ-01', '', 25, 10, 8, 0, 7, 1200, 'Dhaka Marine', '2025-11-03', 'Aqua', 'AQ-200', '', 'seven beyond repair' ),
+		array( 'Adjust Fan', 'Asset', $cat_fan, '', $loc_cabin, 'PCS', '', '', '', 4, 3, 0, 1, 0, 3500, 'Electro Mart', '2026-01-20', 'Walton', 'W-16', 'SN-99127', 'one away for repair' ),
+		array( 'Dish Soap', 'Inventory', $cat_kitchen, '', $loc_kitchen, 'LTR', '', '', '', 12, 12, 0, 0, 0, 0, '', '', '', '', '', '' ),
+	);
+
+	nocache_headers();
+	header( 'Content-Type: text/csv; charset=utf-8' );
+	header( 'Content-Disposition: attachment; filename="bhela-register-sample.csv"' );
+
+	$fh = fopen( 'php://output', 'w' );
+	// Same BOM every other export writes: without it Excel reads UTF-8 as the
+	// local codepage and any Bengali item name arrives as mojibake.
+	fwrite( $fh, "\xEF\xBB\xBF" );
+
+	// Headers are the registry's own labels, which is exactly what the column
+	// guesser matches on — so re-uploading this file maps every column with no
+	// hand-picking. A required field is marked, the same way the mapping screen
+	// marks it.
+	$head = array();
+	foreach ( $fields as $def ) {
+		$head[] = $def['label'] . ( empty( $def['required'] ) ? '' : ' *' );
+	}
+	fputcsv( $fh, $head );
+
+	foreach ( $rows as $row ) {
+		$out = array();
+		foreach ( $row as $cell ) {
+			// Figures stay figures so the columns remain sortable; text goes
+			// through the formula guard like every other export.
+			$out[] = is_int( $cell ) ? $cell : bhela_bm_csv_cell( $cell );
+		}
+		fputcsv( $fh, $out );
+	}
+
+	fclose( $fh );
+	exit;
+}
+add_action( 'admin_post_bhela_bm_inv_sample_csv', 'bhela_bm_inv_sample_csv' );
+
 /** Step 1 — take the file, parse it, stage it, and go to the mapping step. */
 function bhela_bm_inv_import_upload() {
 	if ( ! current_user_can( 'bhela_inv_import' ) ) {
@@ -145,6 +230,17 @@ function bhela_bm_inv_import_upload() {
 	$fh = fopen( $file['tmp_name'], 'r' );
 	if ( ! $fh ) {
 		bhela_bm_inv_import_bail( __( 'That file could not be opened.', 'bhela-booking' ) );
+	}
+
+	// Skip a UTF-8 BOM before parsing, not after.
+	//
+	// Excel writes one, and it sits in front of the first field's opening quote —
+	// so fgetcsv does not see a quoted field at all and hands back the quotes as
+	// literal text. The first column then arrives as `"Item name"` including the
+	// punctuation, and every value in it is subtly wrong. Stripping the BOM from
+	// each cell afterwards is too late: by then the damage is in the parse.
+	if ( "\xEF\xBB\xBF" !== fread( $fh, 3 ) ) {
+		rewind( $fh );
 	}
 	$rows = array();
 	$n    = 0;
@@ -736,6 +832,12 @@ function bhela_bm_inv_import_page() {
 			<div class="bha-panel">
 				<h2 class="bha-panel__title"><?php esc_html_e( 'Step 1 — choose the file', 'bhela-booking' ); ?></h2>
 				<p><?php esc_html_e( 'A CSV, up to 2 MB. Save your spreadsheet as CSV first if it is an .xlsx workbook. The file is read once and never stored on the server.', 'bhela-booking' ); ?></p>
+				<p class="bha-callout"><?php esc_html_e( 'Your own column names and order are fine — you say what each one means at the next step. The sample below is only a starting point if you do not have a list yet.', 'bhela-booking' ); ?></p>
+				<p class="bha-buttons"><a class="button" href="<?php echo esc_url( wp_nonce_url(
+					add_query_arg( 'action', 'bhela_bm_inv_sample_csv', admin_url( 'admin-post.php' ) ),
+					'bhela_bm_inv_sample_csv'
+				) ); ?>">📄 <?php esc_html_e( 'Download a sample CSV', 'bhela-booking' ); ?></a></p>
+				<p class="bha-note"><?php esc_html_e( 'The sample carries every column the importer understands, filled in with four worked rows — a consumable, two assets and one row leaving every optional column blank. Its categories and locations come from your own lists, so you can fill it in and upload it straight back.', 'bhela-booking' ); ?></p>
 				<form method="post" enctype="multipart/form-data" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<input type="hidden" name="action" value="bhela_bm_inv_import_upload">
 					<?php wp_nonce_field( 'bhela_bm_inv_import_upload' ); ?>

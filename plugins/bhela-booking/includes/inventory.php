@@ -1607,10 +1607,11 @@ function bhela_bm_inv_menu() {
 	add_submenu_page( $parent, __( 'Monthly Stock Update', 'bhela-booking' ), '🔧 ' . __( 'Monthly Stock', 'bhela-booking' ), 'bhela_inv_count', 'bhela-bm-inv-month', 'bhela_bm_inv_month_page' );
 	add_submenu_page( $parent, __( 'Inventory Report', 'bhela-booking' ), '📐 ' . __( 'Inventory Report', 'bhela-booking' ), 'bhela_inv_view', 'bhela-bm-inv-report', 'bhela_bm_inv_report_page' );
 	add_submenu_page( $parent, __( 'Asset Report', 'bhela-booking' ), '🏷️ ' . __( 'Asset Report', 'bhela-booking' ), 'bhela_inv_view', 'bhela-bm-inv-assets', 'bhela_bm_inv_asset_page' );
-	// Registered with no parent: addressable and styled (bhela_bm_is_plugin_screen()
-	// matches on the page arg), but it consumes no menu slot. Reached from a button
-	// on the Item Register, which is where an owner would look for it.
-	add_submenu_page( null, __( 'Import Register', 'bhela-booking' ), __( 'Import Register', 'bhela-booking' ), 'bhela_inv_import', 'bhela-bm-inv-import', 'bhela_bm_inv_import_page' );
+	// A real menu item, like the Gallery's Bulk Upload next door. It was briefly
+	// registered with a null parent to save a slot, which made the whole importer
+	// unreachable except by typing its URL — a feature nobody can find is not a
+	// feature, and one menu row is a cheap price for the register's way in.
+	add_submenu_page( $parent, __( 'Import Register', 'bhela-booking' ), '🚚 ' . __( 'Import Register', 'bhela-booking' ), 'bhela_inv_import', 'bhela-bm-inv-import', 'bhela_bm_inv_import_page' );
 }
 add_action( 'admin_menu', 'bhela_bm_inv_menu' );
 
@@ -2230,7 +2231,19 @@ function bhela_bm_inv_month_page() {
 					</thead>
 					<tbody>
 					<?php if ( ! $data['rows'] ) : ?>
-						<tr><td colspan="20"><?php esc_html_e( 'No items in the register yet. Import it, or add an item by hand.', 'bhela-booking' ); ?></td></tr>
+						<tr><td colspan="20"><?php
+							// Both routes out of an empty register, as links rather than as
+							// advice — this is the screen an owner lands on first.
+							printf(
+								/* translators: 1: link to the CSV importer, 2: link to add one item */
+								esc_html__( 'No items in the register yet. %1$s, or %2$s.', 'bhela-booking' ),
+								'<a href="' . esc_url( function_exists( 'bhela_bm_inv_import_url' )
+									? bhela_bm_inv_import_url()
+									: add_query_arg( array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-inv-import' ), admin_url( 'edit.php' ) )
+								) . '">' . esc_html__( 'import it from a spreadsheet', 'bhela-booking' ) . '</a>',
+								'<a href="' . esc_url( admin_url( 'post-new.php?post_type=bhela_inv_item' ) ) . '">' . esc_html__( 'add one by hand', 'bhela-booking' ) . '</a>'
+							);
+						?></td></tr>
 					<?php endif; ?>
 					<?php foreach ( $data['rows'] as $row ) :
 						$l   = $row['line'];

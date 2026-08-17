@@ -278,7 +278,7 @@ foreach ( array(
 	'📊 Dashboard', '📄 Trip Report', '🧾 Cost Sheets', '💸 Expenses',
 	'📈 Monthly Statement', '📚 Yearly Report', '👷 Salary',
 	// The register's five, none of them already taken.
-	'📦 Item Register', '🔧 Monthly Stock', '📐 Inventory Report', '🏷️ Asset Report',
+	'📦 Item Register', '🚚 Import Register', '🔧 Monthly Stock', '📐 Inventory Report', '🏷️ Asset Report',
 	'📅 Trip Calendar', '🗺️ Spots',
 	'🖼️ Gallery', '⬆️ Bulk Upload', '⭐ Reviews', '📋 Activity Log',
 	'🔩 Audit Trail', '👥 Team', '⚙️ Settings', '🎯 Quick Guide',

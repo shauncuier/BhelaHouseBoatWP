@@ -368,6 +368,44 @@ foreach ( $csv[0] as $i => $h ) {
 	}
 }
 ok( ! isset( $map[0] ), 'an "Sl" column is not guessed as the Item ID — it is a row number' );
+
+// A UTF-8 BOM has to be skipped BEFORE fgetcsv, not stripped from cells after it.
+// Excel writes one, and it sits in front of the first field's opening quote — so
+// the parser never sees a quoted field and hands back the quotes as text, making
+// every value in column one subtly wrong. Written as a real file, because this
+// only reproduces through the parser.
+$bom_file = wp_tempnam( 'zz-bom.csv' );
+file_put_contents( $bom_file, "\xEF\xBB\xBF" . '"Item name *","Category *","Opening quantity *"' . "\n" . '"ZZ Quoted Bowl","Kitchen Items",7' . "\n" );
+$bh = fopen( $bom_file, 'r' );
+if ( "\xEF\xBB\xBF" !== fread( $bh, 3 ) ) {
+	rewind( $bh );
+}
+$bom_rows = array();
+while ( ( $bline = fgetcsv( $bh ) ) !== false ) {
+	$bom_rows[] = array_map( 'bhela_bm_inv_import_clean', $bline );
+}
+fclose( $bh );
+@unlink( $bom_file );
+ok( 'Item name *' === ( $bom_rows[0][0] ?? '' ), 'a BOM does not leave quotes on the first header', var_export( $bom_rows[0][0] ?? null, true ) );
+ok( 'ZZ Quoted Bowl' === ( $bom_rows[1][0] ?? '' ), 'nor on the first value', var_export( $bom_rows[1][0] ?? null, true ) );
+$bom_src = (string) file_get_contents( $plugin . '/includes/inventory-import.php' );
+ok( false !== strpos( $bom_src, 'fread( $fh, 3 )' ), 'the importer skips the BOM before parsing, not after' );
+
+// The generated sample must map itself perfectly — its headers ARE the registry's
+// labels, so an owner who downloads it, fills it in and uploads it back should
+// never have to hand-pick a column.
+$sample_head = array();
+foreach ( bhela_bm_inv_import_fields() as $sk => $sdef ) {
+	$sample_head[ $sk ] = $sdef['label'] . ( empty( $sdef['required'] ) ? '' : ' *' );
+}
+$wrong = array();
+foreach ( $sample_head as $sk => $label ) {
+	$guess = bhela_bm_inv_import_guess( $label );
+	if ( $guess !== $sk ) {
+		$wrong[] = $label . ' → ' . ( $guess ? $guess : '(none)' );
+	}
+}
+ok( ! $wrong, sprintf( 'all %d sample columns map to their own field', count( $sample_head ) ), implode( ', ', $wrong ) );
 ok( 'name' === ( $map[1] ?? '' ) && 'open' === ( $map[3] ?? '' ), 'the obvious columns are guessed', wp_json_encode( $map ) );
 
 $posts_before = (int) wp_count_posts( 'bhela_inv_item' )->publish;

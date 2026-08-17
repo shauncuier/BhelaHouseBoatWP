@@ -60,6 +60,7 @@ function bhela_bm_dashboard_menu_order() {
 		'edit.php?post_type=bhela_salary',        // 👷 Salary
 		// Store
 		'edit.php?post_type=bhela_inv_item',      // 📦 Item Register
+		'bhela-bm-inv-import',                    // 🚚 Import Register
 		'bhela-bm-inv-month',                     // 🔧 Monthly Stock
 		'bhela-bm-inv-report',                    // 📐 Inventory Report
 		'bhela-bm-inv-assets',                    // 🏷️ Asset Report
