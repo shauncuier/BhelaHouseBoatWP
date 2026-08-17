@@ -2,7 +2,7 @@
 /** Dev helper: render every BHELA admin screen and check the design system. */
 
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'salary', 'dashboard', 'guide', 'log', 'audit', 'inventory-core', 'inventory', 'inventory-import' );
+bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'yearly', 'salary', 'dashboard', 'guide', 'log', 'audit', 'inventory-core', 'inventory', 'inventory-import' );
 wp_set_current_user( 1 );
 
 echo "=== 1. helpers ===\n";
@@ -82,6 +82,9 @@ $screens = array(
 	'Dashboard'        => array( 'bhela_booking_page_bhela-bm-dashboard', array( 'page' => 'bhela-bm-dashboard' ), fn() => bhela_bm_dashboard_page() ),
 	'Trip Report'      => array( 'bhela_booking_page_bhela-bm-reports', array( 'page' => 'bhela-bm-reports', 'from' => '2026-07-01', 'to' => '2026-07-31', 'cancelled' => 1 ), fn() => bhela_bm_reports_page() ),
 	'Monthly Statement' => array( 'bhela_booking_page_bhela-bm-statement', array( 'page' => 'bhela-bm-statement', 'month' => '2026-07' ), fn() => bhela_bm_statement_page() ),
+	// Was missing from this list entirely, which is how a column could be added to
+	// its table without anything checking the row widths still lined up.
+	'Yearly Report'    => array( 'bhela_booking_page_bhela-bm-yearly', array( 'page' => 'bhela-bm-yearly', 'year' => '2026' ), fn() => bhela_bm_yearly_page() ),
 	'Team'             => array( 'bhela_booking_page_bhela-bm-team', array( 'page' => 'bhela-bm-team' ), fn() => bhela_bm_team_page() ),
 	'Activity Log'     => array( 'bhela_booking_page_bhela-bm-log', array( 'page' => 'bhela-bm-log' ), fn() => bhela_bm_log_page() ),
 	'Quick Guide'      => array( 'bhela_booking_page_bhela-bm-guide', array( 'page' => 'bhela-bm-guide' ), fn() => bhela_bm_guide_page() ),

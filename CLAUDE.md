@@ -407,7 +407,8 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_cost_heads($retired)` | `includes/costs.php` | Expense heads in force (owner-editable, slug => label) |
 | `bhela_bm_cost_stored_lines($id)` | `includes/costs.php` | Sheet rows keyed by slug; converts legacy positional data on read |
 | `bhela_bm_expense_rows($from,$to)` | `includes/expenses.php` | Expenses in a range, totalled per type |
-| `bhela_bm_statement_data($month)` | `includes/statement.php` | A month's approved trips, deductions and gross profit |
+| `bhela_bm_statement_data($month)` | `includes/statement.php` | A month's approved trips, deductions and gross profit. Gross = trip profit − expenses − **payroll** |
+| `bhela_bm_salary_month_total($month,$trips)` | `includes/salary.php` | The month's wage bill, from SAVED sheets only. Pass `$trips` — see §13.11 |
 | `bhela_bm_salary_rows($id,$month)` | `includes/salary.php` | Payroll rows; trips default from approved sheets |
 | `bhela_bm_cost_transitions()` | `includes/costs.php` | Cost-sheet workflow: from-state → target + required capability |
 | `bhela_bm_screen_header()` | `includes/ui.php` | The teal banner every admin screen opens with (also emits `.wp-header-end`) |
@@ -553,7 +554,9 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 7. **Bengali text in source:** Many strings are hardcoded in Bengali — no translation files exist.
 8. **`_bhela_day_type` is a derived label, not stored truth.** Read it through `bhela_bm_booking_day_type()`. The raw meta is a cache and it went stale in production: a booking whose Travel Date was moved to a Monday kept printing "Weekend" on the invoice, because the only writers are the two repricing branches of `bhela_bm_save_booking()` and a booking taken online can reach neither.
 9. **The stock lock is not only a wp-admin thing.** `includes/inventory-core.php` loads on *every* request and depends on nothing, because `wp_delete_post()` from WP-CLI or cron never reaches an `is_admin()` block — a closed month deletable from the command line is not closed. It closes four gaps the cost sheet still leaves open: direct `update_post_meta()`, trash, hard delete, and quick-edit. **A closed month cannot be deleted even by an administrator** — that is deliberate; reopen it first. A test fixture must therefore go through `bhela_test_delete()`, not `wp_delete_post()`.
-10. **A ৳0 booking is not a paid one.** `bhela_bm_balance()` requires a positive total before it calls a balance settled — a Full Boat sits at ৳0 until an admin prices it, and `0 − 0 = 0` would otherwise stamp an unpriced enquiry PAID.
+10. **Staff salary is a cost, and gross profit deducts it.** `gross = trip profit − expenses − payroll`. It was omitted entirely until v2.27.0, which overstated every month's bottom line by the whole wage bill. Two rules: only a **saved** salary sheet counts (the roster alone is rates, not a commitment — an unsaved sheet must not deduct wages for a month nobody has done payroll for), and the figure deducted is `payable`, not `after`, because an advance already handed over is still part of the wage bill.
+11. **`bhela_bm_salary_month_total()` and `bhela_bm_statement_data()` can call each other.** Payroll prices trip-based crew from the month's trip count, and that count comes from the statement — so the statement passes its own already-computed count down (`bhela_bm_salary_month_total( $month, count( $out['trips'] ) )`). `bhela_bm_salary_trip_count()` also carries a re-entry guard returning 0, because a wrong answer that returns beats an infinite loop that hangs the request. Do not remove either half.
+12. **A ৳0 booking is not a paid one.** `bhela_bm_balance()` requires a positive total before it calls a balance settled — a Full Boat sits at ৳0 until an admin prices it, and `0 − 0 = 0` would otherwise stamp an unpriced enquiry PAID.
 
 ---
 

@@ -49,6 +49,7 @@ function bhela_bm_statement_data( $month ) {
 		'trips' => array(), 'pending' => array(),
 		'guests' => 0, 'earnings' => 0, 'cost' => 0, 'profit' => 0,
 		'expenses' => array( 'rows' => array(), 'by_type' => array(), 'total' => 0 ),
+		'salary' => array( 'total' => 0, 'sheets' => 0, 'ids' => array() ),
 		'gross' => 0, 'cost_pp' => 0.0, 'profit_pp' => 0.0,
 		'signoff' => array(), 'stale' => array(),
 	);
@@ -133,12 +134,27 @@ function bhela_bm_statement_data( $month ) {
 		? bhela_bm_expense_rows( $from, $to )
 		: $out['expenses'];
 
-	$out['gross'] = $out['profit'] - $out['expenses']['total'];
+	// Crew wages are a cost of running the boat, so they come off the bottom line
+	// like fuel and groceries do. This used to be omitted altogether, which
+	// overstated every month's gross profit by the whole wage bill.
+	//
+	// Kept as its own figure rather than folded into `expenses`, because the
+	// owner's sheet reads them as separate things — trip costs, then overheads
+	// like marketing and renovation, then payroll — and merging them would also
+	// silently move the "deductions" total the July harness pins.
+	// The trip count is passed in from what this function has already counted, so
+	// payroll never has to ask the statement for it and re-enter this function.
+	$out['salary'] = function_exists( 'bhela_bm_salary_month_total' )
+		? bhela_bm_salary_month_total( $month, count( $out['trips'] ) )
+		: $out['salary'];
+
+	$out['gross'] = $out['profit'] - $out['expenses']['total'] - $out['salary']['total'];
 	if ( $out['guests'] > 0 ) {
 		// Cost per person on the owner's sheet includes marketing and
 		// renovation, not just trip cost — the two readings differ by about a
-		// thousand taka a head, so this follows the sheet.
-		$out['cost_pp']   = round( ( $out['cost'] + $out['expenses']['total'] ) / $out['guests'], 2 );
+		// thousand taka a head, so this follows the sheet. Payroll is in here for
+		// the same reason it is in gross profit: it is a cost of carrying them.
+		$out['cost_pp']   = round( ( $out['cost'] + $out['expenses']['total'] + $out['salary']['total'] ) / $out['guests'], 2 );
 		$out['profit_pp'] = round( $out['gross'] / $out['guests'], 2 );
 	}
 	return $out;
@@ -295,10 +311,36 @@ function bhela_bm_statement_page() {
 						<td class="bha-num">− <?php echo esc_html( bhela_bm_money( $amount ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
+				<?php
+				// Payroll, on its own row. Shown whenever a sheet exists for the month
+				// even if it totals zero, because "payroll: 0" and "no payroll sheet
+				// yet" are different facts and the owner should be able to tell which
+				// one they are looking at.
+				if ( $d['salary']['sheets'] > 0 ) :
+					?>
+					<tr class="bha-row--deduct">
+						<td colspan="6"><?php
+							esc_html_e( 'Less: Staff salary', 'bhela-booking' );
+							if ( $d['salary']['sheets'] > 1 ) {
+								echo ' <span class="bha-flag">' . esc_html( sprintf(
+									/* translators: %d: how many salary sheets exist for the month */
+									__( '%d sheets for this month — check that is intended', 'bhela-booking' ),
+									(int) $d['salary']['sheets']
+								) ) . '</span>';
+							}
+						?></td>
+						<td class="bha-num">− <?php echo esc_html( bhela_bm_money( $d['salary']['total'] ) ); ?></td>
+					</tr>
+				<?php endif; ?>
 				<tr class="bha-row--total">
 					<td colspan="6"><?php esc_html_e( 'Gross Profit', 'bhela-booking' ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $d['gross'] ) ); ?></td>
 				</tr>
+				<?php if ( 0 === $d['salary']['sheets'] && $d['trips'] ) : ?>
+					<tr class="bha-row--muted">
+						<td colspan="7"><span class="bha-flag"><?php esc_html_e( 'No salary sheet for this month yet, so no wages have been deducted — the figure above is before payroll.', 'bhela-booking' ); ?></span></td>
+					</tr>
+				<?php endif; ?>
 			</tfoot>
 		</table>
 		</div>

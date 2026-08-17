@@ -107,7 +107,7 @@ function bhela_bm_yearly_label( $year, $mode = 'financial' ) {
 function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 	$totals = array(
 		'trips' => 0, 'guests' => 0, 'earnings' => 0,
-		'cost' => 0, 'profit' => 0, 'expenses' => 0, 'gross' => 0,
+		'cost' => 0, 'profit' => 0, 'expenses' => 0, 'salary' => 0, 'gross' => 0,
 	);
 	$out = array(
 		'months' => array(), 'totals' => $totals, 'by_type' => array(),
@@ -128,6 +128,8 @@ function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 			'cost'     => (int) $d['cost'],
 			'profit'   => (int) $d['profit'],
 			'expenses' => (int) $d['expenses']['total'],
+			// Payroll is a cost of the month like any other, so it rolls up too.
+			'salary'   => (int) $d['salary']['total'],
 			'gross'    => (int) $d['gross'],
 			'pending'  => count( $d['pending'] ),
 		);
@@ -139,6 +141,7 @@ function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 		$out['totals']['cost']     += $row['cost'];
 		$out['totals']['profit']   += $row['profit'];
 		$out['totals']['expenses'] += $row['expenses'];
+		$out['totals']['salary']   += $row['salary'];
 		$out['totals']['gross']    += $row['gross'];
 		$out['pending']            += $row['pending'];
 		$out['stale']              += count( $d['stale'] );
@@ -165,7 +168,7 @@ function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 	arsort( $out['by_type'] );
 
 	$g = $out['totals']['guests'];
-	$out['totals']['cost_pp']   = $g > 0 ? round( ( $out['totals']['cost'] + $out['totals']['expenses'] ) / $g, 2 ) : 0.0;
+	$out['totals']['cost_pp']   = $g > 0 ? round( ( $out['totals']['cost'] + $out['totals']['expenses'] + $out['totals']['salary'] ) / $g, 2 ) : 0.0;
 	$out['totals']['profit_pp'] = $g > 0 ? round( $out['totals']['gross'] / $g, 2 ) : 0.0;
 	// Margin on what was invoiced, which is the figure an owner compares
 	// against last year rather than the absolute taka.
@@ -241,16 +244,16 @@ function bhela_bm_yearly_csv() {
 	// Excel reads a UTF-8 CSV as the local codepage without a BOM, which turns
 	// every Bengali expense label into mojibake.
 	fwrite( $fh, "\xEF\xBB\xBF" );
-	fputcsv( $fh, array( 'Month', 'Trips', 'Guests', 'Earnings', 'Trip Cost', 'Trip Profit', 'Expenses', 'Gross Profit' ) );
+	fputcsv( $fh, array( 'Month', 'Trips', 'Guests', 'Earnings', 'Trip Cost', 'Trip Profit', 'Expenses', 'Salary', 'Gross Profit' ) );
 	foreach ( $d['months'] as $m ) {
 		fputcsv( $fh, array(
 			$m['label'], $m['trips'], $m['guests'], $m['earnings'],
-			$m['cost'], $m['profit'], $m['expenses'], $m['gross'],
+			$m['cost'], $m['profit'], $m['expenses'], $m['salary'], $m['gross'],
 		) );
 	}
 	$t = $d['totals'];
 	fputcsv( $fh, array() );
-	fputcsv( $fh, array( 'TOTAL', $t['trips'], $t['guests'], $t['earnings'], $t['cost'], $t['profit'], $t['expenses'], $t['gross'] ) );
+	fputcsv( $fh, array( 'TOTAL', $t['trips'], $t['guests'], $t['earnings'], $t['cost'], $t['profit'], $t['expenses'], $t['salary'], $t['gross'] ) );
 
 	if ( $d['by_type'] ) {
 		$types = function_exists( 'bhela_bm_expense_types' ) ? bhela_bm_expense_types( true ) : array();
@@ -405,6 +408,7 @@ function bhela_bm_yearly_page() {
 					<th class="bha-num"><?php esc_html_e( 'Trip Cost', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'Trip Profit', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'Expenses', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Salary', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'Gross Profit', 'bhela-booking' ); ?></th>
 					<th class="bha-noprint" style="width:110px"></th>
 				</tr>
@@ -430,11 +434,12 @@ function bhela_bm_yearly_page() {
 					<td class="bha-num"><?php echo $empty ? '—' : esc_html( bhela_bm_money( $m['cost'] ) ); ?></td>
 					<td class="bha-num"><?php echo $empty ? '—' : esc_html( bhela_bm_money( $m['profit'] ) ); ?></td>
 					<td class="bha-num"><?php echo $m['expenses'] ? esc_html( bhela_bm_money( $m['expenses'] ) ) : '—'; ?></td>
+					<td class="bha-num"><?php echo $m['salary'] ? esc_html( bhela_bm_money( $m['salary'] ) ) : '—'; ?></td>
 					<td class="bha-num <?php echo $empty ? '' : ( $m['gross'] < 0 ? 'bha-num--due' : 'bha-num--clear' ); ?>">
-						<?php echo $empty && ! $m['expenses'] ? '—' : esc_html( bhela_bm_money( $m['gross'] ) ); ?>
+						<?php echo $empty && ! $m['expenses'] && ! $m['salary'] ? '—' : esc_html( bhela_bm_money( $m['gross'] ) ); ?>
 					</td>
 					<td class="bha-noprint">
-						<?php if ( ! $empty || $m['expenses'] ) : ?>
+						<?php if ( ! $empty || $m['expenses'] || $m['salary'] ) : ?>
 							<a class="button button-small" href="<?php echo esc_url( add_query_arg(
 								array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-statement', 'month' => $m['key'] ),
 								admin_url( 'edit.php' )
@@ -453,6 +458,7 @@ function bhela_bm_yearly_page() {
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['cost'] ) ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['profit'] ) ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['expenses'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['salary'] ) ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['gross'] ) ); ?></td>
 					<td class="bha-noprint"></td>
 				</tr>

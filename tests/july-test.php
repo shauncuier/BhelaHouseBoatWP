@@ -102,6 +102,51 @@ ok( $d3['gross'] === $d['gross'] - 5000, 'and it reduced gross profit', number_f
 delete_option( 'bhela_bm_expense_types' );
 bhela_test_delete( $id );
 
+echo "\n=== staff salary is a cost, so it comes off gross profit ===\n";
+// Wages were missing from the statement entirely, which overstated every month's
+// bottom line by the whole payroll. Assert the deduction the same way the expense
+// one above is asserted: against the figure immediately before it.
+$base    = bhela_bm_statement_data( '2026-07' );
+$staff_backup = get_option( 'bhela_bm_staff', null );
+update_option( 'bhela_bm_staff', array(
+	'zz1' => array( 'name' => 'ZZ Majhi', 'designation' => 'Boatman', 'type' => 'monthly', 'rate' => 0, 'monthly' => 18000 ),
+	'zz2' => array( 'name' => 'ZZ Cook',  'designation' => 'Cook',    'type' => 'monthly', 'rate' => 0, 'monthly' => 12000 ),
+) );
+
+ok( 0 === $base['salary']['total'] && 0 === $base['salary']['sheets'],
+	'a roster alone deducts nothing — an unsaved sheet is not a wage bill', (string) $base['salary']['total'] );
+
+$pay = wp_insert_post( array( 'post_type' => 'bhela_salary', 'post_status' => 'publish', 'post_title' => 'ZZJ payroll' ) );
+$made[] = $pay;
+update_post_meta( $pay, '_bhela_salary_month', '2026-07' );
+update_post_meta( $pay, '_bhela_salary_rows', wp_json_encode( array(
+	'zz1' => array( 'name' => 'ZZ Majhi', 'type' => 'monthly', 'monthly' => 18000, 'advance' => 5000 ),
+	'zz2' => array( 'name' => 'ZZ Cook',  'type' => 'monthly', 'monthly' => 12000 ),
+) ) );
+
+$d4 = bhela_bm_statement_data( '2026-07' );
+ok( 30000 === $d4['salary']['total'], 'the month picks up the saved payroll', number_format( $d4['salary']['total'] ) );
+ok( 1 === $d4['salary']['sheets'], 'and reports how many sheets it came from' );
+ok( $d4['gross'] === $base['gross'] - 30000, 'and it reduced gross profit', number_format( $d4['gross'] ) );
+// An advance already handed over is still part of the wage bill; deducting only
+// what is left to pay would make a month look cheaper for having paid early.
+ok( 30000 === $d4['salary']['total'], 'payable is deducted, not the amount still outstanding' );
+ok( $d4['cost_pp'] > $base['cost_pp'], 'cost per person carries the wages too', (string) $d4['cost_pp'] );
+
+if ( function_exists( 'bhela_bm_yearly_data' ) ) {
+	$y = bhela_bm_yearly_data( '2026', 'financial' );
+	ok( 30000 === (int) $y['totals']['salary'], 'and the yearly rollup carries it', number_format( $y['totals']['salary'] ) );
+}
+
+bhela_test_delete( $pay );
+$made = array_values( array_diff( $made, array( $pay ) ) );
+if ( null === $staff_backup ) {
+	delete_option( 'bhela_bm_staff' );
+} else {
+	update_option( 'bhela_bm_staff', $staff_backup );
+}
+ok( 0 === bhela_bm_statement_data( '2026-07' )['salary']['total'], 'removing the sheet removes the deduction' );
+
 echo "\n=== the owner's bottom line, reproduced ===\n";
 $d = bhela_bm_statement_data( '2026-07' );
 ok( 336689 === $d['expenses']['total'], 'deductions = 336,689 (ads 46,689 + web 40,000 + renovation 250,000)', number_format( $d['expenses']['total'] ) );

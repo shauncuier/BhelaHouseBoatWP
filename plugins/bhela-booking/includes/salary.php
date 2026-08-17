@@ -138,7 +138,22 @@ function bhela_bm_salary_trip_count( $month ) {
 	if ( ! $month || ! function_exists( 'bhela_bm_statement_data' ) ) {
 		return 0;
 	}
-	return count( bhela_bm_statement_data( $month )['trips'] );
+	// The statement now deducts payroll, and payroll prices trip-based crew from
+	// the month's trip count — so these two functions can call each other. The
+	// statement passes its own already-computed count down to avoid that, and this
+	// guard is the backstop for any future caller that forgets to: re-entering
+	// here means a cycle, and 0 trips is a wrong answer that returns, where an
+	// infinite loop is a wrong answer that hangs the request.
+	static $busy = array();
+	if ( isset( $busy[ $month ] ) ) {
+		return 0;
+	}
+	$busy[ $month ] = true;
+	try {
+		return count( bhela_bm_statement_data( $month )['trips'] );
+	} finally {
+		unset( $busy[ $month ] );
+	}
 }
 
 /**
@@ -148,14 +163,19 @@ function bhela_bm_salary_trip_count( $month ) {
  * A saved row keeps the name, rate and designation it was saved with — the
  * roster can change without rewriting a month that has already been paid.
  *
- * @param int    $post_id Sheet ID (0 for a new one).
- * @param string $month   YYYY-MM, used to default trips completed.
+ * @param int      $post_id Sheet ID (0 for a new one).
+ * @param string   $month   YYYY-MM, used to default trips completed.
+ * @param int|null $trips   Trip count, when the caller already knows it. Null asks
+ *                          for it, which costs a statement query.
  * @return array
  */
-function bhela_bm_salary_rows( $post_id = 0, $month = '' ) {
+function bhela_bm_salary_rows( $post_id = 0, $month = '', $trips = null ) {
 	$saved = $post_id ? json_decode( (string) get_post_meta( $post_id, '_bhela_salary_rows', true ), true ) : array();
 	$saved = is_array( $saved ) ? $saved : array();
-	$trips = bhela_bm_salary_trip_count( $month );
+	// A caller that already knows the month's trip count passes it in. The monthly
+	// statement does exactly that, because it deducts payroll and would otherwise
+	// send this function back into the statement to ask how many trips there were.
+	$trips = null === $trips ? bhela_bm_salary_trip_count( $month ) : max( 0, (int) $trips );
 
 	$rows = array();
 	foreach ( bhela_bm_staff() as $id => $s ) {
@@ -211,6 +231,56 @@ function bhela_bm_salary_totals( $rows ) {
 		}
 	}
 	return $t;
+}
+
+/**
+ * The month's payroll, as a cost the monthly statement deducts.
+ *
+ * Crew wages are a cost of running the boat, so they belong in gross profit
+ * alongside fuel and groceries. The statement was computing
+ * `profit − expenses` and leaving payroll out entirely, which overstated every
+ * month's bottom line by the whole wage bill.
+ *
+ * Two deliberate choices:
+ *
+ *   - It reads SAVED sheets only, never the staff roster. bhela_bm_salary_rows()
+ *     with no post ID will happily price the roster against the month's trip
+ *     count, which is the right default for a blank *form* and quite wrong as an
+ *     accounting figure — it would deduct wages for a month nobody has done
+ *     payroll for yet.
+ *   - It totals `payable`, not `after`. An advance already handed over is still
+ *     part of the wage bill; `after` is only what is left to pay, and deducting
+ *     that would make a month look cheaper for having paid early.
+ *
+ * There is no one-sheet-per-month constraint on bhela_salary, so every sheet
+ * found is summed and the count is reported — two sheets for one month is a thing
+ * the owner needs to see rather than something to silently pick between.
+ *
+ * @param string $month YYYY-MM.
+ * @return array{total:int,sheets:int,ids:int[]}
+ */
+function bhela_bm_salary_month_total( $month, $trips = null ) {
+	$out = array( 'total' => 0, 'sheets' => 0, 'ids' => array() );
+	if ( ! preg_match( '/^\d{4}-(0[1-9]|1[0-2])$/', (string) $month ) ) {
+		return $out;
+	}
+	$ids = get_posts( array(
+		'post_type'      => 'bhela_salary',
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'meta_query'     => array(
+			array( 'key' => '_bhela_salary_month', 'value' => $month ),
+		),
+	) );
+	foreach ( $ids as $id ) {
+		$rows           = bhela_bm_salary_rows( $id, $month, $trips );
+		$out['total']  += (int) bhela_bm_salary_totals( $rows )['payable'];
+		$out['sheets']++;
+		$out['ids'][]   = (int) $id;
+	}
+	return $out;
 }
 
 /* =========================================================
