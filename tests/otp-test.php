@@ -38,6 +38,31 @@ add_filter( 'pre_wp_mail', function ( $null, $atts ) {
 	return true;
 }, 10, 2 );
 
+/*
+ * The harness owns the gateway settings it tests.
+ *
+ * It used to read whatever the live site had, and every send goes through
+ * bhela_bm_send_sms(), which returns false immediately when `sms_enabled` is off
+ * — and the submission gate is skipped entirely when `otp_enabled` is off. On a
+ * site with SMS switched off (a fresh checkout, or any site not yet using it)
+ * that failed eighteen checks about parsing, throttling and the server-side gate,
+ * none of which have anything to do with the owner's configuration. A suite that
+ * is permanently red is a suite people stop reading.
+ *
+ * Every outbound call is intercepted above, so nothing here reaches a network and
+ * no SMS is ever sent. Restored at the end.
+ */
+$otp_restore = get_option( 'bhela_bm_settings', array() );
+update_option( 'bhela_bm_settings', wp_parse_args( array(
+	'otp_enabled'   => 1,
+	'sms_enabled'   => 1,
+	'sms_provider'  => 'bulksmsbd',
+	'sms_api_key'   => 'ZZTESTKEY-not-a-real-credential',
+	'sms_sender_id' => 'ZZTEST',
+), $otp_restore ) );
+
+ok( bhela_bm_otp_on(), 'the harness has OTP switched on for itself' );
+
 function reset_state( $phone ) {
 	delete_transient( bhela_bm_otp_key( $phone ) );
 	delete_transient( bhela_bm_otp_ok_key( $phone ) );
@@ -153,6 +178,19 @@ foreach ( array( '', 'abc', '12345' ) as $junk ) {
 	ok( empty( $res['success'] ), sprintf( "junk phone '%s' refused", $junk ) );
 }
 
+echo "\n=== cleanup ===\n";
 reset_state( $PHONE );
 reset_state( $other );
+// Put the owner's settings back. Leaving the dummy key behind would switch SMS
+// and OTP on for a live site, and a booking form demanding a code it cannot send
+// would stop guests booking at all.
+if ( $otp_restore ) {
+	update_option( 'bhela_bm_settings', $otp_restore );
+} else {
+	delete_option( 'bhela_bm_settings' );
+}
+$otp_after = bhela_bm_get_settings();
+ok( ( $otp_restore['sms_api_key'] ?? '' ) === $otp_after['sms_api_key'], 'the real API key setting is restored' );
+ok( (int) ( $otp_restore['otp_enabled'] ?? 0 ) === (int) $otp_after['otp_enabled'], 'and OTP is back as it was', (string) $otp_after['otp_enabled'] );
+
 bhela_test_done();
