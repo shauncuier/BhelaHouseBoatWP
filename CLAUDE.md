@@ -160,6 +160,16 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 
 - **Regular/Holiday rate:** Applied on weekend days (configurable, default Fri+Sat) and holiday dates
 - **Weekday rate:** 20% discount on non-weekend, non-holiday days
+- **Full Boat arrives priced, not blank.** A whole-boat request from the booking form is
+  priced at the standard rate for every cabin at maximum occupancy — `bhela_bm_full_boat_plan()`
+  gives 6 cabins × 6 adults = 36 people — and an admin adjusts the Total after negotiating. It
+  used to arrive at ৳0 waiting for a hand quote, so the guest saw no number and the booking sat
+  unpriced. Weekend ৳288,000 / weekday ৳230,400 at current rates. The plan is fed through
+  `bhela_bm_calc_multi()` rather than multiplied inline, so weekday discounts, holidays and the
+  advance percentage apply exactly as they do to any other booking. `booking.js` computes the
+  same figure the same way (`MAX_CABINS * MAX_CAP * occRate(MAX_CAP, dt)`) — `booking-test.php`
+  §3d pins both sides together. The per-cabin `lines` breakdown is dropped: six identical rows
+  is not what a whole-boat guest agreed to.
 - **A cabin is opened for adults only:** every cabin needs at least 2 adults, so children never justify an extra cabin (2 cabins require 4 adults). Cabin tier is the adult count in that cabin. 4–8 children ride along in that cabin and never push the booking into a larger (cheaper-per-head) tier.
 - **Children pricing:** 0–4 free (share food + bed with parents, excluded from cabin size), 4–8 pay a **flat fee** (`child_fee` setting, default ৳5,000) with **no weekday discount**, 9+ full rate
   - Example (weekend): 4 adults + one 5-year-old = 4-person cabin → 4 × ৳10,000 + ৳5,000 = **৳45,000** (not a 5-person cabin at ৳9,000/head)

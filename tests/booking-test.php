@@ -193,6 +193,68 @@ delete_transient( 'bhela_bm_fb_warn_' . $fb0 );
 bk_save( $fb0, array( 'bhela_full_boat' => '1', 'bhela_total' => 250000 ) );
 ok( ! get_transient( 'bhela_bm_fb_warn_' . $fb0 ), 'pricing it silences the warning' );
 
+echo "\n=== 3d. a Full Boat from the FRONT END arrives priced ===\n";
+// It used to arrive at ৳0 and wait for a hand quote, so the guest saw no number at
+// all and the booking sat unpriced. It now carries the standard whole-boat rate —
+// every cabin at maximum occupancy — which an admin adjusts after negotiating.
+$fb_plan = bhela_bm_full_boat_plan();
+ok( bhela_bm_max_cabins() === count( $fb_plan ), 'the plan is every cabin', (string) count( $fb_plan ) );
+$fb_occ   = bhela_bm_rates_by_occupancy();
+$fb_size  = $fb_occ ? max( array_keys( $fb_occ ) ) : 6;
+$fb_heads = array_sum( wp_list_pluck( $fb_plan, 'adults' ) );
+ok( bhela_bm_max_guests() === $fb_heads, 'filled to capacity — ' . count( $fb_plan ) . ' × ' . $fb_size . ' = ' . bhela_bm_max_guests(), (string) $fb_heads );
+ok( 0 === array_sum( wp_list_pluck( $fb_plan, 'c48' ) ) + array_sum( wp_list_pluck( $fb_plan, 'c04' ) ),
+	'no children assumed — a child fee nobody asked for would inflate every quote' );
+
+// Priced through the one engine, so weekday/holiday and the advance % apply as
+// they do anywhere else. These are the figures the booking form must also show.
+$fb_wknd = bhela_bm_full_boat_price( '2026-08-21' );   // Friday
+$fb_week = bhela_bm_full_boat_price( '2026-08-18' );   // Tuesday
+ok( ! is_wp_error( $fb_wknd ) && ! is_wp_error( $fb_week ), 'both day types price without error' );
+$fb_row    = bhela_bm_rate_for_occupancy( $fb_size );
+$fb_rate_w = (int) $fb_row['regular'];
+$fb_rate_d = (int) $fb_row['weekday'];
+ok( bhela_bm_max_guests() * (int) $fb_rate_w === (int) $fb_wknd['total'],
+	'weekend total is ' . bhela_bm_max_guests() . ' × ' . $fb_rate_w, bhela_bm_money( $fb_wknd['total'] ) );
+ok( bhela_bm_max_guests() * (int) $fb_rate_d === (int) $fb_week['total'],
+	'weekday total is ' . bhela_bm_max_guests() . ' × ' . $fb_rate_d, bhela_bm_money( $fb_week['total'] ) );
+ok( (int) $fb_week['total'] < (int) $fb_wknd['total'], 'the weekday discount still applies to a whole boat' );
+
+// The JS must reach the same number, and it computes it the same way rather than
+// from a literal — MAX_CABINS × MAX_CAP × occRate(MAX_CAP, dt). A divergence here
+// shows the guest one price and stores another.
+$fb_js = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/assets/booking.js' );
+ok( false !== strpos( $fb_js, 'MAX_CABINS * MAX_CAP * occRate(MAX_CAP, dt)' ),
+	'booking.js prices the boat from the same plan, not a hardcoded figure' );
+ok( false !== strpos( $fb_js, 'function renderFullBoat' ), 'and paints it as one line, not six identical cabins' );
+
+// Submitted for real: the whole-boat branch of the submission handler.
+$fb_fe = bhela_bm_process_submission( array(
+	'name'       => 'ZZ Full Boat guest',
+	'phone'      => '01700000009',
+	'date'       => '2026-08-21',
+	'full_boat'  => '1',
+	'cabins'     => wp_json_encode( array() ),
+) );
+if ( is_wp_error( $fb_fe ) ) {
+	ok( false, 'a front-end Full Boat submits', $fb_fe->get_error_message() );
+} else {
+	$fb_id  = (int) $fb_fe['booking_id'];
+	$made[] = $fb_id;
+	ok( (int) $fb_wknd['total'] === (int) get_post_meta( $fb_id, '_bhela_total', true ),
+		'it stores the standard rate, not ৳0', get_post_meta( $fb_id, '_bhela_total', true ) );
+	ok( (int) get_post_meta( $fb_id, '_bhela_advance', true ) > 0, 'and therefore an advance to ask for',
+		get_post_meta( $fb_id, '_bhela_advance', true ) );
+	ok( bhela_bm_max_guests() === (int) get_post_meta( $fb_id, '_bhela_guests', true ),
+		'guests is the boat capacity', get_post_meta( $fb_id, '_bhela_guests', true ) );
+	ok( '' === (string) get_post_meta( $fb_id, '_bhela_lines', true ) || '[]' === (string) get_post_meta( $fb_id, '_bhela_lines', true ),
+		'no per-cabin breakdown — six identical rows is not what was sold',
+		(string) get_post_meta( $fb_id, '_bhela_lines', true ) );
+	// A priced boat is not a paid one; only a payment settles it.
+	$fb_bal = bhela_bm_balance( get_post_meta( $fb_id, '_bhela_total', true ), 0 );
+	ok( ! $fb_bal['settled'], 'priced but unpaid — no PAID stamp' );
+}
+
 echo "\n=== 3c. unticking restores per-cabin pricing ===\n";
 bk_save( $fb, array(
 	'bhela_cabin_adults' => array( 4 ),

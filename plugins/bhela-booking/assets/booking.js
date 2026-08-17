@@ -532,18 +532,31 @@
 			var dt = dayType(dateEl.value);
 			if (emptyMsg) emptyMsg.textContent = EMPTY_DEFAULT;
 
-			// Full Boat → custom quote request; skip combo pricing entirely.
+			// Full Boat → priced at the standard whole-boat rate rather than left
+			// blank for a hand quote: every cabin at maximum occupancy, so
+			// MAX_CABINS × MAX_CAP people. Must agree to the taka with
+			// bhela_bm_full_boat_plan() / bhela_bm_full_boat_price() on the server —
+			// same cabin plan, same occupancy rate, same advance percentage.
+			// The combination editor stays out of it; the boat is sold as one unit.
 			if (fullBoat()) {
 				currentOptions = [];
 				editMode = false;
 				editBox.hidden = true;
 				autoplanBox.hidden = true;
 				if (guestError) guestError.hidden = true;
-				priceBox.hidden = true;
-				if (emptyMsg) { emptyMsg.hidden = false; emptyMsg.textContent = '🚢 পুরো বোট রিজার্ভ — কাস্টম কোটের জন্য রিকোয়েস্ট পাঠান। তারিখ ও চাহিদা অনুযায়ী আমরা দাম জানাবো।'; }
 				if (next2) next2.disabled = false;
 				if (submitBtn) submitBtn.disabled = false;
-				updateMobileBar('কাস্টম কোট', dt);
+
+				if (!dt) {                       // no date yet — nothing to price against
+					priceBox.hidden = true;
+					if (emptyMsg) { emptyMsg.hidden = false; emptyMsg.textContent = '🚢 পুরো বোট রিজার্ভ — তারিখ দিলে স্ট্যান্ডার্ড রেট দেখা যাবে।'; }
+					updateMobileBar('পুরো বোট', dt);
+					return;
+				}
+
+				var fbTotal = MAX_CABINS * MAX_CAP * occRate(MAX_CAP, dt);
+				renderFullBoat(fbTotal, dt);
+				updateMobileBar(money(fbTotal), dt);
 				return;
 			}
 
@@ -620,6 +633,37 @@
 			if (!o) { priceBox.hidden = true; if (emptyMsg) emptyMsg.hidden = false; updateMobileBar('', dt); return; }
 			if (!dt) { priceBox.hidden = true; if (emptyMsg) emptyMsg.hidden = false; updateMobileBar('', dt); return; }
 			paintSummary(o.combo, dt);
+		}
+
+		/**
+		 * Paint the summary for a whole-boat booking.
+		 *
+		 * Deliberately NOT paintSummary(): that one draws one breakdown line per
+		 * cabin, and six identical rows is not what someone buying the whole boat
+		 * agreed to. One row, and an explicit note that the figure is negotiable —
+		 * the server sends the same caveat in the WhatsApp text.
+		 */
+		function renderFullBoat(total, dt) {
+			var labels = { weekday: 'Weekday −20% 🔥', weekend: 'Weekend', holiday: 'সরকারি ছুটি' };
+			var rate = occRate(MAX_CAP, dt);
+			document.getElementById('bm-daytype').textContent = labels[dt];
+			document.getElementById('bm-guests-echo').textContent = MAX_GUESTS + ' জন (পুরো বোট)';
+			document.getElementById('bm-total').textContent = money(total);
+			document.getElementById('bm-advance').textContent =
+				money(Math.ceil(total * (bhelaBM.advancePercent / 100)));
+
+			// Against the weekend rate, so a weekday full boat still shows its saving.
+			var regular = MAX_CABINS * MAX_CAP * occRate(MAX_CAP, 'weekend');
+			var savings = Math.max(0, regular - total);
+			savingsRow.hidden = savings <= 0;
+			if (savings > 0) document.getElementById('bm-savings').textContent = money(savings);
+
+			breakdown.innerHTML = '<div class="bm-bd-line"><span>পুরো বোট (' + MAX_CABINS + ' কেবিন · ' + MAX_GUESTS + ' জন)'
+				+ '<small>স্ট্যান্ডার্ড রেট ' + money(rate) + '/জন · দাম আলোচনাসাপেক্ষ</small></span>'
+				+ '<strong>' + money(total) + '</strong></div>';
+
+			priceBox.hidden = false;
+			if (emptyMsg) emptyMsg.hidden = true;
 		}
 
 		/** Paint the price summary from a priced combo {cabins,total,regular,bodies}. */

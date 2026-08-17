@@ -161,7 +161,7 @@ function bhela_bm_booking_form_shortcode() {
 						<p class="bhela-bm-childnote">👶 0–4 বছর ফ্রি · 4–8 বছর <?php echo esc_html( bhela_bm_money( $settings['child_fee'] ) ); ?> · 9+ পূর্ণ রেট। 2–<?php echo esc_html( bhela_bm_max_guests() ); ?> জন (<?php echo esc_html( bhela_bm_max_cabins() ); ?>টি কেবিন) · যত বেশি জন, জনপ্রতি রেট তত কম।</p>
 						<label class="bm-fullboat">
 							<input type="checkbox" id="bm-fullboat" name="full_boat" value="1">
-							<span>🚢 <strong>পুরো বোট রিজার্ভ</strong> করতে চাই — কাস্টম কোটের জন্য রিকোয়েস্ট পাঠাবো (<?php echo esc_html( bhela_bm_max_cabins() ); ?> কেবিন · <?php echo esc_html( bhela_bm_max_guests() ); ?> জন)</span>
+							<span>🚢 <strong>পুরো বোট রিজার্ভ</strong> করতে চাই (<?php echo esc_html( bhela_bm_max_cabins() ); ?> কেবিন · <?php echo esc_html( bhela_bm_max_guests() ); ?> জন) — স্ট্যান্ডার্ড রেট দেখানো হবে, দাম আলোচনাসাপেক্ষ</span>
 						</label>
 						<div class="bm-nav" data-nav="2">
 							<button type="button" class="bm-back" data-back="1">← পিছনে</button>
@@ -415,17 +415,20 @@ function bhela_bm_process_submission( $data ) {
 	}
 
 	if ( $full_boat ) {
-		// Custom-quote request for the whole boat — no per-cabin pricing.
-		$price = array(
-			'day_type' => bhela_bm_day_type( $date ),
-			'lines'    => array(),
-			'guests'   => bhela_bm_max_guests(),
-			'total'    => 0,
-			'savings'  => 0,
-			'advance'  => 0,
-			'due'      => 0,
-		);
-		$cabin_summary = bhela_bm_full_boat_label();
+		// Priced at the standard whole-boat rate — every cabin full, 6 × 6 = 36 —
+		// rather than left at ৳0 for someone to quote by hand. An admin adjusts the
+		// Total after negotiating; see bhela_bm_full_boat_plan().
+		$price = bhela_bm_full_boat_price( $date );
+		if ( is_wp_error( $price ) ) {
+			return $price;
+		}
+		// The guest booked one thing, not six cabins, so the per-cabin breakdown is
+		// dropped: the invoice, both emails and the SMS all print `lines` when it is
+		// present, and six identical rows is not what a whole-boat guest agreed to.
+		// `guests` stays the boat's capacity, which is what the label promises.
+		$price['lines']  = array();
+		$price['guests'] = bhela_bm_max_guests();
+		$cabin_summary   = bhela_bm_full_boat_label();
 	} else {
 		$price = is_array( $cabins )
 			? bhela_bm_calc_multi( $cabins, $date )
@@ -505,9 +508,15 @@ function bhela_bm_process_submission( $data ) {
 
 	$settings = bhela_bm_get_settings();
 	if ( $full_boat ) {
+		// Carries the standard figure now, and says plainly that it is a starting
+		// point — a guest who sees a number and no caveat reads it as final.
 		$wa_text = sprintf(
-			"আসসালামু আলাইকুম। আমি পুরো বোট (Full Boat) রিজার্ভ করতে চাই — কাস্টম কোট প্রয়োজন।\n\n🧾 Booking No: %s\nনাম: %s\nমোবাইল: %s\nতারিখ: %s",
-			$invoice_no, $name, $phone, $date
+			"আসসালামু আলাইকুম। আমি পুরো বোট (Full Boat) রিজার্ভ করতে চাই।\n\n🧾 Booking No: %s\nনাম: %s\nমোবাইল: %s\nতারিখ: %s\nঅতিথি: %d জন (%d কেবিন)\nস্ট্যান্ডার্ড রেট: %s | অগ্রিম (%s%%): %s\n\n(দাম আলোচনাসাপেক্ষ — চূড়ান্ত দাম আমরা জানাবো।)",
+			$invoice_no, $name, $phone, $date,
+			$price['guests'], bhela_bm_max_cabins(),
+			bhela_bm_money( $price['total'] ),
+			bhela_bm_bn_num( (int) $settings['advance_percent'] ),
+			bhela_bm_money( $price['advance'] )
 		);
 	} else {
 		$wa_text = sprintf(

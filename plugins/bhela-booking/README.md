@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.28.0
+- **Version:** 2.29.0
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 
@@ -36,7 +36,7 @@ because URLs of that shape are already in email this plugin has sent.
 - **Cabin inventory** — `booked` count per trip; frontend + form respect remaining cabins; server rejects over-capacity submits.
 - **Invoices** — secure per-booking link (`wp_hash` + `hash_equals`), per-cabin per-person line items, bKash/Nagad/bank/QR. A settled invoice carries a **PAID / সম্পূর্ণ পরিশোধিত** stamp drawn as an outline, so it survives printing with backgrounds off; an unpriced ৳0 quote never gets one.
 - **Inventory & Asset Register** — a permanent record per item, a monthly stock sheet whose opening is last month's closing, a physical count whose variance must be explained before the month can close, and a month that locks when closed. Plus a column-mapped CSV importer for the opening baseline, an Inventory and an Asset report, and an append-only Audit Trail recording who changed which figure from what to what. A closed month cannot be edited or deleted — not through the form, not through `update_post_meta()`, and not by an administrator.
-- **Full Boat** — bookable from the form *and* creatable in wp-admin: takes all 6 cabins, priced by hand, and cannot be confirmed onto a date with any other cabin sold unless "Overbook" is ticked. Saving one with no price warns rather than blocks.
+- **Full Boat** — bookable from the form *and* creatable in wp-admin: takes all 6 cabins. From the form it arrives **priced at the standard whole-boat rate** (every cabin full, 6 × 6 = 36 people — ৳288,000 weekend, ৳230,400 weekday), which an admin then adjusts after negotiating; the form and the invoice both say the price is negotiable. It cannot be confirmed onto a date with any other cabin sold unless "Overbook" is ticked, and one created in wp-admin with no price warns rather than blocks.
 - **Booking tracker** — customers look up status by phone/email (not the guessable invoice number).
 - **Email notifications** — per-type toggles, owner recipient, From-name, Reply-To, test send.
 - **SMS notifications** — provider-agnostic (BulkSMSBD preset + custom-gateway mapping), 3 triggers, test send. Off by default.

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.28.0
+ * Version: 2.29.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.28.0' );
+define( 'BHELA_BM_VERSION', '2.29.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -157,10 +157,50 @@ function bhela_bm_max_guests() {
 function bhela_bm_full_boat_label() {
 	return sprintf(
 		/* translators: 1: total cabins, 2: total guests */
-		__( 'Full Boat — কাস্টম কোট (%1$d কেবিন / %2$d জন)', 'bhela-booking' ),
+		__( 'Full Boat — পুরো বোট (%1$d কেবিন / %2$d জন)', 'bhela-booking' ),
 		bhela_bm_max_cabins(),
 		bhela_bm_max_guests()
 	);
+}
+
+/**
+ * The cabin plan a whole-boat booking is priced from: every cabin, filled.
+ *
+ * A Full Boat request used to arrive at ৳0 and wait for someone to quote it by
+ * hand, which meant the guest saw no number at all and the booking sat unpriced.
+ * It now arrives priced at the standard rate for a full boat — every cabin at its
+ * maximum occupancy, so 6 × 6 = 36 people — and an admin adjusts it after
+ * negotiating. A starting figure that is right most of the time beats a blank.
+ *
+ * Occupancy comes from the rate table rather than a literal 6, so adding or
+ * removing a cabin tier moves this with it. Feeding the plan through
+ * bhela_bm_calc_multi() rather than multiplying here is deliberate: weekday
+ * discounts, holidays and the advance percentage then apply exactly as they do to
+ * any other booking, and there is only one pricing engine to keep correct.
+ *
+ * @return array Cabin rows, shaped for bhela_bm_calc_multi().
+ */
+function bhela_bm_full_boat_plan() {
+	$occ  = bhela_bm_rates_by_occupancy();
+	$size = $occ ? max( array_keys( $occ ) ) : 6;
+	return array_fill(
+		0,
+		bhela_bm_max_cabins(),
+		array( 'adults' => (int) $size, 'c48' => 0, 'c04' => 0 )
+	);
+}
+
+/**
+ * What a whole boat costs on a given date, at the standard rate.
+ *
+ * The one answer both the booking form and the server give, so the figure a guest
+ * is shown is the figure that gets stored.
+ *
+ * @param string $date Y-m-d.
+ * @return array|WP_Error The same shape bhela_bm_calc_multi() returns.
+ */
+function bhela_bm_full_boat_price( $date ) {
+	return bhela_bm_calc_multi( bhela_bm_full_boat_plan(), $date );
 }
 
 /**
