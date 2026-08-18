@@ -157,19 +157,35 @@ function bhela_bm_salary_trip_count( $month ) {
 }
 
 /**
- * The rows to render for a sheet: whatever it already holds, plus any roster
- * member not on it yet.
+ * The rows for a sheet.
  *
- * A saved row keeps the name, rate and designation it was saved with — the
- * roster can change without rewriting a month that has already been paid.
+ * Two callers wanting two different things, which is why `$include_roster` exists:
  *
- * @param int      $post_id Sheet ID (0 for a new one).
- * @param string   $month   YYYY-MM, used to default trips completed.
- * @param int|null $trips   Trip count, when the caller already knows it. Null asks
- *                          for it, which costs a statement query.
+ *   - The **edit screen** wants the sheet plus anyone on the roster who is not on
+ *     it yet, so a new hire can be seen and added. That is a working surface.
+ *   - The **money** — the monthly statement and the stored sheet total — wants only
+ *     the rows the sheet was actually saved with. That is the record.
+ *
+ * Conflating the two was a real accounting bug. Adding one monthly-salaried manager
+ * to the roster raised an already-saved July sheet's payroll by their full monthly
+ * salary and dropped that month's gross profit by the same amount, with nobody
+ * editing July. A month that has been paid must not gain a wage bill because
+ * someone was hired later; there is no hire date on the roster to reason with, so
+ * the snapshot is the only honest answer.
+ *
+ * A saved row also keeps the name, rate and designation it was saved with, so a pay
+ * rise does not rewrite a month already paid. That half always worked — it was only
+ * *new* people who leaked backwards.
+ *
+ * @param int      $post_id        Sheet ID (0 for a new one).
+ * @param string   $month          YYYY-MM, used to default trips completed.
+ * @param int|null $trips          Trip count, when the caller already knows it. Null
+ *                                 asks for it, which costs a statement query.
+ * @param bool     $include_roster Merge in roster members the sheet does not hold.
+ *                                 True for the form, false for anything that adds up.
  * @return array
  */
-function bhela_bm_salary_rows( $post_id = 0, $month = '', $trips = null ) {
+function bhela_bm_salary_rows( $post_id = 0, $month = '', $trips = null, $include_roster = true ) {
 	$saved = $post_id ? json_decode( (string) get_post_meta( $post_id, '_bhela_salary_rows', true ), true ) : array();
 	$saved = is_array( $saved ) ? $saved : array();
 	// A caller that already knows the month's trip count passes it in. The monthly
@@ -177,21 +193,39 @@ function bhela_bm_salary_rows( $post_id = 0, $month = '', $trips = null ) {
 	// send this function back into the statement to ask how many trips there were.
 	$trips = null === $trips ? bhela_bm_salary_trip_count( $month ) : max( 0, (int) $trips );
 
+	// A sheet with no saved rows at all is a blank form: price the roster so there is
+	// something to edit. Once it holds rows, those rows are the sheet.
+	$blank = ! $saved;
+
 	$rows = array();
 	foreach ( bhela_bm_staff() as $id => $s ) {
-		$r          = $saved[ $id ] ?? array();
-		$rows[ $id ] = bhela_bm_salary_row( $id, wp_parse_args( $r, $s ), $trips );
+		$on_sheet = array_key_exists( $id, $saved );
+		if ( ! $on_sheet && ! $include_roster ) {
+			continue;                           // not on the sheet, so not in the total
+		}
+		$r           = $saved[ $id ] ?? array();
+		$rows[ $id ] = bhela_bm_salary_row( $id, wp_parse_args( $r, $s ), $trips, $on_sheet || $blank );
 		unset( $saved[ $id ] );
 	}
-	// Anyone left is a retired or removed staff member the sheet still records.
+	// Anyone left is a retired or removed staff member the sheet still records. They
+	// were saved onto it, so they count.
 	foreach ( $saved as $id => $r ) {
-		$rows[ $id ] = bhela_bm_salary_row( $id, $r, $trips );
+		$rows[ $id ] = bhela_bm_salary_row( $id, $r, $trips, true );
 	}
 	return $rows;
 }
 
-/** Shape one row and do its arithmetic. */
-function bhela_bm_salary_row( $id, $r, $default_trips ) {
+/**
+ * Shape one row and do its arithmetic.
+ *
+ * @param string $id            Staff id.
+ * @param array  $r             Row data (saved row merged over the roster entry).
+ * @param int    $default_trips Trips to use when the row leaves the field blank.
+ * @param bool   $saved         Whether this row is actually on the sheet. False means
+ *                              it came from the roster and is not counted anywhere
+ *                              until someone saves the sheet — the screen says so.
+ */
+function bhela_bm_salary_row( $id, $r, $default_trips, $saved = true ) {
 	$type    = $r['type'] ?? 'trip';
 	$rate    = (int) ( $r['rate'] ?? 0 );
 	$monthly = (int) ( $r['monthly'] ?? 0 );
@@ -219,6 +253,7 @@ function bhela_bm_salary_row( $id, $r, $default_trips ) {
 		'settlement'  => (string) ( $r['settlement'] ?? '' ),
 		'adjustment'  => (string) ( $r['adjustment'] ?? '' ),
 		'verify'      => (string) ( $r['verify'] ?? '' ),
+		'saved'       => (bool) $saved,
 	);
 }
 
@@ -243,11 +278,12 @@ function bhela_bm_salary_totals( $rows ) {
  *
  * Two deliberate choices:
  *
- *   - It reads SAVED sheets only, never the staff roster. bhela_bm_salary_rows()
- *     with no post ID will happily price the roster against the month's trip
- *     count, which is the right default for a blank *form* and quite wrong as an
- *     accounting figure — it would deduct wages for a month nobody has done
- *     payroll for yet.
+ *   - It reads SAVED sheets only, and within a sheet only the rows that were saved
+ *     onto it — hence the `false` for `$include_roster`. Two separate traps. A sheet
+ *     that does not exist must not deduct wages for a month nobody has done payroll
+ *     for; and a sheet that does exist must not gain a wage bill because someone was
+ *     added to the roster afterwards. The second one shipped: one new manager
+ *     silently cost an already-closed July its whole monthly salary.
  *   - It totals `payable`, not `after`. An advance already handed over is still
  *     part of the wage bill; `after` is only what is left to pay, and deducting
  *     that would make a month look cheaper for having paid early.
@@ -275,7 +311,9 @@ function bhela_bm_salary_month_total( $month, $trips = null ) {
 		),
 	) );
 	foreach ( $ids as $id ) {
-		$rows           = bhela_bm_salary_rows( $id, $month, $trips );
+		// false: saved rows only. A roster member who is not on this sheet was not
+		// paid in this month, and adding them today must not change what it cost.
+		$rows           = bhela_bm_salary_rows( $id, $month, $trips, false );
 		$out['total']  += (int) bhela_bm_salary_totals( $rows )['payable'];
 		$out['sheets']++;
 		$out['ids'][]   = (int) $id;
@@ -365,6 +403,15 @@ function bhela_bm_salary_meta_cb( $post ) {
 				<tr>
 					<td>
 						<strong><?php echo esc_html( $r['name'] ); ?></strong>
+						<?php
+						// A row merged in from the roster is NOT part of this month's payroll
+						// until the sheet is saved — the statement counts saved rows only. Say
+						// so on the row, because a figure sitting in a Payable column reads as
+						// owed whether or not anything has counted it.
+						if ( empty( $r['saved'] ) ) :
+							?>
+							<span class="bha-pill bha-pill--attention"><?php esc_html_e( 'not on this sheet yet', 'bhela-booking' ); ?></span>
+						<?php endif; ?>
 						<div class="bha-sub"><?php echo esc_html( $r['designation'] ); ?><?php echo $r['account'] ? ' · ' . esc_html( $r['account'] ) : ''; ?></div>
 						<?php // Snapshot the roster details onto the sheet, so a later pay rise
 						      // cannot rewrite a month that has already been paid. ?>
@@ -451,7 +498,9 @@ function bhela_bm_salary_save( $post_id, $post ) {
 	}
 	update_post_meta( $post_id, '_bhela_salary_rows', wp_json_encode( $rows, JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT ) );
 
-	$totals = bhela_bm_salary_totals( bhela_bm_salary_rows( $post_id, $month ) );
+	// Saved rows only, so the figure stamped on the sheet is the figure the monthly
+	// statement deducts. Anything merged in from the roster is not on the sheet yet.
+	$totals = bhela_bm_salary_totals( bhela_bm_salary_rows( $post_id, $month, null, false ) );
 	update_post_meta( $post_id, '_bhela_salary_total', $totals['payable'] );
 
 	$title = sprintf( __( 'Salary — %s', 'bhela-booking' ), mysql2date( 'F Y', $month . '-01' ) );

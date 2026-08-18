@@ -134,6 +134,83 @@ ok( 45500 === $rows_after['saimon']['sub'], "…and the old sub-total", number_f
 $fresh = bhela_bm_salary_rows( 0, '2026-07' );
 ok( 5000 === $fresh['saimon']['rate'], 'a NEW sheet picks up the new rate' );
 
+echo "\n=== 6b. a NEW hire does not appear in a month already paid ===\n";
+// Section 6 covers a pay RISE, which was always handled. A new PERSON was not: the
+// sheet's rows were "whatever it holds, plus any roster member not on it yet", so
+// hiring a monthly-salaried manager today added them to every saved sheet and
+// dropped each of those months' gross profit by a full monthly salary — with nobody
+// editing those months. Found by adding one manager and watching July move from
+// ৳558,500 to ৳583,500.
+// Measured with bhela_bm_salary_totals() over the SAVED rows — which is exactly the
+// quantity bhela_bm_salary_month_total() sums per sheet. It cannot be measured through
+// month_total() here: bhela_bm_salary_save() renames the sheet to "Salary - July 2026",
+// and bhela_test_isolate() scopes queries to `post_title LIKE 'ZZ%'`, so the fixture is
+// invisible to that query and it would answer 0 no matter what the fix did.
+$saved_payable = function ( $sheet ) {
+	return (int) bhela_bm_salary_totals( bhela_bm_salary_rows( $sheet, '2026-07', null, false ) )['payable'];
+};
+$before_total = $saved_payable( $sheet );
+$before_rows  = count( bhela_bm_salary_rows( $sheet, '2026-07', null, false ) );
+ok( $before_total > 0, 'July has a payroll figure to protect', number_format( $before_total ) );
+
+$hired = $left ?? $raised;
+$hired['zz_newmanager'] = array(
+	'name' => 'ZZ Late Hire', 'designation' => 'Operations Manager',
+	'type' => 'monthly', 'rate' => 0, 'monthly' => 25000, 'account' => 'Bank',
+);
+bhela_bm_save_staff( array_map(
+	function ( $id, $r ) {
+		return array_merge( $r, array( 'id' => $id ) );
+	},
+	array_keys( $hired ),
+	$hired
+) );
+ok( isset( bhela_bm_staff()['zz_newmanager'] ), 'the new hire is on the roster' );
+
+// The money must not budge.
+ok( $before_total === $saved_payable( $sheet ),
+	'July payroll is unchanged by a hire made afterwards',
+	number_format( $before_total ) . ' -> ' . number_format( $saved_payable( $sheet ) ) );
+$saved_rows = bhela_bm_salary_rows( $sheet, '2026-07', null, false );
+ok( $before_rows === count( $saved_rows ), 'and the saved sheet still holds the same people', $before_rows . ' -> ' . count( $saved_rows ) );
+ok( ! isset( $saved_rows['zz_newmanager'] ), 'the new hire is not among them' );
+
+// The statement is the figure that matters, so check it directly too.
+
+
+// But the FORM must still show them, or there is no way to add someone mid-month.
+$form_rows = bhela_bm_salary_rows( $sheet, '2026-07' );
+ok( isset( $form_rows['zz_newmanager'] ), 'the edit screen still offers the new hire' );
+ok( empty( $form_rows['zz_newmanager']['saved'] ), 'flagged as not on the sheet yet' );
+ok( ! empty( $form_rows['saimon']['saved'] ), 'while a row that IS on the sheet is not flagged' );
+$sheet_html = '';
+if ( function_exists( 'bhela_bm_salary_meta_cb' ) ) {
+	ob_start();
+	bhela_bm_salary_meta_cb( get_post( $sheet ) );
+	$sheet_html = (string) ob_get_clean();
+}
+ok( false !== strpos( $sheet_html, 'not on this sheet yet' ), 'and the screen says so in words' );
+
+// Saving the sheet is what commits them — then, and only then, the month changes.
+$with_hire = array();
+foreach ( $form_rows as $id => $r ) {
+	$with_hire[ $id ] = array(
+		'name' => $r['name'], 'designation' => $r['designation'], 'type' => $r['type'],
+		'account' => $r['account'], 'rate' => $r['rate'], 'monthly' => $r['monthly'],
+		'trips' => $r['trips'], 'advance' => $r['advance'],
+		'settlement' => $r['settlement'], 'adjustment' => $r['adjustment'], 'verify' => $r['verify'],
+	);
+}
+$_POST = array( 'bhela_bm_salary_nonce' => wp_create_nonce( 'bhela_bm_salary_save' ), 'sal_month' => '2026-07', 'sal_rows' => $with_hire );
+bhela_bm_salary_save( $sheet, get_post( $sheet ) );
+$_POST = array();
+ok( $before_total + 25000 === $saved_payable( $sheet ),
+	'once saved, the hire is counted — deliberately, by someone',
+	number_format( $saved_payable( $sheet ) ) );
+ok( (int) get_post_meta( $sheet, '_bhela_salary_total', true ) === $saved_payable( $sheet ),
+	'and the total stamped on the sheet is the same figure the statement would deduct',
+	get_post_meta( $sheet, '_bhela_salary_total', true ) . ' vs ' . $saved_payable( $sheet ) );
+
 echo "\n=== 7. someone who leaves ===\n";
 $left = $raised;
 $left['forhad']['retired'] = 1;
