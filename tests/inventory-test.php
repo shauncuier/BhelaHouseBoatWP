@@ -437,6 +437,110 @@ foreach ( bhela_bm_inv_categories( true ) as $slug => $def ) {
 }
 ok( count( $cat_codes ) === count( array_unique( $cat_codes ) ), 'no two categories share a code — Item IDs would interleave' );
 
+echo "\n=== 13b. the commit path, and running the same file twice ===\n";
+// Everything above stops at the dry run. This is the half that writes: it mints
+// items, gives them per-category IDs, and seeds the month's opening — and it is the
+// half an owner runs on their real register exactly once, so it had better be right
+// the first time. Driven through bhela_bm_inv_import_commit() rather than by hand,
+// because the handler owns the nonce, the re-derived mapping and the redirect.
+$imp_month = '2027-04';
+$imp_head  = array( 'Item name', 'Category', 'Inventory or Asset', 'Location', 'Opening quantity', 'Good quantity', 'Damaged quantity', 'Unit value' );
+$imp_rows  = array(
+	$imp_head,
+	array( 'ZZ Import Tumbler', 'Kitchen Items', 'inventory', 'BHELA Kitchen', '120', '118', '2', '90' ),
+	array( 'ZZ Import Fan', 'Fan', 'asset', 'Cabin 1', '6', '5', '1', '4200' ),
+);
+$imp_map = array();
+foreach ( $imp_head as $i => $h ) {
+	$g = bhela_bm_inv_import_guess( $h );
+	if ( '' !== $g ) {
+		$imp_map[ $i ] = $g;
+	}
+}
+$imp_data = array( 'rows' => $imp_rows, 'user' => 1, 'name' => 'zz-import.csv' );
+$imp_opts = array( 'has_header' => true, 'kind' => 'inventory', 'month' => $imp_month );
+
+// The handler ends in wp_safe_redirect() + exit; throwing from the filter unwinds
+// past the exit, which is the only way a CLI harness can drive it.
+$imp_catch = function ( $loc ) {
+	throw new RuntimeException( $loc );
+};
+$imp_commit = function () use ( $imp_data, $imp_map, $imp_month, $imp_catch ) {
+	add_filter( 'wp_redirect', $imp_catch );
+	$token = wp_generate_password( 20, false );
+	set_site_transient( bhela_bm_inv_import_key( $token ), $imp_data, HOUR_IN_SECONDS );
+	$_POST = array(
+		'_wpnonce'     => wp_create_nonce( 'bhela_bm_inv_import_commit' ),
+		'token'        => $token,
+		'has_header'   => '1',
+		'default_kind' => 'inventory',
+		'month'        => $imp_month,
+		'map'          => $imp_map,
+	);
+	$_REQUEST = $_POST;
+	$where    = '';
+	try {
+		bhela_bm_inv_import_commit();
+	} catch ( RuntimeException $e ) {
+		$where = $e->getMessage();
+	}
+	$_POST    = array();
+	$_REQUEST = array();
+	remove_filter( 'wp_redirect', $imp_catch );
+	return $where;
+};
+
+$imp_where = $imp_commit();
+ok( false !== strpos( $imp_where, 'step=done' ), 'the commit lands on the done step', $imp_where );
+
+$imp_made = array();
+foreach ( get_posts( array( 'post_type' => 'bhela_inv_item', 'post_status' => 'any', 'numberposts' => -1 ) ) as $ip ) {
+	if ( 0 === strpos( $ip->post_title, 'ZZ Import ' ) ) {
+		$imp_made[] = $ip->ID;
+		$made[]     = $ip->ID;
+	}
+}
+ok( 2 === count( $imp_made ), 'both rows became items', (string) count( $imp_made ) );
+$imp_codes = array();
+foreach ( $imp_made as $ip ) {
+	$imp_codes[ get_post_meta( $ip, '_bhela_inv_kind', true ) ] = get_post_meta( $ip, '_bhela_inv_code', true );
+}
+ok( isset( $imp_codes['asset'] ) && false !== strpos( $imp_codes['asset'], '-FAN-' ), 'the asset took its category code', wp_json_encode( $imp_codes ) );
+ok( isset( $imp_codes['inventory'] ) && false !== strpos( $imp_codes['inventory'], '-KIT-' ), 'and so did the consumable', wp_json_encode( $imp_codes ) );
+
+$imp_period = bhela_bm_inv_period_id( $imp_month );
+$made[]     = $imp_period;
+$imp_md     = bhela_bm_inv_month_data( $imp_month );
+ok( 126 === (int) $imp_md['totals']['open'], 'the month opens on 120 + 6 = 126', (string) $imp_md['totals']['open'] );
+ok( ( 120 * 90 ) + ( 6 * 4200 ) === (int) $imp_md['totals']['value'], 'valued from the unit values in the file', (string) $imp_md['totals']['value'] );
+
+// Running the same file again must not double the register or the opening. An
+// unchanged row is reported as SKIPPED rather than as an update — there is nothing
+// to change, and "2 updates" would imply the register had been rewritten.
+$imp_plan2 = bhela_bm_inv_import_plan( $imp_data, $imp_map, $imp_opts );
+ok( 0 === count( $imp_plan2['create'] ), 'a second run creates nothing', (string) count( $imp_plan2['create'] ) );
+ok( 2 === count( $imp_plan2['skip'] ), 'both rows are skipped, not rewritten', (string) count( $imp_plan2['skip'] ) );
+ok( 'name and category' === ( $imp_plan2['skip'][0]['via'] ?? '' ), 'matched on name within category, and it says so', (string) ( $imp_plan2['skip'][0]['via'] ?? '' ) );
+
+$imp_commit();
+$imp_again = 0;
+foreach ( get_posts( array( 'post_type' => 'bhela_inv_item', 'post_status' => 'any', 'numberposts' => -1 ) ) as $ip ) {
+	if ( 0 === strpos( $ip->post_title, 'ZZ Import ' ) ) {
+		$imp_again++;
+	}
+}
+ok( 2 === $imp_again, 'still two items after a second commit, not four', (string) $imp_again );
+ok( 126 === (int) bhela_bm_inv_month_data( $imp_month )['totals']['open'], 'and the opening did not double',
+	(string) bhela_bm_inv_month_data( $imp_month )['totals']['open'] );
+
+// A closed month refuses an import outright rather than editing frozen figures.
+bhela_bm_inv_meta_write( $imp_period, '_bhela_inv_status', 'closed' );
+ok( bhela_bm_inv_is_locked( $imp_period ), 'the month is locked' );
+$imp_blocked = iv_died( $imp_commit );
+ok( $imp_blocked || 126 === (int) bhela_bm_inv_month_data( $imp_month )['totals']['open'],
+	'importing into a closed month changes nothing' );
+bhela_bm_inv_meta_write( $imp_period, '_bhela_inv_status', 'draft' );
+
 echo "\n=== 14. the lists behave like the cost heads ===\n";
 $cat_backup = get_option( 'bhela_bm_inv_categories', null );
 bhela_bm_inv_save_categories( array(
