@@ -495,6 +495,34 @@ iv_save( $val_period, array( $val_item => array( 'add' => 60, 'use' => 4, 'good'
 $val_line = bhela_bm_inv_stored_lines( $val_period )[ bhela_bm_inv_line_key( $val_item ) ] ?? array();
 ok( 180 === (int) ( $val_line['rate'] ?? 0 ), 'a later price rise does not restate the saved month', 'rate: ' . (int) ( $val_line['rate'] ?? 0 ) );
 
+echo "\n=== 17. a month that was just opened does not report itself empty ===\n";
+// Found in the browser: September carried 56 plates and 12 jackets forward, the rows
+// showed them, and every summary card above those rows read 0 — because the cards
+// came from the `_bhela_inv_totals` meta, which is only written on save. The same
+// gap appears mid-month for any item nobody has touched yet: its opening is real
+// but lives in no stored line.
+$c1_item = iv_item( 'Carry plate', 'inventory', 'kitchen', 180 );
+$c1      = iv_period( '2027-01' );
+iv_save( $c1, array( $c1_item => array( 'add' => 60, 'use' => 4, 'good' => 56, 'count' => 56 ) ) );
+bhela_bm_inv_meta_write( $c1, '_bhela_inv_status', 'closed' );
+ok( 'closed' === bhela_bm_inv_status( $c1 ), 'January is closed', bhela_bm_inv_status( $c1 ) );
+
+$c2 = iv_period( '2027-02' );
+bhela_bm_inv_take_opening( $c2 );
+$feb = bhela_bm_inv_month_data( '2027-02' );
+ok( 56 === (int) $feb['totals']['open'], 'February reports the opening it carried, not 0', (string) $feb['totals']['open'] );
+ok( 56 === (int) $feb['totals']['close'], 'and a closing to match, with no movements yet', (string) $feb['totals']['close'] );
+ok( 56 * 180 === (int) $feb['totals']['value'], 'and values it at the item rate', (string) $feb['totals']['value'] );
+// The cards must agree with the rows they sit above — that was the whole defect.
+$feb_rows_open = array_sum( array_map( fn( $r ) => (int) $r['line']['open'], $feb['rows'] ) );
+ok( $feb_rows_open === (int) $feb['totals']['open'], 'cards and rows cannot disagree', $feb_rows_open . ' vs ' . $feb['totals']['open'] );
+
+// A closed month still answers with the figures it closed on.
+$jan = bhela_bm_inv_month_data( '2027-01' );
+ok( 56 === (int) $jan['totals']['close'], 'a closed month still totals its own lines', (string) $jan['totals']['close'] );
+ok( (int) bhela_bm_inv_period_totals( $c1 )['close'] === (int) $jan['totals']['close'],
+	'and agrees with the frozen totals meta', bhela_bm_inv_period_totals( $c1 )['close'] . ' vs ' . $jan['totals']['close'] );
+
 echo "\n=== cleanup ===\n";
 foreach ( $made as $id ) {
 	bhela_test_delete( $id );

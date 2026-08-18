@@ -2015,7 +2015,17 @@ function bhela_bm_inv_month_data( $month, $filter = array() ) {
 	}
 
 	$out['rows']      = $rows;
-	$out['totals']    = bhela_bm_inv_period_totals( $period );
+	// Totalled from the rows this screen is about to draw, not from the stored
+	// totals meta. The meta is only written on save, so a month that was just
+	// opened had every summary card reading 0 — Opening 0, Closing 0, value ৳0 —
+	// above rows that plainly showed the 56 and 12 it had carried forward. The same
+	// gap appears part-way through a month for any item nobody has touched yet,
+	// whose opening is real but is in no stored line.
+	//
+	// For a closed month the rows ARE the stored lines, so this agrees with the
+	// frozen figures to the taka. bhela_bm_inv_period_totals() is left alone; the
+	// reports read it and a closed month must keep answering with what it closed on.
+	$out['totals']    = bhela_bm_inv_totals( wp_list_pluck( $rows, 'line' ) );
 	$out['drift']     = bhela_bm_inv_opening_drift( $period );
 	$out['can_close'] = bhela_bm_inv_can_close( $period );
 	$out['source']    = bhela_bm_inv_opening_source( $period );
