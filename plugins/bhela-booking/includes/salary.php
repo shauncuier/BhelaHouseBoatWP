@@ -437,7 +437,12 @@ function bhela_bm_salary_save( $post_id, $post ) {
 			'account'     => sanitize_text_field( $r['account'] ?? '' ),
 			'rate'        => max( 0, (int) ( $r['rate'] ?? 0 ) ),
 			'monthly'     => max( 0, (int) ( $r['monthly'] ?? 0 ) ),
-			'trips'       => max( 0, (int) ( $r['trips'] ?? 0 ) ),
+			// Blank is kept blank. bhela_bm_salary_row() reads a blank trips field as
+			// "however many trips ran" and a typed 0 as "none" — and `(int) ''` is 0,
+			// so casting here collapsed the two and the blank case could never survive
+			// a save. Whoever cleared the field got a crew member paid for no trips.
+			// The form pre-fills the month's count, so blank is always deliberate.
+			'trips'       => ( '' === trim( (string) ( $r['trips'] ?? '' ) ) ) ? '' : max( 0, (int) $r['trips'] ),
 			'advance'     => max( 0, (int) ( $r['advance'] ?? 0 ) ),
 			'settlement'  => sanitize_text_field( $r['settlement'] ?? '' ),
 			'adjustment'  => sanitize_text_field( $r['adjustment'] ?? '' ),

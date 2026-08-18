@@ -441,10 +441,7 @@ function bhela_bm_yearly_page() {
 					</td>
 					<td class="bha-noprint">
 						<?php if ( ! $empty || $m['expenses'] || $m['salary'] ) : ?>
-							<a class="button button-small" href="<?php echo esc_url( add_query_arg(
-								array( 'post_type' => 'bhela_booking', 'page' => 'bhela-bm-statement', 'month' => $m['key'] ),
-								admin_url( 'edit.php' )
-							) ); ?>"><?php esc_html_e( 'Statement', 'bhela-booking' ); ?></a>
+							<a class="button button-small" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-statement', array( 'month' => $m['key'] ) ) ); ?>"><?php esc_html_e( 'Statement', 'bhela-booking' ); ?></a>
 						<?php endif; ?>
 					</td>
 				</tr>

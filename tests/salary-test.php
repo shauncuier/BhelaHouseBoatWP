@@ -76,6 +76,44 @@ ok( 8 === $rows['forhad']['trips'], 'Forhad kept at 8 trips' );
 ok( 12000 === $rows['forhad']['sub'], 'Supervisor 1500 x 8 = 12,000', number_format( $rows['forhad']['sub'] ) );
 ok( 13000 === $rows['uttom']['after'], 'Manager 33,000 less 20,000 advance = 13,000', number_format( $rows['uttom']['after'] ) );
 
+echo "\n=== 4b. a cleared trips field still means 'all of them' ===\n";
+// bhela_bm_salary_row() documents blank as "however many trips ran" and a typed 0
+// as "none". The save handler cast it with (int), and `(int) ''` is 0 — so the blank
+// case could not survive a save: whoever cleared the field got a crew member priced
+// for no trips at all, silently, on a sheet that then deducted too little payroll.
+$blank_rows = array();
+foreach ( $rows as $id => $r ) {
+	$blank_rows[ $id ] = array(
+		'name' => $r['name'], 'designation' => $r['designation'], 'type' => $r['type'],
+		'account' => $r['account'], 'rate' => $r['rate'], 'monthly' => $r['monthly'],
+		'trips' => 'forhad' === $id ? '' : 0,   // one cleared, the rest explicitly none
+		'advance' => 0, 'settlement' => '', 'adjustment' => '', 'verify' => '',
+	);
+}
+$_POST = array( 'bhela_bm_salary_nonce' => wp_create_nonce( 'bhela_bm_salary_save' ), 'sal_month' => '2026-07', 'sal_rows' => $blank_rows );
+bhela_bm_salary_save( $sheet, get_post( $sheet ) );
+$_POST = array();
+
+$stored = json_decode( (string) get_post_meta( $sheet, '_bhela_salary_rows', true ), true );
+ok( '' === ( $stored['forhad']['trips'] ?? 'x' ), 'a cleared field is stored blank, not as 0',
+	var_export( $stored['forhad']['trips'] ?? null, true ) );
+ok( 0 === ( $stored['uttom']['trips'] ?? null ), 'and a typed 0 is still 0',
+	var_export( $stored['uttom']['trips'] ?? null, true ) );
+
+$blank_read = bhela_bm_salary_rows( $sheet, '2026-07' );
+$month_trips = bhela_bm_salary_trip_count( '2026-07' );
+ok( $month_trips === $blank_read['forhad']['trips'], 'blank reads back as the month\'s trip count',
+	$blank_read['forhad']['trips'] . ' vs ' . $month_trips );
+ok( 0 === $blank_read['uttom']['trips'], 'a typed 0 still means none' );
+ok( 0 === $blank_read['uttom']['sub'], 'so nothing is owed per trip for that person' );
+
+// Put section 4's figures back, since sections 5 onward assert on them.
+$_POST = array( 'bhela_bm_salary_nonce' => wp_create_nonce( 'bhela_bm_salary_save' ), 'sal_month' => '2026-07', 'sal_rows' => $post_rows );
+bhela_bm_salary_save( $sheet, get_post( $sheet ) );
+$_POST = array();
+$rows = bhela_bm_salary_rows( $sheet, '2026-07' );
+ok( 8 === $rows['forhad']['trips'], 'section 4 figures restored', (string) $rows['forhad']['trips'] );
+
 echo "\n=== 5. month total matches the PDF ===\n";
 $t = bhela_bm_salary_totals( $rows );
 printf( "  sub=%s monthly=%s payable=%s advance=%s after=%s\n",
