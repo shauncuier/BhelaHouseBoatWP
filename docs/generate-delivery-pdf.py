@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """Generate the BHELA project delivery & handover PDF (3s-Soft -> KeyToBD)."""
 
+import os
+
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
@@ -11,7 +13,10 @@ from reportlab.platypus import (
     PageBreak, KeepTogether, HRFlowable, NextPageTemplate,
 )
 
-OUT = r"C:\Users\jashe\Local Sites\bhela-house-boat\app\public\wp-content\docs\BHELA-Project-Delivery.pdf"
+# Resolved from this script's own location. It used to name an absolute path into
+# "bhela-house-boat" - a different LocalWP site that still exists - so regenerating
+# wrote the PDF into the wrong checkout and the real one silently went stale.
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "BHELA-Project-Delivery.pdf")
 
 # Midnight Monsoon brand palette
 INK      = colors.HexColor("#0A2A2F")
@@ -30,6 +35,12 @@ DOC_REF   = "3SS-BHELA-DEL-2026-07"
 DEL_DATE  = "21 July 2026"
 END_DATE  = "21 August 2026"
 PRICE     = "USD 200.00"
+ADD_REF   = "3SS-BHELA-ADD-2026-08"
+ADD_DATE  = "18 August 2026"
+ADD_PRICE = "USD 250.00"
+TOTAL     = "USD 450.00"
+VER_DEL   = "v2.15.0"
+VER_NOW   = "v2.29.1"
 
 styles = getSampleStyleSheet()
 S = {}
@@ -234,6 +245,10 @@ st.append(info_table([
     ('Client', 'KeyToBD - Kaisar Hamid Apon, Owner'),
     ('Delivery date', DEL_DATE),
     ('Free service until', '%s (see section 6)' % END_DATE),
+    ('Version at delivery', 'Theme %s  |  Booking Engine %s' % (VER_DEL, VER_DEL)),
+    ('Version now', 'Theme %s  |  Booking Engine %s (see Addendum A)' % (VER_NOW, VER_NOW)),
+    ('Post-delivery development', '%s - new modules beyond original scope' % ADD_PRICE),
+    ('Revised total', '%s' % TOTAL),
     ('Components', 'BHELA Theme v2.15.0 &nbsp;|&nbsp; BHELA Booking Engine Plugin v2.15.0'),
     ('Document ref', DOC_REF),
 ]))
@@ -520,13 +535,197 @@ st.append(callout(
     'platform, 3s-Soft will fix it free of charge. The period ends on <b>%s</b>; after that date '
     'continued support and any new development can be arranged by mutual agreement.' % END_DATE, colors.HexColor('#FFF3E9'), CTA))
 
-# ============ 7. ACCEPTANCE ============
+# ============ ADDENDUM A ============
+st.append(PageBreak())
+st.append(Paragraph('Addendum A &#8212; Development After Delivery', S['h1']))
+st.append(para('<b>Period covered:</b> 22 July 2026 to %s &nbsp;&#183;&nbsp; <b>Document ref:</b> %s' % (ADD_DATE, ADD_REF)))
+st.append(para('The platform was delivered on %s at version %s. In the four weeks since, it has been '
+               'developed considerably further at the client\'s request, and separately corrected '
+               'wherever something in the original delivery did not behave as documented. Those are two '
+               'different things commercially, and this addendum keeps them apart.' % (DEL_DATE, VER_DEL)))
+st.append(Spacer(1, 3*mm))
+st.append(info_table([
+    ('Section 7 - new modules beyond original scope', '<b>Chargeable. %s</b>' % ADD_PRICE),
+    ('Section 8 - fixes inside the delivered scope', '<b>No charge</b>, under the section 6 free service period'),
+]))
+st.append(Spacer(1, 4*mm))
+st.append(callout('<b>Scale of the work.</b> 35 tagged releases, 44 commits, 15 new plugin modules and '
+                  'approximately 23,600 lines of new code across 85 files - taking the platform from '
+                  '%s to %s.' % (VER_DEL, VER_NOW)))
+
+st.append(Spacer(1, 7*mm))
+st.append(section(7, 'New Modules Beyond Original Scope &#8212; Chargeable'))
+st.append(para('None of the following appears in section 2 of the original delivery. Each is a new '
+               'module built after handover.'))
+
+st.append(Paragraph('7.1&nbsp;&nbsp;Accounting &amp; Financial Control Suite', S['h2']))
+st.append(para('The largest single addition. The platform now answers <i>did this trip make money, and '
+               'did this month?</i> rather than only <i>who booked?</i>'))
+st.append(feature_table([
+    ('Trip Cost Sheets', 'One sheet per trip covering every cost head - fuel, groceries, meat, fish, gas, jetty, staff transport, electricity and more - each with three payment columns, a remark and spare rows for one-offs. Cost heads are owner-editable, so the list follows the business rather than the code.'),
+    ('Approval workflow', 'Prepare, Check, Approve - each step stamped with <b>who</b> did it and <b>when</b>. An approved sheet locks: figures can no longer be edited, and an administrator must deliberately unlock it before anything changes.'),
+    ('Expenses', 'Spending not tied to a trip - advertising, boosting, renovation, one-off purchases - with date, type, amount, payment method, means of verification and remark. Types and payment methods are owner-editable.'),
+    ('Monthly Statement', 'The month\'s <b>approved</b> trips as rows, then one deduction line per expense type, then staff payroll, then gross profit. Also cost per person and profit per person, with the three sign-offs carried through. Print and PDF ready.'),
+    ('Yearly Report', 'Twelve monthly statements rolled up, in <b>financial-year (July to June)</b> or calendar mode, with season totals, margin and the year\'s expense mix. Built from the monthly statement twelve times, so a yearly figure can never disagree with the month it summarises.'),
+    ('Staff roster &amp; payroll', 'Staff recorded as trip-based, monthly-salaried or both, with per-trip rate, monthly salary and payment account. A salary sheet per month prices trip-based crew automatically from the number of trips that actually ran, and records advances, settlement and adjustments.'),
+    ('Payroll in the bottom line', 'Gross profit is now trip profit less expenses less payroll. Wages are a real cost and are treated as one.'),
+]))
+
+st.append(Paragraph('7.2&nbsp;&nbsp;Inventory &amp; Asset Register', S['h2']))
+st.append(para('A complete stock and asset control system - the second major addition.'))
+st.append(feature_table([
+    ('Item register', 'A permanent record per item: category, sub-category, location, unit, brand, model, serial, supplier, purchase date and bill, warranty, unit value, responsible person, photos. Every item receives a <b>frozen Item ID</b> built from its category (BHELA-KIT-0001) that never changes and is never reused.'),
+    ('Monthly stock sheet', 'Each month <b>opens on the previous month\'s closing</b>, automatically. Records what came in, what went out, what was used, lost or scrapped, and splits what is on board by condition: good, repairable, under repair, damaged.'),
+    ('Physical verification', 'A counted figure per item against the system figure. Any variance must be explained before the month can be closed - a discrepancy is reported, never quietly corrected.'),
+    ('Month close &amp; lock', 'A closed month is <b>genuinely closed</b>. Its figures cannot be edited through the form, cannot be changed directly in the database, and cannot be deleted - not even by an administrator. Reopening is possible and is itself recorded.'),
+    ('Audit Trail', 'An append-only record of who changed which figure, what it was before, what it became and why. It has no delete path and no clear button, by design - it is the register\'s memory, not a log to tidy up.'),
+    ('CSV importer', 'Four steps - upload, map your columns, dry run, commit. It reads the spreadsheet you already keep rather than demanding a fixed format, tells you what it would do before doing anything, blocks a row it cannot resolve instead of guessing, and is safe to run twice.'),
+    ('Inventory &amp; Asset Reports', 'Two reports with print and CSV export - consumables by movement and value, assets by location and condition.'),
+]))
+
+st.append(Paragraph('7.3&nbsp;&nbsp;Staff Roles &amp; Access Control', S['h2']))
+st.append(feature_table([
+    ('Six staff roles', 'Manager, booking staff, cost preparer, cost checker and storekeeper, alongside the administrator - so office staff, kitchen and store can each be given their own login.'),
+    ('Editable permissions', 'A Team screen with a checkbox per permission per role, saved from the page. Access is configured by the owner, not hard-coded.'),
+    ('Role-aware admin', 'Each person sees only the menus they can actually use. A storekeeper sees the store; a cost preparer sees accounts.'),
+]))
+
+st.append(Paragraph('7.4&nbsp;&nbsp;Mobile Verification (OTP)', S['h2']))
+st.append(feature_table([
+    ('Verified numbers', 'Optional SMS code on the booking form, so a booking carries a number proven to work. Email fallback, with per-number and per-IP throttles.'),
+    ('One-part messages', 'Codes are forced into GSM-7 so a verification SMS never silently costs double.'),
+    ('SMS credit on dashboard', 'Live gateway balance with a low-balance warning, so credit never runs out mid-season unnoticed.'),
+]))
+
+st.append(Paragraph('7.5&nbsp;&nbsp;Operational Reporting &amp; Admin Redesign', S['h2']))
+st.append(feature_table([
+    ('Trip Report', 'Every booking for a date or range with advance, due and totals - printable, exportable to CSV, and shareable as a WhatsApp message for the crew.'),
+    ('Admin design system', 'A single consistent design across every admin screen - headers, summary cards, ledger tables, status pills, print styles - replacing screen-by-screen styling.'),
+    ('Four admin menus', 'The sidebar had grown to 22 rows under one Bookings menu. It is now four menus grouped by job - <b>Bookings, Accounts, Store, Setup</b> - each hidden from anyone who cannot use it. Old links and bookmarks continue to work.'),
+    ('Full Boat bookings', 'Whole-boat reservations are bookable from the admin as well as the form, take all six cabins, and now arrive <b>priced automatically</b> at the standard 36-person rate for the owner to adjust after negotiating - instead of arriving blank.'),
+]))
+
+st.append(Paragraph('7.6&nbsp;&nbsp;Guest-Facing Additions', S['h2']))
+st.append(feature_table([
+    ('Reviews with photos', 'Guests submit star-rated reviews with trip photos after travelling; the owner moderates them, and approved reviews appear in a carousel on the website.'),
+    ('Booking Guide page', 'A step-by-step guide for first-time houseboat guests, plus two-level primary navigation to carry the larger page set.'),
+    ('Manageable Spots', 'The included and optional sightseeing spots are now editable content rather than fixed text.'),
+]))
+
+st.append(Paragraph('7.7&nbsp;&nbsp;Quality Assurance Programme', S['h2']))
+st.append(para('Not a feature, and the reason the modules above can be trusted with money.'))
+st.append(feature_table([
+    ('Automated test suite', '<b>14 test harnesses</b>, run from a single command, covering pricing, the July statement reproduced to the taka, salary, cost sheets, the booking save path, the stock register, every admin screen, colour contrast, front-end behaviour behind a page cache, OTP, the SMS gateway, version consistency and the yearly rollup.'),
+    ('What it is for', 'Every future change is checked against all of it before release. The suite has caught real defects - including several during this period - before they reached the live site.'),
+]))
+
+st.append(PageBreak())
+st.append(section(8, 'Fixes Inside the Delivered Scope &#8212; No Charge'))
+st.append(para('Everything below was corrected <b>free of charge</b> under the section 6 free service '
+               'period, which runs to <b>%s</b>. Listed for completeness, so the client can see what '
+               'was done.' % END_DATE))
+st.append(Paragraph('8.1&nbsp;&nbsp;Booking, pricing and invoices', S['h2']))
+st.extend(bullets([
+    'Homepage price estimator corrected until it matched the booking engine exactly',
+    'Weekend rate calculation corrected',
+    'Guest count drift between the form, the admin and the invoice',
+    'Advance amount made owner-owned, with correctly derived percentages',
+    'Invoice discount row, note placeholders, contact details and footer duplication',
+    'Taka symbol rendering fixed everywhere, including print and PDF',
+    'Duplicate WhatsApp numbers and duplicate confirmation emails',
+    '<b>Day type on invoices</b> - a booking moved to a weekday kept printing Weekend; the label is now derived when read rather than cached',
+    '<b>PAID stamp</b> - a settled invoice now carries a clear paid mark, drawn as an outline so it survives printing with backgrounds switched off',
+]))
+st.append(Paragraph('8.2&nbsp;&nbsp;Availability, mobile and security', S['h2']))
+st.extend(bullets([
+    'Additive cabin availability (held plus sold), with a manual Booked status honoured across the engine',
+    'Booking form made safe behind a page cache, and the real visitor IP detected correctly behind a CDN so rate limiting cannot bucket every guest together',
+    'Trip schedule invisible on mobile; WhatsApp button intercepting touches on mobile',
+    'Homepage image payload reduced with correctly sized renditions and hero preload',
+    'Staff file-upload capability revoked where it was not needed',
+    'Invoice links marked no-store and noindex, so they cannot be cached or indexed',
+]))
+st.append(Paragraph('8.3&nbsp;&nbsp;Defects found in the new modules and corrected before release', S['h2']))
+st.append(para('Found by operating the platform with real data rather than test data, and fixed at no charge:'))
+st.extend(bullets([
+    'Stock valuation reading zero permanently, because the first save froze each item\'s unit value at zero',
+    'A newly opened stock month reporting itself empty, above rows that clearly were not',
+    'A closed stock month becoming unreachable after a maintenance routine cleared its index',
+    'A cleared trips field paying a crew member for no trips, and under-deducting that month\'s payroll',
+    'Hiring a staff member retroactively changing the payroll of months already paid',
+    'Clicking Bookings opening the dashboard instead of the booking list',
+]))
+
+st.append(Spacer(1, 7*mm))
+st.append(section('8A', 'Revised Commercial Terms'))
+_ct = Table([
+    [Paragraph('<b>Description</b>', S['cellw']), Paragraph('<b>Amount</b>', S['cellw'])],
+    [Paragraph('Original project - design, development and delivery of the BHELA platform, per sections 2, 4 and 5', S['cell']),
+     Paragraph(PRICE, S['cellb'])],
+    [Paragraph('<b>Post-delivery development</b> - new modules beyond original scope, per section 7', S['cell']),
+     Paragraph('<b>%s</b>' % ADD_PRICE, S['cellb'])],
+    [Paragraph('Fixes inside the delivered scope, per section 8', S['cell']),
+     Paragraph('No charge', S['cellb'])],
+    [Paragraph('<b>Revised total</b>', S['cell']),
+     Paragraph('<b>%s</b>' % TOTAL, S['cellb'])],
+], colWidths=[128*mm, 40*mm])
+_ct.setStyle(TableStyle([
+    ('BACKGROUND', (0, 0), (-1, 0), INK),
+    ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+    ('TOPPADDING', (0, 0), (-1, -1), 5),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+    ('LEFTPADDING', (0, 0), (-1, -1), 7),
+    ('RIGHTPADDING', (0, 0), (-1, -1), 7),
+    ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
+    ('BACKGROUND', (0, -1), (-1, -1), SAND),
+    ('BOX', (0, 0), (-1, -1), 0.5, LINE),
+]))
+st.append(_ct)
+st.append(Spacer(1, 4*mm))
+st.append(para('<b>Post-delivery development: %s (Two Hundred and Fifty US Dollars).</b> This covers every '
+               'module in section 7 - the accounting and financial control suite, the inventory and asset '
+               'register, staff roles and access control, mobile verification, the operational reporting '
+               'and admin redesign, the guest-facing additions, and the automated test suite.' % ADD_PRICE))
+st.append(para('For context, the accounting suite and the inventory register would each ordinarily be '
+               'quoted as a project in its own right. They are charged here as a single continuation of '
+               'the original engagement.'))
+st.append(Spacer(1, 3*mm))
+_tot = Table([
+    [Paragraph('Original project', S['small']), Paragraph('Post-delivery development', S['small']),
+     Paragraph('Revised total', S['small'])],
+    [Paragraph('<b><font size=13 color="#0A2A2F">%s</font></b>' % PRICE, S['cell']),
+     Paragraph('<b><font size=13 color="#137A74">%s</font></b>' % ADD_PRICE, S['cell']),
+     Paragraph('<b><font size=13 color="#0A2A2F">%s</font></b>' % TOTAL, S['cell'])],
+], colWidths=[56*mm, 56*mm, 56*mm])
+_tot.setStyle(TableStyle([
+    ('BACKGROUND', (0, 0), (-1, 0), SAND),
+    ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+    ('TOPPADDING', (0, 0), (-1, -1), 6),
+    ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+    ('BOX', (0, 0), (-1, -1), 0.5, LINE),
+    ('INNERGRID', (0, 0), (-1, -1), 0.4, LINE),
+]))
+st.append(_tot)
+st.append(Spacer(1, 4*mm))
+st.append(para('Section 5.1 of this document still applies: domain setup, hosting setup, WordPress '
+               'installation and configuration, Google Analytics and Google Search Console setup were all '
+               'provided free of charge, at a standard value of USD 165.00. Third-party fees payable '
+               'directly to providers - domain registration, hosting and SMS credits - remain the '
+               'client\'s own cost and are not part of this document.'))
+st.append(Spacer(1, 3*mm))
+st.append(callout('<b>Support on the new modules.</b> Defects found in the section 7 modules were '
+                  'corrected free of charge as they were built, and that continues to the end of the '
+                  'original free service period on <b>%s</b>. Support and development after that date is '
+                  'arranged by mutual agreement, as set out in section 6.' % END_DATE))
+
+# ============ 9. ACCEPTANCE ============
 st.append(Spacer(1, 8*mm))
 _signhead = [
-    section(7, 'Acceptance &amp; Sign-off'),
+    section(9, 'Acceptance &amp; Sign-off'),
     para('By signing below, both parties confirm that the platform described in this document has '
          'been delivered and accepted, and that the commercial and support terms set out in '
-         'sections 5 and 6 are agreed.'),
+         'sections 5, 6, 7, 8 and 8A - including Addendum A and the revised total of '
+         '<b>%s</b> - are agreed.' % TOTAL),
     Spacer(1, 10*mm),
 ]
 
@@ -555,7 +754,7 @@ st.append(Spacer(1, 3*mm))
 st.append(Paragraph(
     'BHELA - The Haor Exclusive &nbsp;|&nbsp; Project delivery and handover document &nbsp;|&nbsp; %s<br/>'
     'Designed and developed by <b>3s-Soft</b> - 3s-soft.com &nbsp;|&nbsp; &#169; 2026 3s-Soft. All rights reserved.'
-    % DOC_REF, S['small']))
+    % ('%s  |  Addendum A %s (%s)' % (DOC_REF, ADD_REF, ADD_DATE)), S['small']))
 
 doc.build(st)
 print('PDF written: %s' % OUT)
