@@ -33,8 +33,9 @@ INK2 = colors.HexColor("#0E3B41")
 PRIMARY = colors.HexColor("#137A74")
 AQUA = colors.HexColor("#6FC7BF")
 CTA = colors.HexColor("#FF7A3D")
-SAND = colors.HexColor("#F4EFE6")
-CREAM = colors.HexColor("#FAF7F2")
+GOLD = colors.HexColor("#F5C97B")
+SAND = colors.HexColor("#F4EDE1")
+CREAM = colors.HexColor("#FBF8F2")
 TEXT = colors.HexColor("#22403E")
 SOFT = colors.HexColor("#5E7472")
 LINE = colors.HexColor("#D9E2E0")
@@ -433,9 +434,9 @@ def render_markdown():
 styles = getSampleStyleSheet()
 S = {}
 S["title"] = ParagraphStyle("title", parent=styles["Title"], fontName="Helvetica-Bold",
-                            fontSize=25, leading=30, textColor=colors.white, alignment=TA_CENTER)
+                            fontSize=26, leading=31, textColor=colors.white, alignment=TA_CENTER)
 S["subtitle"] = ParagraphStyle("subtitle", parent=styles["Normal"], fontName="Helvetica",
-                               fontSize=12, leading=17, textColor=AQUA, alignment=TA_CENTER)
+                               fontSize=12.5, leading=18, textColor=AQUA, alignment=TA_CENTER)
 S["covermeta"] = ParagraphStyle("covermeta", parent=styles["Normal"], fontName="Helvetica",
                                 fontSize=9.5, leading=14, textColor=colors.white,
                                 alignment=TA_CENTER)
@@ -444,16 +445,14 @@ S["h1"] = ParagraphStyle("h1", parent=styles["Heading1"], fontName="Helvetica-Bo
 S["h2"] = ParagraphStyle("h2", parent=styles["Heading2"], fontName="Helvetica-Bold",
                          fontSize=11.5, leading=15, textColor=PRIMARY, spaceBefore=10, spaceAfter=4)
 S["body"] = ParagraphStyle("body", parent=styles["Normal"], fontName="Helvetica",
-                           fontSize=9.8, leading=14.5, textColor=TEXT, spaceAfter=5)
-S["bullet"] = ParagraphStyle("bullet", parent=S["body"], leftIndent=11, bulletIndent=2,
-                             spaceAfter=3.5)
-S["cell"] = ParagraphStyle("cell", parent=styles["Normal"], fontName="Helvetica",
-                           fontSize=9.1, leading=13, textColor=TEXT)
+                           fontSize=9.6, leading=14.2, textColor=TEXT, alignment=TA_CENTER if False else 0, spaceAfter=5)
+S["small"] = ParagraphStyle("small", parent=S["body"], fontSize=8.5, leading=12, textColor=SOFT)
+S["cell"] = ParagraphStyle("cell", parent=S["body"], fontSize=9, leading=12.6, spaceAfter=0)
 S["cellb"] = ParagraphStyle("cellb", parent=S["cell"], fontName="Helvetica-Bold")
 S["cellw"] = ParagraphStyle("cellw", parent=S["cell"], textColor=colors.white,
                             fontName="Helvetica-Bold")
-S["small"] = ParagraphStyle("small", parent=styles["Normal"], fontName="Helvetica",
-                            fontSize=8, leading=11, textColor=SOFT)
+S["bullet"] = ParagraphStyle("bullet", parent=S["body"], leftIndent=11, bulletIndent=2,
+                             spaceAfter=2.5)
 
 
 def para(t, s="body"):
@@ -515,17 +514,17 @@ def callout(text, bg=SAND, bar=CTA):
 def cover_page(canvas, doc):
     canvas.saveState()
     w, h = A4
-    canvas.setFillColor(INK)
-    canvas.rect(0, 0, w, h, stroke=0, fill=1)
     canvas.setFillColor(INK2)
-    canvas.rect(0, h - 118 * mm, w, 118 * mm, stroke=0, fill=1)
+    canvas.rect(0, 0, w, h, stroke=0, fill=1)
     canvas.setFillColor(CTA)
-    canvas.rect(0, h - 121 * mm, w, 2.2 * mm, stroke=0, fill=1)
+    canvas.rect(0, h - 12 * mm, w, 12 * mm, stroke=0, fill=1)
+    # footer rule
+    canvas.setStrokeColor(colors.Color(1, 1, 1, alpha=0.18))
+    canvas.setLineWidth(0.6)
+    canvas.line(25 * mm, 26 * mm, w - 25 * mm, 26 * mm)
     canvas.setFillColor(AQUA)
-    canvas.setFont("Helvetica-Bold", 9)
+    canvas.setFont("Helvetica", 8)
     canvas.drawString(25 * mm, 20 * mm, "Document ref: %s" % DOC_REF)
-    canvas.setFillColor(colors.white)
-    canvas.setFont("Helvetica", 8.5)
     canvas.drawRightString(w - 25 * mm, 20 * mm, "3s-Soft  |  3s-soft.com")
     canvas.restoreState()
 
@@ -533,58 +532,77 @@ def cover_page(canvas, doc):
 def body_page(canvas, doc):
     canvas.saveState()
     w, h = A4
+    canvas.setFillColor(CREAM)
+    canvas.rect(0, 0, w, h, stroke=0, fill=1)
+    # header band
     canvas.setFillColor(INK)
-    canvas.rect(0, h - 13 * mm, w, 13 * mm, stroke=0, fill=1)
+    canvas.rect(0, h - 16 * mm, w, 16 * mm, stroke=0, fill=1)
     canvas.setFillColor(colors.white)
-    canvas.setFont("Helvetica-Bold", 8.5)
-    canvas.drawString(21 * mm, h - 8.8 * mm, "BHELA  |  ERP Module")
+    canvas.setFont("Helvetica-Bold", 9)
+    canvas.drawString(21 * mm, h - 10.6 * mm, "BHELA - The Haor Exclusive")
     canvas.setFillColor(AQUA)
     canvas.setFont("Helvetica", 8)
-    canvas.drawRightString(w - 21 * mm, h - 8.8 * mm, DOC_DATE)
-    canvas.setFillColor(LINE)
-    canvas.rect(21 * mm, 14 * mm, w - 42 * mm, 0.3, stroke=0, fill=1)
+    canvas.drawRightString(w - 21 * mm, h - 10.6 * mm, "ERP Module Specification")
+    # footer
+    canvas.setStrokeColor(LINE)
+    canvas.setLineWidth(0.6)
+    canvas.line(21 * mm, 15 * mm, w - 21 * mm, 15 * mm)
     canvas.setFillColor(SOFT)
-    canvas.setFont("Helvetica", 7.8)
+    canvas.setFont("Helvetica", 7.6)
     canvas.drawString(21 * mm, 10.5 * mm, "3s-Soft  |  %s" % DOC_REF)
-    canvas.drawRightString(w - 21 * mm, 10.5 * mm, "Page %d" % doc.page)
+    canvas.drawRightString(w - 21 * mm, 10.5 * mm, "Page %d" % (doc.page - 1))
     canvas.restoreState()
 
 
 def render_pdf():
     doc = BaseDocTemplate(OUT_PDF, pagesize=A4,
                           leftMargin=21 * mm, rightMargin=21 * mm,
-                          topMargin=20 * mm, bottomMargin=18 * mm,
-                          title="BHELA ERP Module", author="3s-Soft")
-    frame_cover = Frame(25 * mm, 30 * mm, A4[0] - 50 * mm, A4[1] - 60 * mm, id="cover")
-    frame_body = Frame(21 * mm, 18 * mm, A4[0] - 42 * mm, A4[1] - 38 * mm, id="body")
+                          topMargin=24 * mm, bottomMargin=20 * mm,
+                          title="BHELA - ERP Module", author="3s-Soft",
+                          subject="Business Management, Accounting & Inventory")
+    cover_frame = Frame(25 * mm, 30 * mm, A4[0] - 50 * mm, A4[1] - 70 * mm, id="cover")
+    body_frame = Frame(21 * mm, 18 * mm, A4[0] - 42 * mm, A4[1] - 42 * mm, id="body")
     doc.addPageTemplates([
-        PageTemplate(id="cover", frames=[frame_cover], onPage=cover_page),
-        PageTemplate(id="body", frames=[frame_body], onPage=body_page),
+        PageTemplate(id="cover", frames=[cover_frame], onPage=cover_page),
+        PageTemplate(id="body", frames=[body_frame], onPage=body_page),
     ])
 
     st = []
-    st.append(Spacer(1, 32 * mm))
-    st.append(Paragraph("BHELA &#8212; The Haor Exclusive", S["subtitle"]))
-    st.append(Spacer(1, 4 * mm))
-    st.append(Paragraph("ERP Module", S["title"]))
-    st.append(Spacer(1, 3 * mm))
-    st.append(Paragraph("Business Management, Accounting &amp; Inventory", S["subtitle"]))
+
+    # ============ COVER ============
+    st.append(Spacer(1, 26 * mm))
+    st.append(Paragraph("E R P &nbsp; M O D U L E", S["subtitle"]))
+    st.append(Spacer(1, 7 * mm))
+    st.append(Paragraph("BHELA", S["title"]))
+    st.append(Paragraph("The Haor Exclusive", ParagraphStyle(
+        "ct", parent=S["title"], fontSize=15, leading=20, textColor=GOLD)))
+    st.append(Spacer(1, 5 * mm))
+    st.append(Paragraph("Business Management, Accounting &amp; Inventory<br/>Module Specification &amp; Delivery Document", S["subtitle"]))
+    st.append(Spacer(1, 14 * mm))
+
+    ct = Table([
+        [Paragraph('<font color="#6FC7BF" size=8>DEVELOPER</font>', S['covermeta']),
+         Paragraph('<font color="#6FC7BF" size=8>CLIENT</font>', S['covermeta'])],
+        [Paragraph('<b><font size=13 color="white">3s-Soft</font></b>', S['covermeta']),
+         Paragraph('<b><font size=13 color="white">KeyToBD</font></b>', S['covermeta'])],
+        [Paragraph('Jashedul Islam Shaun<br/><font size=8 color="#9FBFBC">Founder</font>', S['covermeta']),
+         Paragraph('Kaisar Hamid Apon<br/><font size=8 color="#9FBFBC">Owner</font>', S['covermeta'])],
+    ], colWidths=[75 * mm, 75 * mm])
+    ct.setStyle(TableStyle([
+        ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+        ('TOPPADDING', (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+        ('LINEAFTER', (0, 0), (0, -1), 0.6, colors.Color(1, 1, 1, alpha=0.22)),
+    ]))
+    st.append(ct)
     st.append(Spacer(1, 16 * mm))
-    st.append(Paragraph(
-        "Trip costing and approval &nbsp;&#183;&nbsp; Expenses &nbsp;&#183;&nbsp; Monthly and "
-        "yearly statements<br/>Payroll &nbsp;&#183;&nbsp; Inventory and asset register "
-        "&nbsp;&#183;&nbsp; Access control and audit trail", S["covermeta"]))
-    st.append(Spacer(1, 18 * mm))
-    st.append(Paragraph(
-        "Prepared by <b>3s-Soft</b> for <b>KeyToBD</b><br/>%s" % DOC_DATE, S["covermeta"]))
-    st.append(Spacer(1, 10 * mm))
-    st.append(Paragraph(
-        '<font color="#FF7A3D" size=17><b>%s</b></font><br/>'
-        '<font size=8.5>one-off &#183; no subscription &#183; no commission</font>' % PRICE,
-        S["covermeta"]))
+    st.append(HRFlowable(width='40%', thickness=1, color=CTA, hAlign='CENTER'))
+    st.append(Spacer(1, 6 * mm))
+    st.append(Paragraph('Delivery date: <b>%s</b><br/>One-off investment: <b><font color="#F5C97B">%s</font></b> &nbsp;&#183;&nbsp; No subscription &nbsp;&#183;&nbsp; Full source ownership' % (DOC_DATE, PRICE), S['covermeta']))
 
     st.append(NextPageTemplate("body"))
     st.append(PageBreak())
+    st.append(Spacer(1, 2 * mm))
 
     st.append(info_table([
         ("Project", "BHELA – The Haor Exclusive"),

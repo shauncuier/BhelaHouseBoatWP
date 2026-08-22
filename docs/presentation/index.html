@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BHELA — Case Study Video Presentation | 3s-Soft</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="theme-midnight">
+  <!-- Top Presentation Header -->
+  <header class="pres-header">
+    <div class="brand-badge">
+      <img src="../../themes/bhela/assets/images/logo.png" alt="BHELA Logo" class="brand-logo-img" onerror="this.style.display='none'">
+      <span class="brand-title">BHELA: THE HAOR EXCLUSIVE</span>
+      <span class="badge-tag">ENGINEERING CASE STUDY</span>
+    </div>
+    
+    <div class="pres-meta">
+      <span class="pres-time" id="slideTimer">00:00</span>
+      <span class="slide-indicator" id="slideIndicator">Slide 1 / 10</span>
+    </div>
+  </header>
+
+  <!-- Main Presentation Stage -->
+  <main class="pres-stage">
+    <!-- Slide Progress Bar -->
+    <div class="progress-track">
+      <div class="progress-fill" id="progressFill"></div>
+    </div>
+
+    <!-- Slides Deck Container -->
+    <div class="slides-container" id="slidesContainer">
+
+      <!-- SLIDE 1: TITLE & HOOK (WITH BOAT HERO IMAGE) -->
+      <section class="slide active" data-slide="1" data-duration="15">
+        <div class="slide-content cover-slide">
+          <div class="cover-two-col">
+            <div class="cover-text-side">
+              <div class="cover-tag">BESPOKE HOSPITALITY SOFTWARE ENGINEERING</div>
+              <h1 class="hero-title">
+                Engineering an <span class="gradient-text">Autonomous Operating System</span> for Luxury Houseboat Tourism
+              </h1>
+              <p class="hero-subtitle">
+                How a custom WordPress monorepo replaced phone/DM chaos, paper ledgers, and inventory shrinkage with 3-tier financial governance, dynamic pricing, and $0 recurring SaaS fees.
+              </p>
+            </div>
+            <div class="cover-image-side">
+              <div class="media-card-wrap">
+                <img src="../../themes/bhela/assets/images/boat/exterior-1.jpg" alt="BHELA Houseboat" class="media-img-cover">
+                <div class="media-img-caption">BHELA Luxury Houseboat · Tanguar Haor</div>
+              </div>
+            </div>
+          </div>
+          
+          <div class="meta-grid">
+            <div class="meta-card">
+              <span class="meta-label">CLIENT &amp; VESSEL</span>
+              <span class="meta-val">BHELA – The Haor Exclusive</span>
+              <span class="meta-sub">KeyToBD · Tanguar Haor, Sunamganj</span>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">ENGINEERING ARCHITECT</span>
+              <span class="meta-val">3s-Soft (Shaun)</span>
+              <span class="meta-sub">Custom Monorepo (Theme + ERP Engine)</span>
+            </div>
+            <div class="meta-card">
+              <span class="meta-label">ARCHITECTURE HIGHLIGHTS</span>
+              <span class="meta-val">Zero Elementor / Zero SaaS</span>
+              <span class="meta-sub">100% Client Source Ownership</span>
+            </div>
+            <div class="meta-card highlight">
+              <span class="meta-label">PROVEN ROI</span>
+              <span class="meta-val">৳0 Reconciled Drift</span>
+              <span class="meta-sub">1-Click Month-End Audit</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 2: BUSINESS CONTEXT (WITH SCENIC & ROOFTOP PHOTOS) -->
+      <section class="slide" data-slide="2" data-duration="18">
+        <div class="slide-content">
+          <div class="section-tag">01 · BUSINESS CONTEXT</div>
+          <h2 class="slide-title">Scaling Luxury Tourism on Bangladesh's Most Pristine Wetland</h2>
+          <p class="slide-intro">Operating a 6-cabin luxury houseboat on Tanguar Haor combines ultra-premium hospitality with remote river logistics.</p>
+
+          <div class="two-col-grid">
+            <div class="info-card">
+              <h3>The Operational Realities</h3>
+              <ul class="feature-list">
+                <li><strong>High AOV Experiential Cruises:</strong> 6 luxury cabins across 5 distinct categories, accommodating 30–35 guests or full private charters.</li>
+                <li><strong>Dynamic Seasonal Demand:</strong> Intense monsoon peak season with complex surge rates, weekend premiums, and multi-bracket family pricing.</li>
+                <li><strong>Remote Wetland Logistics:</strong> Provisioning at local river markets, jetty coordination, volatile diesel consumption, and cash/mobile payments.</li>
+              </ul>
+            </div>
+
+            <div class="media-stack-side">
+              <div class="photo-pair-grid">
+                <div class="photo-card">
+                  <img src="../../themes/bhela/assets/images/hero/hero-haor.jpg" alt="Tanguar Haor Cruise" class="grid-photo">
+                  <div class="photo-badge">Tanguar Haor Wetland Cruise</div>
+                </div>
+                <div class="photo-card">
+                  <img src="../../themes/bhela/assets/images/boat/rooftop-1.jpg" alt="Rooftop Deck" class="grid-photo">
+                  <div class="photo-badge">Open-Sky Rooftop Deck</div>
+                </div>
+              </div>
+              <div class="mini-alert-box">
+                <strong>Why Generic SaaS Failed:</strong> Cloudbeds/Guesty charge $150–$300/mo + 2–3% transaction cuts while failing on cash provisioning, fuel logs, and fish market bills.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 3: THE BEFORE CRISIS -->
+      <section class="slide" data-slide="3" data-duration="20">
+        <div class="slide-content">
+          <div class="section-tag">02 · THE OPERATIONAL CRISIS</div>
+          <h2 class="slide-title">The Four Failure Modes of the Pre-System Era</h2>
+          <p class="slide-intro">Manual workflows were capping business growth and leaking profits on every departure.</p>
+
+          <div class="quad-grid">
+            <div class="crisis-card">
+              <div class="crisis-num">01</div>
+              <h4>Booking &amp; Pricing Friction</h4>
+              <p>Bookings managed over phone calls and DMs. Quotes given from memory led to frequent child rate and holiday surge errors with double-booking risks.</p>
+            </div>
+            <div class="crisis-card">
+              <div class="crisis-num">02</div>
+              <h4>The Profitability Blindspot</h4>
+              <p>Trips ran fully booked yet lost money on diesel and market groceries. No per-trip cost tracking existed to identify margin leakage.</p>
+            </div>
+            <div class="crisis-card">
+              <div class="crisis-num">03</div>
+              <h4>3-Day Month-End Agony</h4>
+              <p>Reconciling monthly revenue against costs took 3 days of manual spreadsheet entry from paper receipts and WhatsApp logs.</p>
+            </div>
+            <div class="crisis-card">
+              <div class="crisis-num">04</div>
+              <h4>Zero Internal Controls</h4>
+              <p>Staff spending cash also approved their own expenses. Kitchen supplies, blankets, and boat spares vanished with no audit trail.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 4: SOLUTION ARCHITECTURE -->
+      <section class="slide" data-slide="4" data-duration="22">
+        <div class="slide-content">
+          <div class="section-tag">03 · ARCHITECTURE</div>
+          <h2 class="slide-title">The Solution: Zero-Bloat High-Performance Monorepo</h2>
+          <p class="slide-intro">An integrated three-layer architecture purpose-built for the business with 100% source ownership.</p>
+
+          <div class="tri-grid">
+            <div class="arch-card">
+              <div class="layer-badge">LAYER 1</div>
+              <h4>Midnight Monsoon Theme</h4>
+              <p class="arch-desc">Custom luxury front-end (`themes/bhela/`)</p>
+              <ul class="micro-list">
+                <li>Pure semantic PHP + Vanilla JS (Zero jQuery)</li>
+                <li>74% image payload reduction via WebP</li>
+                <li>Dynamic rate injection directly from DB</li>
+                <li>Bangla-first native guest experience</li>
+              </ul>
+            </div>
+
+            <div class="arch-card">
+              <div class="layer-badge">LAYER 2</div>
+              <h4>BHELA Booking Engine</h4>
+              <p class="arch-desc">Custom transaction layer (`plugins/bhela-booking/`)</p>
+              <ul class="micro-list">
+                <li>Real-time availability lock (anti-overbooking)</li>
+                <li>SMS OTP phone verification (anti-spam)</li>
+                <li>Dynamic multi-tier quote generator</li>
+                <li>Timing-safe cryptographic invoice links</li>
+              </ul>
+            </div>
+
+            <div class="arch-card">
+              <div class="layer-badge">LAYER 3</div>
+              <h4>Custom ERP &amp; Governance</h4>
+              <p class="arch-desc">Back-office accounting &amp; stock engine</p>
+              <ul class="micro-list">
+                <li>3-Tier Prepare &rarr; Check &rarr; Approve workflow</li>
+                <li>Locked cost sheets &amp; auto monthly statements</li>
+                <li>Permanent asset register with frozen IDs</li>
+                <li>Append-only audit trail (Zero DELETE routes)</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 5: GUEST EXPERIENCE & PRICING (WITH CABIN PHOTOGRAPHY) -->
+      <section class="slide" data-slide="5" data-duration="20">
+        <div class="slide-content">
+          <div class="section-tag">04 · GUEST EXPERIENCE</div>
+          <h2 class="slide-title">Smart Booking Engine &amp; Dynamic Pricing Matrix</h2>
+          <p class="slide-intro">Eliminating booking friction while capturing peak seasonal willingness-to-pay.</p>
+
+          <div class="three-col-experience">
+            <div class="feature-table-wrapper">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Capability</th>
+                    <th>Engine Implementation</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>6-Cabin Matrix</strong></td>
+                    <td>5 cabin types + Full-Boat Charter with sharing constraints.</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Age Logic</strong></td>
+                    <td>Adult (9+): 100% · Child (4-8): ৳5,000 flat · Infant: Free.</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Surge Rules</strong></td>
+                    <td>Weekend rates, holiday multipliers, weekday discounts (-20%).</td>
+                  </tr>
+                  <tr>
+                    <td><strong>SMS OTP</strong></td>
+                    <td>BulkSMSBD gateway verification eliminates troll submissions.</td>
+                  </tr>
+                  <tr>
+                    <td><strong>Invoices</strong></td>
+                    <td>Cryptographic 32-byte salted token prevents enumeration.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Cabin Image Showcase -->
+            <div class="cabin-media-card">
+              <img src="../../themes/bhela/assets/images/cabins/cabin-1.jpg" alt="Luxury Cabin Interior" class="cabin-preview-img">
+              <div class="cabin-preview-badge">Haor Bilash · Luxury Front Balcony Cabin</div>
+            </div>
+
+            <!-- Interactive Demo Widget -->
+            <div class="demo-widget">
+              <div class="widget-header">
+                <span class="widget-title">⚡ Live Pricing Calculator</span>
+                <span class="widget-status">ACTIVE</span>
+              </div>
+              <div class="widget-body">
+                <div class="sim-row">
+                  <label>Cabin Selection:</label>
+                  <select id="simCabin">
+                    <option value="12000">Haor Bilash (Front Balcony - ৳12,000)</option>
+                    <option value="10000">Megh Bilash (Upper Deck - ৳10,000)</option>
+                    <option value="8000">Jol Bilash (Standard - ৳8,000)</option>
+                    <option value="55000">Full Boat Private Charter (৳55,000)</option>
+                  </select>
+                </div>
+                <div class="sim-row">
+                  <label>Travel Day Type:</label>
+                  <div class="pill-group">
+                    <button class="sim-pill active" data-type="weekday">Weekday (-20%)</button>
+                    <button class="sim-pill" data-type="weekend">Weekend (Regular)</button>
+                    <button class="sim-pill" data-type="holiday">Holiday (+15%)</button>
+                  </div>
+                </div>
+                <div class="sim-row">
+                  <label>Guests: 2 Adults + 1 Child (Age 6)</label>
+                </div>
+                <div class="sim-output">
+                  <span class="sim-label">Computed Quote:</span>
+                  <span class="sim-price" id="simResultPrice">৳14,600</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 6: 3-TIER ERP GOVERNANCE -->
+      <section class="slide" data-slide="6" data-duration="22">
+        <div class="slide-content">
+          <div class="section-tag">05 · FINANCIAL ERP ENGINE</div>
+          <h2 class="slide-title">3-Tier Financial Governance &amp; Mathematical Invariance</h2>
+          <p class="slide-intro">Strict separation of duties replaces chaos with cryptographically locked truth.</p>
+
+          <div class="workflow-grid">
+            <div class="step-card">
+              <div class="step-num">STEP 1</div>
+              <h4>PREPARE</h4>
+              <div class="role-badge">Onboard Crew / Store</div>
+              <p>Records real trip expenses across 14 heads: Diesel, Groceries, Local Fish, Gas, Jetty, Crew Wages. 3 split payment columns per head.</p>
+            </div>
+            <div class="step-arrow">&rarr;</div>
+            <div class="step-card">
+              <div class="step-num">STEP 2</div>
+              <h4>CHECK</h4>
+              <div class="role-badge">Operations Manager</div>
+              <p>Cross-references physical vendor receipts, stock issue slips, and guest manifests. The checker cannot be the preparer.</p>
+            </div>
+            <div class="step-arrow">&rarr;</div>
+            <div class="step-card step-lock">
+              <div class="step-num">STEP 3</div>
+              <h4>APPROVE &amp; LOCK</h4>
+              <div class="role-badge">Managing Director</div>
+              <p>Final sign-off locks the sheet permanently. Figures feed into the Monthly Statement. Cannot be altered without audited admin unlock.</p>
+            </div>
+          </div>
+
+          <div class="highlight-banner">
+            <div class="hb-icon">📊</div>
+            <div class="hb-content">
+              <strong>July 2026 Live Validation:</strong> The automated statement engine reproduced the owner's manual ledger to the exact Taka: <strong>13 trips · 335 guests · ৳498,214 gross profit</strong> with zero formula desynchronization.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 7: INVENTORY & ASSETS (WITH DINING PHOTO) -->
+      <section class="slide" data-slide="7" data-duration="20">
+        <div class="slide-content">
+          <div class="section-tag">06 · INVENTORY INTEGRITY</div>
+          <h2 class="slide-title">Dual-Register Stock Engine: Eliminating Shrinkage</h2>
+          <p class="slide-intro">Permanent category tagging, condition lifecycle tracking, and automatic monthly carry-forward.</p>
+
+          <div class="tri-grid">
+            <div class="info-card">
+              <h3>Permanent Item Register</h3>
+              <p>Every asset receives an immutable category code (e.g. <code>BHELA-KIT-0001</code>, <code>BHELA-ENG-0012</code>). Tracks model, serial, purchase bill, warranty, and assigned custodian.</p>
+            </div>
+            <div class="info-card">
+              <h3>Condition Lifecycle</h3>
+              <p>Assets audited across: <strong>Good &rarr; Repairable &rarr; Under Repair &rarr; Damaged &rarr; Scrapped</strong>. Distinguishes consumables from fixed capital assets.</p>
+            </div>
+            <div class="info-card">
+              <h3>Variance Reconciliation</h3>
+              <p>Physical count vs. system count reconciled at month-end. Closing count becomes next month's opening count automatically. Variances require mandatory justification.</p>
+            </div>
+          </div>
+
+          <div class="inventory-media-split">
+            <div class="table-card-inner">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Dimension</th>
+                    <th>Legacy Paper / Excel Method</th>
+                    <th>BHELA Custom ERP Engine</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>Damaged Gear</strong></td>
+                    <td>Discarded quietly without log; purchased anew</td>
+                    <td><span class="badge-success">Tracked in 4 condition states with repair log</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Month Transition</strong></td>
+                    <td>Manual re-typing across spreadsheet tabs</td>
+                    <td><span class="badge-success">100% Automated locked carry-forward</span></td>
+                  </tr>
+                  <tr>
+                    <td><strong>Setup / Import</strong></td>
+                    <td>Days of manual re-entry</td>
+                    <td><span class="badge-success">4-step smart CSV importer (Map &rarr; Commit)</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            
+            <div class="food-photo-card">
+              <img src="../../themes/bhela/assets/images/food/food-spread.jpg" alt="Gourmet Dining Provisions" class="food-img">
+              <div class="food-caption">Fresh Fish &amp; Market Provisions Control</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 8: ENTERPRISE SECURITY -->
+      <section class="slide" data-slide="8" data-duration="20">
+        <div class="slide-content">
+          <div class="section-tag">07 · DEFENSIVE SECURITY</div>
+          <h2 class="slide-title">Enterprise Access Control &amp; Append-Only Audit Trail</h2>
+          <p class="slide-intro">Engineered with defensive security, zero overlapping privileges, and permanent system memory.</p>
+
+          <div class="two-col-grid">
+            <div class="sec-card">
+              <h4>6 Granular Staff Roles</h4>
+              <p>Configurable permission matrix: <em>Administrator, Manager, Booking Staff, Cost Preparer, Cost Checker, Storekeeper</em>.</p>
+              <div class="role-pill-cloud">
+                <span class="role-tag">Store: Stock Only</span>
+                <span class="role-tag">Staff: Bookings Only</span>
+                <span class="role-tag">Accounts: Cost Sheets Only</span>
+                <span class="role-tag">Zero Cross-Privilege Contamination</span>
+              </div>
+            </div>
+
+            <div class="sec-card">
+              <h4>Append-Only Audit Trail</h4>
+              <p>Every change (actor, timestamp, field, old value &rarr; new value) is written to a dedicated table.</p>
+              <div class="code-box">
+                <div class="code-line"><span class="c-dim">2026-08-18 14:32:01</span> | <span class="c-user">shaun</span> | cost_sheet_142 &bull; diesel_cost: ৳14,500 &rarr; ৳15,200</div>
+                <div class="code-line"><span class="c-dim">2026-08-18 16:05:12</span> | <span class="c-user">apon_md</span> | approved_sheet_142: STATUS &rarr; LOCKED</div>
+                <div class="code-line highlight"><span class="c-gold">&#9888; ZERO DELETE OR DROP ROUTES IN CODEBASE</span></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="tests-bar">
+            <div class="tb-title">14 Headless Automated CLI Test Suites (`tests/run.php`)</div>
+            <div class="tb-badges">
+              <span class="t-badge">security-test: PASS</span>
+              <span class="t-badge">july-statement-test: PASS</span>
+              <span class="t-badge">inventory-test: PASS</span>
+              <span class="t-badge">otp-test: PASS</span>
+              <span class="t-badge">wcag-contrast-test: PASS</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 9: RESULTS & ROI -->
+      <section class="slide" data-slide="9" data-duration="22">
+        <div class="slide-content">
+          <div class="section-tag">08 · MEASURABLE RESULTS</div>
+          <h2 class="slide-title">Business Impact &amp; Return on Investment</h2>
+          <p class="slide-intro">Delivering undeniable operational velocity, cost savings, and financial clarity.</p>
+
+          <div class="kpi-stat-grid">
+            <div class="kpi-box">
+              <div class="kpi-num">100%</div>
+              <div class="kpi-lbl">Double Bookings Eliminated</div>
+              <div class="kpi-sub">Real-time availability lock across all channels</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-num">3 Days &rarr; 1 Click</div>
+              <div class="kpi-lbl">Month-End Statement Audit</div>
+              <div class="kpi-sub">Instant verified gross profit calculation</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-num">$0 / mo</div>
+              <div class="kpi-lbl">Recurring SaaS Fees</div>
+              <div class="kpi-sub">Saved $2,000+/yr in SaaS tolls &amp; cuts</div>
+            </div>
+            <div class="kpi-box">
+              <div class="kpi-num">100%</div>
+              <div class="kpi-lbl">Code &amp; Data Ownership</div>
+              <div class="kpi-sub">Zero vendor lock-in; complete sovereignty</div>
+            </div>
+          </div>
+
+          <div class="two-col-grid impact-grid">
+            <div class="impact-item">
+              <strong>Operational Velocity:</strong> Front desk reservation turnaround accelerated 4x with instant WhatsApp quote generation and pre-filled invoice links.
+            </div>
+            <div class="impact-item">
+              <strong>Audit Defense:</strong> Partner dividend and tax disputes eliminated through locked historical statements and signed trip cost sheets.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 10: CONCLUSION & CREDITS -->
+      <section class="slide" data-slide="10" data-duration="25">
+        <div class="slide-content">
+          <div class="section-tag">09 · STRATEGIC TAKEAWAYS</div>
+          <h2 class="slide-title">Key Architectural Lessons &amp; Project Credits</h2>
+          <p class="slide-intro">Why bespoke software architecture remains the highest-ROI investment for scaling businesses.</p>
+
+          <div class="two-col-grid">
+            <div class="takeaway-card">
+              <h3>Engineering Takeaways</h3>
+              <ul class="feature-list">
+                <li><strong>Tailored Beats Generic:</strong> Off-the-shelf SaaS forces unique businesses into rigid workflows. Bespoke architecture captures the exact operational nuance.</li>
+                <li><strong>WordPress as an Application Framework:</strong> When stripped of bloated page-builders, WordPress provides an exceptional auth, ORM, and database backbone.</li>
+                <li><strong>Internal Controls = Real Cash:</strong> Software must protect profit margins, enforce separation of duties, and maintain immutable auditability.</li>
+              </ul>
+            </div>
+
+            <div class="credits-card">
+              <div class="cc-badge">DEVELOPED BY</div>
+              <h3 class="cc-name">3s-Soft</h3>
+              <p class="cc-lead"><strong>Jashedul Islam Shaun</strong> — Founder &amp; Lead Systems Architect</p>
+              <div class="cc-contact">
+                <div>🌐 <strong>Web:</strong> 3s-soft.com</div>
+                <div>💼 <strong>Client:</strong> KeyToBD (Kaisar Hamid Apon)</div>
+                <div>🚢 <strong>Live Platform:</strong> bhelahouseboat.com</div>
+              </div>
+              <div class="cc-cta">
+                Need a bespoke booking engine, custom ERP, or high-performance web architecture? Connect with 3s-Soft today.
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Live Presenter Voiceover / Captions Box -->
+    <div class="narrator-box" id="narratorBox">
+      <div class="narrator-header">
+        <div class="narrator-status">
+          <span class="audio-wave"></span>
+          <span>PRESENTER VOICEOVER NARRATION</span>
+        </div>
+        <button class="narrator-toggle-btn" id="voiceToggleBtn" title="Toggle Audio Synthesis">🔊 Sound On</button>
+      </div>
+      <div class="narrator-text" id="narratorText">
+        Welcome to the engineering case study of BHELA: The Haor Exclusive. In this presentation, we examine how 3s-Soft architected a bespoke WordPress booking engine and enterprise ERP layer to eliminate operational chaos for a premier luxury houseboat in Bangladesh.
+      </div>
+    </div>
+  </main>
+
+  <!-- Bottom Control Bar -->
+  <footer class="pres-controls">
+    <div class="ctrl-group left">
+      <button class="ctrl-btn" id="prevBtn" title="Previous Slide (Left Arrow)">◀ Previous</button>
+      <button class="ctrl-btn play-btn" id="playBtn" title="Play/Pause Auto Presentation (Space)">▶ Play</button>
+      <button class="ctrl-btn" id="nextBtn" title="Next Slide (Right Arrow)">Next ▶</button>
+    </div>
+
+    <div class="slide-dots" id="slideDots"></div>
+
+    <div class="ctrl-group right">
+      <button class="ctrl-btn speed-btn" id="speedBtn" title="Playback Speed">1.0x</button>
+      <button class="ctrl-btn" id="notesToggleBtn" title="Toggle Presenter Notes">📝 Notes</button>
+      <a href="../BHELA-Case-Study-LinkedIn.pdf" target="_blank" class="ctrl-btn pdf-btn" title="Download LinkedIn PDF">📄 Download PDF</a>
+      <button class="ctrl-btn fs-btn" id="fsBtn" title="Toggle Fullscreen (F)">⛶ Fullscreen</button>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
