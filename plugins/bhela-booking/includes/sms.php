@@ -39,7 +39,18 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 	};
 	$status   = $m( '_bhela_status' ) ? $m( '_bhela_status' ) : 'pending';
 	$total    = (int) $m( '_bhela_total' );
-	$paid     = (int) $m( '_bhela_paid_amount' );
+	$s        = bhela_bm_get_settings();
+	// Through bhela_bm_balance(), not `max( 0, $total - $paid )` as this used to be.
+	// That was a second copy of the arithmetic every other guest-facing surface
+	// already shares, and a text message quoting a different Due from the invoice
+	// beside it is the one discrepancy a guest is guaranteed to notice.
+	$bal      = bhela_bm_balance( $total, $m( '_bhela_paid_amount' ) );
+	$stay     = bhela_bm_booking_stay( $booking_id );
+	$pay_key  = (string) $m( '_bhela_pay_method' );
+	$pay_label = '' !== $pay_key ? ( bhela_bm_pay_methods()[ $pay_key ] ?? '' ) : '';
+	$fmt      = function ( $ymd ) {
+		return $ymd ? mysql2date( 'j F Y', $ymd ) : '';
+	};
 
 	$map = array(
 		'{name}'    => get_the_title( $booking_id ),
@@ -50,8 +61,38 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 		'{guests}'  => (int) $m( '_bhela_guests' ),
 		'{total}'   => bhela_bm_money( $total ),
 		'{advance}' => bhela_bm_money( (int) $m( '_bhela_advance' ) ),
-		'{due}'     => bhela_bm_money( max( 0, $total - $paid ) ),
+		'{paid}'    => bhela_bm_money( $bal['paid'] ),
+		'{due}'     => bhela_bm_money( $bal['due'] ),
 		'{status}'  => bhela_bm_statuses()[ $status ] ?? $status,
+
+		// The stay. Dates are derived from the travel date on every read, so moving
+		// a booking moves both ends of it — see bhela_bm_booking_stay().
+		'{checkin}'       => $fmt( $stay['in'] ),
+		'{checkout}'      => $fmt( $stay['out'] ),
+		'{checkin_time}'  => $stay['in_time'],
+		'{checkout_time}' => $stay['out_time'],
+
+		// Logistics. Each falls back to the setting, so a booking only carries what
+		// actually differs from the norm.
+		'{boarding}'   => $m( '_bhela_boarding' ) ?: ( $s['boarding_ghat'] ?? '' ),
+		'{package}'    => $s['package_label'] ?? '',
+		'{room}'       => $m( '_bhela_room_no' ),
+		'{room_type}'  => $m( '_bhela_cabin_type' ),
+		'{address}'    => $m( '_bhela_address' ),
+		// Carries its own brackets so the template needs no conditional: an unset
+		// method must print nothing, not "(—)", which reads as a lost value.
+		'{pay_method}' => $pay_label ? '(' . $pay_label . ')' : '',
+
+		// Who handled it, and when it went out.
+		'{booked_by}' => $m( '_bhela_booked_by' ),
+		'{issued_by}' => $m( '_bhela_issued_by' ),
+		'{issued_on}' => mysql2date( 'j F Y', current_time( 'mysql' ) ),
+
+		'{ops_manager}'      => $s['ops_manager'] ?? '',
+		'{support_whatsapp}' => $s['support_whatsapp'] ?: ( $s['whatsapp'] ?? '' ),
+		'{notes}'            => bhela_bm_confirm_notes(),
+		'{invoice_link}'     => function_exists( 'bhela_bm_invoice_url' ) ? bhela_bm_invoice_url( $booking_id ) : '',
+
 		// Private review link — only meaningful in the completion template.
 		'{review_link}' => function_exists( 'bhela_bm_review_url' ) ? bhela_bm_review_url( $booking_id ) : '',
 	);

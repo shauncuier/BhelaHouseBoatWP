@@ -203,6 +203,10 @@ function bhela_bm_booking_form_shortcode() {
 							<input type="email" id="bm-email" name="email" autocomplete="email" placeholder="you@email.com">
 						</p>
 						<p class="bhela-bm-field">
+							<label for="bm-address">ঠিকানা <span>(ঐচ্ছিক)</span></label>
+							<input type="text" id="bm-address" name="address" autocomplete="address-level2" placeholder="যেমন: সুনামগঞ্জ">
+						</p>
+						<p class="bhela-bm-field">
 							<label for="bm-message">বিশেষ নোট <span>(ঐচ্ছিক)</span></label>
 							<textarea id="bm-message" name="message" rows="3" placeholder="যেমন: Full Boat Reservation, Corporate Tour, BBQ..."></textarea>
 						</p>
@@ -378,6 +382,9 @@ function bhela_bm_process_submission( $data ) {
 	$name      = sanitize_text_field( $data['name'] ?? '' );
 	$phone     = sanitize_text_field( $data['phone'] ?? '' );
 	$email     = sanitize_email( $data['email'] ?? '' );
+	// Optional, and only used on the confirmation message — a guest who does not
+	// give one simply has no address line.
+	$address   = sanitize_text_field( $data['address'] ?? '' );
 	$date      = sanitize_text_field( $data['date'] ?? '' );
 	$message   = sanitize_textarea_field( $data['message'] ?? '' );
 	$cabins    = json_decode( wp_unslash( $data['cabins'] ?? '' ), true );
@@ -469,6 +476,7 @@ function bhela_bm_process_submission( $data ) {
 		bhela_bm_otp_stamp( $post_id, $phone );
 	}
 	update_post_meta( $post_id, '_bhela_email', $email );
+	update_post_meta( $post_id, '_bhela_address', $address );
 	update_post_meta( $post_id, '_bhela_travel_date', $date );
 	update_post_meta( $post_id, '_bhela_cabin_type', $cabin_summary );
 	update_post_meta( $post_id, '_bhela_cabins_json', wp_json_encode( is_array( $cabins ) ? $cabins : array(), JSON_UNESCAPED_UNICODE ) );

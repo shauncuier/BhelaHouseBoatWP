@@ -29,6 +29,13 @@ $inv_mgr_wa = ! empty( $s['support_whatsapp'] ) ? $s['support_whatsapp'] : '';
 if ( $inv_mgr_wa && bhela_bm_normalize_mobile( $inv_mgr_wa ) === bhela_bm_normalize_mobile( $inv_wa ) ) {
 	$inv_mgr_wa = '';
 }
+// Trip logistics. All three were hardcoded into this template — the boarding ghat
+// once and the package label twice more further down — so changing where the boat
+// leaves from meant editing PHP. A booking may override the ghat; blank means the
+// house default.
+$inv_package  = (string) ( $s['package_label'] ?? '' );
+$inv_boarding = (string) ( get_post_meta( $invoice['booking_id'], '_bhela_boarding', true ) ?: ( $s['boarding_ghat'] ?? '' ) );
+$inv_stay     = bhela_bm_booking_stay( $invoice['booking_id'] );
 $logo     = '';
 $theme_logo = get_template_directory() . '/assets/images/logo.png';
 if ( file_exists( $theme_logo ) ) {
@@ -180,8 +187,9 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 				<div>
 					<h3>Trip Details / ভ্রমণ</h3>
 					<p><span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM7 10h5v5H7z"/></svg><strong><?php echo esc_html( $invoice['travel_date'] ); ?></strong><?php if ( $invoice['day_type'] ) : ?>&nbsp;(<?php echo esc_html( $day_labels[ $invoice['day_type'] ] ?? $invoice['day_type'] ); ?>)<?php endif; ?></span><br>
-					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5L8 7.5V4h8v3.5l-4 4z"/></svg>২ দিন ১ রাত প্যাকেজ</span><br>
-					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Boarding: Anwarpur Ghat</span></p>
+					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M6 2v6h.01L6 8.01 10 12l-4 4 .01.01H6V22h12v-5.99h-.01L18 16l-4-4 4-3.99-.01-.01H18V2zm10 14.5V20H8v-3.5l4-4 4 4zm-4-5L8 7.5V4h8v3.5l-4 4z"/></svg><?php echo esc_html( $inv_package ); ?> প্যাকেজ</span><br>
+					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>Boarding: <?php echo esc_html( $inv_boarding ); ?></span><br>
+					<span class="inv-meta-row"><svg class="inv-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>Check-in <?php echo esc_html( $inv_stay['in_time'] ); ?> &middot; Check-out <?php echo esc_html( $inv_stay['out_time'] ); ?></span></p>
 				</div>
 			</div>
 
@@ -204,12 +212,12 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 							</tr>
 						<?php endforeach; ?>
 						<tr>
-							<td colspan="4" style="font-size:12.5px;color:#5b6b6a">২ দিন ১ রাত — থাকা, সকল খাবার, হাওর ভ্রমণ, গাইড ও নিরাপত্তা অন্তর্ভুক্ত</td>
+							<td colspan="4" style="font-size:12.5px;color:#5b6b6a"><?php echo esc_html( $inv_package ); ?> — থাকা, সকল খাবার, হাওর ভ্রমণ, গাইড ও নিরাপত্তা অন্তর্ভুক্ত</td>
 						</tr>
 					<?php else : ?>
 						<tr>
 							<td><strong><?php echo esc_html( $invoice['cabin'] ? $invoice['cabin'] : 'Houseboat Package' ); ?></strong><br>
-							<span style="font-size:12.5px;color:#5b6b6a">২ দিন ১ রাত — থাকা, সকল খাবার, হাওর ভ্রমণ, গাইড ও নিরাপত্তা</span></td>
+							<span style="font-size:12.5px;color:#5b6b6a"><?php echo esc_html( $inv_package ); ?> — থাকা, সকল খাবার, হাওর ভ্রমণ, গাইড ও নিরাপত্তা</span></td>
 							<td><?php echo esc_html( $invoice['guests'] ); ?> জন</td>
 							<td><?php echo esc_html( $invoice['per_person'] ? bhela_bm_money( $invoice['per_person'] ) : '—' ); ?></td>
 							<td><?php echo esc_html( $invoice['total'] ? bhela_bm_money( $invoice['total'] ) : '—' ); ?></td>

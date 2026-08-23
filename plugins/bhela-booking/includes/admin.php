@@ -218,8 +218,40 @@ function bhela_bm_details_metabox( $post ) {
 			<td><input type="text" name="bhela_phone" value="<?php echo esc_attr( $m( '_bhela_phone' ) ); ?>"></td></tr>
 		<tr><th><?php esc_html_e( 'Email', 'bhela-booking' ); ?></th>
 			<td><input type="email" name="bhela_email" value="<?php echo esc_attr( $m( '_bhela_email' ) ); ?>"></td></tr>
+		<tr><th><?php esc_html_e( 'Address', 'bhela-booking' ); ?></th>
+			<td><input type="text" class="regular-text" name="bhela_address" value="<?php echo esc_attr( $m( '_bhela_address' ) ); ?>" placeholder="<?php esc_attr_e( 'Sunamganj', 'bhela-booking' ); ?>">
+				<p class="description"><?php esc_html_e( 'Shown on the confirmation message. Optional.', 'bhela-booking' ); ?></p></td></tr>
 		<tr><th><?php esc_html_e( 'Travel Date', 'bhela-booking' ); ?> *</th>
-			<td><input type="date" name="bhela_travel_date" value="<?php echo esc_attr( $m( '_bhela_travel_date' ) ); ?>"></td></tr>
+			<td><input type="date" name="bhela_travel_date" value="<?php echo esc_attr( $m( '_bhela_travel_date' ) ); ?>">
+				<?php
+				$stay = bhela_bm_booking_stay( $post->ID );
+				if ( $stay['in'] ) :
+					?>
+					<p class="description">
+						<?php
+						printf(
+							/* translators: 1: check-in date, 2: check-in window, 3: check-out date, 4: check-out window */
+							esc_html__( 'Check-in %1$s (%2$s) - check-out %3$s (%4$s). Both follow this date; the windows are set in Settings.', 'bhela-booking' ),
+							esc_html( mysql2date( 'j M Y', $stay['in'] ) ),
+							esc_html( $stay['in_time'] ),
+							esc_html( mysql2date( 'j M Y', $stay['out'] ) ),
+							esc_html( $stay['out_time'] )
+						);
+						?>
+					</p>
+				<?php endif; ?>
+			</td></tr>
+		<tr><th><?php esc_html_e( 'Room No.', 'bhela-booking' ); ?></th>
+			<td><input type="text" name="bhela_room_no" value="<?php echo esc_attr( $m( '_bhela_room_no' ) ); ?>" placeholder="02, 03">
+				<p class="description"><?php esc_html_e( 'Which physical rooms this guest has. The engine counts cabins; it does not name them.', 'bhela-booking' ); ?></p></td></tr>
+		<tr><th><?php esc_html_e( 'Boarding Ghat', 'bhela-booking' ); ?></th>
+			<td><input type="text" name="bhela_boarding" value="<?php echo esc_attr( $m( '_bhela_boarding' ) ); ?>" placeholder="<?php echo esc_attr( bhela_bm_get_settings()['boarding_ghat'] ?? '' ); ?>">
+				<p class="description"><?php esc_html_e( 'Leave empty to use the default from Settings.', 'bhela-booking' ); ?></p></td></tr>
+		<tr><th><?php esc_html_e( 'Booking taken by', 'bhela-booking' ); ?></th>
+			<td><input type="text" name="bhela_booked_by" value="<?php echo esc_attr( $m( '_bhela_booked_by' ) ); ?>">
+				<p class="description"><?php esc_html_e( 'Who took this booking. Filled with your name on first save; a phone booking entered by someone else can be corrected here.', 'bhela-booking' ); ?></p></td></tr>
+		<tr><th><?php esc_html_e( 'Confirmation issued by', 'bhela-booking' ); ?></th>
+			<td><input type="text" name="bhela_issued_by" value="<?php echo esc_attr( $m( '_bhela_issued_by' ) ); ?>"></td></tr>
 		<tr><th><?php esc_html_e( 'Cabin', 'bhela-booking' ); ?></th>
 			<td><select name="bhela_cabin_key">
 				<option value=""><?php esc_html_e( '— Custom / Unknown —', 'bhela-booking' ); ?></option>
@@ -390,6 +422,53 @@ function bhela_bm_actions_metabox( $post ) {
 		<?php if ( $invoice_no ) : ?>
 		<p><a class="button button-secondary" href="<?php echo esc_url( bhela_bm_invoice_url( $post->ID ) ); ?>" target="_blank">🧾 <?php esc_html_e( 'View / Print Invoice', 'bhela-booking' ); ?></a></p>
 	<?php endif; ?>
+	<?php
+	if ( function_exists( 'bhela_bm_confirm_text' ) ) :
+		$bhela_confirm = bhela_bm_confirm_text( $post->ID );
+		$bhela_wa      = bhela_bm_wa_url( get_post_meta( $post->ID, '_bhela_phone', true ), $bhela_confirm );
+		?>
+		<p>
+			<button type="button" class="button button-primary" id="bhela-copy-confirm"
+				data-copied="<?php esc_attr_e( 'Copied', 'bhela-booking' ); ?>">📋 <?php esc_html_e( 'Copy confirmation', 'bhela-booking' ); ?></button>
+			<?php if ( $bhela_wa ) : ?>
+				<a class="button button-secondary" href="<?php echo esc_url( $bhela_wa ); ?>" target="_blank" rel="noopener">💬 <?php esc_html_e( 'Send on WhatsApp', 'bhela-booking' ); ?></a>
+			<?php endif; ?>
+		</p>
+		<?php // Held in a textarea rather than a data- attribute: the message is multi-line and full of emoji, and a textarea needs no escaping gymnastics to survive both. ?>
+		<textarea id="bhela-confirm-text" readonly rows="6" class="large-text code" style="display:none"><?php echo esc_textarea( $bhela_confirm ); ?></textarea>
+		<p class="description">
+			<a href="#" id="bhela-confirm-toggle"><?php esc_html_e( 'Preview the message', 'bhela-booking' ); ?></a> ·
+			<?php esc_html_e( 'Save the booking first if you have just changed anything — this is built from what is stored.', 'bhela-booking' ); ?>
+		</p>
+		<script>
+		( function () {
+			var btn = document.getElementById( 'bhela-copy-confirm' ),
+				box = document.getElementById( 'bhela-confirm-text' ),
+				tog = document.getElementById( 'bhela-confirm-toggle' );
+			if ( ! btn || ! box ) { return; }
+			tog.addEventListener( 'click', function ( e ) {
+				e.preventDefault();
+				box.style.display = box.style.display === 'none' ? '' : 'none';
+			} );
+			btn.addEventListener( 'click', function () {
+				var done = function () {
+					var was = btn.textContent;
+					btn.textContent = '✅ ' + btn.dataset.copied;
+					setTimeout( function () { btn.textContent = was; }, 1600 );
+				};
+				// navigator.clipboard needs a secure context; a LocalWP site is plain
+				// http, so the textarea fallback is the path that actually runs here.
+				if ( navigator.clipboard && window.isSecureContext ) {
+					navigator.clipboard.writeText( box.value ).then( done );
+					return;
+				}
+				box.style.display = '';
+				box.select();
+				try { document.execCommand( 'copy' ); done(); } catch ( err ) {}
+			} );
+		}() );
+		</script>
+	<?php endif; ?>
 	<?php if ( function_exists( 'bhela_bm_review_url' ) ) : ?>
 		<?php $bhela_rv = function_exists( 'bhela_bm_review_for_booking' ) ? bhela_bm_review_for_booking( $post->ID ) : 0; ?>
 		<p><a class="button button-secondary" href="<?php echo esc_url( bhela_bm_review_url( $post->ID ) ); ?>" target="_blank">⭐ <?php esc_html_e( 'Open review form', 'bhela-booking' ); ?></a></p>
@@ -448,7 +527,13 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	$fields = array(
 		'_bhela_phone'        => sanitize_text_field( $_POST['bhela_phone'] ?? '' ),
 		'_bhela_email'        => sanitize_email( $_POST['bhela_email'] ?? '' ),
+		'_bhela_address'      => sanitize_text_field( $_POST['bhela_address'] ?? '' ),
 		'_bhela_travel_date'  => sanitize_text_field( $_POST['bhela_travel_date'] ?? '' ),
+		'_bhela_room_no'      => sanitize_text_field( $_POST['bhela_room_no'] ?? '' ),
+		// Blank is meaningful: it means "use the Settings default", so it is stored
+		// as blank rather than being back-filled with the setting at save time. A
+		// copied-in default would freeze today's ghat onto the booking for ever.
+		'_bhela_boarding'     => sanitize_text_field( $_POST['bhela_boarding'] ?? '' ),
 		'_bhela_cabin_key'    => sanitize_key( $_POST['bhela_cabin_key'] ?? '' ),
 		'_bhela_guests'       => max( 1, (int) ( $_POST['bhela_guests'] ?? 1 ) ),
 		'_bhela_pay_method'   => sanitize_key( $_POST['bhela_pay_method'] ?? '' ),
@@ -462,6 +547,27 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	);
 	foreach ( $fields as $key => $value ) {
 		update_post_meta( $post_id, $key, $value );
+	}
+
+	// Staff attribution. Kept out of the loop above deliberately: that loop writes
+	// whatever was posted, including '', which is right for a field the admin can
+	// clear and wrong for these two. They default to whoever is saving, and once a
+	// name is on the booking an empty box must not wipe it — a booking taken by
+	// Nishat should not lose her name because a manager opened it and pressed
+	// Update. Typing a different name still replaces it.
+	//
+	// Stored as text rather than a user ID on purpose: staff on the salary roster
+	// do not all have WordPress logins, and a phone booking is often entered by
+	// somebody other than the person who took the call.
+	$who = wp_get_current_user();
+	$who = $who && $who->exists() ? $who->display_name : '';
+	foreach ( array( '_bhela_booked_by' => 'bhela_booked_by', '_bhela_issued_by' => 'bhela_issued_by' ) as $meta => $field ) {
+		$posted = sanitize_text_field( $_POST[ $field ] ?? '' );
+		if ( '' !== $posted ) {
+			update_post_meta( $post_id, $meta, $posted );
+		} elseif ( '' === (string) get_post_meta( $post_id, $meta, true ) ) {
+			update_post_meta( $post_id, $meta, $who );
+		}
 	}
 
 	// `_bhela_day_type` is a label, not a price, so unlike the Total it is safe —
@@ -773,7 +879,7 @@ function bhela_bm_settings_page() {
 
 	if ( isset( $_POST['bhela_bm_settings_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_settings_nonce'] ) ), 'bhela_bm_settings' ) ) {
 		$s = bhela_bm_get_settings();
-		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix', 'ops_manager', 'support_whatsapp' ) as $f ) {
+		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix', 'ops_manager', 'support_whatsapp', 'boarding_ghat', 'checkin_time', 'checkout_time', 'package_label' ) as $f ) {
 			$s[ $f ] = isset( $_POST[ $f ] ) ? sanitize_text_field( wp_unslash( $_POST[ $f ] ) ) : $s[ $f ];
 		}
 		$s['email'] = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : $s['email'];
@@ -782,6 +888,12 @@ function bhela_bm_settings_page() {
 		$s['bangla_qr']       = esc_url_raw( $_POST['bangla_qr'] ?? '' );
 		unset( $s['holidays'] ); // holidays now live on the Trip Calendar rows
 		$s['invoice_note']    = sanitize_textarea_field( $_POST['invoice_note'] ?? '' );
+		// Only overwrite when the Business panel was actually submitted, for the same
+		// reason the weekend days are guarded below: a save from another panel would
+		// otherwise blank the notes.
+		if ( isset( $_POST['boarding_ghat'] ) ) {
+			$s['confirm_notes'] = sanitize_textarea_field( $_POST['confirm_notes'] ?? '' );
+		}
 
 		// Email notification settings.
 		foreach ( array( 'email_enabled', 'email_admin_new', 'email_customer_request', 'email_customer_confirmed', 'email_customer_completed' ) as $f ) {
@@ -853,7 +965,7 @@ function bhela_bm_settings_page() {
 		}
 		// Only overwrite a template that was actually posted: a save that does not
 		// include these fields must not silently blank them.
-		foreach ( array( 'sms_tpl_admin', 'sms_tpl_new', 'sms_tpl_confirmed', 'sms_tpl_completed' ) as $f ) {
+		foreach ( array( 'sms_tpl_admin', 'sms_tpl_new', 'sms_tpl_confirmed', 'sms_tpl_completed', 'confirm_template' ) as $f ) {
 			if ( isset( $_POST[ $f ] ) ) {
 				$s[ $f ] = sanitize_textarea_field( wp_unslash( $_POST[ $f ] ) );
 			}
@@ -941,6 +1053,20 @@ function bhela_bm_settings_page() {
 					<p class="description"><?php esc_html_e( 'Named at the bottom of every invoice so guests know who to contact. Leave empty to hide that line.', 'bhela-booking' ); ?></p></td></tr>
 				<tr><th>Support WhatsApp</th><td><input type="text" name="support_whatsapp" value="<?php echo esc_attr( $s['support_whatsapp'] ?? '' ); ?>" placeholder="+8801781720957">
 					<p class="description"><?php esc_html_e( 'Booking-support number shown on the invoice. Falls back to the WhatsApp number above when empty.', 'bhela-booking' ); ?></p></td></tr>
+			</table>
+
+			<h2><?php esc_html_e( 'Trip Logistics', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'Printed on the invoice, the customer email and the booking confirmation message. These used to be fixed in the code.', 'bhela-booking' ); ?></p>
+			<table class="form-table">
+				<tr><th>Boarding Ghat</th><td><input type="text" class="regular-text" name="boarding_ghat" value="<?php echo esc_attr( $s['boarding_ghat'] ?? '' ); ?>" placeholder="Anwarpur Ghat">
+					<p class="description"><?php esc_html_e( 'Where guests board. A booking can override this individually if a trip leaves from elsewhere.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th>Check-in Time</th><td><input type="text" name="checkin_time" value="<?php echo esc_attr( $s['checkin_time'] ?? '' ); ?>" placeholder="8:00 AM – 10:00 AM"></td></tr>
+				<tr><th>Check-out Time</th><td><input type="text" name="checkout_time" value="<?php echo esc_attr( $s['checkout_time'] ?? '' ); ?>" placeholder="5:00 PM – 7:00 PM">
+					<p class="description"><?php esc_html_e( 'Check-in is the travel date and check-out the day after — the dates follow the booking, only these time windows are fixed.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th>Package Label</th><td><input type="text" name="package_label" value="<?php echo esc_attr( $s['package_label'] ?? '' ); ?>" placeholder="২ দিন ১ রাত"></td></tr>
+				<tr><th>Confirmation Notes</th><td>
+					<textarea name="confirm_notes" rows="3" class="large-text" placeholder="AC Service: 16–18 Hours&#10;Electricity: 24 Hours"><?php echo esc_textarea( $s['confirm_notes'] ?? '' ); ?></textarea>
+					<p class="description"><?php esc_html_e( 'One note per line. Shown at the bottom of the confirmation message.', 'bhela-booking' ); ?></p></td></tr>
 			</table>
 			</div><!-- /business -->
 
@@ -1128,12 +1254,21 @@ function bhela_bm_settings_page() {
 			</div>
 
 			<table class="form-table">
-				<tr><th colspan="2"><em><?php esc_html_e( 'Placeholders:', 'bhela-booking' ); ?></em> <code>{name} {phone} {invoice} {date} {cabin} {guests} {total} {advance} {due} {status} {review_link}</code></th></tr>
+				<tr><th colspan="2"><em><?php esc_html_e( 'Placeholders:', 'bhela-booking' ); ?></em> <code>{name} {phone} {invoice} {date} {cabin} {guests} {total} {advance} {paid} {due} {status} {review_link}</code><br>
+					<em><?php esc_html_e( 'Also available:', 'bhela-booking' ); ?></em> <code>{address} {boarding} {checkin} {checkout} {checkin_time} {checkout_time} {package} {room} {room_type} {pay_method} {booked_by} {issued_by} {issued_on} {notes} {invoice_link} {ops_manager} {support_whatsapp}</code></th></tr>
 				<tr><th><?php esc_html_e( 'New booking → you', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_admin" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_admin'] ); ?></textarea></td></tr>
 				<tr><th><?php esc_html_e( 'New booking → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_new" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_new'] ); ?></textarea></td></tr>
 				<tr><th><?php esc_html_e( 'Status change → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_confirmed" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_confirmed'] ); ?></textarea></td></tr>
 				<tr><th><?php esc_html_e( 'Trip completed → customer', 'bhela-booking' ); ?></th><td><textarea name="sms_tpl_completed" rows="2" class="large-text"><?php echo esc_textarea( $s['sms_tpl_completed'] ?? '' ); ?></textarea>
 					<p class="description"><?php esc_html_e( 'Sent instead of the line above when a booking is marked Completed. Use {review_link} for the guest\'s private review link. Leave a template empty to fall back to the wording shipped with the plugin — use the tick boxes above to stop a message being sent.', 'bhela-booking' ); ?></p></td></tr>
+			</table>
+
+			<h2><?php esc_html_e( 'Booking Confirmation Message', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'The message staff copy to WhatsApp from a booking. Not sent automatically — a person presses Copy confirmation on the booking and pastes it.', 'bhela-booking' ); ?></p>
+			<table class="form-table">
+				<tr><th><?php esc_html_e( 'Template', 'bhela-booking' ); ?></th><td>
+					<textarea name="confirm_template" rows="18" class="large-text code" placeholder="<?php echo esc_attr( bhela_bm_confirm_default_template() ); ?>"><?php echo esc_textarea( $s['confirm_template'] ?? '' ); ?></textarea>
+					<p class="description"><?php esc_html_e( 'Leave empty to use the wording shipped with the plugin, shown greyed out above. Any placeholder from the list further up works here. A line whose value is empty — an address nobody gave — is dropped rather than printed blank.', 'bhela-booking' ); ?></p></td></tr>
 			</table>
 			<?php
 			$sms_last = get_transient( 'bhela_bm_sms_test_result' );

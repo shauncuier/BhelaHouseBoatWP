@@ -124,7 +124,7 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	}
 
 	$rows  = bhela_bm_email_row( 'বুকিং নম্বর', $invoice_no, true );
-	$rows .= bhela_bm_email_row( 'ভ্রমণের তারিখ', $m( '_bhela_travel_date' ) . ' (২ দিন ১ রাত)' );
+	$rows .= bhela_bm_email_row( 'ভ্রমণের তারিখ', $m( '_bhela_travel_date' ) . ' (' . ( bhela_bm_get_settings()['package_label'] ?? '' ) . ')' );
 	$booking_lines = json_decode( (string) $m( '_bhela_lines' ), true );
 	if ( is_array( $booking_lines ) && $booking_lines ) {
 		foreach ( $booking_lines as $bl ) {
@@ -146,7 +146,15 @@ function bhela_bm_email_customer_html( $booking_id, $type ) {
 	}
 
 	$boarding = ( 'confirmed' === $type )
-		? '<p style="margin:18px 0 0;padding:14px 16px;background:#EBF7EF;border-radius:10px;font-size:13.5px;color:#14532d;line-height:1.8;">📌 <strong>রিপোর্টিং:</strong> Anwarpur Ghat — নির্ধারিত সময় ফোনে জানানো হবে।<br>💵 বাকি টাকা অনবোর্ড হওয়ার সময় পরিশোধযোগ্য।</p>'
+		? sprintf(
+			// The ghat name used to be written into this file, followed by "we will
+			// phone you with the time" — which was untrue by then, since staff were
+			// already sending the real window by WhatsApp. Both now come from
+			// Settings, so this email agrees with the confirmation message.
+			'<p style="margin:18px 0 0;padding:14px 16px;background:#EBF7EF;border-radius:10px;font-size:13.5px;color:#14532d;line-height:1.8;">📌 <strong>রিপোর্টিং:</strong> %1$s — %2$s।<br>💵 বাকি টাকা অনবোর্ড হওয়ার সময় পরিশোধযোগ্য।</p>',
+			esc_html( get_post_meta( $booking_id, '_bhela_boarding', true ) ?: ( $settings['boarding_ghat'] ?? '' ) ),
+			esc_html( bhela_bm_booking_stay( $booking_id )['in_time'] )
+		)
 		: '';
 
 	ob_start();

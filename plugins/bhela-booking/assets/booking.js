@@ -1216,7 +1216,11 @@
 			var fd = new FormData(form);
 			var params = new URLSearchParams();
 			params.append('action', 'bhela_bm_submit');
-			['name', 'phone', 'email', 'date', 'message', 'bhela_bm_hp'].forEach(function (f) {
+			// An explicit list, not every FormData entry — so a new input on the form
+			// is NOT submitted until its name is added here. That is what happened to
+			// `address`: the field rendered, the guest filled it in, and the value was
+			// silently dropped on the way to the server.
+			['name', 'phone', 'email', 'address', 'date', 'message', 'bhela_bm_hp'].forEach(function (f) {
 				params.append(f, fd.get(f) || '');
 			});
 			params.append('cabins', JSON.stringify(fullBoat() ? [] : activeCabins()));

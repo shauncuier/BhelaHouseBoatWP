@@ -255,6 +255,99 @@ if ( is_wp_error( $fb_fe ) ) {
 	ok( ! $fb_bal['settled'], 'priced but unpaid — no PAID stamp' );
 }
 
+echo "\n=== 3e. the confirmation message ===\n";
+// Staff were typing this out by hand per booking. Everything in it already existed
+// in the record, so hand typing only added the chance of quoting a wrong Due.
+$cf = bk_new( 'confirm guest' );
+bk_save( $cf, array(
+	'bhela_travel_date' => $friday,
+	'bhela_phone'       => '01712345678',
+	'bhela_guests'      => 4,
+	'bhela_address'     => 'Sunamganj',
+	'bhela_room_no'     => '02',
+	'bhela_booked_by'   => 'Nishat Kaiser',
+	'bhela_issued_by'   => 'Nishat Kaiser',
+	'bhela_pay_method'  => 'bkash',
+	'bhela_paid_amount' => 4000,
+) );
+bk_money( $cf, 33000, 4000 );
+update_post_meta( $cf, '_bhela_pay_method', 'bkash' );
+$cf_text = bhela_bm_confirm_text( $cf );
+
+// The failure that matters: a token the renderer does not know stays on screen as
+// literal `{curly}` text and goes out to a guest that way.
+preg_match_all( '/\{[a-z_]+\}/', $cf_text, $cf_left );
+ok( ! $cf_left[0], 'every placeholder resolved', implode( ' ', $cf_left[0] ) );
+
+ok( false !== strpos( $cf_text, (string) bk_meta( $cf, 'invoice_no' ) ), 'carries the system booking number' );
+ok( false !== strpos( $cf_text, 'Sunamganj' ), 'address' );
+ok( false !== strpos( $cf_text, 'Nishat Kaiser' ), 'staff names' );
+ok( false !== strpos( $cf_text, 'bKash' ), 'payment method as a label, not a slug' );
+ok( false !== strpos( $cf_text, bhela_bm_invoice_url( $cf ) ), 'the secure invoice link' );
+
+// The message and the invoice are read side by side. A different Due on each is
+// the one discrepancy a guest is guaranteed to notice, so both come from
+// bhela_bm_balance() rather than from two copies of the subtraction.
+$cf_bal = bhela_bm_balance( 33000, 4000 );
+ok( false !== strpos( $cf_text, bhela_bm_money( $cf_bal['due'] ) ), 'Due matches bhela_bm_balance()', bhela_bm_money( $cf_bal['due'] ) );
+
+// Dates are derived on every read. A stored copy is what went stale in production
+// and printed "Weekend" against a Monday — see CLAUDE.md §13.8.
+$cf_stay = bhela_bm_booking_stay( $cf );
+ok( $friday === $cf_stay['in'], 'check-in is the travel date', $cf_stay['in'] );
+ok( gmdate( 'Y-m-d', strtotime( $friday . ' +1 day' ) ) === $cf_stay['out'], 'check-out is the day after', $cf_stay['out'] );
+bk_save( $cf, array( 'bhela_travel_date' => $monday, 'bhela_paid_amount' => 4000 ) );
+$cf_moved = bhela_bm_booking_stay( $cf );
+ok( $monday === $cf_moved['in'] && gmdate( 'Y-m-d', strtotime( $monday . ' +1 day' ) ) === $cf_moved['out'],
+	'moving the travel date moves both ends', $cf_moved['in'] . ' → ' . $cf_moved['out'] );
+
+// A blank optional field must drop its line, not print a dangling label.
+bk_save( $cf, array( 'bhela_travel_date' => $monday, 'bhela_address' => '', 'bhela_room_no' => '', 'bhela_paid_amount' => 4000 ) );
+$cf_bare = bhela_bm_confirm_text( $cf );
+ok( ! preg_match( '/^\s*📍 Address:\s*$/mu', $cf_bare ), 'an empty address drops its line' );
+ok( false !== strpos( $cf_bare, 'Note:' ), 'but a label that heads a list survives' );
+
+// Boarding falls back to the setting, and a booking overrides it.
+$cf_s = bhela_bm_get_settings();
+ok( false !== strpos( $cf_bare, $cf_s['boarding_ghat'] ), 'boarding falls back to the setting', $cf_s['boarding_ghat'] );
+update_post_meta( $cf, '_bhela_boarding', 'ZZ Tekerghat Ghat' );
+ok( false !== strpos( bhela_bm_confirm_text( $cf ), 'ZZ Tekerghat Ghat' ), 'and a booking can override it' );
+
+// The booking form renders `address`, and booking.js copies an explicit list of
+// field names into the request rather than the whole form — so adding an input is
+// not enough to submit it. The field shipped once with the value silently dropped
+// between the guest typing it and the server: the input was there, the booking
+// stored ''. Both ends are pinned here because neither alone would have caught it.
+$cf_form = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/frontend.php' );
+$cf_js   = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/assets/booking.js' );
+ok( false !== strpos( $cf_form, 'name="address"' ), 'the form renders an address input' );
+ok( (bool) preg_match( "/\[[^\]]*'address'[^\]]*\]\.forEach/", $cf_js ), 'and booking.js actually submits it' );
+
+// Proof end to end, through the real submission handler.
+$cf_sub = bhela_bm_process_submission( array(
+	'name'    => 'ZZ Address guest',
+	'phone'   => '01700000011',
+	'address' => 'Sunamganj',
+	'date'    => $friday,
+	'cabins'  => wp_json_encode( array( array( 'adults' => 2, 'c48' => 0, 'c04' => 0 ) ) ),
+) );
+if ( is_wp_error( $cf_sub ) ) {
+	ok( false, 'a front-end booking stores the address', $cf_sub->get_error_message() );
+} else {
+	$made[] = (int) $cf_sub['booking_id'];
+	ok( 'Sunamganj' === get_post_meta( (int) $cf_sub['booking_id'], '_bhela_address', true ),
+		'a front-end booking stores the address', get_post_meta( (int) $cf_sub['booking_id'], '_bhela_address', true ) );
+}
+
+// The strings these settings replaced were hardcoded into the guest-facing files,
+// which is why changing the boarding ghat used to be a code edit.
+$cf_inv = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/templates/invoice.php' );
+$cf_eml = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/emails.php' );
+ok( false === strpos( $cf_inv, 'Anwarpur Ghat' ), 'the invoice no longer hardcodes the ghat' );
+ok( false === strpos( $cf_eml, 'Anwarpur Ghat' ), 'nor does the customer email' );
+ok( false === strpos( $cf_inv, '২ দিন ১ রাত' ), 'nor the package label' );
+ok( false === strpos( $cf_eml, '২ দিন ১ রাত' ), 'nor does the email' );
+
 echo "\n=== 3c. unticking restores per-cabin pricing ===\n";
 bk_save( $fb, array(
 	'bhela_cabin_adults' => array( 4 ),

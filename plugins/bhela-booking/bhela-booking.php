@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.29.1
+ * Version: 2.30.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.29.1' );
+define( 'BHELA_BM_VERSION', '2.30.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -38,6 +38,21 @@ function bhela_bm_default_settings() {
 		'invoice_prefix'   => 'BH',
 		'ops_manager'      => 'Uttam',              // named on the invoice footer
 		'support_whatsapp' => '+8801781720957',     // booking-support number
+
+		// Trip logistics. These were hardcoded into the invoice template and the
+		// customer email — changing the boarding ghat or the package length meant
+		// editing PHP, in four places, one of which nobody would have found.
+		'boarding_ghat'  => 'Anwarpur Ghat',
+		'checkin_time'   => '8:00 AM – 10:00 AM',
+		'checkout_time'  => '5:00 PM – 7:00 PM',
+		'package_label'  => '২ দিন ১ রাত',
+		// One note per line. Printed on the confirmation message as a bullet list.
+		'confirm_notes'  => "AC Service: 16–18 Hours\nElectricity: 24 Hours",
+		// Blank means "use bhela_bm_confirm_default_template()". Storing the default
+		// here instead would freeze today's wording into the database, so a later
+		// improvement to the shipped text would never reach a site that had saved
+		// its settings once.
+		'confirm_template' => '',
 		'advance_percent'  => 50,
 		'child_fee'        => 5000, // flat charge per 4–8 year old, any day type
 		'date_chips'       => 5,    // how many upcoming trips show as quick-pick chips (0 = hide)
@@ -361,6 +376,67 @@ function bhela_bm_booking_day_type( $booking_id ) {
 		return bhela_bm_day_type( $date );
 	}
 	return (string) get_post_meta( $booking_id, '_bhela_day_type', true );
+}
+
+/**
+ * How a guest paid, key => label.
+ *
+ * The booking edit screen and the Trip Report each had their own copy of this
+ * list, and the confirmation message needed a third. One list, so a method added
+ * here appears everywhere rather than in whichever screen was remembered.
+ * Expenses keep a separate list on purpose — that is money going out, and its
+ * methods are owner-editable.
+ */
+function bhela_bm_pay_methods() {
+	return array(
+		''      => '—',
+		'bkash' => 'bKash',
+		'nagad' => 'Nagad',
+		'bank'  => 'Bank Transfer',
+		'cash'  => 'Cash',
+	);
+}
+
+/**
+ * The stay: check-in and check-out, with their time windows.
+ *
+ * Check-in is the travel date and check-out the day after — the package is two
+ * days, one night. Both are DERIVED on every read rather than stored, for exactly
+ * the reason the day type above is: a stored copy goes stale the moment someone
+ * moves the travel date, and nothing in the save path is guaranteed to run. A
+ * wrong check-out date on a confirmation message is worse than a wrong label,
+ * because the guest plans a journey home around it.
+ *
+ * The time windows are settings, not per booking — the boat leaves when it leaves.
+ *
+ * @param int $booking_id Booking post ID.
+ * @return array{in:string,out:string,in_time:string,out_time:string,nights:int}
+ *               `in`/`out` are Y-m-d, or '' when the travel date is missing or
+ *               malformed. Callers must handle '' rather than printing it.
+ */
+function bhela_bm_booking_stay( $booking_id ) {
+	$s   = bhela_bm_get_settings();
+	$out = array(
+		'in'       => '',
+		'out'      => '',
+		'in_time'  => (string) ( $s['checkin_time'] ?? '' ),
+		'out_time' => (string) ( $s['checkout_time'] ?? '' ),
+		'nights'   => 1,
+	);
+
+	$date  = (string) get_post_meta( $booking_id, '_bhela_travel_date', true );
+	$valid = DateTime::createFromFormat( 'Y-m-d', $date );
+	// Same round-trip guard as bhela_bm_booking_day_type(): createFromFormat()
+	// accepts 2026-02-31 and rolls it into March, which would put check-out on a
+	// day the boat is not sailing.
+	if ( ! $valid || $valid->format( 'Y-m-d' ) !== $date ) {
+		return $out;
+	}
+
+	$out['in'] = $date;
+	$valid->modify( '+' . $out['nights'] . ' day' );
+	$out['out'] = $valid->format( 'Y-m-d' );
+	return $out;
 }
 
 /**
@@ -746,6 +822,10 @@ require_once BHELA_BM_PATH . 'includes/frontend.php';
 require_once BHELA_BM_PATH . 'includes/invoice.php';
 require_once BHELA_BM_PATH . 'includes/emails.php';
 require_once BHELA_BM_PATH . 'includes/sms.php';
+// Loaded outside the is_admin() block below, and it has to be: the {notes} token it
+// supplies is available to every SMS template, and an SMS goes out from the public
+// booking form where nothing in wp-admin is loaded.
+require_once BHELA_BM_PATH . 'includes/confirm.php';
 require_once BHELA_BM_PATH . 'includes/otp.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';
