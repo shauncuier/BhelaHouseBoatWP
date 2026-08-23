@@ -1065,8 +1065,8 @@ function bhela_bm_settings_page() {
 					<p class="description"><?php esc_html_e( 'Check-in is the travel date and check-out the day after — the dates follow the booking, only these time windows are fixed.', 'bhela-booking' ); ?></p></td></tr>
 				<tr><th>Package Label</th><td><input type="text" name="package_label" value="<?php echo esc_attr( $s['package_label'] ?? '' ); ?>" placeholder="২ দিন ১ রাত"></td></tr>
 				<tr><th>Confirmation Notes</th><td>
-					<textarea name="confirm_notes" rows="3" class="large-text" placeholder="AC Service: 16–18 Hours&#10;Electricity: 24 Hours"><?php echo esc_textarea( $s['confirm_notes'] ?? '' ); ?></textarea>
-					<p class="description"><?php esc_html_e( 'One note per line. Shown at the bottom of the confirmation message.', 'bhela-booking' ); ?></p></td></tr>
+					<textarea name="confirm_notes" rows="5" class="large-text"><?php echo esc_textarea( $s['confirm_notes'] ?? '' ); ?></textarea>
+					<p class="description"><?php esc_html_e( 'One note per line. Printed on the booking confirmation message and on the invoice, from this one field — so the two can never promise a guest different things.', 'bhela-booking' ); ?></p></td></tr>
 			</table>
 			</div><!-- /business -->
 

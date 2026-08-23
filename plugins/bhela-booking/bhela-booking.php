@@ -46,8 +46,14 @@ function bhela_bm_default_settings() {
 		'checkin_time'   => '8:00 AM – 10:00 AM',
 		'checkout_time'  => '5:00 PM – 7:00 PM',
 		'package_label'  => '২ দিন ১ রাত',
-		// One note per line. Printed on the confirmation message as a bullet list.
-		'confirm_notes'  => "AC Service: 16–18 Hours\nElectricity: 24 Hours",
+		// One note per line. Printed on the confirmation message and the invoice.
+		//
+		// Worded as a commitment with its limits attached, not as a bare number. "AC
+		// Service: 16–18 Hours" invites the guest to ask why it is not 24, at night,
+		// on the boat; saying up front that the generator stops for fuel and
+		// maintenance answers that before it becomes a complaint.
+		'confirm_notes'  => "AC Service: Available for approximately 16–18 hours throughout the trip, subject to scheduled generator breaks for fuel, maintenance, and operational requirements.\n"
+			. "Electricity: 24-hour electricity supply is available throughout the trip, subject to normal generator operation.",
 		// Blank means "use bhela_bm_confirm_default_template()". Storing the default
 		// here instead would freeze today's wording into the database, so a later
 		// improvement to the shipped text would never reach a site that had saved
