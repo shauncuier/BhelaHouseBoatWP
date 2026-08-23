@@ -339,6 +339,21 @@ if ( is_wp_error( $cf_sub ) ) {
 		'a front-end booking stores the address', get_post_meta( (int) $cf_sub['booking_id'], '_bhela_address', true ) );
 }
 
+// The service notes appear on the invoice as well as in the message, from the one
+// setting — an invoice promising 24-hour AC while the confirmation says 16-18 is
+// exactly the contradiction a guest brings up at check-in.
+$cf_lines = bhela_bm_confirm_note_lines();
+ok( $cf_lines, 'there are service notes to print', implode( ' | ', $cf_lines ) );
+$cf_html = bk_invoice_html( $cf );
+foreach ( $cf_lines as $cf_line ) {
+	ok( false !== strpos( $cf_html, esc_html( $cf_line ) ), 'the invoice prints: ' . $cf_line );
+	ok( false !== strpos( $cf_text, $cf_line ), 'and so does the confirmation message: ' . $cf_line );
+}
+// Bordered, not filled: browsers drop background colours when printing, so a
+// tinted panel prints as nothing at all. Same rule as the PAID stamp above.
+ok( (bool) preg_match( '/\.svc-note\s*\{[^}]*border:/', $cf_html ), 'the service-note block is drawn with a border' );
+ok( ! preg_match( '/\.svc-note\s*\{[^}]*background/', $cf_html ), 'and has no fill to lose in print' );
+
 // The strings these settings replaced were hardcoded into the guest-facing files,
 // which is why changing the boarding ghat used to be a code edit.
 $cf_inv = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/templates/invoice.php' );

@@ -66,14 +66,25 @@ function bhela_bm_confirm_default_template() {
 		. "ধন্যবাদ — BHELA – The Haor Exclusive";
 }
 
-/** The standard notes, one per line, as a bullet list. */
+/**
+ * The standing service notes, as an array of lines.
+ *
+ * Two consumers want the same source in different shapes — the WhatsApp message
+ * wants asterisks, the invoice wants a <ul> — so the split lives here once and each
+ * formats it. A second copy of "explode the textarea and drop the blanks" is how
+ * the two would end up disagreeing about a trailing empty line.
+ *
+ * @return string[]
+ */
+function bhela_bm_confirm_note_lines() {
+	$raw = (string) ( bhela_bm_get_settings()['confirm_notes'] ?? '' );
+	return array_values( array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', $raw ) ) ) );
+}
+
+/** The standard notes as a plain-text bullet list, for the WhatsApp message. */
 function bhela_bm_confirm_notes() {
-	$raw   = (string) ( bhela_bm_get_settings()['confirm_notes'] ?? '' );
-	$lines = array_filter( array_map( 'trim', preg_split( '/\r\n|\r|\n/', $raw ) ) );
-	if ( ! $lines ) {
-		return '';
-	}
-	return '* ' . implode( "\n* ", $lines );
+	$lines = bhela_bm_confirm_note_lines();
+	return $lines ? '* ' . implode( "\n* ", $lines ) : '';
 }
 
 /**

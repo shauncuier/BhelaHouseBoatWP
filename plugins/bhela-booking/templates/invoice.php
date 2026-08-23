@@ -128,6 +128,16 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	@media (max-width:560px) { .mgr__cta { width:100%; text-align:center; } }
 
 	.note { font-size:12.5px; color:#5b6b6a; line-height:1.8; border-top:1px dashed #cdd9d8; padding-top:16px; }
+	/* Service notes. Bordered rather than filled, for the same reason the PAID
+	   stamp is: browsers print with print-color-adjust:economy by default and drop
+	   background colours, so a tinted panel prints as nothing and takes the text's
+	   only visual grouping with it. */
+	.svc-note { border:1px solid #cdd9d8; border-left:4px solid #14676B; border-radius:8px;
+		padding:12px 16px; margin-bottom:16px; }
+	.svc-note h4 { font-size:12px; text-transform:uppercase; letter-spacing:.6px;
+		color:#14676B; margin-bottom:6px; }
+	.svc-note ul { margin:0; padding-left:18px; }
+	.svc-note li { font-size:12.5px; color:#3d5150; line-height:1.7; }
 	.inv-foot { background:#0B2E33; color:#cfe3e2; text-align:center; padding:18px; font-size:13px; }
 	.inv-foot a { color:#cfe3e2; text-decoration:none; }
 	.inv-foot a:hover { color:#fff; text-decoration:underline; }
@@ -311,6 +321,24 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 
 			<?php if ( $invoice['message'] ) : ?>
 				<p style="margin-bottom:16px"><strong>Note:</strong> <?php echo esc_html( $invoice['message'] ); ?></p>
+			<?php endif; ?>
+
+			<?php
+			// The standing service notes — AC hours, electricity. Same setting the
+			// WhatsApp confirmation prints, so the two cannot tell a guest different
+			// things about what they are getting. Titled rather than left as a bare
+			// "Note:", because the guest's own note above already uses that word.
+			$inv_notes = function_exists( 'bhela_bm_confirm_note_lines' ) ? bhela_bm_confirm_note_lines() : array();
+			if ( $inv_notes ) :
+				?>
+				<div class="svc-note">
+					<h4><?php esc_html_e( 'Service Notes / সার্ভিস তথ্য', 'bhela-booking' ); ?></h4>
+					<ul>
+						<?php foreach ( $inv_notes as $inv_n ) : ?>
+							<li><?php echo esc_html( $inv_n ); ?></li>
+						<?php endforeach; ?>
+					</ul>
+				</div>
 			<?php endif; ?>
 
 			<div class="note"><?php echo nl2br( esc_html( bhela_bm_render_invoice_note( $s['invoice_note'], $invoice ) ) ); ?></div>
