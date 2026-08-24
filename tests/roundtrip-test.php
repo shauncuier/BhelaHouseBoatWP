@@ -110,7 +110,10 @@ ok( 9999 === (int) bhela_bm_cost_stored_lines( $sheet )['b2b_partner']['p1'], 'a
 ok( ! bhela_bm_cost_b2b_drift( $sheet )['stale'], 'and is not reported stale — it was never auto-filled' );
 
 bhela_test_delete( $rt_book );
-delete_option( 'bhela_bm_agencies' );
+// The agency directory is NOT deleted here. It is owner-built data with live
+// referral tokens in it, and a delete_option() on the way out took a real partner
+// with it once already. bhela_test_owner_options() in the bootstrap snapshots and
+// restores it, so this harness can write to it freely and leave nothing behind.
 
 echo "\n=== 4. approved sheet still refuses writes ===\n";
 update_post_meta( $sheet, '_bhela_cost_status', 'approved' );

@@ -349,6 +349,35 @@ function bhela_bm_details_metabox( $post ) {
 				<p class="description"><?php esc_html_e( 'Suggested from the agency rate when you pick one, and yours to change. The amount is what is stored — a figure agreed with a partner, not a percentage that moves when the price does.', 'bhela-booking' ); ?></p></td></tr>
 		<tr><th><?php esc_html_e( 'Agency reference', 'bhela-booking' ); ?></th>
 			<td><input type="text" name="bhela_agency_ref" value="<?php echo esc_attr( $m( '_bhela_agency_ref' ) ); ?>" placeholder="<?php esc_attr_e( 'their own booking ref', 'bhela-booking' ); ?>"></td></tr>
+		<?php
+		// A referral attributed itself from a link. Until somebody agrees it was a
+		// genuine introduction, the commission counts for nothing anywhere — see
+		// bhela_bm_commission_rows(). The partner who owns the link is the one best
+		// placed to claim bookings that were coming anyway, so this is a person's
+		// decision by design, not a default.
+		$bhela_ref_state = (string) $m( '_bhela_referral' );
+		if ( '' !== $bhela_ref_state ) :
+			?>
+			<tr><th><?php esc_html_e( 'Referral', 'bhela-booking' ); ?></th>
+				<td>
+					<?php if ( 'unconfirmed' === $bhela_ref_state ) : ?>
+						<?php echo bhela_bm_status_pill( __( 'referral — unconfirmed', 'bhela-booking' ), 'attention' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<p class="description">
+							<?php
+							printf(
+								/* translators: %s: when the referral link was followed */
+								esc_html__( 'Arrived through a referral link on %s. The commission above is a suggestion and is counted by nothing until you confirm it.', 'bhela-booking' ),
+								esc_html( $m( '_bhela_referral_at' ) ? mysql2date( 'j M Y, g:i a', $m( '_bhela_referral_at' ) ) : '—' )
+							);
+							?>
+						</p>
+						<label><input type="checkbox" name="bhela_referral_confirm" value="1"> <strong><?php esc_html_e( 'Confirm this referral on save', 'bhela-booking' ); ?></strong></label><br>
+						<label><input type="checkbox" name="bhela_referral_reject" value="1"> <?php esc_html_e( 'Not a referral — clear the agency and commission', 'bhela-booking' ); ?></label>
+					<?php else : ?>
+						<?php echo bhela_bm_status_pill( __( 'referral confirmed', 'bhela-booking' ), 'good' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+					<?php endif; ?>
+				</td></tr>
+		<?php endif; ?>
 		<script>
 		( function () {
 			var sel  = document.getElementById( 'bhela-agency' ),
@@ -619,6 +648,17 @@ function bhela_bm_save_booking( $post_id, $post ) {
 	// Stored as text rather than a user ID on purpose: staff on the salary roster
 	// do not all have WordPress logins, and a phone booking is often entered by
 	// somebody other than the person who took the call.
+	// Confirming or rejecting a referral. Kept out of the $fields loop above because
+	// these are one-shot actions, not stored values — an unticked box must mean
+	// "leave it alone", not "clear it".
+	if ( ! empty( $_POST['bhela_referral_reject'] ) ) {
+		update_post_meta( $post_id, '_bhela_agency', '' );
+		update_post_meta( $post_id, '_bhela_commission', 0 );
+		update_post_meta( $post_id, '_bhela_referral', '' );
+	} elseif ( ! empty( $_POST['bhela_referral_confirm'] ) ) {
+		update_post_meta( $post_id, '_bhela_referral', 'confirmed' );
+	}
+
 	$who = wp_get_current_user();
 	$who = $who && $who->exists() ? $who->display_name : '';
 	foreach ( array( '_bhela_booked_by' => 'bhela_booked_by', '_bhela_issued_by' => 'bhela_issued_by' ) as $meta => $field ) {
@@ -1578,6 +1618,7 @@ function bhela_bm_settings_page() {
 						<th style="width:150px"><?php esc_html_e( 'Phone', 'bhela-booking' ); ?></th>
 						<th><?php esc_html_e( 'Email', 'bhela-booking' ); ?></th>
 						<th style="width:110px"><?php esc_html_e( 'Rate (%)', 'bhela-booking' ); ?></th>
+						<th><?php esc_html_e( 'Referral link', 'bhela-booking' ); ?></th>
 						<th style="width:90px"><?php esc_html_e( 'Ended', 'bhela-booking' ); ?></th>
 					</tr>
 				</thead>
@@ -1591,6 +1632,13 @@ function bhela_bm_settings_page() {
 						<td><input type="text" name="agencies[<?php echo esc_attr( $ag_id ); ?>][phone]" value="<?php echo esc_attr( $ag['phone'] ); ?>" style="width:100%"></td>
 						<td><input type="email" name="agencies[<?php echo esc_attr( $ag_id ); ?>][email]" value="<?php echo esc_attr( $ag['email'] ); ?>" style="width:100%"></td>
 						<td><input type="number" min="0" max="100" step="0.5" name="agencies[<?php echo esc_attr( $ag_id ); ?>][rate]" value="<?php echo esc_attr( $ag['rate'] ); ?>" style="width:100%"></td>
+						<td>
+							<?php // The token rides along so saving this screen never rotates a live link. ?>
+							<input type="hidden" name="agencies[<?php echo esc_attr( $ag_id ); ?>][token]" value="<?php echo esc_attr( $ag['token'] ); ?>">
+							<?php $ag_url = bhela_bm_agency_ref_url( $ag_id ); ?>
+							<input type="text" readonly value="<?php echo esc_attr( $ag_url ); ?>" style="width:100%;font-size:11px" onclick="this.select()">
+							<label style="font-size:11px"><input type="checkbox" name="agencies[<?php echo esc_attr( $ag_id ); ?>][regen]" value="1"> <?php esc_html_e( 'New link on save (breaks the old one)', 'bhela-booking' ); ?></label>
+						</td>
 						<td><label><input type="checkbox" name="agencies[<?php echo esc_attr( $ag_id ); ?>][retired]" value="1" <?php checked( $ag['retired'] ); ?>> <?php esc_html_e( 'Hide', 'bhela-booking' ); ?></label></td>
 					</tr>
 				<?php endforeach; ?>
@@ -1612,6 +1660,7 @@ function bhela_bm_settings_page() {
 						'<td><input type="text" name="agencies[' + key + '][phone]" style="width:100%"></td>' +
 						'<td><input type="email" name="agencies[' + key + '][email]" style="width:100%"></td>' +
 						'<td><input type="number" min="0" max="100" step="0.5" name="agencies[' + key + '][rate]" style="width:100%"></td>' +
+						'<td><em style="font-size:11px;color:#5E7472">link appears after saving</em></td>' +
 						'<td></td>';
 					body.appendChild(tr);
 					tr.querySelector('input[type=text]').focus();

@@ -477,6 +477,20 @@ function bhela_bm_process_submission( $data ) {
 	}
 	update_post_meta( $post_id, '_bhela_email', $email );
 	update_post_meta( $post_id, '_bhela_address', $address );
+	// Did this guest arrive through an agency's referral link? Attribute it and
+	// suggest the commission, but mark it UNCONFIRMED — nothing reaches the accounts
+	// until somebody in the office agrees it was a genuine referral. See
+	// bhela_bm_commission_rows(), which is where that gate is enforced.
+	//
+	// Only front-end bookings are attributed this way. One entered in wp-admin
+	// already had a person choose the agency, which is the confirmation.
+	$ref_agency = function_exists( 'bhela_bm_referred_agency' ) ? bhela_bm_referred_agency() : '';
+	if ( '' !== $ref_agency ) {
+		update_post_meta( $post_id, '_bhela_agency', $ref_agency );
+		update_post_meta( $post_id, '_bhela_commission', bhela_bm_agency_commission( $ref_agency, (int) $price['total'] ) );
+		update_post_meta( $post_id, '_bhela_referral', 'unconfirmed' );
+		update_post_meta( $post_id, '_bhela_referral_at', current_time( 'mysql' ) );
+	}
 	update_post_meta( $post_id, '_bhela_travel_date', $date );
 	update_post_meta( $post_id, '_bhela_cabin_type', $cabin_summary );
 	update_post_meta( $post_id, '_bhela_cabins_json', wp_json_encode( is_array( $cabins ) ? $cabins : array(), JSON_UNESCAPED_UNICODE ) );

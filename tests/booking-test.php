@@ -441,6 +441,80 @@ ok( 0 === (int) bhela_bm_commission_rows( $friday, $friday )['total'], 'a cancel
 	(string) bhela_bm_commission_rows( $friday, $friday )['total'] );
 bk_save( $b2b, array( 'bhela_travel_date' => $friday, 'bhela_status' => 'confirmed', 'bhela_agency' => $ag_id, 'bhela_commission' => 3500 ) );
 
+echo "\n=== 3h. referral links ===\n";
+$ref_tok = bhela_bm_agencies()[ $ag_id ]['token'] ?? '';
+ok( '' !== $ref_tok, 'the agency has a referral token', $ref_tok );
+ok( $ag_id === bhela_bm_agency_by_token( $ref_tok ), 'the token resolves to its agency' );
+ok( '' === bhela_bm_agency_by_token( 'nonsense' ), 'an unknown token resolves to nothing' );
+ok( false !== strpos( bhela_bm_agency_ref_url( $ag_id ), 'ref=' . $ref_tok ), 'the link carries it',
+	bhela_bm_agency_ref_url( $ag_id ) );
+
+// Rotation. A partner whose link leaks needs a new one WITHOUT losing the bookings
+// they already brought — which is why the token is stored and random rather than a
+// wp_hash() over the frozen agency id, where it could never change.
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_tok, 'regen' => 1 ),
+) );
+$ref_new = bhela_bm_agencies()[ $ag_id ]['token'] ?? '';
+ok( $ref_new !== $ref_tok, 'regenerating mints a different token' );
+ok( '' === bhela_bm_agency_by_token( $ref_tok ), 'and the old link stops attributing' );
+ok( $ag_id === bhela_bm_agency_by_token( $ref_new ), 'while the new one works' );
+
+// An ordinary save must NOT rotate it, or every settings save would break every
+// live link an agency is already advertising.
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_new ),
+) );
+ok( $ref_new === ( bhela_bm_agencies()[ $ag_id ]['token'] ?? '' ), 'a normal save keeps the link alive' );
+
+// A retired partner's link stops attributing, which is half of what retiring means.
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_new, 'retired' => 1 ),
+) );
+ok( '' === bhela_bm_agency_by_token( $ref_new ), 'a retired agency stops attributing' );
+ok( null !== bhela_bm_agency( $ag_id ), 'but still names the bookings it already brought' );
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_new ),
+) );
+
+echo "\n=== 3i. a referral suggests, and waits ===\n";
+// The control that matters: appending ?ref= to a URL must not move money on its own.
+$_COOKIE[ bhela_bm_ref_cookie() ] = $ref_new;
+$ref_sub = bhela_bm_process_submission( array(
+	'name'   => 'ZZ Referred guest',
+	'phone'  => '01700000033',
+	'date'   => $friday,
+	'cabins' => wp_json_encode( array( array( 'adults' => 2, 'c48' => 0, 'c04' => 0 ) ) ),
+) );
+unset( $_COOKIE[ bhela_bm_ref_cookie() ] );
+
+if ( is_wp_error( $ref_sub ) ) {
+	ok( false, 'a referred booking submits', $ref_sub->get_error_message() );
+} else {
+	$ref_id = (int) $ref_sub['booking_id'];
+	$made[] = $ref_id;
+	$ref_total = (int) get_post_meta( $ref_id, '_bhela_total', true );
+	ok( $ag_id === get_post_meta( $ref_id, '_bhela_agency', true ), 'the booking is attributed to the agency' );
+	ok( bhela_bm_agency_commission( $ag_id, $ref_total ) === (int) get_post_meta( $ref_id, '_bhela_commission', true ),
+		'with the commission suggested from the rate', get_post_meta( $ref_id, '_bhela_commission', true ) );
+	ok( 'unconfirmed' === get_post_meta( $ref_id, '_bhela_referral', true ), 'and held as unconfirmed' );
+
+	// Absent from the accounts until a person agrees. Because the statement and the
+	// cost sheet both read bhela_bm_commission_rows(), one gate covers both.
+	$ref_before = (int) bhela_bm_commission_rows( $friday, $friday )['total'];
+	update_post_meta( $ref_id, '_bhela_referral', 'confirmed' );
+	$ref_after = (int) bhela_bm_commission_rows( $friday, $friday )['total'];
+	ok( $ref_after - $ref_before === (int) get_post_meta( $ref_id, '_bhela_commission', true ),
+		'it counts only once confirmed', $ref_before . ' → ' . $ref_after );
+	update_post_meta( $ref_id, '_bhela_referral', 'unconfirmed' );
+	ok( $ref_before === (int) bhela_bm_commission_rows( $friday, $friday )['total'],
+		'and stops counting again if unconfirmed' );
+
+	// A booking that arrived by referral is still a guest booking: nothing leaks.
+	ok( false === strpos( bk_invoice_html( $ref_id ), 'ZZ Travel Compass' ), 'the invoice still names no agency' );
+	ok( false === strpos( bhela_bm_confirm_text( $ref_id ), 'ZZ Travel Compass' ), 'nor does the confirmation message' );
+}
+
 echo "\n=== 3c. unticking restores per-cabin pricing ===\n";
 bk_save( $fb, array(
 	'bhela_cabin_adults' => array( 4 ),
