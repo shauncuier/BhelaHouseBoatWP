@@ -5,16 +5,20 @@
 
 **Pages**
 - `index.html` — **Overview**: project overview, what the client receives, business value, and why a custom theme + booking engine (vs templates/SaaS).
-- `manual.html` — **Owner's Manual**: plain-language, Bangla-friendly guide to running the site day to day (bookings, invoices, rates, availability, blog, email/SMS, settings).
+- `manual.html` — **Owner's Manual**: plain-language Bangla guide to running the platform day to day, in 28 sections — bookings, invoices, rates, availability, the confirmation message, trip costing, expenses, payroll, monthly and yearly accounts, stock, B2B partners, staff roles, blog, email/SMS and settings.
 
 BHELA – The Haor Exclusive is a **custom WordPress booking platform** for a premium
 houseboat operating on Tanguar Haor, Sunamganj, Bangladesh. It is built from two
-purpose-made components the client fully owns:
+purpose-made components the client fully owns, and it now runs the business behind
+the bookings as well as the bookings themselves:
 
 - **BHELA Theme** — a bespoke "Midnight Monsoon" design (homepage, cabins, schedule,
   food, gallery, FAQ, policies, blog).
 - **BHELA Booking Engine** — a plugin with a multi-step booking wizard, live per-person
-  pricing, 6-cabin availability, invoices, guest reviews, trip calendar, and email/SMS.
+  pricing, 6-cabin availability, invoices, guest reviews, trip calendar, and email/SMS —
+  plus the back office: trip cost sheets with a three-person approval chain, expenses,
+  payroll, monthly and yearly statements, a stock register, staff roles with an
+  audit trail, and B2B partners with commission and referral links.
 
 ## What the client receives
 
@@ -28,7 +32,13 @@ purpose-made components the client fully owns:
 | Blog (হাওর জার্নাল) | SEO content engine feeding the booking funnel |
 | SEO & analytics | Meta/OG/Twitter, JSON-LD, sitemap, GA4 + Pixel ready |
 | Full source + ownership | Complete versioned code on GitHub — owned outright |
-| Documentation | Owner's manual (Bangla-friendly) + developer docs |
+| Trip costing | Cost sheet per trip, prepared → checked → approved, then locked |
+| Monthly & yearly accounts | Builds itself from approved trips, less expenses, payroll and commission |
+| Payroll | Roster + monthly sheet; trip-based crew priced from trips that actually ran |
+| Stock register | Frozen item IDs, CSV import with dry run, monthly count that carries forward |
+| B2B partners | Agency directory, commission, referral links held until a person confirms |
+| Staff roles & audit | Six roles, editable permissions, append-only record of every change |
+| Documentation | Owner's manual in Bangla (28 sections) + developer docs |
 
 ## Why a custom theme + plugin (not a template or SaaS)
 
@@ -39,6 +49,8 @@ purpose-made components the client fully owns:
 - **0% commission** — the owner keeps 100% of every booking.
 - **Owns the code & data** — a real business asset, not a rented platform.
 - **Bangla-first, on-brand** — the experience fits the business, not the other way round.
+- **The accounts live where the bookings live** — the trip a guest books is the same
+  trip that gets costed, crewed, stocked and reported on. No export, no second system.
 
 ## Repository
 
