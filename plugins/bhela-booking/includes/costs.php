@@ -252,22 +252,17 @@ function bhela_bm_cost_items() {
 /**
  * Validate a travel date, in the one format the meta is stored in.
  *
- * Delegates to the trip report's validator when that module is loaded so both
- * screens accept exactly the same input; falls back to its own check because
- * costs.php must not depend on load order.
+ * Kept as a named function because the cost sheet's callers read better for it, but
+ * there is no second implementation any more: it forwards to the core validator, so
+ * every screen accepts exactly the same input. The duplicate that used to live here
+ * behind a function_exists() guard was working around bhela_bm_report_date() being
+ * parked in reports.php; it is in core now.
  *
  * @param mixed $value Raw request value.
  * @return string Valid Y-m-d date, or ''.
  */
 function bhela_bm_cost_date( $value ) {
-	if ( function_exists( 'bhela_bm_report_date' ) ) {
-		return bhela_bm_report_date( $value );
-	}
-	$value = is_string( $value ) ? trim( $value ) : '';
-	if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m ) ) {
-		return '';
-	}
-	return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ? $value : '';
+	return bhela_bm_report_date( $value );
 }
 
 /** How many spare, preparer-labelled rows to keep available. A minimum, not a cap. */

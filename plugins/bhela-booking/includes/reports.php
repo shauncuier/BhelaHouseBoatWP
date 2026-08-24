@@ -33,21 +33,8 @@ add_action( 'admin_menu', 'bhela_bm_reports_menu' );
 
 /* ---------- Data ---------- */
 
-/**
- * Accept a date only in the exact storage format, and only if it is a real
- * calendar date. `_bhela_travel_date` is a plain Y-m-d string, so a malformed
- * value would silently match nothing (or everything) rather than error.
- *
- * @param mixed $value Raw request value.
- * @return string Valid Y-m-d date, or '' when it is not one.
- */
-function bhela_bm_report_date( $value ) {
-	$value = is_string( $value ) ? trim( $value ) : '';
-	if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m ) ) {
-		return '';
-	}
-	return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ? $value : '';
-}
+// bhela_bm_report_date() lives in bhela-booking.php: four modules validate a date
+// with it, so it is core rather than this screen's private helper.
 
 /**
  * Bookings travelling between two dates, plus the totals for the footer row.

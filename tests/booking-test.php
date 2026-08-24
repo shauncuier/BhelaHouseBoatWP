@@ -17,7 +17,7 @@
  */
 
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'ui', 'roles', 'log', 'trips', 'invoice', 'emails', 'admin' );
+bhela_test_modules( 'ui', 'roles', 'log', 'trips', 'invoice', 'emails', 'admin', 'b2b-report' );
 
 wp_set_current_user( 1 );
 
@@ -640,6 +640,96 @@ ok( (bool) array_filter( array( 0 ), 'strlen' ), 'a Sunday-only list does not tr
 $ad = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/admin.php' );
 ok( (bool) preg_match( '/bhela_pricing_days_present.*bhela_bm_sanitize_weekend_days/s', $ad ),
 	'and the marker still gates the write' );
+
+echo "\n=== 7. the B2B report shows what the accounts deliberately hide ===\n";
+// bhela_bm_commission_rows() answers "what does the month owe", so it drops cancelled
+// bookings and unconfirmed referrals on purpose. The B2B screen has to show exactly
+// those — a referral waiting on a person is the main reason to open it. Two readings
+// of the same data, so this pins them against each other rather than trusting either.
+bhela_bm_save_agencies( array(
+	array( 'id' => '', 'name' => 'ZZ B2B Alpha', 'phone' => '', 'email' => '', 'rate' => 10 ),
+	array( 'id' => '', 'name' => 'ZZ B2B Beta',  'phone' => '', 'email' => '', 'rate' => 5 ),
+) );
+$b2b_ids = array();
+foreach ( bhela_bm_agencies() as $aid => $arow ) {
+	if ( 0 === strpos( $arow['name'], 'ZZ B2B ' ) ) {
+		$b2b_ids[ $arow['name'] ] = $aid;
+	}
+}
+$alpha = $b2b_ids['ZZ B2B Alpha'];
+$beta  = $b2b_ids['ZZ B2B Beta'];
+
+/** @return int booking id */
+function zz_b2b( $agency, $total, $comm, $referral, $status = 'confirmed' ) {
+	$id = wp_insert_post( array( 'post_type' => 'bhela_booking', 'post_status' => 'publish', 'post_title' => 'ZZ b2b guest' ) );
+	update_post_meta( $id, '_bhela_travel_date', '2026-09-10' );
+	update_post_meta( $id, '_bhela_status', $status );
+	update_post_meta( $id, '_bhela_total', $total );
+	update_post_meta( $id, '_bhela_guests', 4 );
+	update_post_meta( $id, '_bhela_agency', $agency );
+	update_post_meta( $id, '_bhela_commission', $comm );
+	if ( '' !== $referral ) {
+		update_post_meta( $id, '_bhela_referral', $referral );
+	}
+	return $id;
+}
+
+$b_hand    = zz_b2b( $alpha, 30000, 3000, '' );                        // staff entered it
+$b_pending = zz_b2b( $alpha, 26000, 2600, 'unconfirmed' );             // came by link, unconfirmed
+$b_conf    = zz_b2b( $beta,  40000, 2000, 'confirmed' );               // came by link, confirmed
+$b_cancel  = zz_b2b( $beta,  50000, 2500, 'confirmed', 'cancelled' );  // no trip, no commission
+$b_direct  = zz_b2b( '',     20000, 0,    '' );                        // not a B2B booking at all
+
+$b2b = bhela_bm_b2b_rows( '2026-09-01', '2026-09-30' );
+$bt  = $b2b['totals'];
+
+ok( 4 === $bt['bookings'], 'the four agency bookings are listed, the direct one is not', (string) $bt['bookings'] );
+$listed = array_column( $b2b['rows'], 'id' );
+ok( ! in_array( $b_direct, $listed, true ), 'a booking with no agency and no commission never appears' );
+ok( in_array( $b_pending, $listed, true ), 'AND the unconfirmed referral IS listed — hiding it is what the accounts do' );
+ok( in_array( $b_cancel, $listed, true ), 'so is the cancelled one, which the statement also drops' );
+
+ok( 5000 === $bt['commission'], 'owed = 3000 hand + 2000 confirmed; pending and cancelled excluded', (string) $bt['commission'] );
+ok( 2600 === $bt['pending'] && 1 === $bt['pending_n'], 'the waiting figure is counted separately, not mixed in',
+	$bt['pending'] . ' / ' . $bt['pending_n'] );
+
+// The screen's "owed" and the statement's deduction are two implementations of one
+// rule. If they ever disagree, one of the two is wrong and nobody would notice.
+$rows_fn = bhela_bm_commission_rows( '2026-09-01', '2026-09-30' );
+ok( (int) $rows_fn['total'] === $bt['commission'], 'and it agrees to the taka with what the statement deducts',
+	$rows_fn['total'] . ' vs ' . $bt['commission'] );
+
+echo "\n=== 7b. filtering by one agency ===\n";
+$only = bhela_bm_b2b_rows( '2026-09-01', '2026-09-30', $alpha );
+ok( 2 === $only['totals']['bookings'], 'Alpha has two bookings', (string) $only['totals']['bookings'] );
+ok( 3000 === $only['totals']['commission'] && 2600 === $only['totals']['pending'], 'with its own owed and waiting figures',
+	$only['totals']['commission'] . ' / ' . $only['totals']['pending'] );
+$names = array_unique( array_column( $only['rows'], 'agency_id' ) );
+ok( array( $alpha ) === array_values( $names ), 'and nothing from Beta leaks in' );
+
+ok( 'unconfirmed' === $b2b['rows'][0]['referral'], 'the waiting row sorts to the top, where it gets acted on',
+	$b2b['rows'][0]['referral'] );
+
+$per = bhela_bm_b2b_by_agency( $b2b['rows'] );
+ok( 3000 === $per[ $alpha ]['commission'] && 2000 === $per[ $beta ]['commission'], 'the per-agency subtotals split correctly',
+	$per[ $alpha ]['commission'] . ' / ' . $per[ $beta ]['commission'] );
+
+echo "\n=== 7c. confirming moves it, on both readings at once ===\n";
+update_post_meta( $b_pending, '_bhela_referral', 'confirmed' );
+$after   = bhela_bm_b2b_rows( '2026-09-01', '2026-09-30' );
+$after_s = bhela_bm_commission_rows( '2026-09-01', '2026-09-30' );
+ok( 7600 === $after['totals']['commission'], 'owed rises by exactly the 2600 that was waiting',
+	(string) $after['totals']['commission'] );
+ok( 0 === $after['totals']['pending'] && 0 === $after['totals']['pending_n'], 'and nothing is left waiting' );
+ok( (int) $after_s['total'] === $after['totals']['commission'], 'the statement moved by the same amount, in the same step',
+	$after_s['total'] . ' vs ' . $after['totals']['commission'] );
+
+foreach ( array( $b_hand, $b_pending, $b_conf, $b_cancel, $b_direct ) as $zz ) {
+	bhela_test_delete( $zz );
+}
+// The agency directory is left alone — owner-built data with live referral tokens in
+// it. bhela_test_owner_options() restores it; a delete_option() here took a real
+// partner with it once already.
 
 foreach ( $made as $id ) {
 	delete_transient( 'bhela_bm_fb_warn_' . $id );

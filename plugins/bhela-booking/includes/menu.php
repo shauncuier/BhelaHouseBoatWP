@@ -200,6 +200,7 @@ function bhela_bm_menu_layout() {
 			'edit.php?post_type=bhela_salary',        // 👷 Salary
 			'bhela-bm-statement',                     // 📈 Monthly Statement
 			'bhela-bm-yearly',                        // 📚 Yearly Report
+			'bhela-bm-b2b',                           // 🤝 B2B Report
 		),
 		'store'    => array(
 			'edit.php?post_type=bhela_inv_item',      // 📦 Item Register

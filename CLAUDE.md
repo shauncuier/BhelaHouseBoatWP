@@ -236,7 +236,7 @@ to Quick Guide. `includes/menu.php` splits that into four, grouped by the job so
 | Menu | Slug / landing page | Rows |
 |---|---|---|
 | **Bookings** | `edit.php?post_type=bhela_booking` | All Bookings · Add New · 📊 Dashboard · 📄 Trip Report · 📅 Trip Calendar · ⭐ Reviews |
-| **Accounts** | `bhela-bm-statement` | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report |
+| **Accounts** | `bhela-bm-statement` | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report · 🤝 B2B Report |
 | **Store** | `bhela-bm-inv-month` | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
 | **Setup** | `bhela-bm-settings` | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
 
@@ -439,6 +439,8 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_pay_methods()` | `bhela-booking.php` | Booking payment methods, key => label. One list; expenses keep their own |
 | `bhela_bm_agencies($retired)` | `includes/agencies.php` | B2B partner directory. Ids frozen once, retired ones still resolve on old bookings |
 | `bhela_bm_commission_rows($from,$to)` | `includes/agencies.php` | Commission owed in a date range, by agency. **The single source** — the cost sheet and the statement both read it |
+| `bhela_bm_b2b_rows($from,$to,$agency)` | `includes/b2b-report.php` | Every agency booking in a range. Deliberately shows what `bhela_bm_commission_rows()` hides — unconfirmed and cancelled |
+| `bhela_bm_report_date($value)` | `bhela-booking.php` | The one Y-m-d validator. In core because four modules need it — see §13.22 |
 | `bhela_bm_cost_b2b_drift($id)` | `includes/costs.php` | Whether the B2B line has gone stale. **Reports, never corrects**, like the earnings drift beside it |
 | `bhela_bm_agency_ref_url($id)` | `includes/agencies.php` | A partner's referral link. Token is **stored and random**, so it can be rotated — a `wp_hash()` over the frozen id never could |
 | `bhela_bm_referred_agency()` | `includes/agencies.php` | The agency in the visitor's cookie, or '' |
@@ -641,6 +643,9 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 18. **B2B commission is invisible to the guest, by design.** It is a commercial arrangement between BHELA and the partner, so it must never appear on the invoice, the customer email or the confirmation message — `booking-test.php` §3f asserts its absence from all three, because a rule about what must NOT be there breaks silently. `{agency}` / `{commission}` / `{agency_ref}` placeholders exist so an *agency-facing* template can carry them, and are deliberately absent from the shipped guest template.
 19. **A commission is deducted once, from the booking.** `bhela_bm_commission_rows()` is the single source: the Monthly Statement deducts from it, and the trip cost sheet's `b2b_partner` line **fills itself** from it. Typing the same figure onto the cost sheet by hand would deduct it twice — so a hand-typed line is left alone and simply stops being auto-filled, exactly as `_bhela_cost_earnings_auto` distinguishes a typed figure from a cached one.
 17. **A new input on the booking form is not submitted until `booking.js` names it.** The submit handler copies an explicit field list into the request rather than serialising the whole form, so adding `<input name="address">` rendered the field, let the guest fill it in, and dropped the value on the way to the server — the booking stored `''` with no error anywhere. `booking-test.php` §3e pins both ends: the form renders the input, and the JS list contains it.
+22. **A shared helper parked in one screen's file is a load-order accident.** `bhela_bm_report_date()` sat in `reports.php` while four modules validated dates with it. Two had already worked around that: `costs.php` carried a duplicate behind a `function_exists()` guard, and `b2b-report.php` fataled outright when the report module was not loaded. It lives in `bhela-booking.php` now, `bhela_bm_cost_date()` forwards to it, and there is one implementation.
+23. **The B2B Report is the one screen that must NOT reuse `bhela_bm_commission_rows()`.** That function answers "what does the month owe", so it drops cancelled bookings and unconfirmed referrals on purpose (§13.20). The report exists to show exactly those — a referral waiting on a person is the main reason to open it. They are therefore two readings of the same data, and `booking-test.php` §7 pins their *owed* figures against each other to the taka, because two implementations of one rule is how a silent disagreement starts.
+
 15. **`wp_set_current_user()` returns the cached user when the id has not changed.** Swapping a role on the same account and re-setting it keeps the old capabilities, so a per-role test reports identical menus for every role and passes by luck. Go via `wp_set_current_user( 0 )` first — `ui-test.php`'s `zz_menu()` does, and three role assertions were silently wrong until it did.
 
 ---
