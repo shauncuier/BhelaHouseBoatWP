@@ -724,6 +724,43 @@ ok( 0 === $after['totals']['pending'] && 0 === $after['totals']['pending_n'], 'a
 ok( (int) $after_s['total'] === $after['totals']['commission'], 'the statement moved by the same amount, in the same step',
 	$after_s['total'] . ' vs ' . $after['totals']['commission'] );
 
+echo "\n=== 7d. the date default must not hide the report's own subject ===\n";
+// This screen shipped defaulting to the current calendar month, filtered by TRAVEL
+// date. A referral is taken now for a trip months away, so confirming one changed
+// nothing anybody could see — three agency bookings, one of them visible, and no
+// error to explain the other two. The fixtures above all travel in September, which
+// is exactly the case that was invisible.
+$r_all = bhela_bm_b2b_range( '', '' );
+ok( $r_all['all'], 'blank dates mean every date, not "this month"' );
+$seen_all = bhela_bm_b2b_rows( $r_all['from'], $r_all['to'] );
+$seen_ids = array_column( $seen_all['rows'], 'id' );
+ok( in_array( $b_conf, $seen_ids, true ), 'a confirmed referral travelling in a future month IS in the default view' );
+ok( in_array( $b_pending, $seen_ids, true ), 'and so is one still waiting' );
+
+// One end given is an open-ended range, not a licence to invent the other.
+$r_open = bhela_bm_b2b_range( '2026-09-01', '' );
+ok( ! $r_open['all'] && '2026-09-01' === $r_open['from'] && $r_open['to'] > '2099-01-01',
+	'a start with no end stays open at the end', $r_open['from'] . '..' . $r_open['to'] );
+$r_inv = bhela_bm_b2b_range( '2026-09-30', '2026-09-01' );
+ok( $r_inv['from'] === $r_inv['to'], 'an inverted range collapses to one day rather than returning nothing' );
+ok( '' === bhela_bm_b2b_range( 'nonsense', '' )['from'] || $r_all['all'], 'a malformed date does not become a filter' );
+
+// The waiting count is deliberately computed outside the filter: a date window is
+// the operator's choice, and a choice must not hide the thing needing action.
+update_post_meta( $b_conf, '_bhela_referral', 'unconfirmed' );   // two waiting now
+$p_all = bhela_bm_b2b_pending_all();
+ok( 2 === $p_all['count'], 'referrals waiting are counted across every date', (string) $p_all['count'] );
+$narrow = bhela_bm_b2b_rows( '2026-01-01', '2026-01-31' );
+ok( 0 === $narrow['totals']['pending_n'] && 2 === $p_all['count'],
+	'so a January filter shows none in range while the banner still says two' );
+update_post_meta( $b_conf, '_bhela_referral', 'confirmed' );
+
+// A cancelled trip owes nobody, so it is not waiting on anybody either.
+update_post_meta( $b_cancel, '_bhela_referral', 'unconfirmed' );
+ok( 1 === bhela_bm_b2b_pending_all()['count'], 'a cancelled booking is not counted as waiting',
+	(string) bhela_bm_b2b_pending_all()['count'] );
+update_post_meta( $b_cancel, '_bhela_referral', 'confirmed' );
+
 foreach ( array( $b_hand, $b_pending, $b_conf, $b_cancel, $b_direct ) as $zz ) {
 	bhela_test_delete( $zz );
 }

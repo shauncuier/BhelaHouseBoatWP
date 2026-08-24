@@ -138,6 +138,88 @@ function bhela_bm_b2b_rows( $from, $to, $agency_id = '' ) {
 	return array( 'rows' => $rows, 'totals' => $totals );
 }
 
+/**
+ * Resolve the date window from the request.
+ *
+ * **Blank means every date, and that default is the fix for a real failure.** This
+ * screen opened on the current calendar month, filtered by TRAVEL date — but a
+ * referral is taken now for a trip months away, so confirming one changed nothing
+ * you could see. Three agency bookings, one of them visible, and no error to explain
+ * the other two. A report whose default hides its own subject is worse than one that
+ * loads slowly.
+ *
+ * So an unfiltered view shows everything and the operator narrows down, rather than
+ * starting narrow and having to guess what is being kept from them.
+ *
+ * It is one function because the page and the CSV export both need the answer, and
+ * the CSV used to pass the raw request through with no defaulting at all — blank
+ * dates fell into the early return in bhela_bm_b2b_rows() and downloaded an empty
+ * file.
+ *
+ * @param mixed $raw_from Request value.
+ * @param mixed $raw_to   Request value.
+ * @return array{from:string,to:string,all:bool}
+ */
+function bhela_bm_b2b_range( $raw_from, $raw_to ) {
+	$from = bhela_bm_report_date( $raw_from );
+	$to   = bhela_bm_report_date( $raw_to );
+
+	if ( '' === $from && '' === $to ) {
+		return array( 'from' => '1900-01-01', 'to' => '2999-12-31', 'all' => true );
+	}
+	// One end given is an open-ended range, not an excuse to invent the other.
+	if ( '' === $from ) {
+		$from = '1900-01-01';
+	}
+	if ( '' === $to ) {
+		$to = '2999-12-31';
+	}
+	// An inverted range collapses to a single day rather than returning nothing,
+	// which would read as "no agency bookings".
+	if ( $to < $from ) {
+		$to = $from;
+	}
+	return array( 'from' => $from, 'to' => $to, 'all' => false );
+}
+
+/**
+ * Referrals waiting on a person, across every date.
+ *
+ * Counted outside the filter on purpose. The date window is the operator's choice,
+ * and a choice must not be able to hide the one thing this screen exists to surface
+ * — an unconfirmed referral is a partner not being paid and a figure missing from
+ * the month, whichever month it belongs to.
+ *
+ * @return array{count:int,total:int}
+ */
+function bhela_bm_b2b_pending_all() {
+	$out = array( 'count' => 0, 'total' => 0 );
+
+	$ids = get_posts( array(
+		'post_type'      => 'bhela_booking',
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'meta_query'     => array(
+			array(
+				'key'   => '_bhela_referral',
+				'value' => 'unconfirmed',
+			),
+		),
+	) );
+
+	foreach ( $ids as $id ) {
+		// A cancelled trip owes nobody, so it is not waiting on anyone either.
+		if ( 'cancelled' === get_post_meta( $id, '_bhela_status', true ) ) {
+			continue;
+		}
+		$out['count']++;
+		$out['total'] += (int) get_post_meta( $id, '_bhela_commission', true );
+	}
+	return $out;
+}
+
 /** Per-agency subtotals for the rows on screen. */
 function bhela_bm_b2b_by_agency( $rows ) {
 	$out = array();
@@ -170,13 +252,13 @@ function bhela_bm_b2b_csv() {
 	}
 	check_admin_referer( 'bhela_bm_b2b_csv' );
 
-	$from   = bhela_bm_report_date( $_GET['from'] ?? '' );
-	$to     = bhela_bm_report_date( $_GET['to'] ?? '' );
+	$range  = bhela_bm_b2b_range( $_GET['from'] ?? '', $_GET['to'] ?? '' );
 	$agency = sanitize_key( $_GET['agency'] ?? '' );
-	$data   = bhela_bm_b2b_rows( $from, $to, $agency );
+	$data   = bhela_bm_b2b_rows( $range['from'], $range['to'], $agency );
 
+	$stamp = $range['all'] ? 'all-dates' : $range['from'] . '_to_' . $range['to'];
 	header( 'Content-Type: text/csv; charset=utf-8' );
-	header( 'Content-Disposition: attachment; filename="bhela-b2b-' . $from . '_to_' . $to . '.csv"' );
+	header( 'Content-Disposition: attachment; filename="bhela-b2b-' . $stamp . '.csv"' );
 	$fh = fopen( 'php://output', 'w' );
 	fwrite( $fh, "\xEF\xBB\xBF" );          // BOM, so Excel reads the Bengali
 	fputcsv( $fh, array( 'Travel date', 'Booking', 'Guest', 'Agency', 'Agency ref', 'Guests', 'Booking value', 'Commission', 'Referral', 'Status' ) );
@@ -211,27 +293,28 @@ function bhela_bm_b2b_page() {
 		return;
 	}
 
-	// Defaults to the current financial-ish view: this month plus the rest of it.
-	$from = bhela_bm_report_date( $_GET['from'] ?? '' );
-	$to   = bhela_bm_report_date( $_GET['to'] ?? '' );
-	if ( ! $from ) {
-		$from = gmdate( 'Y-m-01' );
-	}
-	if ( ! $to || $to < $from ) {
-		$to = gmdate( 'Y-m-t', strtotime( $from ) );
-	}
+	// Blank dates mean every date — see bhela_bm_b2b_range().
+	$range     = bhela_bm_b2b_range( $_GET['from'] ?? '', $_GET['to'] ?? '' );
+	$from      = $range['from'];
+	$to        = $range['to'];
 	$agency_id = sanitize_key( $_GET['agency'] ?? '' );
+
+	// What the date inputs show. An all-dates view leaves them empty, because that
+	// is what produced it and typing a date is how you narrow it.
+	$in_from = $range['all'] ? '' : bhela_bm_report_date( $_GET['from'] ?? '' );
+	$in_to   = $range['all'] ? '' : bhela_bm_report_date( $_GET['to'] ?? '' );
 
 	$data     = bhela_bm_b2b_rows( $from, $to, $agency_id );
 	$rows     = $data['rows'];
 	$t        = $data['totals'];
 	$per      = bhela_bm_b2b_by_agency( $rows );
+	$pending  = bhela_bm_b2b_pending_all();
 	$statuses = bhela_bm_statuses();
 	$agencies = bhela_bm_agencies( true );
 
 	$csv_url = wp_nonce_url(
 		add_query_arg(
-			array( 'action' => 'bhela_bm_b2b_csv', 'from' => $from, 'to' => $to, 'agency' => $agency_id ),
+			array( 'action' => 'bhela_bm_b2b_csv', 'from' => $in_from, 'to' => $in_to, 'agency' => $agency_id ),
 			admin_url( 'admin-post.php' )
 		),
 		'bhela_bm_b2b_csv'
@@ -244,7 +327,14 @@ function bhela_bm_b2b_page() {
 		bhela_bm_screen_header(
 			'🤝',
 			__( 'B2B Report', 'bhela-booking' ),
-			__( 'Every booking a travel partner brought, what it was worth, and what they are owed. Nothing here is ever shown to a guest.', 'bhela-booking' ),
+						$range['all']
+				? __( 'Every booking a travel partner brought, what it was worth, and what they are owed — all dates. Nothing here is ever shown to a guest.', 'bhela-booking' )
+				: sprintf(
+					/* translators: 1: start date, 2: end date */
+					__( 'Agency bookings travelling between %1$s and %2$s. Leave the dates blank to see every one. Nothing here is ever shown to a guest.', 'bhela-booking' ),
+					mysql2date( 'j M Y', $from ),
+					mysql2date( 'j M Y', $to )
+				),
 			$actions
 		);
 		?>
@@ -266,11 +356,11 @@ function bhela_bm_b2b_page() {
 				</div>
 				<div class="bha-field">
 					<label for="bhela-b2b-from"><?php esc_html_e( 'From', 'bhela-booking' ); ?></label>
-					<input type="date" id="bhela-b2b-from" name="from" value="<?php echo esc_attr( $from ); ?>">
+					<input type="date" id="bhela-b2b-from" name="from" value="<?php echo esc_attr( $in_from ); ?>">
 				</div>
 				<div class="bha-field">
 					<label for="bhela-b2b-to"><?php esc_html_e( 'To', 'bhela-booking' ); ?></label>
-					<input type="date" id="bhela-b2b-to" name="to" value="<?php echo esc_attr( $to ); ?>">
+					<input type="date" id="bhela-b2b-to" name="to" value="<?php echo esc_attr( $in_to ); ?>">
 				</div>
 				<button type="submit" class="button button-primary"><?php esc_html_e( 'View', 'bhela-booking' ); ?></button>
 			</form>
@@ -289,16 +379,33 @@ function bhela_bm_b2b_page() {
 				<span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $t['pending'] ) ); ?></span></div>
 		</div>
 
-		<?php if ( $t['pending_n'] > 0 ) : ?>
+		<?php
+		// Counted across every date, not just the filtered window. A date filter is
+		// the operator's choice and must not be able to hide the one thing this
+		// screen exists to surface.
+		$hidden = max( 0, $pending['count'] - $t['pending_n'] );
+		if ( $pending['count'] > 0 ) :
+			?>
 			<p class="bha-callout bha-callout--attention bha-callout--lead">
 				<strong><?php
 					printf(
 						/* translators: %d: how many referrals are waiting */
-						esc_html( _n( '%d referral is waiting for you to confirm it.', '%d referrals are waiting for you to confirm it.', $t['pending_n'], 'bhela-booking' ) ),
-						(int) $t['pending_n']
+						esc_html( _n( '%d referral is waiting for you to confirm it.', '%d referrals are waiting for you to confirm it.', $pending['count'], 'bhela-booking' ) ),
+						(int) $pending['count']
 					);
 				?></strong>
-				<?php esc_html_e( 'Until you do, that commission is counted by nothing — not the Monthly Statement, not the trip cost sheet. Open a booking below and tick Confirm this referral.', 'bhela-booking' ); ?>
+				<?php esc_html_e( 'Until you do, that commission is counted by nothing — not the Monthly Statement, not the trip cost sheet. Open the booking and tick Confirm this referral.', 'bhela-booking' ); ?>
+				<?php if ( $hidden > 0 ) : ?>
+					<br>
+					<?php
+					printf(
+						/* translators: %d: referrals outside the current filter */
+						esc_html( _n( '%d of them falls outside the dates you are filtering on.', '%d of them fall outside the dates you are filtering on.', $hidden, 'bhela-booking' ) ),
+						(int) $hidden
+					);
+					?>
+					<a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-b2b' ) ); ?>"><?php esc_html_e( 'Show every date', 'bhela-booking' ); ?></a>
+				<?php endif; ?>
 			</p>
 		<?php endif; ?>
 
@@ -324,7 +431,7 @@ function bhela_bm_b2b_page() {
 							<td class="bha-num"><?php echo $a['pending'] > 0 ? esc_html( bhela_bm_money( $a['pending'] ) ) : '—'; ?></td>
 							<td class="bha-noprint">
 								<?php if ( '_none' !== $aid ) : ?>
-									<a class="button button-small" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-b2b', array( 'agency' => $aid, 'from' => $from, 'to' => $to ) ) ); ?>"><?php esc_html_e( 'Only this one', 'bhela-booking' ); ?></a>
+									<a class="button button-small" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-b2b', array( 'agency' => $aid, 'from' => $in_from, 'to' => $in_to ) ) ); ?>"><?php esc_html_e( 'Only this one', 'bhela-booking' ); ?></a>
 								<?php endif; ?>
 							</td>
 						</tr>
