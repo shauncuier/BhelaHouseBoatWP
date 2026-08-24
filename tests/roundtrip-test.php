@@ -64,6 +64,57 @@ $after = json_decode( (string) get_post_meta( $sheet, '_bhela_cost_lines', true 
 $customs = count( array_filter( array_keys( $after ), function ( $k ) { return 0 === strpos( $k, 'x_' ); } ) );
 ok( $customs <= bhela_bm_cost_max_custom_rows(), 'capped at ' . bhela_bm_cost_max_custom_rows(), (string) $customs );
 
+echo "\n=== 3b. the B2B line fills itself, and is not double counted ===\n";
+// The commission is entered once, on the booking. The cost sheet's B2B Partner line
+// fills from it — so the same 3,000 cannot be deducted once by the sheet and again
+// by the statement reading the bookings.
+bhela_bm_save_agencies( array(
+	array( 'id' => '', 'name' => 'ZZ RT Agency', 'phone' => '', 'email' => '', 'rate' => 10 ),
+) );
+$rt_ag = '';
+foreach ( bhela_bm_agencies() as $aid => $arow ) {
+	if ( 'ZZ RT Agency' === $arow['name'] ) {
+		$rt_ag = $aid;
+	}
+}
+$rt_book = wp_insert_post( array( 'post_type' => 'bhela_booking', 'post_status' => 'publish', 'post_title' => 'ZZ rt b2b' ) );
+update_post_meta( $rt_book, '_bhela_travel_date', '2026-07-01' );
+update_post_meta( $rt_book, '_bhela_status', 'confirmed' );
+update_post_meta( $rt_book, '_bhela_total', 30000 );
+update_post_meta( $rt_book, '_bhela_agency', $rt_ag );
+update_post_meta( $rt_book, '_bhela_commission', 3000 );
+
+update_post_meta( $sheet, '_bhela_cost_status', 'draft' );   // §4 below locks it again
+save( $sheet, array( 'engine_fuel' => array( 'p1' => 5000 ) ) );
+$rt_lines = bhela_bm_cost_stored_lines( $sheet );
+ok( 3000 === (int) ( $rt_lines['b2b_partner']['p1'] ?? 0 ), 'the B2B line filled itself from the booking',
+	(string) ( $rt_lines['b2b_partner']['p1'] ?? 0 ) );
+ok( 8000 === (int) get_post_meta( $sheet, '_bhela_cost_total', true ), 'and is included in the sheet total once',
+	get_post_meta( $sheet, '_bhela_cost_total', true ) );
+
+// Move the commission underneath the sheet: it must REPORT, never silently rewrite.
+// Same contract as the earnings drift, and for the same reason — three people sign
+// off a sheet, and changing a figure they approved without saying so is worse than
+// showing it is out of date.
+update_post_meta( $rt_book, '_bhela_commission', 4200 );
+$rt_drift = bhela_bm_cost_b2b_drift( $sheet );
+ok( $rt_drift['stale'], 'a changed commission is reported as stale' );
+ok( 3000 === (int) $rt_drift['stored'] && 4200 === (int) $rt_drift['live'], 'with both figures named',
+	$rt_drift['stored'] . ' → ' . $rt_drift['live'] );
+ok( 3000 === (int) bhela_bm_cost_stored_lines( $sheet )['b2b_partner']['p1'], 'and the sheet is NOT rewritten behind the owner' );
+
+// A figure typed over by hand is a decision, not a cache — leave it alone entirely.
+save( $sheet, array( 'engine_fuel' => array( 'p1' => 5000 ), 'b2b_partner' => array( 'p1' => 9999 ) ) );
+ok( 9999 === (int) bhela_bm_cost_stored_lines( $sheet )['b2b_partner']['p1'], 'a hand-typed B2B figure survives a save',
+	(string) bhela_bm_cost_stored_lines( $sheet )['b2b_partner']['p1'] );
+ok( ! bhela_bm_cost_b2b_drift( $sheet )['stale'], 'and is not reported stale — it was never auto-filled' );
+
+bhela_test_delete( $rt_book );
+// The agency directory is NOT deleted here. It is owner-built data with live
+// referral tokens in it, and a delete_option() on the way out took a real partner
+// with it once already. bhela_test_owner_options() in the bootstrap snapshots and
+// restores it, so this harness can write to it freely and leave nothing behind.
+
 echo "\n=== 4. approved sheet still refuses writes ===\n";
 update_post_meta( $sheet, '_bhela_cost_status', 'approved' );
 $locked_total = (int) get_post_meta( $sheet, '_bhela_cost_total', true );

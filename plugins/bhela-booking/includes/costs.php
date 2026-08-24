@@ -252,22 +252,17 @@ function bhela_bm_cost_items() {
 /**
  * Validate a travel date, in the one format the meta is stored in.
  *
- * Delegates to the trip report's validator when that module is loaded so both
- * screens accept exactly the same input; falls back to its own check because
- * costs.php must not depend on load order.
+ * Kept as a named function because the cost sheet's callers read better for it, but
+ * there is no second implementation any more: it forwards to the core validator, so
+ * every screen accepts exactly the same input. The duplicate that used to live here
+ * behind a function_exists() guard was working around bhela_bm_report_date() being
+ * parked in reports.php; it is in core now.
  *
  * @param mixed $value Raw request value.
  * @return string Valid Y-m-d date, or ''.
  */
 function bhela_bm_cost_date( $value ) {
-	if ( function_exists( 'bhela_bm_report_date' ) ) {
-		return bhela_bm_report_date( $value );
-	}
-	$value = is_string( $value ) ? trim( $value ) : '';
-	if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m ) ) {
-		return '';
-	}
-	return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ? $value : '';
+	return bhela_bm_report_date( $value );
 }
 
 /** How many spare, preparer-labelled rows to keep available. A minimum, not a cap. */
@@ -400,6 +395,42 @@ function bhela_bm_cost_earnings_drift( $post_id ) {
 	}
 
 	$live         = (int) bhela_bm_cost_booking_earnings( $date )['total'];
+	$out['live']  = $live;
+	$out['diff']  = $live - $stored;
+	$out['stale'] = $live !== $stored;
+	return $out;
+}
+
+/**
+ * Has the B2B commission moved since this sheet last filled it in?
+ *
+ * The same contract as bhela_bm_cost_earnings_drift() above, and deliberately the
+ * same shape: it REPORTS, it does not correct. An approved sheet has three names on
+ * it, and rewriting a figure they signed off would be worse than showing it is out
+ * of date — the fix is to unlock, adjust and re-approve, which the workflow already
+ * supports.
+ *
+ * A line typed over by hand is left alone entirely: `_bhela_cost_b2b_auto` is what
+ * the bookings said when the sheet was saved, so a stored value that no longer
+ * matches it was somebody's decision, not a stale cache.
+ *
+ * @param int $post_id Cost sheet.
+ * @return array{stale:bool,stored:int,live:int,diff:int}
+ */
+function bhela_bm_cost_b2b_drift( $post_id ) {
+	$lines  = bhela_bm_cost_stored_lines( $post_id );
+	$stored = (int) ( $lines['b2b_partner']['p1'] ?? 0 );
+	$auto   = get_post_meta( $post_id, '_bhela_cost_b2b_auto', true );
+	$out    = array( 'stale' => false, 'stored' => $stored, 'live' => $stored, 'diff' => 0 );
+
+	if ( '' === $auto || (int) $auto !== $stored ) {
+		return $out;                        // typed by hand, or never auto-filled
+	}
+	$date = (string) get_post_meta( $post_id, '_bhela_cost_trip_date', true );
+	if ( '' === $date || ! function_exists( 'bhela_bm_commission_rows' ) ) {
+		return $out;
+	}
+	$live         = (int) bhela_bm_commission_rows( $date, $date )['total'];
 	$out['live']  = $live;
 	$out['diff']  = $live - $stored;
 	$out['stale'] = $live !== $stored;
@@ -1224,6 +1255,35 @@ function bhela_bm_cost_save( $post_id, $post ) {
 	// list and be misread as the old positional format on the next load.
 	update_post_meta( $post_id, '_bhela_cost_lines', wp_json_encode( $lines, JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT ) );
 	update_post_meta( $post_id, '_bhela_cost_total', $total );
+
+	// The B2B Partner line fills itself from the commissions on that date's
+	// bookings, so the figure is entered once — on the booking — and cannot be
+	// counted twice by also being typed here.
+	//
+	// Same contract as earnings below it: `_bhela_cost_b2b_auto` records what the
+	// bookings said at save time, so bhela_bm_cost_b2b_drift() can tell a value it
+	// filled in from one somebody typed over. A typed figure is a decision and is
+	// left alone; a filled one is refreshed while the sheet is still editable.
+	$b2b_live = function_exists( 'bhela_bm_commission_rows' )
+		? (int) bhela_bm_commission_rows( $date, $date )['total']
+		: 0;
+	$b2b_was  = get_post_meta( $post_id, '_bhela_cost_b2b_auto', true );
+	$b2b_line = (int) ( $lines['b2b_partner']['p1'] ?? 0 );
+	// Untouched by hand if it still equals what we last filled in — or if the line
+	// is empty on a sheet that has never carried one.
+	if ( '' === $b2b_was || (int) $b2b_was === $b2b_line ) {
+		if ( $b2b_live !== $b2b_line ) {
+			if ( ! isset( $lines['b2b_partner'] ) || ! is_array( $lines['b2b_partner'] ) ) {
+				$lines['b2b_partner'] = array( 'p1' => 0, 'p2' => 0, 'p3' => 0, 'remark' => '' );
+			}
+			$total -= $b2b_line;
+			$lines['b2b_partner']['p1'] = $b2b_live;
+			$total += $b2b_live;
+			update_post_meta( $post_id, '_bhela_cost_lines', wp_json_encode( $lines, JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT ) );
+			update_post_meta( $post_id, '_bhela_cost_total', $total );
+		}
+		update_post_meta( $post_id, '_bhela_cost_b2b_auto', $b2b_live );
+	}
 
 	$book = bhela_bm_cost_booking_earnings( $date );
 	update_post_meta( $post_id, '_bhela_cost_earnings_auto', $book['total'] );

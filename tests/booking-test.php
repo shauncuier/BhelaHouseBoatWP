@@ -17,7 +17,7 @@
  */
 
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'ui', 'roles', 'log', 'trips', 'invoice', 'emails', 'admin' );
+bhela_test_modules( 'ui', 'roles', 'log', 'trips', 'invoice', 'emails', 'admin', 'b2b-report' );
 
 wp_set_current_user( 1 );
 
@@ -363,6 +363,158 @@ ok( false === strpos( $cf_eml, 'Anwarpur Ghat' ), 'nor does the customer email' 
 ok( false === strpos( $cf_inv, '২ দিন ১ রাত' ), 'nor the package label' );
 ok( false === strpos( $cf_eml, '২ দিন ১ রাত' ), 'nor does the email' );
 
+echo "\n=== 3f. B2B commission never reaches the guest ===\n";
+// The commission is between BHELA and the partner. It is deducted in the accounts
+// and must not appear on anything the guest reads. This is a rule about what must
+// NOT be there, which is exactly the kind that rots silently — nothing breaks when
+// it leaks, it just quietly shows a guest what BHELA pays an agency.
+bhela_bm_save_agencies( array(
+	array( 'id' => '', 'name' => 'ZZ Travel Compass', 'phone' => '01700000022', 'email' => 'zz@example.invalid', 'rate' => 10 ),
+) );
+$ag_id = '';
+foreach ( bhela_bm_agencies() as $aid => $arow ) {
+	if ( 'ZZ Travel Compass' === $arow['name'] ) {
+		$ag_id = $aid;
+	}
+}
+ok( '' !== $ag_id, 'the agency saved and has an id', $ag_id );
+ok( 3000 === bhela_bm_agency_commission( $ag_id, 30000 ), '10% of 30,000 suggests 3,000',
+	(string) bhela_bm_agency_commission( $ag_id, 30000 ) );
+
+$b2b = bk_new( 'b2b guest' );
+bk_save( $b2b, array(
+	'bhela_travel_date' => $friday,
+	'bhela_agency'      => $ag_id,
+	'bhela_commission'  => 3500,          // negotiated, not the suggested 3,000
+	'bhela_agency_ref'  => 'TC-99',
+	'bhela_paid_amount' => 10000,
+) );
+bk_money( $b2b, 30000, 10000 );
+update_post_meta( $b2b, '_bhela_agency', $ag_id );
+update_post_meta( $b2b, '_bhela_commission', 3500 );
+
+ok( 3500 === (int) bk_meta( $b2b, 'commission' ), 'the agreed amount is stored, not the suggestion', bk_meta( $b2b, 'commission' ) );
+ok( 'ZZ Travel Compass' === bhela_bm_booking_agency_name( $b2b ), 'and the agency resolves by id' );
+
+// The three guest-facing surfaces.
+$b2b_inv  = bk_invoice_html( $b2b );
+$b2b_conf = bhela_bm_confirm_text( $b2b );
+$b2b_mail = bhela_bm_email_customer_html( $b2b, 'confirmed' );
+foreach ( array( 'invoice' => $b2b_inv, 'confirmation message' => $b2b_conf, 'customer email' => $b2b_mail ) as $where => $doc ) {
+	ok( false === strpos( $doc, '3,500' ) && false === strpos( $doc, '3500' ),
+		"the commission is absent from the $where" );
+	ok( false === strpos( $doc, 'ZZ Travel Compass' ), "and so is the agency name — $where" );
+	ok( false === strpos( $doc, 'TC-99' ), "and the agency reference — $where" );
+}
+// The guest still sees their own full price. The commission comes out of BHELA's
+// side, not the guest's — an invoice quietly reduced by 3,500 would be wrong.
+ok( false !== strpos( $b2b_inv, '30,000' ), 'the guest is still billed the full 30,000' );
+
+// The placeholders exist for an agency-facing message, but are not in the shipped
+// guest template — adding them is a settings edit, not a code change.
+ok( false !== strpos( bhela_bm_render_sms( '{agency}|{commission}|{agency_ref}', $b2b ), 'ZZ Travel Compass' ),
+	'an agency-facing template CAN carry them' );
+ok( false === strpos( bhela_bm_confirm_default_template(), '{commission}' ),
+	'but the shipped guest template does not' );
+
+// The invoice prints the guest's address. It was added to the booking, the admin,
+// the public form and the confirmation message in v2.30.0 and missed here, so the
+// invoice showed no address at all while every other surface had one.
+$addr_id = bk_new( 'address on invoice' );
+bk_save( $addr_id, array( 'bhela_travel_date' => $friday, 'bhela_address' => 'Dhaka' ) );
+bk_money( $addr_id, 30000, 0 );
+ok( false !== strpos( bk_invoice_html( $addr_id ), 'Dhaka' ), 'the invoice prints the guest address' );
+bk_save( $addr_id, array( 'bhela_travel_date' => $friday, 'bhela_address' => '' ) );
+$addr_html = bk_invoice_html( $addr_id );
+ok( false === strpos( $addr_html, 'Dhaka' ), 'and drops it when there is none' );
+ok( false !== strpos( $addr_html, 'Bill To' ), 'without breaking the Bill To block' );
+
+echo "\n=== 3g. the commission is counted exactly once ===\n";
+$b2b_rows = bhela_bm_commission_rows( $friday, $friday );
+ok( 3500 === (int) $b2b_rows['total'], 'the day totals 3,500', (string) $b2b_rows['total'] );
+ok( isset( $b2b_rows['by_agency'][ $ag_id ] ), 'attributed to the agency' );
+ok( 1 === (int) $b2b_rows['by_agency'][ $ag_id ]['bookings'], 'one booking' );
+
+// A cancelled booking owes nobody a commission — no trip, no sale.
+bk_save( $b2b, array( 'bhela_travel_date' => $friday, 'bhela_status' => 'cancelled', 'bhela_agency' => $ag_id, 'bhela_commission' => 3500 ) );
+ok( 0 === (int) bhela_bm_commission_rows( $friday, $friday )['total'], 'a cancelled booking owes no commission',
+	(string) bhela_bm_commission_rows( $friday, $friday )['total'] );
+bk_save( $b2b, array( 'bhela_travel_date' => $friday, 'bhela_status' => 'confirmed', 'bhela_agency' => $ag_id, 'bhela_commission' => 3500 ) );
+
+echo "\n=== 3h. referral links ===\n";
+$ref_tok = bhela_bm_agencies()[ $ag_id ]['token'] ?? '';
+ok( '' !== $ref_tok, 'the agency has a referral token', $ref_tok );
+ok( $ag_id === bhela_bm_agency_by_token( $ref_tok ), 'the token resolves to its agency' );
+ok( '' === bhela_bm_agency_by_token( 'nonsense' ), 'an unknown token resolves to nothing' );
+ok( false !== strpos( bhela_bm_agency_ref_url( $ag_id ), 'ref=' . $ref_tok ), 'the link carries it',
+	bhela_bm_agency_ref_url( $ag_id ) );
+
+// Rotation. A partner whose link leaks needs a new one WITHOUT losing the bookings
+// they already brought — which is why the token is stored and random rather than a
+// wp_hash() over the frozen agency id, where it could never change.
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_tok, 'regen' => 1 ),
+) );
+$ref_new = bhela_bm_agencies()[ $ag_id ]['token'] ?? '';
+ok( $ref_new !== $ref_tok, 'regenerating mints a different token' );
+ok( '' === bhela_bm_agency_by_token( $ref_tok ), 'and the old link stops attributing' );
+ok( $ag_id === bhela_bm_agency_by_token( $ref_new ), 'while the new one works' );
+
+// An ordinary save must NOT rotate it, or every settings save would break every
+// live link an agency is already advertising.
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_new ),
+) );
+ok( $ref_new === ( bhela_bm_agencies()[ $ag_id ]['token'] ?? '' ), 'a normal save keeps the link alive' );
+
+// A retired partner's link stops attributing, which is half of what retiring means.
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_new, 'retired' => 1 ),
+) );
+ok( '' === bhela_bm_agency_by_token( $ref_new ), 'a retired agency stops attributing' );
+ok( null !== bhela_bm_agency( $ag_id ), 'but still names the bookings it already brought' );
+bhela_bm_save_agencies( array(
+	array( 'id' => $ag_id, 'name' => 'ZZ Travel Compass', 'rate' => 10, 'token' => $ref_new ),
+) );
+
+echo "\n=== 3i. a referral suggests, and waits ===\n";
+// The control that matters: appending ?ref= to a URL must not move money on its own.
+$_COOKIE[ bhela_bm_ref_cookie() ] = $ref_new;
+$ref_sub = bhela_bm_process_submission( array(
+	'name'   => 'ZZ Referred guest',
+	'phone'  => '01700000033',
+	'date'   => $friday,
+	'cabins' => wp_json_encode( array( array( 'adults' => 2, 'c48' => 0, 'c04' => 0 ) ) ),
+) );
+unset( $_COOKIE[ bhela_bm_ref_cookie() ] );
+
+if ( is_wp_error( $ref_sub ) ) {
+	ok( false, 'a referred booking submits', $ref_sub->get_error_message() );
+} else {
+	$ref_id = (int) $ref_sub['booking_id'];
+	$made[] = $ref_id;
+	$ref_total = (int) get_post_meta( $ref_id, '_bhela_total', true );
+	ok( $ag_id === get_post_meta( $ref_id, '_bhela_agency', true ), 'the booking is attributed to the agency' );
+	ok( bhela_bm_agency_commission( $ag_id, $ref_total ) === (int) get_post_meta( $ref_id, '_bhela_commission', true ),
+		'with the commission suggested from the rate', get_post_meta( $ref_id, '_bhela_commission', true ) );
+	ok( 'unconfirmed' === get_post_meta( $ref_id, '_bhela_referral', true ), 'and held as unconfirmed' );
+
+	// Absent from the accounts until a person agrees. Because the statement and the
+	// cost sheet both read bhela_bm_commission_rows(), one gate covers both.
+	$ref_before = (int) bhela_bm_commission_rows( $friday, $friday )['total'];
+	update_post_meta( $ref_id, '_bhela_referral', 'confirmed' );
+	$ref_after = (int) bhela_bm_commission_rows( $friday, $friday )['total'];
+	ok( $ref_after - $ref_before === (int) get_post_meta( $ref_id, '_bhela_commission', true ),
+		'it counts only once confirmed', $ref_before . ' → ' . $ref_after );
+	update_post_meta( $ref_id, '_bhela_referral', 'unconfirmed' );
+	ok( $ref_before === (int) bhela_bm_commission_rows( $friday, $friday )['total'],
+		'and stops counting again if unconfirmed' );
+
+	// A booking that arrived by referral is still a guest booking: nothing leaks.
+	ok( false === strpos( bk_invoice_html( $ref_id ), 'ZZ Travel Compass' ), 'the invoice still names no agency' );
+	ok( false === strpos( bhela_bm_confirm_text( $ref_id ), 'ZZ Travel Compass' ), 'nor does the confirmation message' );
+}
+
 echo "\n=== 3c. unticking restores per-cabin pricing ===\n";
 bk_save( $fb, array(
 	'bhela_cabin_adults' => array( 4 ),
@@ -488,6 +640,96 @@ ok( (bool) array_filter( array( 0 ), 'strlen' ), 'a Sunday-only list does not tr
 $ad = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/admin.php' );
 ok( (bool) preg_match( '/bhela_pricing_days_present.*bhela_bm_sanitize_weekend_days/s', $ad ),
 	'and the marker still gates the write' );
+
+echo "\n=== 7. the B2B report shows what the accounts deliberately hide ===\n";
+// bhela_bm_commission_rows() answers "what does the month owe", so it drops cancelled
+// bookings and unconfirmed referrals on purpose. The B2B screen has to show exactly
+// those — a referral waiting on a person is the main reason to open it. Two readings
+// of the same data, so this pins them against each other rather than trusting either.
+bhela_bm_save_agencies( array(
+	array( 'id' => '', 'name' => 'ZZ B2B Alpha', 'phone' => '', 'email' => '', 'rate' => 10 ),
+	array( 'id' => '', 'name' => 'ZZ B2B Beta',  'phone' => '', 'email' => '', 'rate' => 5 ),
+) );
+$b2b_ids = array();
+foreach ( bhela_bm_agencies() as $aid => $arow ) {
+	if ( 0 === strpos( $arow['name'], 'ZZ B2B ' ) ) {
+		$b2b_ids[ $arow['name'] ] = $aid;
+	}
+}
+$alpha = $b2b_ids['ZZ B2B Alpha'];
+$beta  = $b2b_ids['ZZ B2B Beta'];
+
+/** @return int booking id */
+function zz_b2b( $agency, $total, $comm, $referral, $status = 'confirmed' ) {
+	$id = wp_insert_post( array( 'post_type' => 'bhela_booking', 'post_status' => 'publish', 'post_title' => 'ZZ b2b guest' ) );
+	update_post_meta( $id, '_bhela_travel_date', '2026-09-10' );
+	update_post_meta( $id, '_bhela_status', $status );
+	update_post_meta( $id, '_bhela_total', $total );
+	update_post_meta( $id, '_bhela_guests', 4 );
+	update_post_meta( $id, '_bhela_agency', $agency );
+	update_post_meta( $id, '_bhela_commission', $comm );
+	if ( '' !== $referral ) {
+		update_post_meta( $id, '_bhela_referral', $referral );
+	}
+	return $id;
+}
+
+$b_hand    = zz_b2b( $alpha, 30000, 3000, '' );                        // staff entered it
+$b_pending = zz_b2b( $alpha, 26000, 2600, 'unconfirmed' );             // came by link, unconfirmed
+$b_conf    = zz_b2b( $beta,  40000, 2000, 'confirmed' );               // came by link, confirmed
+$b_cancel  = zz_b2b( $beta,  50000, 2500, 'confirmed', 'cancelled' );  // no trip, no commission
+$b_direct  = zz_b2b( '',     20000, 0,    '' );                        // not a B2B booking at all
+
+$b2b = bhela_bm_b2b_rows( '2026-09-01', '2026-09-30' );
+$bt  = $b2b['totals'];
+
+ok( 4 === $bt['bookings'], 'the four agency bookings are listed, the direct one is not', (string) $bt['bookings'] );
+$listed = array_column( $b2b['rows'], 'id' );
+ok( ! in_array( $b_direct, $listed, true ), 'a booking with no agency and no commission never appears' );
+ok( in_array( $b_pending, $listed, true ), 'AND the unconfirmed referral IS listed — hiding it is what the accounts do' );
+ok( in_array( $b_cancel, $listed, true ), 'so is the cancelled one, which the statement also drops' );
+
+ok( 5000 === $bt['commission'], 'owed = 3000 hand + 2000 confirmed; pending and cancelled excluded', (string) $bt['commission'] );
+ok( 2600 === $bt['pending'] && 1 === $bt['pending_n'], 'the waiting figure is counted separately, not mixed in',
+	$bt['pending'] . ' / ' . $bt['pending_n'] );
+
+// The screen's "owed" and the statement's deduction are two implementations of one
+// rule. If they ever disagree, one of the two is wrong and nobody would notice.
+$rows_fn = bhela_bm_commission_rows( '2026-09-01', '2026-09-30' );
+ok( (int) $rows_fn['total'] === $bt['commission'], 'and it agrees to the taka with what the statement deducts',
+	$rows_fn['total'] . ' vs ' . $bt['commission'] );
+
+echo "\n=== 7b. filtering by one agency ===\n";
+$only = bhela_bm_b2b_rows( '2026-09-01', '2026-09-30', $alpha );
+ok( 2 === $only['totals']['bookings'], 'Alpha has two bookings', (string) $only['totals']['bookings'] );
+ok( 3000 === $only['totals']['commission'] && 2600 === $only['totals']['pending'], 'with its own owed and waiting figures',
+	$only['totals']['commission'] . ' / ' . $only['totals']['pending'] );
+$names = array_unique( array_column( $only['rows'], 'agency_id' ) );
+ok( array( $alpha ) === array_values( $names ), 'and nothing from Beta leaks in' );
+
+ok( 'unconfirmed' === $b2b['rows'][0]['referral'], 'the waiting row sorts to the top, where it gets acted on',
+	$b2b['rows'][0]['referral'] );
+
+$per = bhela_bm_b2b_by_agency( $b2b['rows'] );
+ok( 3000 === $per[ $alpha ]['commission'] && 2000 === $per[ $beta ]['commission'], 'the per-agency subtotals split correctly',
+	$per[ $alpha ]['commission'] . ' / ' . $per[ $beta ]['commission'] );
+
+echo "\n=== 7c. confirming moves it, on both readings at once ===\n";
+update_post_meta( $b_pending, '_bhela_referral', 'confirmed' );
+$after   = bhela_bm_b2b_rows( '2026-09-01', '2026-09-30' );
+$after_s = bhela_bm_commission_rows( '2026-09-01', '2026-09-30' );
+ok( 7600 === $after['totals']['commission'], 'owed rises by exactly the 2600 that was waiting',
+	(string) $after['totals']['commission'] );
+ok( 0 === $after['totals']['pending'] && 0 === $after['totals']['pending_n'], 'and nothing is left waiting' );
+ok( (int) $after_s['total'] === $after['totals']['commission'], 'the statement moved by the same amount, in the same step',
+	$after_s['total'] . ' vs ' . $after['totals']['commission'] );
+
+foreach ( array( $b_hand, $b_pending, $b_conf, $b_cancel, $b_direct ) as $zz ) {
+	bhela_test_delete( $zz );
+}
+// The agency directory is left alone — owner-built data with live referral tokens in
+// it. bhela_test_owner_options() restores it; a delete_option() here took a real
+// partner with it once already.
 
 foreach ( $made as $id ) {
 	delete_transient( 'bhela_bm_fb_warn_' . $id );

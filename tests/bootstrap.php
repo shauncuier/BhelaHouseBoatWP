@@ -217,29 +217,60 @@ if ( ! getenv( 'BHELA_TEST_NO_ISOLATE' ) ) {
  * has scoped to `post_title LIKE 'ZZ%'` — so a rebuild inside a harness would index
  * the fixtures and drop every real month.
  */
+/**
+ * The owner-owned options a harness must give back exactly as it found them.
+ *
+ * All of these are lists a person built by hand in Settings and would have to build
+ * again. A harness that writes one is not doing anything wrong — it needs an agency,
+ * a roster, a period to test against — but it must not leave its version behind, and
+ * it must not delete the real one on the way out.
+ *
+ * Started as a guard for the period index alone. It is a list because the same
+ * mistake then happened a second time, to bhela_bm_agencies: a test tidied up after
+ * itself with delete_option() and took a real partner directory with it.
+ */
+function bhela_test_owner_options() {
+	return array(
+		'bhela_bm_inv_periods',   // month => post id. Also the one-sheet-per-month constraint
+		'bhela_bm_agencies',      // B2B partner directory, including live referral tokens
+		'bhela_bm_staff',         // salary roster
+		'bhela_bm_inv_categories',
+		'bhela_bm_inv_subcats',
+		'bhela_bm_inv_locations',
+		'bhela_bm_expense_types',
+		'bhela_bm_expense_methods',
+		'bhela_bm_cost_heads',
+	);
+}
+
 function bhela_test_restore_period_index() {
-	// sweep.php rewrites this index on purpose — that is its job, and restoring a
-	// snapshot over the top would undo the repair it just made.
+	// sweep.php rewrites the period index on purpose — that is its job, and restoring
+	// a snapshot over the top would undo the repair it just made.
 	if ( defined( 'BHELA_TEST_INDEX_WRITER' ) && BHELA_TEST_INDEX_WRITER ) {
 		return;
 	}
 	// Nothing to restore if we never got far enough to take the snapshot.
-	if ( ! array_key_exists( 'bhela_periods_before', $GLOBALS ) || ! function_exists( 'update_option' ) ) {
+	if ( ! array_key_exists( 'bhela_owner_options_before', $GLOBALS ) || ! function_exists( 'update_option' ) ) {
 		return;
 	}
-	$before = $GLOBALS['bhela_periods_before'];
-	if ( get_option( 'bhela_bm_inv_periods', array() ) === $before ) {
-		return;
-	}
-	if ( $before ) {
-		update_option( 'bhela_bm_inv_periods', $before, false );
-	} else {
-		delete_option( 'bhela_bm_inv_periods' );
+	foreach ( $GLOBALS['bhela_owner_options_before'] as $option => $before ) {
+		if ( get_option( $option, null ) === $before ) {
+			continue;
+		}
+		if ( null === $before ) {
+			delete_option( $option );       // it did not exist when we started
+		} else {
+			update_option( $option, $before, false );
+		}
 	}
 }
 
-// Taken here, after WordPress is up and before any harness code runs.
-$GLOBALS['bhela_periods_before'] = get_option( 'bhela_bm_inv_periods', array() );
+// Taken here, after WordPress is up and before any harness code runs. `null` records
+// "there was no such option", so a harness that creates one does not leave it behind.
+$GLOBALS['bhela_owner_options_before'] = array();
+foreach ( bhela_test_owner_options() as $bhela_opt ) {
+	$GLOBALS['bhela_owner_options_before'][ $bhela_opt ] = get_option( $bhela_opt, null );
+}
 
 /* ---------- Assertions ---------- */
 

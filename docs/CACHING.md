@@ -33,6 +33,17 @@ strings, and would then serve one guest's invoice to the next visitor.
 
 Add `bhela_invoice` to the cache plugin's URL/query-string exclusion list.
 
+**3. The agency referral link: `?ref=`** — a partner's referral link sets a cookie
+and immediately redirects to the clean URL, and both halves of that need PHP to run.
+Most caches miss a URL carrying an unknown query string anyway, so this usually works
+untouched — but a cache configured to *ignore* query strings would serve the plain
+homepage from cache, the cookie would never be set, and every booking that partner
+sent would quietly go unattributed. Nothing would look broken; the commission would
+simply never appear.
+
+Add `ref` to the same exclusion list. Only the `?ref=` request needs to miss the
+cache — the clean URL it redirects to is cached exactly as before.
+
 LiteSpeed Cache → Cache → Excludes → **Do Not Cache Query Strings**: `bhela_invoice`
 WP Rocket → Advanced Rules → **Never Cache URLs**: `(.*)bhela_invoice(.*)`
 

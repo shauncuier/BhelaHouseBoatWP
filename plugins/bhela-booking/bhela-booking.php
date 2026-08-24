@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.30.0
+ * Version: 2.31.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.30.0' );
+define( 'BHELA_BM_VERSION', '2.31.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -832,6 +832,30 @@ require_once BHELA_BM_PATH . 'includes/sms.php';
 // supplies is available to every SMS template, and an SMS goes out from the public
 // booking form where nothing in wp-admin is loaded.
 require_once BHELA_BM_PATH . 'includes/confirm.php';
+/**
+ * Accept a date only in the exact format the meta is stored in, and only if it is
+ * a real calendar date. `_bhela_travel_date` is a plain Y-m-d string, so a malformed
+ * value would silently match nothing (or everything) rather than error.
+ *
+ * It lives in core rather than in reports.php because four modules now validate a
+ * date this way — the trip report, the cost sheet, the B2B report and its CSV. Two
+ * of them had already worked around its absence: costs.php carried a duplicate
+ * behind a function_exists() guard, and b2b-report.php simply fataled when the
+ * report module happened not to be loaded. A shared helper parked in one screen's
+ * file is a load-order accident waiting to happen.
+ *
+ * @param mixed $value Raw request value.
+ * @return string Valid Y-m-d date, or '' when it is not one.
+ */
+function bhela_bm_report_date( $value ) {
+	$value = is_string( $value ) ? trim( $value ) : '';
+	if ( ! preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m ) ) {
+		return '';
+	}
+	return checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ? $value : '';
+}
+
+require_once BHELA_BM_PATH . 'includes/agencies.php';
 require_once BHELA_BM_PATH . 'includes/otp.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';
@@ -853,6 +877,7 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/costs.php';
 	require_once BHELA_BM_PATH . 'includes/expenses.php';
 	require_once BHELA_BM_PATH . 'includes/statement.php';
+	require_once BHELA_BM_PATH . 'includes/b2b-report.php';
 	require_once BHELA_BM_PATH . 'includes/yearly.php';
 	require_once BHELA_BM_PATH . 'includes/salary.php';
 	require_once BHELA_BM_PATH . 'includes/inventory.php';
