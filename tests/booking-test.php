@@ -363,6 +363,84 @@ ok( false === strpos( $cf_eml, 'Anwarpur Ghat' ), 'nor does the customer email' 
 ok( false === strpos( $cf_inv, '২ দিন ১ রাত' ), 'nor the package label' );
 ok( false === strpos( $cf_eml, '২ দিন ১ রাত' ), 'nor does the email' );
 
+echo "\n=== 3f. B2B commission never reaches the guest ===\n";
+// The commission is between BHELA and the partner. It is deducted in the accounts
+// and must not appear on anything the guest reads. This is a rule about what must
+// NOT be there, which is exactly the kind that rots silently — nothing breaks when
+// it leaks, it just quietly shows a guest what BHELA pays an agency.
+bhela_bm_save_agencies( array(
+	array( 'id' => '', 'name' => 'ZZ Travel Compass', 'phone' => '01700000022', 'email' => 'zz@example.invalid', 'rate' => 10 ),
+) );
+$ag_id = '';
+foreach ( bhela_bm_agencies() as $aid => $arow ) {
+	if ( 'ZZ Travel Compass' === $arow['name'] ) {
+		$ag_id = $aid;
+	}
+}
+ok( '' !== $ag_id, 'the agency saved and has an id', $ag_id );
+ok( 3000 === bhela_bm_agency_commission( $ag_id, 30000 ), '10% of 30,000 suggests 3,000',
+	(string) bhela_bm_agency_commission( $ag_id, 30000 ) );
+
+$b2b = bk_new( 'b2b guest' );
+bk_save( $b2b, array(
+	'bhela_travel_date' => $friday,
+	'bhela_agency'      => $ag_id,
+	'bhela_commission'  => 3500,          // negotiated, not the suggested 3,000
+	'bhela_agency_ref'  => 'TC-99',
+	'bhela_paid_amount' => 10000,
+) );
+bk_money( $b2b, 30000, 10000 );
+update_post_meta( $b2b, '_bhela_agency', $ag_id );
+update_post_meta( $b2b, '_bhela_commission', 3500 );
+
+ok( 3500 === (int) bk_meta( $b2b, 'commission' ), 'the agreed amount is stored, not the suggestion', bk_meta( $b2b, 'commission' ) );
+ok( 'ZZ Travel Compass' === bhela_bm_booking_agency_name( $b2b ), 'and the agency resolves by id' );
+
+// The three guest-facing surfaces.
+$b2b_inv  = bk_invoice_html( $b2b );
+$b2b_conf = bhela_bm_confirm_text( $b2b );
+$b2b_mail = bhela_bm_email_customer_html( $b2b, 'confirmed' );
+foreach ( array( 'invoice' => $b2b_inv, 'confirmation message' => $b2b_conf, 'customer email' => $b2b_mail ) as $where => $doc ) {
+	ok( false === strpos( $doc, '3,500' ) && false === strpos( $doc, '3500' ),
+		"the commission is absent from the $where" );
+	ok( false === strpos( $doc, 'ZZ Travel Compass' ), "and so is the agency name — $where" );
+	ok( false === strpos( $doc, 'TC-99' ), "and the agency reference — $where" );
+}
+// The guest still sees their own full price. The commission comes out of BHELA's
+// side, not the guest's — an invoice quietly reduced by 3,500 would be wrong.
+ok( false !== strpos( $b2b_inv, '30,000' ), 'the guest is still billed the full 30,000' );
+
+// The placeholders exist for an agency-facing message, but are not in the shipped
+// guest template — adding them is a settings edit, not a code change.
+ok( false !== strpos( bhela_bm_render_sms( '{agency}|{commission}|{agency_ref}', $b2b ), 'ZZ Travel Compass' ),
+	'an agency-facing template CAN carry them' );
+ok( false === strpos( bhela_bm_confirm_default_template(), '{commission}' ),
+	'but the shipped guest template does not' );
+
+// The invoice prints the guest's address. It was added to the booking, the admin,
+// the public form and the confirmation message in v2.30.0 and missed here, so the
+// invoice showed no address at all while every other surface had one.
+$addr_id = bk_new( 'address on invoice' );
+bk_save( $addr_id, array( 'bhela_travel_date' => $friday, 'bhela_address' => 'Dhaka' ) );
+bk_money( $addr_id, 30000, 0 );
+ok( false !== strpos( bk_invoice_html( $addr_id ), 'Dhaka' ), 'the invoice prints the guest address' );
+bk_save( $addr_id, array( 'bhela_travel_date' => $friday, 'bhela_address' => '' ) );
+$addr_html = bk_invoice_html( $addr_id );
+ok( false === strpos( $addr_html, 'Dhaka' ), 'and drops it when there is none' );
+ok( false !== strpos( $addr_html, 'Bill To' ), 'without breaking the Bill To block' );
+
+echo "\n=== 3g. the commission is counted exactly once ===\n";
+$b2b_rows = bhela_bm_commission_rows( $friday, $friday );
+ok( 3500 === (int) $b2b_rows['total'], 'the day totals 3,500', (string) $b2b_rows['total'] );
+ok( isset( $b2b_rows['by_agency'][ $ag_id ] ), 'attributed to the agency' );
+ok( 1 === (int) $b2b_rows['by_agency'][ $ag_id ]['bookings'], 'one booking' );
+
+// A cancelled booking owes nobody a commission — no trip, no sale.
+bk_save( $b2b, array( 'bhela_travel_date' => $friday, 'bhela_status' => 'cancelled', 'bhela_agency' => $ag_id, 'bhela_commission' => 3500 ) );
+ok( 0 === (int) bhela_bm_commission_rows( $friday, $friday )['total'], 'a cancelled booking owes no commission',
+	(string) bhela_bm_commission_rows( $friday, $friday )['total'] );
+bk_save( $b2b, array( 'bhela_travel_date' => $friday, 'bhela_status' => 'confirmed', 'bhela_agency' => $ag_id, 'bhela_commission' => 3500 ) );
+
 echo "\n=== 3c. unticking restores per-cabin pricing ===\n";
 bk_save( $fb, array(
 	'bhela_cabin_adults' => array( 4 ),

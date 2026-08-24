@@ -311,6 +311,63 @@ function bhela_bm_details_metabox( $post ) {
 			</select></td></tr>
 		<tr><th><?php esc_html_e( 'Transaction ID', 'bhela-booking' ); ?></th>
 			<td><input type="text" name="bhela_txn_id" value="<?php echo esc_attr( $m( '_bhela_txn_id' ) ); ?>"></td></tr>
+		<?php
+		// B2B block. Grouped and labelled as internal so nobody mistakes it for
+		// something the guest sees - the commission is a commercial arrangement
+		// between BHELA and the partner, and it is kept off every guest surface.
+		$bhela_agencies = function_exists( 'bhela_bm_agencies' ) ? bhela_bm_agencies() : array();
+		$bhela_agency   = (string) $m( '_bhela_agency' );
+		// A retired partner still has to render on the booking it brought, so it is
+		// added back to the list for this booking only.
+		if ( '' !== $bhela_agency && ! isset( $bhela_agencies[ $bhela_agency ] ) ) {
+			$bhela_retired = bhela_bm_agency( $bhela_agency );
+			if ( $bhela_retired ) {
+				$bhela_agencies[ $bhela_agency ] = $bhela_retired;
+			}
+		}
+		?>
+		<tr><th colspan="2" style="padding-bottom:0">
+			<h3 style="margin:14px 0 0"><?php esc_html_e( 'B2B / Agency', 'bhela-booking' ); ?>
+				<span class="bha-pill bha-pill--neutral"><?php esc_html_e( 'internal only', 'bhela-booking' ); ?></span></h3>
+			<p class="description" style="font-weight:400"><?php esc_html_e( 'Never shown to the guest — not on the invoice, the confirmation message or any email.', 'bhela-booking' ); ?></p>
+		</th></tr>
+		<tr><th><?php esc_html_e( 'Booked through', 'bhela-booking' ); ?></th>
+			<td><select name="bhela_agency" id="bhela-agency"
+					data-rates="<?php echo esc_attr( wp_json_encode( array_map( function ( $a ) { return $a['rate']; }, $bhela_agencies ) ) ); ?>">
+					<option value=""><?php esc_html_e( '— Direct booking —', 'bhela-booking' ); ?></option>
+					<?php foreach ( $bhela_agencies as $bhela_aid => $bhela_a ) : ?>
+						<option value="<?php echo esc_attr( $bhela_aid ); ?>" <?php selected( $bhela_agency, $bhela_aid ); ?>>
+							<?php echo esc_html( $bhela_a['name'] . ( ! empty( $bhela_a['retired'] ) ? ' (retired)' : '' ) ); ?>
+						</option>
+					<?php endforeach; ?>
+				</select>
+				<?php if ( ! $bhela_agencies ) : ?>
+					<p class="description"><a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-settings' ) . '#bhela-panel-agencies' ); ?>"><?php esc_html_e( 'Add agencies in Settings → Agencies', 'bhela-booking' ); ?></a></p>
+				<?php endif; ?></td></tr>
+		<tr><th><?php esc_html_e( 'Commission (৳)', 'bhela-booking' ); ?></th>
+			<td><input type="number" min="0" name="bhela_commission" id="bhela-commission" value="<?php echo esc_attr( $m( '_bhela_commission' ) ?: '' ); ?>">
+				<p class="description"><?php esc_html_e( 'Suggested from the agency rate when you pick one, and yours to change. The amount is what is stored — a figure agreed with a partner, not a percentage that moves when the price does.', 'bhela-booking' ); ?></p></td></tr>
+		<tr><th><?php esc_html_e( 'Agency reference', 'bhela-booking' ); ?></th>
+			<td><input type="text" name="bhela_agency_ref" value="<?php echo esc_attr( $m( '_bhela_agency_ref' ) ); ?>" placeholder="<?php esc_attr_e( 'their own booking ref', 'bhela-booking' ); ?>"></td></tr>
+		<script>
+		( function () {
+			var sel  = document.getElementById( 'bhela-agency' ),
+				amt  = document.getElementById( 'bhela-commission' ),
+				tot  = document.querySelector( '[name="bhela_total"]' );
+			if ( ! sel || ! amt ) { return; }
+			var rates = {};
+			try { rates = JSON.parse( sel.dataset.rates || '{}' ); } catch ( e ) {}
+			sel.addEventListener( 'change', function () {
+				// Suggest, never overwrite. A figure already typed is an agreed deal,
+				// and recomputing it from today's rate would silently rewrite what
+				// somebody negotiated.
+				if ( amt.value.trim() !== '' && Number( amt.value ) > 0 ) { return; }
+				var rate  = Number( rates[ sel.value ] || 0 ),
+					total = Number( ( tot && tot.value ) || 0 );
+				if ( rate > 0 && total > 0 ) { amt.value = Math.round( total * rate / 100 ); }
+			} );
+		}() );
+		</script>
 		<tr><th><?php esc_html_e( 'Customer Note', 'bhela-booking' ); ?></th>
 			<td><textarea name="bhela_message" rows="3"><?php echo esc_textarea( $m( '_bhela_message' ) ); ?></textarea></td></tr>
 	</table>
@@ -538,6 +595,9 @@ function bhela_bm_save_booking( $post_id, $post ) {
 		'_bhela_guests'       => max( 1, (int) ( $_POST['bhela_guests'] ?? 1 ) ),
 		'_bhela_pay_method'   => sanitize_key( $_POST['bhela_pay_method'] ?? '' ),
 		'_bhela_txn_id'       => sanitize_text_field( $_POST['bhela_txn_id'] ?? '' ),
+		'_bhela_agency'       => sanitize_key( $_POST['bhela_agency'] ?? '' ),
+		'_bhela_commission'   => max( 0, (int) ( $_POST['bhela_commission'] ?? 0 ) ),
+		'_bhela_agency_ref'   => sanitize_text_field( $_POST['bhela_agency_ref'] ?? '' ),
 		'_bhela_message'      => sanitize_textarea_field( $_POST['bhela_message'] ?? '' ),
 		'_bhela_paid_amount'  => max( 0, (int) ( $_POST['bhela_paid_amount'] ?? 0 ) ),
 		'_bhela_manual_price' => isset( $_POST['bhela_manual_price'] ) ? '1' : '',
@@ -938,6 +998,9 @@ function bhela_bm_settings_page() {
 		if ( isset( $_POST['cost_heads'] ) && function_exists( 'bhela_bm_save_cost_heads' ) ) {
 			bhela_bm_save_cost_heads( wp_unslash( $_POST['cost_heads'] ) );
 		}
+		if ( isset( $_POST['agencies'] ) && function_exists( 'bhela_bm_save_agencies' ) ) {
+			bhela_bm_save_agencies( wp_unslash( $_POST['agencies'] ) );
+		}
 		if ( isset( $_POST['staff'] ) && function_exists( 'bhela_bm_save_staff' ) ) {
 			bhela_bm_save_staff( wp_unslash( $_POST['staff'] ) );
 		}
@@ -1012,6 +1075,7 @@ function bhela_bm_settings_page() {
 		'heads'    => array( 'icon' => '🧾', 'label' => __( 'Lists', 'bhela-booking' ) ),
 		'store'    => array( 'icon' => '📦', 'label' => __( 'Store Lists', 'bhela-booking' ) ),
 		'staff'    => array( 'icon' => '👷', 'label' => __( 'Staff', 'bhela-booking' ) ),
+		'agencies' => array( 'icon' => '🤝', 'label' => __( 'Agencies', 'bhela-booking' ) ),
 	);
 	?>
 	<div class="wrap bha-set">
@@ -1502,6 +1566,59 @@ function bhela_bm_settings_page() {
 			})();
 			</script>
 			</div><!-- /staff -->
+
+			<div class="bha-set__panel" id="bhela-panel-agencies" role="tabpanel" aria-labelledby="bhela-tab-agencies">
+			<h2><?php esc_html_e( 'B2B Travel Agencies', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'Partners who book on a guest\'s behalf and keep a commission. The rate here only suggests an amount on the booking — the figure you agreed is what gets stored. Nothing on this tab is ever shown to a guest.', 'bhela-booking' ); ?></p>
+			<?php $agency_rows = function_exists( 'bhela_bm_agencies' ) ? bhela_bm_agencies( true ) : array(); ?>
+			<table class="widefat striped" id="bhela-agency-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Agency', 'bhela-booking' ); ?></th>
+						<th style="width:150px"><?php esc_html_e( 'Phone', 'bhela-booking' ); ?></th>
+						<th><?php esc_html_e( 'Email', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'Rate (%)', 'bhela-booking' ); ?></th>
+						<th style="width:90px"><?php esc_html_e( 'Ended', 'bhela-booking' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $agency_rows as $ag_id => $ag ) : ?>
+					<tr>
+						<td>
+							<input type="hidden" name="agencies[<?php echo esc_attr( $ag_id ); ?>][id]" value="<?php echo esc_attr( $ag_id ); ?>">
+							<input type="text" name="agencies[<?php echo esc_attr( $ag_id ); ?>][name]" value="<?php echo esc_attr( $ag['name'] ); ?>" style="width:100%">
+						</td>
+						<td><input type="text" name="agencies[<?php echo esc_attr( $ag_id ); ?>][phone]" value="<?php echo esc_attr( $ag['phone'] ); ?>" style="width:100%"></td>
+						<td><input type="email" name="agencies[<?php echo esc_attr( $ag_id ); ?>][email]" value="<?php echo esc_attr( $ag['email'] ); ?>" style="width:100%"></td>
+						<td><input type="number" min="0" max="100" step="0.5" name="agencies[<?php echo esc_attr( $ag_id ); ?>][rate]" value="<?php echo esc_attr( $ag['rate'] ); ?>" style="width:100%"></td>
+						<td><label><input type="checkbox" name="agencies[<?php echo esc_attr( $ag_id ); ?>][retired]" value="1" <?php checked( $ag['retired'] ); ?>> <?php esc_html_e( 'Hide', 'bhela-booking' ); ?></label></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p><button type="button" class="button" id="bhela-agency-add">+ <?php esc_html_e( 'Add agency', 'bhela-booking' ); ?></button></p>
+			<p class="description"><?php esc_html_e( 'Marking a partner as ended keeps them on the bookings they already brought — history must stay readable — but drops them from the list on new ones. Clearing a name deletes the row.', 'bhela-booking' ); ?></p>
+			<script>
+			(function () {
+				var btn = document.getElementById('bhela-agency-add');
+				if (!btn) return;
+				btn.addEventListener('click', function () {
+					var body = document.querySelector('#bhela-agency-table tbody');
+					var key = 'new_' + Date.now().toString(36);
+					var tr = document.createElement('tr');
+					tr.innerHTML =
+						'<td><input type="hidden" name="agencies[' + key + '][id]" value="">' +
+						'<input type="text" name="agencies[' + key + '][name]" style="width:100%"></td>' +
+						'<td><input type="text" name="agencies[' + key + '][phone]" style="width:100%"></td>' +
+						'<td><input type="email" name="agencies[' + key + '][email]" style="width:100%"></td>' +
+						'<td><input type="number" min="0" max="100" step="0.5" name="agencies[' + key + '][rate]" style="width:100%"></td>' +
+						'<td></td>';
+					body.appendChild(tr);
+					tr.querySelector('input[type=text]').focus();
+				});
+			})();
+			</script>
+			</div><!-- /agencies -->
 
 			<div class="bha-set__save">
 				<button type="submit" class="button button-primary button-large"><?php esc_html_e( 'Save Settings', 'bhela-booking' ); ?></button>

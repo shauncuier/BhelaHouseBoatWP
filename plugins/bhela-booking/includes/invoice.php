@@ -89,6 +89,11 @@ function bhela_bm_invoice_data( $booking_id ) {
 		'name'        => get_the_title( $booking_id ),
 		'phone'       => $m( '_bhela_phone' ),
 		'email'       => $m( '_bhela_email' ),
+		// The guest's own address, not the business one in the header. It was added
+		// to the booking, the admin screen, the public form and the confirmation
+		// message in v2.30.0 and missed here, so the invoice printed no address at
+		// all while every other surface had one.
+		'address'     => $m( '_bhela_address' ),
 		'travel_date' => $m( '_bhela_travel_date' ),
 		'cabin'       => $m( '_bhela_cabin_type' ),
 		'guests'      => (int) $m( '_bhela_guests' ),

@@ -50,6 +50,7 @@ function bhela_bm_statement_data( $month ) {
 		'guests' => 0, 'earnings' => 0, 'cost' => 0, 'profit' => 0,
 		'expenses' => array( 'rows' => array(), 'by_type' => array(), 'total' => 0 ),
 		'salary' => array( 'total' => 0, 'sheets' => 0, 'ids' => array() ),
+		'commission' => array( 'total' => 0, 'by_agency' => array() ),
 		'gross' => 0, 'cost_pp' => 0.0, 'profit_pp' => 0.0,
 		'signoff' => array(), 'stale' => array(),
 	);
@@ -148,13 +149,25 @@ function bhela_bm_statement_data( $month ) {
 		? bhela_bm_salary_month_total( $month, count( $out['trips'] ) )
 		: $out['salary'];
 
-	$out['gross'] = $out['profit'] - $out['expenses']['total'] - $out['salary']['total'];
+	// B2B commission. A partner books on a guest's behalf and keeps a cut, so the
+	// money never reaches BHELA even though the guest paid the full price — it is
+	// a cost of sale and comes off the bottom line like any other.
+	//
+	// Read from the BOOKINGS, not from the cost sheets. The B2B Partner cost head
+	// exists and a sheet can carry the same figure, so counting both would deduct
+	// one commission twice. The cost sheet fills its line FROM this number; this
+	// is the single source.
+	$out['commission'] = function_exists( 'bhela_bm_commission_rows' )
+		? bhela_bm_commission_rows( $from, $to )
+		: $out['commission'];
+
+	$out['gross'] = $out['profit'] - $out['expenses']['total'] - $out['salary']['total'] - $out['commission']['total'];
 	if ( $out['guests'] > 0 ) {
 		// Cost per person on the owner's sheet includes marketing and
 		// renovation, not just trip cost — the two readings differ by about a
 		// thousand taka a head, so this follows the sheet. Payroll is in here for
 		// the same reason it is in gross profit: it is a cost of carrying them.
-		$out['cost_pp']   = round( ( $out['cost'] + $out['expenses']['total'] + $out['salary']['total'] ) / $out['guests'], 2 );
+		$out['cost_pp']   = round( ( $out['cost'] + $out['expenses']['total'] + $out['salary']['total'] + $out['commission']['total'] ) / $out['guests'], 2 );
 		$out['profit_pp'] = round( $out['gross'] / $out['guests'], 2 );
 	}
 	return $out;
@@ -333,6 +346,24 @@ function bhela_bm_statement_page() {
 						<td class="bha-num">− <?php echo esc_html( bhela_bm_money( $d['salary']['total'] ) ); ?></td>
 					</tr>
 				<?php endif; ?>
+				<?php
+				// B2B commission, one row per partner. Itemised rather than lumped
+				// into a single figure because "how much did we pay Travel Compass"
+				// is the question this exists to answer.
+				foreach ( $d['commission']['by_agency'] as $ag_row ) :
+					?>
+					<tr class="bha-row--deduct">
+						<td colspan="6"><?php
+							printf(
+								/* translators: 1: agency name, 2: how many bookings they brought */
+								esc_html__( 'Less: B2B commission — %1$s (%2$d booking(s))', 'bhela-booking' ),
+								esc_html( $ag_row['name'] ),
+								(int) $ag_row['bookings']
+							);
+						?></td>
+						<td class="bha-num">− <?php echo esc_html( bhela_bm_money( $ag_row['total'] ) ); ?></td>
+					</tr>
+				<?php endforeach; ?>
 				<tr class="bha-row--total">
 					<td colspan="6"><?php esc_html_e( 'Gross Profit', 'bhela-booking' ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $d['gross'] ) ); ?></td>

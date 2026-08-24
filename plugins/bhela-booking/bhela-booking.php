@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.30.0
+ * Version: 2.31.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.30.0' );
+define( 'BHELA_BM_VERSION', '2.31.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -832,6 +832,7 @@ require_once BHELA_BM_PATH . 'includes/sms.php';
 // supplies is available to every SMS template, and an SMS goes out from the public
 // booking form where nothing in wp-admin is loaded.
 require_once BHELA_BM_PATH . 'includes/confirm.php';
+require_once BHELA_BM_PATH . 'includes/agencies.php';
 require_once BHELA_BM_PATH . 'includes/otp.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';

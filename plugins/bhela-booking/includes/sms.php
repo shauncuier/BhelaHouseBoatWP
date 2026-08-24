@@ -83,6 +83,14 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 		// method must print nothing, not "(—)", which reads as a lost value.
 		'{pay_method}' => $pay_label ? '(' . $pay_label . ')' : '',
 
+		// B2B. Deliberately NOT in the shipped confirmation template: that message
+		// goes to the guest, and the commission is between BHELA and the partner.
+		// They exist so an AGENCY-facing template can carry them, which is then a
+		// settings edit rather than a code change.
+		'{agency}'     => function_exists( 'bhela_bm_booking_agency_name' ) ? bhela_bm_booking_agency_name( $booking_id ) : '',
+		'{agency_ref}' => $m( '_bhela_agency_ref' ),
+		'{commission}' => (int) $m( '_bhela_commission' ) > 0 ? bhela_bm_money( (int) $m( '_bhela_commission' ) ) : '',
+
 		// Who handled it, and when it went out.
 		'{booked_by}' => $m( '_bhela_booked_by' ),
 		'{issued_by}' => $m( '_bhela_issued_by' ),
