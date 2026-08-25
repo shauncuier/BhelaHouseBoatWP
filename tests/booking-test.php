@@ -492,6 +492,30 @@ if ( null === $reg_before ) {
 }
 ok( bhela_bm_get_settings()['vessel_reg'] === ( $reg_before['vessel_reg'] ?? bhela_bm_default_settings()['vessel_reg'] ),
 	'the real setting is put back exactly as it was' );
+echo "\n=== 3k. the payment QR codes stay scannable ===\n";
+// The QR images are owner-pasted URLs, so the template cannot control what shape
+// arrives. It used to size them with `object-fit: cover`, which CROPS anything that
+// is not square — and a QR missing a corner has lost a finder pattern and simply
+// stops scanning. Nothing errors; the guest just cannot pay.
+$qr_tpl = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/templates/invoice.php' );
+ok( false !== strpos( $qr_tpl, 'object-fit:contain' ), 'QR images letterbox rather than crop' );
+ok( false === strpos( $qr_tpl, 'object-fit:cover' ), 'and nothing in the invoice crops an image any more' );
+ok( (bool) preg_match( '/\.pay-qrs figure \{[^}]*break-inside:avoid/', $qr_tpl ),
+	'a QR cannot be split across a page break' );
+ok( (bool) preg_match( '/@media print \{(?:[^}]|\}(?!\s*\n\t\<))*print-color-adjust:exact/s', $qr_tpl )
+	|| false !== strpos( $qr_tpl, 'print-color-adjust:exact' ),
+	'and prints as true black, not economy-mode grey' );
+
+// Both codes are configured, and the block only renders when at least one is.
+$qr_s = bhela_bm_get_settings();
+ok( '' !== (string) ( $qr_s['bangla_qr'] ?? '' ) && '' !== (string) ( $qr_s['nagad_qr'] ?? '' ),
+	'both QR images are set in settings' );
+$qr_id = bk_new( 'qr on invoice' );
+bk_save( $qr_id, array( 'bhela_travel_date' => $friday ) );
+bk_money( $qr_id, 30000, 0 );
+$qr_html = bk_invoice_html( $qr_id );
+ok( false !== strpos( $qr_html, 'pay-qrs' ), 'and the invoice renders the QR block' );
+ok( 2 === substr_count( $qr_html, '<figure>' ), 'with both codes, not one', (string) substr_count( $qr_html, '<figure>' ) );
 echo "\n=== 3g. the commission is counted exactly once ===\n";
 $b2b_rows = bhela_bm_commission_rows( $friday, $friday );
 ok( 3500 === (int) $b2b_rows['total'], 'the day totals 3,500', (string) $b2b_rows['total'] );

@@ -103,7 +103,12 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.pay-info h3 { color:#14676B; font-size:14px; margin-bottom:6px; }
 	.pay-qrs { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; margin-top:16px; padding-top:16px; border-top:1px dashed #d8cfbc; }
 	.pay-qrs figure { margin:0; text-align:center; }
-	.pay-qrs img { width:150px; height:150px; object-fit:cover; border-radius:10px; border:3px solid #fff; box-shadow:0 4px 16px rgba(11,46,51,.15); }
+	/* object-fit was `cover`, which CROPS a source that is not square — and a QR with
+	   a corner cut off has lost a finder pattern and simply stops scanning. `contain`
+	   letterboxes onto white instead, so whatever the owner pastes in stays readable.
+	   The white border is not decoration either: it extends the quiet zone. */
+	.pay-qrs img { width:158px; height:158px; object-fit:contain; background:#fff; border-radius:10px; border:6px solid #fff; box-shadow:0 4px 16px rgba(11,46,51,.15); }
+	.pay-qrs figure { break-inside:avoid; page-break-inside:avoid; }
 	.pay-qrs figcaption { font-size:12.5px; font-weight:700; color:#0B2E33; margin-top:6px; line-height:1.4; }
 	.pay-qrs figcaption small { font-weight:400; color:#5b6b6a; }
 	.pay-qrs__hint { flex-basis:100%; font-size:12.5px; color:#5b6b6a; margin-top:4px; }
@@ -153,6 +158,12 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 		body { background:#fff; padding:0; }
 		.print-bar { display:none; }
 		.invoice { box-shadow:none; border-radius:0; max-width:100%; }
+		/* A QR must print as true black on true white. Browsers default to
+		   print-color-adjust:economy, which can lighten an image enough to cost a
+		   scanner its contrast margin — and a QR split across a page break cannot be
+		   scanned at all, hence the break rules above. */
+		.pay-qrs img { print-color-adjust:exact; -webkit-print-color-adjust:exact; box-shadow:none; }
+		.pay-qrs { break-inside:avoid; page-break-inside:avoid; }
 	}
 </style>
 </head>
