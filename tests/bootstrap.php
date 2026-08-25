@@ -231,6 +231,14 @@ if ( ! getenv( 'BHELA_TEST_NO_ISOLATE' ) ) {
  */
 function bhela_test_owner_options() {
 	return array(
+		// The big one. Every phone number, payment detail, email and SMS template and
+		// gateway key the owner has ever typed. It was NOT on this list until a harness
+		// needed to write to it, which is the wrong order to discover that.
+		'bhela_bm_settings',
+		'bhela_bm_rates',         // cabin rates — owner-set money
+		'bhela_bm_trips',         // trip calendar entries, including holiday flags
+		'bhela_bm_role_perms',    // per-role permissions set from the Team screen
+		'bhela_bm_inv_seq',       // per-category Item ID counter; losing it reuses numbers
 		'bhela_bm_inv_periods',   // month => post id. Also the one-sheet-per-month constraint
 		'bhela_bm_agencies',      // B2B partner directory, including live referral tokens
 		'bhela_bm_staff',         // salary roster

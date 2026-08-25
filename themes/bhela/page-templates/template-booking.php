@@ -77,6 +77,10 @@ get_header();
 		<span>❄️ AC + Attached Washroom</span>
 		<span>🔌 ২৪ ঘণ্টা বিদ্যুৎ</span>
 		<span>👨‍👩‍👧‍👦 অপরিচিতদের সাথে শেয়ার নয়</span>
+		<?php // Same kind of assurance as the four above: the boat is a licensed vessel. ?>
+		<?php if ( bhela_contact( 'vessel_reg' ) ) : ?>
+			<span>🛳️ <?php echo esc_html( bhela_contact( 'vessel_reg' ) ); ?></span>
+		<?php endif; ?>
 	</div>
 
 	<div class="entry-content" style="margin-top:2.4rem">

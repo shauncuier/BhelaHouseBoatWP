@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.31.1
+Version: 2.32.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -581,6 +581,18 @@ a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 
 .footer-col ul { list-style: none; padding: 0; }
 .footer-col li { margin-bottom: .55rem; font-size: .95rem; }
 .footer-tagline { font-family: var(--font-display); color: var(--gold); font-size: 1.1rem; margin-top: 1rem; }
+/* Government vessel registration — an official mark, so bordered rather than filled.
+   A fill would compete with the logo directly above it. */
+.footer-reg {
+	display: inline-flex; flex-direction: column; gap: .15rem; margin-top: 1.4rem;
+	padding: .6rem .9rem; border: 1px solid var(--line-inverse); border-left: 3px solid var(--gold);
+	border-radius: 10px;
+}
+.footer-reg__label {
+	font-size: .7rem; letter-spacing: .12em; text-transform: uppercase;
+	color: var(--text-inverse); opacity: .75;
+}
+.footer-reg__no { font-size: .98rem; font-weight: 700; color: #fff; font-variant-numeric: tabular-nums; }
 /* Social icons — only the networks filled in under Customize → BHELA Contact */
 .footer-social { display: flex; flex-direction: column; align-items: center; text-align: center; gap: .85rem; padding: 1.8rem 0 .4rem; border-top: 1px solid var(--line-inverse); }
 .footer-social__label { font-size: .9rem; color: var(--text-inverse); font-weight: 600; letter-spacing: .02em; }

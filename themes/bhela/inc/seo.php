@@ -197,6 +197,17 @@ function bhela_seo_schema() {
 			'availableLanguage' => array( 'bn', 'en' ),
 		),
 	);
+	// The vessel's government registration, as a labelled PropertyValue rather than a
+	// bare string — so it reads as a vessel registration and not an unexplained id.
+	// vatID/taxID were considered and rejected: this is not a tax identifier, and
+	// claiming it is one is a factual error a search engine is right to distrust.
+	if ( bhela_contact( 'vessel_reg' ) ) {
+		$org['identifier'] = array(
+			'@type' => 'PropertyValue',
+			'name'  => 'Vessel Registration',
+			'value' => bhela_contact( 'vessel_reg' ),
+		);
+	}
 	if ( $social ) {
 		$org['sameAs'] = $social;
 	}

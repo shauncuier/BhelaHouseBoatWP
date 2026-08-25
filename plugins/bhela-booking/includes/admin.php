@@ -979,7 +979,7 @@ function bhela_bm_settings_page() {
 
 	if ( isset( $_POST['bhela_bm_settings_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_settings_nonce'] ) ), 'bhela_bm_settings' ) ) {
 		$s = bhela_bm_get_settings();
-		foreach ( array( 'business_name', 'business_tagline', 'address', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix', 'ops_manager', 'support_whatsapp', 'boarding_ghat', 'checkin_time', 'checkout_time', 'package_label' ) as $f ) {
+		foreach ( array( 'business_name', 'business_tagline', 'address', 'vessel_reg', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix', 'ops_manager', 'support_whatsapp', 'boarding_ghat', 'checkin_time', 'checkout_time', 'package_label' ) as $f ) {
 			$s[ $f ] = isset( $_POST[ $f ] ) ? sanitize_text_field( wp_unslash( $_POST[ $f ] ) ) : $s[ $f ];
 		}
 		$s['email'] = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : $s['email'];
@@ -1149,6 +1149,8 @@ function bhela_bm_settings_page() {
 				<tr><th>Business Name</th><td><input type="text" class="regular-text" name="business_name" value="<?php echo esc_attr( $s['business_name'] ); ?>"></td></tr>
 				<tr><th>Tagline</th><td><input type="text" class="regular-text" name="business_tagline" value="<?php echo esc_attr( $s['business_tagline'] ); ?>"></td></tr>
 				<tr><th>Address</th><td><input type="text" class="regular-text" name="address" value="<?php echo esc_attr( $s['address'] ); ?>"></td></tr>
+				<tr><th>Vessel Registration</th><td><input type="text" class="regular-text" name="vessel_reg" value="<?php echo esc_attr( $s['vessel_reg'] ?? '' ); ?>" placeholder="M.B BHELA (M-01-5520)">
+					<p class="description"><?php esc_html_e( 'The vessel&#8217;s government registration. Printed exactly as typed on the invoice header, the site footer and the booking page. Leave empty to hide it everywhere.', 'bhela-booking' ); ?></p></td></tr>
 				<tr><th>Phone 1</th><td><input type="text" name="phone_1" value="<?php echo esc_attr( $s['phone_1'] ); ?>"></td></tr>
 				<tr><th>Phone 2</th><td><input type="text" name="phone_2" value="<?php echo esc_attr( $s['phone_2'] ); ?>"></td></tr>
 				<tr><th>WhatsApp</th><td><input type="text" name="whatsapp" value="<?php echo esc_attr( $s['whatsapp'] ); ?>"></td></tr>

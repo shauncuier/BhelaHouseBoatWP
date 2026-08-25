@@ -17,6 +17,18 @@ if ( ! defined( 'ABSPATH' ) ) {
 				<img src="<?php echo esc_url( get_template_directory_uri() . '/assets/images/logo.png' ); ?>" alt="BHELA logo">
 				<p>টাঙ্গুয়ার হাওরের প্রিমিয়াম ফ্যামিলি ও গ্রুপ ফ্রেন্ডলি AC হাউসবোট। থাকা, খাওয়া, হাওর ভ্রমণ — সব এক প্যাকেজে।</p>
 				<p class="footer-tagline">"ভেলার আকর্ষণ ভেলা নয়, হাওর!"</p>
+				<?php
+				// The vessel's registration sits with the logo and the tagline because this
+				// column IS the identity block — and because the brand column runs shorter
+				// than the contact column beside it, so the badge fills real dead space
+				// rather than adding height. Blank setting, no badge.
+				if ( bhela_contact( 'vessel_reg' ) ) :
+					?>
+					<p class="footer-reg">
+						<span class="footer-reg__label"><?php esc_html_e( 'সরকারি নিবন্ধিত নৌযান', 'bhela' ); ?></span>
+						<span class="footer-reg__no"><?php echo esc_html( bhela_contact( 'vessel_reg' ) ); ?></span>
+					</p>
+				<?php endif; ?>
 			</div>
 			<div class="footer-col">
 				<h4>এক্সপ্লোর</h4>

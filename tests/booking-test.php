@@ -429,6 +429,69 @@ $addr_html = bk_invoice_html( $addr_id );
 ok( false === strpos( $addr_html, 'Dhaka' ), 'and drops it when there is none' );
 ok( false !== strpos( $addr_html, 'Bill To' ), 'without breaking the Bill To block' );
 
+echo "\n=== 3j. the vessel registration prints, and vanishes cleanly ===\n";
+// The boat's government registration (M.B BHELA (M-01-5520)) goes on the invoice
+// header, the footer identity badge and the booking page. Printed BARE on the
+// invoice — no invented label — so there is nothing to assert about wording, only
+// about presence and absence.
+//
+// Writing to bhela_bm_settings is safe because bhela_test_owner_options() now
+// snapshots it. It did NOT until this test needed it, which is the wrong order to
+// find that out: a harness that cleared it would have wiped every phone number,
+// payment detail and gateway key the owner has ever typed.
+$reg_before = get_option( 'bhela_bm_settings' );
+$reg_id     = bk_new( 'vessel reg' );
+bk_save( $reg_id, array( 'bhela_travel_date' => $friday ) );
+bk_money( $reg_id, 30000, 0 );
+
+$reg_s = bhela_bm_get_settings();
+$reg_s['vessel_reg'] = 'ZZ M.B TEST (M-99-0001)';
+update_option( 'bhela_bm_settings', $reg_s );
+
+$reg_html = bk_invoice_html( $reg_id );
+ok( false !== strpos( $reg_html, 'ZZ M.B TEST (M-99-0001)' ), 'the invoice header prints the registration' );
+ok( false !== strpos( bhela_bm_render_sms( '[{vessel_reg}]', $reg_id ), '[ZZ M.B TEST (M-99-0001)]' ),
+	'and {vessel_reg} resolves in a message template' );
+
+// The absence case is the one that rots unnoticed. A blank value must remove the
+// line, not print an empty element — on the invoice that shows as a gap in the teal
+// header, and in the footer as a bordered badge with nothing inside it.
+$reg_s['vessel_reg'] = '';
+update_option( 'bhela_bm_settings', $reg_s );
+$blank_html = bk_invoice_html( $reg_id );
+ok( false === strpos( $blank_html, 'M-99-0001' ), 'a blank setting drops it from the invoice' );
+ok( false === strpos( $blank_html, '<p></p>' ), 'and leaves no empty paragraph behind' );
+ok( false !== strpos( $blank_html, 'INVOICE' ), 'the header itself still renders' );
+ok( '[]' === bhela_bm_render_sms( '[{vessel_reg}]', $reg_id ),
+	'and the placeholder resolves to nothing, not to the literal token',
+	bhela_bm_render_sms( '[{vessel_reg}]', $reg_id ) );
+
+// Deliberately NOT in the shipped confirmation message. The placeholder exists so
+// the owner can add it themselves. A blank confirm_template means "use the shipped
+// default", so a later edit to that default would never reach a site that has saved
+// its settings — which makes an unasked-for change here both wrong and unfixable.
+ok( false === strpos( bhela_bm_confirm_default_template(), '{vessel_reg}' ),
+	'the shipped confirmation template still does not carry it' );
+
+// One source of truth. The theme bridge defaults to EMPTY rather than hardcoding the
+// number the way it hardcodes the address: a stale registration misrepresents the
+// boat, whereas a missing one is merely missing.
+$reg_fn = (string) file_get_contents( get_template_directory() . '/functions.php' );
+ok( (bool) preg_match( "/'vessel_reg' => '',/", $reg_fn ),
+	'the theme fallback is empty, never a hardcoded second copy' );
+ok( false !== strpos( $reg_fn, "'address', 'vessel_reg' )" ),
+	'while still reading the real value from the plugin settings' );
+$reg_foot  = (string) file_get_contents( get_template_directory() . '/footer.php' );
+$reg_prints = substr_count( $reg_foot, "esc_html( bhela_contact( 'vessel_reg' ) )" );
+ok( 1 === $reg_prints, 'and the footer prints it exactly once, in the identity badge', (string) $reg_prints );
+
+if ( null === $reg_before ) {
+	delete_option( 'bhela_bm_settings' );
+} else {
+	update_option( 'bhela_bm_settings', $reg_before );
+}
+ok( bhela_bm_get_settings()['vessel_reg'] === ( $reg_before['vessel_reg'] ?? bhela_bm_default_settings()['vessel_reg'] ),
+	'the real setting is put back exactly as it was' );
 echo "\n=== 3g. the commission is counted exactly once ===\n";
 $b2b_rows = bhela_bm_commission_rows( $friday, $friday );
 ok( 3500 === (int) $b2b_rows['total'], 'the day totals 3,500', (string) $b2b_rows['total'] );

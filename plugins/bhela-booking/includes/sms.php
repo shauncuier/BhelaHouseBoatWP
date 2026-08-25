@@ -76,6 +76,11 @@ function bhela_bm_render_sms( $template, $booking_id ) {
 		// actually differs from the norm.
 		'{boarding}'   => $m( '_bhela_boarding' ) ?: ( $s['boarding_ghat'] ?? '' ),
 		'{package}'    => $s['package_label'] ?? '',
+		// Available for an operator who wants it in their template. Deliberately NOT
+		// in bhela_bm_confirm_default_template() — a blank confirm_template means
+		// "use the shipped default", so editing that default would never reach a site
+		// that has already saved its settings once.
+		'{vessel_reg}' => $s['vessel_reg'] ?? '',
 		'{room}'       => $m( '_bhela_room_no' ),
 		'{room_type}'  => $m( '_bhela_cabin_type' ),
 		'{address}'    => $m( '_bhela_address' ),

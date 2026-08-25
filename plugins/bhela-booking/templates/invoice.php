@@ -171,6 +171,10 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 					<h1><?php echo esc_html( $s['business_name'] ); ?></h1>
 					<p><?php echo esc_html( $s['business_tagline'] ); ?></p>
 					<p><?php echo esc_html( $s['address'] ); ?></p>
+					<?php // Blank hides the line outright rather than printing an empty <p>. ?>
+					<?php if ( ! empty( $s['vessel_reg'] ) ) : ?>
+						<p><?php echo esc_html( $s['vessel_reg'] ); ?></p>
+					<?php endif; ?>
 				</div>
 			</div>
 			<div class="inv-no">

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.31.1
+ * Version: 2.32.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.31.1' );
+define( 'BHELA_BM_VERSION', '2.32.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -26,6 +26,10 @@ function bhela_bm_default_settings() {
 		'business_name'    => 'BHELA – The Haor Exclusive',
 		'business_tagline' => 'Where Nature, Comfort & Memories Meet',
 		'address'          => 'Anwarpur Ghat, Tahirpur, Sunamganj, Bangladesh',
+		// The vessel's government registration, exactly as issued. Printed BARE on
+		// every surface — no invented label like "Govt. Reg:", which would risk
+		// naming the wrong kind of document. "M.B" is Motor Boat.
+		'vessel_reg'       => 'M.B BHELA (M-01-5520)',
 		'phone_1'          => '01891-562461',
 		'phone_2'          => '01614-182769',
 		'whatsapp'         => '+8801891562461',

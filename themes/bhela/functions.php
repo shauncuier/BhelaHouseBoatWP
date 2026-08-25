@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.31.1' );
+define( 'BHELA_VERSION', '2.32.0' );
 
 // Bump when bhela_menu_structure() changes: existing installs rebuild the
 // primary menu once, then it is left alone so owner edits stick.
@@ -107,10 +107,17 @@ function bhela_contact( $key ) {
 		'threads'   => '',
 		'messenger' => '',
 		'address'   => 'Anwarpur Ghat, Tahirpur, Sunamganj',
+		// Deliberately EMPTY, unlike the address and phones above. Those are
+		// hardcoded so the theme still reads sensibly with the plugin switched off.
+		// A vessel registration is a legal identifier, and a stale hardcoded one is
+		// worse than a missing one: a wrong number on an invoice misrepresents the
+		// boat, whereas a blank line is just a blank line. One source of truth — the
+		// plugin setting — and every surface hides its line when it is empty.
+		'vessel_reg' => '',
 	);
 	if ( function_exists( 'bhela_bm_get_settings' ) ) {
 		$s = bhela_bm_get_settings();
-		foreach ( array( 'phone_1', 'phone_2', 'whatsapp', 'email', 'address' ) as $k ) {
+		foreach ( array( 'phone_1', 'phone_2', 'whatsapp', 'email', 'address', 'vessel_reg' ) as $k ) {
 			if ( ! empty( $s[ $k ] ) ) {
 				$defaults[ $k ] = $s[ $k ];
 			}
@@ -225,6 +232,7 @@ function bhela_customize_register( $wp_customize ) {
 		'threads'   => 'Threads URL',
 		'messenger' => 'Messenger link (m.me/yourpage)',
 		'address'   => 'Address',
+		'vessel_reg' => 'Vessel Registration',
 	);
 	foreach ( $fields as $key => $label ) {
 		$wp_customize->add_setting( 'bhela_' . $key, array( 'sanitize_callback' => 'sanitize_text_field' ) );
