@@ -300,6 +300,20 @@ function bhela_bm_calc_multi( $cabins, $date, $coupon = '', $phone = '' ) {
 	$max_cap   = max( array_keys( bhela_bm_rates_by_occupancy() ) );
 	$child_fee = max( 0, (int) $settings['child_fee'] );
 
+	// Refuse an impossible cabin list BEFORE pricing it. The over-capacity check
+	// below runs after the loop, so a crafted 20,000-cabin payload was priced in
+	// full and only then rejected — 2.2 seconds of CPU for a 580KB request, on two
+	// endpoints a logged-out visitor can reach. The boat has six cabins; nothing
+	// longer than that is worth a single iteration.
+	if ( is_array( $cabins ) && count( $cabins ) > bhela_bm_max_cabins() ) {
+		return new WP_Error( 'over_capacity', sprintf(
+			/* translators: 1: max guests, 2: max cabins */
+			__( 'সর্বোচ্চ %1$d জন (%2$d টি কেবিন)। বড় গ্রুপের জন্য সরাসরি যোগাযোগ করুন।', 'bhela-booking' ),
+			bhela_bm_max_guests(),
+			bhela_bm_max_cabins()
+		) );
+	}
+
 	$total         = 0;
 	$regular_total = 0;
 	$guests        = 0; // paying occupants (adults + 4–8 children); infants excluded
@@ -308,9 +322,15 @@ function bhela_bm_calc_multi( $cabins, $date, $coupon = '', $phone = '' ) {
 	$lines         = array();
 
 	foreach ( (array) $cabins as $c ) {
-		$adults = max( 0, (int) ( $c['adults'] ?? 0 ) );
-		$c48    = max( 0, (int) ( $c['c48'] ?? 0 ) );
-		$c04    = max( 0, (int) ( $c['c04'] ?? 0 ) );
+		// Cast through float first: a payload of "9e99" is a valid numeric string that
+		// (int) cannot represent, which fills the error log with warnings anyone can
+		// trigger. The values are clamped below regardless.
+		$num    = function ( $v ) {
+			return is_scalar( $v ) ? max( 0, (int) min( (float) $v, PHP_INT_MAX ) ) : 0;
+		};
+		$adults = $num( $c['adults'] ?? 0 );
+		$c48    = $num( $c['c48'] ?? 0 );
+		$c04    = $num( $c['c04'] ?? 0 );
 		$occ    = $adults + $c48;          // people sharing the cabin — 0–4 infants excluded
 		if ( $occ + $c04 < 1 ) {
 			continue;

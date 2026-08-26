@@ -676,6 +676,38 @@ ok( 0 === (int) bhela_bm_coupons( true )['ZZVIP40']['uses'], 'five checks spend 
 bhela_bm_coupon_redeem( 'ZZVIP40', $of_ph, 0 );
 ok( 1 === (int) bhela_bm_coupons( true )['ZZVIP40']['uses'], 'one redemption spends exactly one' );
 
+// Redeem against a REAL booking id, which is the only path that reaches the activity
+// log. Passing 0 skips that branch entirely — which is how a fatal (bhela_bm_log()
+// called with one argument instead of two) survived a green suite and broke every
+// booking that successfully used a coupon: the guest saw a critical error while the
+// booking was created and the coupon spent.
+$cp_bk = bk_new( 'coupon redeem log' );
+bk_save( $cp_bk, array( 'bhela_travel_date' => $friday ) );
+$cp_logged = bhela_bm_coupon_redeem( 'ZZ5K', '01755555555', $cp_bk );
+ok( true === $cp_logged, 'redeeming against a real booking returns cleanly, log call included' );
+ok( 1 === (int) bhela_bm_coupons( true )['ZZ5K']['uses'], 'and it counts once', (string) bhela_bm_coupons( true )['ZZ5K']['uses'] );
+
+// The phone hash is recorded only when the rule that needs it is switched on.
+// ZZ5K has once_per_phone off, so storing an identifier would be growth and a
+// privacy cost for nothing.
+ok( array() === (array) bhela_bm_coupons( true )['ZZ5K']['_used_by'],
+	'a coupon without the once-per-mobile rule stores no phone at all' );
+
+// The engine must refuse an impossible cabin list BEFORE pricing it: the capacity
+// check used to run after the loop, so a crafted 20,000-cabin payload was priced in
+// full first — seconds of CPU on an endpoint a logged-out visitor can reach.
+$cp_flood = array_fill( 0, 500, array( 'adults' => 4, 'c48' => 0, 'c04' => 0 ) );
+$cp_t0    = microtime( true );
+$cp_res   = bhela_bm_calc_multi( $cp_flood, $friday );
+$cp_ms    = ( microtime( true ) - $cp_t0 ) * 1000;
+ok( is_wp_error( $cp_res ) && 'over_capacity' === $cp_res->get_error_code(),
+	'an oversized cabin list is refused' );
+ok( $cp_ms < 50, 'and refused immediately, not after pricing all of it', sprintf( '%.1fms', $cp_ms ) );
+
+// A numeric string (int) cannot represent must not fill the error log.
+$cp_junk = bhela_bm_calc_multi( array( array( 'adults' => '9e99', 'c48' => 0, 'c04' => 0 ) ), $friday );
+ok( is_wp_error( $cp_junk ), 'and a nonsense guest count is refused, without a cast warning' );
+
 ok( 'used' === bhela_bm_coupon_check( 'ZZVIP40', 40000, $of_mon, $of_ph )['reason'],
 	'the same mobile cannot use it twice' );
 ok( bhela_bm_coupon_check( 'ZZVIP40', 40000, $of_mon, '01722222222' )['ok'],

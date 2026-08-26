@@ -125,7 +125,9 @@ function bhela_bm_save_coupons( $posted ) {
 			'_used_by'       => (array) ( $existing[ $code ]['_used_by'] ?? array() ),
 		);
 	}
-	update_option( 'bhela_bm_coupons', $out );
+	// autoload OFF: `_used_by` grows by one hash per redemption, and this option is
+	// only ever read on booking paths and the settings screen.
+	update_option( 'bhela_bm_coupons', $out, false );
 }
 
 /** How a phone number is recorded against a coupon. Hashed, never stored plain. */
@@ -231,7 +233,10 @@ function bhela_bm_coupon_redeem( $code, $phone = '', $booking_id = 0 ) {
 	}
 
 	$row['uses'] = $now + 1;
-	$key         = bhela_bm_coupon_phone_key( $phone );
+	// Recorded ONLY when the once-per-mobile rule is on. Without it the hash serves
+	// no purpose, and keeping one anyway would grow the option forever and store a
+	// guest identifier this feature does not need.
+	$key = ! empty( $row['once_per_phone'] ) ? bhela_bm_coupon_phone_key( $phone ) : '';
 	if ( $key ) {
 		$used = (array) ( $row['_used_by'] ?? array() );
 		if ( ! in_array( $key, $used, true ) ) {
@@ -240,10 +245,10 @@ function bhela_bm_coupon_redeem( $code, $phone = '', $booking_id = 0 ) {
 		$row['_used_by'] = $used;
 	}
 	$all[ $code ] = $row;
-	update_option( 'bhela_bm_coupons', $all );
+	update_option( 'bhela_bm_coupons', $all, false );
 
 	if ( $booking_id && function_exists( 'bhela_bm_log' ) ) {
-		bhela_bm_log( sprintf( 'Coupon %s redeemed on booking #%d (use %d)', $code, $booking_id, $row['uses'] ) );
+		bhela_bm_log( 'booking', sprintf( 'Coupon %s redeemed on booking #%d (use %d)', $code, $booking_id, $row['uses'] ) );
 	}
 	return true;
 }
