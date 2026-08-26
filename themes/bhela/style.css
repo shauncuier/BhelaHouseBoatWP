@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.32.0
+Version: 2.33.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -581,6 +581,40 @@ a.tag, span.tag { display: inline-block; padding: .22rem .85rem; border-radius: 
 .footer-col ul { list-style: none; padding: 0; }
 .footer-col li { margin-bottom: .55rem; font-size: .95rem; }
 .footer-tagline { font-family: var(--font-display); color: var(--gold); font-size: 1.1rem; margin-top: 1rem; }
+
+/* ==========================================================
+   CABIN RATE TABLE — centred figures under a real header
+   ========================================================== */
+.cabin-rate-table {
+	width: 100%; margin: .8rem 0; border-collapse: collapse;
+	font-size: .92rem; font-variant-numeric: tabular-nums;
+}
+.cabin-rate-table th {
+	padding: .4rem .5rem; font-size: .7rem; font-weight: 700;
+	letter-spacing: .1em; text-transform: uppercase; color: var(--text-soft);
+	border-bottom: 1px solid var(--line); text-align: center;
+}
+.cabin-rate-table th:first-child { text-align: left; }
+.cabin-rate-table td {
+	padding: .45rem .5rem; text-align: center; border-bottom: 1px solid var(--line);
+}
+.cabin-rate-table td:first-child { text-align: left; color: var(--text-soft); }
+.cabin-rate-table .now { font-weight: 700; }
+.cabin-rate-table .now.is-accent { color: var(--primary); }
+.cabin-rate-table .was { color: var(--text-soft); font-weight: 400; }
+.cabin-rate-table .was s { opacity: .7; }
+.cabin-rate-table .off {
+	display: inline-block; margin-left: .25rem; padding: 0 .35rem; border-radius: 999px;
+	border: 1px solid currentColor; font-size: .68rem; font-weight: 700; color: var(--cta);
+}
+/* The footer note spans the table, so it must beat the label-column rule above
+   that left-aligns td:first-child. */
+.cabin-rate-table tfoot td,
+.cabin-rate-table tfoot td:first-child {
+	border-bottom: 0; padding-top: .5rem; text-align: center;
+	font-size: .74rem; color: var(--text-soft);
+}
+
 /* Government vessel registration — an official mark, so bordered rather than filled.
    A fill would compete with the logo directly above it. */
 .footer-reg {

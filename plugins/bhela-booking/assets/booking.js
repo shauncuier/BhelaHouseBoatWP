@@ -209,7 +209,68 @@
 				var pick = keys.filter(function (k) { return k >= size; })[0] || keys[keys.length - 1];
 				r = bhelaBM.occRates[pick];
 			}
-			return dt === 'weekday' ? r.weekday : r.regular;
+			return offerRate(r, dt);
+		}
+
+		/**
+		 * The per-person rate charged, promotion included.
+		 *
+		 * Mirrors bhela_bm_offer_rate() in bhela-booking.php, including the min():
+		 * the offer is a percentage off REGULAR while the weekday rate is already 20%
+		 * below regular, so a weekday offer under 20% would otherwise RAISE the price.
+		 * If these two ever disagree the guest sees one number and is charged another,
+		 * which is why booking-test pins them against each other.
+		 */
+		function offerRate(r, dt) {
+			var standing = dt === 'weekday' ? r.weekday : r.regular;
+			var o = bhelaBM.offer || {};
+			if (!o.on) return standing;
+			var pct = dt === 'weekday' ? (o.weekday | 0) : (o.regular | 0);
+			if (pct <= 0 || pct > 90) return standing;
+			return Math.min(standing, Math.round(r.regular * (100 - pct) / 100));
+		}
+
+		/** The undiscounted per-person rate for a tier — what a saving is measured against. */
+		function rackRate(size) {
+			var r = bhelaBM.occRates[size];
+			if (!r) {
+				var keys = Object.keys(bhelaBM.occRates).map(Number).sort(function (a, b) { return a - b; });
+				var pick = keys.filter(function (k) { return k >= size; })[0] || keys[keys.length - 1];
+				r = bhelaBM.occRates[pick];
+			}
+			return r.regular;
+		}
+
+		/**
+		 * Whether the promotion covers a given travel date. Blank ends are open —
+		 * the same rule bhela_bm_offer() applies server-side.
+		 */
+		function offerCoversDate(dateStr) {
+			var o = bhelaBM.offer || {};
+			if (!o.on || !dateStr) return !!o.on;
+			if (o.from && dateStr < o.from) return false;
+			if (o.to && dateStr > o.to) return false;
+			return true;
+		}
+
+		/**
+		 * The day-type caption, DERIVED rather than written out.
+		 *
+		 * The percentage used to be written out as a literal in this string. The
+		 * moment an offer changes the effective discount, a hardcoded figure becomes
+		 * a false statement printed directly beside a real price — so it is computed
+		 * from the rates instead, and can never drift from what is charged.
+		 */
+		function dayTypeLabel(dt) {
+			if (dt === 'holiday') return 'সরকারি ছুটি';
+			var r = bhelaBM.occRates[Object.keys(bhelaBM.occRates)[0]];
+			var base = dt === 'weekend' ? 'Weekend' : 'Weekday';
+			if (!r || !r.regular) return base;
+			var pct = Math.round((1 - offerRate(r, dt) / r.regular) * 100);
+			if (pct <= 0) return base;
+			var o = bhelaBM.offer || {};
+			var tag = (o.on && o.label) ? (' ' + o.label) : '';
+			return base + ' −' + pct + '%' + tag + ' 🔥';
 		}
 
 		/**
@@ -318,7 +379,12 @@
 				// Priced on the adults in the cabin, not on how many bodies it holds.
 				var tier = c.tier || Math.max(c.adults, MIN_CAP);
 				var rate = occRate(tier, dt || 'weekend');
-				var reg = occRate(tier, 'weekend');
+				// The RACK rate, deliberately NOT through occRate(): that now applies the
+				// promotion, and running the "was" price through it would compare the
+				// discount against itself — which printed a struck-through price that was
+				// already discounted and a badge reading −13% for a 30% offer.
+				// Mirrors `$reg = (int) $row['regular']` in bhela_bm_calc_multi().
+				var reg = rackRate(tier);
 				// 4–8 children pay a flat fee — identical on weekdays and weekends.
 				total += c.adults * rate + c.c48 * bhelaBM.childFee;
 				regular += c.adults * reg + c.c48 * bhelaBM.childFee;
@@ -633,8 +699,164 @@
 			if (!o) { priceBox.hidden = true; if (emptyMsg) emptyMsg.hidden = false; updateMobileBar('', dt); return; }
 			if (!dt) { priceBox.hidden = true; if (emptyMsg) emptyMsg.hidden = false; updateMobileBar('', dt); return; }
 			paintSummary(o.combo, dt);
+		
+
+			// A coupon's value depends on the total, so a changed date or party size
+			// makes an applied code stale. recheck() compares a signature of the
+			// pricing inputs, so calling it from every render cannot loop.
+			if (window.bhelaBMCouponRecheck) window.bhelaBMCouponRecheck();
 		}
 
+		/* ---------- Discount display and the coupon box ---------- */
+
+		/**
+		 * The coupon the server has accepted, or null.
+		 *
+		 * Only ever written from a server response. The browser never decides what a
+		 * coupon is worth — it holds the code and shows the total it is told.
+		 */
+		var couponState = null;
+
+		/**
+		 * Paint the total, the struck-through rack price and the offer badge.
+		 *
+		 * One function for both renderers, because they used to write straight into
+		 * #bm-total and would now wipe out the <s> element living inside it.
+		 */
+		function paintTotals(rack, total, dt) {
+			if (couponState && couponState.applied) {
+				rack = couponState.rack;
+				total = couponState.total;
+			}
+			var rackEl = document.getElementById('bm-rack');
+			var nowEl = document.getElementById('bm-total-now');
+			var offRow = document.getElementById('bm-offer-row');
+			var offBad = document.getElementById('bm-offer-badge');
+
+			nowEl.textContent = money(total);
+			var cut = Math.max(0, rack - total);
+			rackEl.hidden = cut <= 0;
+			if (cut > 0) rackEl.textContent = money(rack);
+
+			var label = '';
+			if (couponState && couponState.applied) {
+				label = couponState.label;
+			} else if (cut > 0) {
+				var o = bhelaBM.offer || {};
+				label = (o.on && o.label) ? o.label : '';
+			}
+			var pct = rack > 0 ? Math.round(cut * 100 / rack) : 0;
+			offRow.hidden = cut <= 0 || !label;
+			if (!offRow.hidden) offBad.textContent = label + ' −' + pct + '%';
+
+			savingsRow.hidden = cut <= 0;
+			if (cut > 0) document.getElementById('bm-savings').textContent = money(cut);
+
+			document.getElementById('bm-advance').textContent =
+				money(Math.ceil(total * (bhelaBM.advancePercent / 100)));
+			return total;
+		}
+
+		(function () {
+			var input = document.getElementById('bhela-bm-coupon');
+			var btn = document.getElementById('bhela-bm-coupon-apply');
+			var msg = document.getElementById('bhela-bm-coupon-msg');
+			if (!input || !btn || !msg) return;
+
+			function say(text, kind) {
+				msg.textContent = text || '';
+				msg.className = 'bhela-bm-coupon__msg' + (kind ? ' is-' + kind : '');
+			}
+
+			/**
+			 * Ask the server whether the code applies, and at what total.
+			 *
+			 * `silent` is used when the guest changes their dates or party size after
+			 * applying a code: the discount depends on the total, so a stale figure
+			 * would be a wrong price. Re-checking is the only safe option — the
+			 * alternative, leaving the old total on screen, quotes a number the server
+			 * will not honour.
+			 */
+			function apply(silent) {
+				var code = (input.value || '').trim();
+				if (!code) {
+					couponState = null;
+					say('');
+					repaint();
+					return;
+				}
+				var params = new URLSearchParams();
+				params.set('action', 'bhela_bm_coupon_check');
+				params.set('coupon', code);
+				params.set('date', dateEl ? dateEl.value : '');
+				params.set('phone', (document.getElementById('bm-phone') || {}).value || '');
+				params.set('cabins', JSON.stringify(fullBoat() ? [] : activeCabins()));
+
+				btn.disabled = true;
+				if (!silent) say('…');
+				postWithNonce(params).then(function (res) {
+					btn.disabled = false;
+					if (!res || !res.success) {
+						couponState = null;
+						say((res && res.data && res.data.message) || 'কোডটি প্রয়োগ করা গেল না।', 'bad');
+						repaint();
+						return;
+					}
+					var d = res.data;
+					// `applied:false` means the code is genuine but the running offer
+					// already saves more. Not a failure — the guest keeps the better
+					// price, so the message says so rather than crying error.
+					couponState = d.applied
+						? { applied: true, code: d.code, label: d.label, total: d.total, rack: d.rack }
+						: null;
+					say(d.message || '', d.applied ? 'good' : 'info');
+					repaint();
+				}).catch(function () {
+					btn.disabled = false;
+					couponState = null;
+					say('সংযোগে সমস্যা — আবার চেষ্টা করুন।', 'bad');
+					repaint();
+				});
+			}
+
+			btn.addEventListener('click', function () { apply(false); });
+			input.addEventListener('keydown', function (e) {
+				if (e.key === 'Enter') { e.preventDefault(); apply(false); }
+			});
+			// Typing a new code invalidates the applied one immediately, so the screen
+			// can never show a discount for a code that is no longer in the box.
+			input.addEventListener('input', function () {
+				if (couponState && couponState.code !== (input.value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')) {
+					couponState = null;
+					say('');
+					repaint();
+				}
+			});
+
+			function repaint() {
+				renderSummary(dayType(dateEl ? dateEl.value : ''));
+			}
+
+			/**
+			 * Re-check after the guest changes dates or party size.
+			 *
+			 * Compares a signature of the pricing inputs rather than reacting to every
+			 * render — repainting is itself a render, so an unguarded hook would call
+			 * itself forever. A stale coupon total is not a cosmetic problem: it quotes
+			 * a price the server will refuse.
+			 */
+			var lastSig = null, timer = null;
+			function recheck() {
+				if (!couponState) { lastSig = null; return; }
+				var sig = (dateEl ? dateEl.value : '') + '|' +
+					JSON.stringify(fullBoat() ? [] : activeCabins());
+				if (sig === lastSig) return;
+				lastSig = sig;
+				clearTimeout(timer);
+				timer = setTimeout(function () { apply(true); }, 350);
+			}
+			window.bhelaBMCouponRecheck = recheck;
+		}());
 		/**
 		 * Paint the summary for a whole-boat booking.
 		 *
@@ -644,19 +866,13 @@
 		 * the server sends the same caveat in the WhatsApp text.
 		 */
 		function renderFullBoat(total, dt) {
-			var labels = { weekday: 'Weekday −20% 🔥', weekend: 'Weekend', holiday: 'সরকারি ছুটি' };
 			var rate = occRate(MAX_CAP, dt);
-			document.getElementById('bm-daytype').textContent = labels[dt];
+			document.getElementById('bm-daytype').textContent = dayTypeLabel(dt);
 			document.getElementById('bm-guests-echo').textContent = MAX_GUESTS + ' জন (পুরো বোট)';
-			document.getElementById('bm-total').textContent = money(total);
-			document.getElementById('bm-advance').textContent =
-				money(Math.ceil(total * (bhelaBM.advancePercent / 100)));
-
-			// Against the weekend rate, so a weekday full boat still shows its saving.
-			var regular = MAX_CABINS * MAX_CAP * occRate(MAX_CAP, 'weekend');
-			var savings = Math.max(0, regular - total);
-			savingsRow.hidden = savings <= 0;
-			if (savings > 0) document.getElementById('bm-savings').textContent = money(savings);
+			// Against the weekend RACK rate, so a weekday full boat still shows its
+			// saving. paintTotals() owns the total, the struck price and the advance.
+			var regular = MAX_CABINS * MAX_CAP * bhelaBM.occRates[MAX_CAP].regular;
+			total = paintTotals(regular, total, dt);
 
 			breakdown.innerHTML = '<div class="bm-bd-line"><span>পুরো বোট (' + MAX_CABINS + ' কেবিন · ' + MAX_GUESTS + ' জন)'
 				+ '<small>স্ট্যান্ডার্ড রেট ' + money(rate) + '/জন · দাম আলোচনাসাপেক্ষ</small></span>'
@@ -670,17 +886,10 @@
 		function paintSummary(c, dt) {
 			var infants = c.cabins.reduce(function (s, cb) { return s + cb.c04; }, 0);
 
-			var labels = { weekday: 'Weekday −20% 🔥', weekend: 'Weekend', holiday: 'সরকারি ছুটি' };
 			var paying = c.bodies; // already paying guests only (infants excluded)
-			document.getElementById('bm-daytype').textContent = labels[dt];
+			document.getElementById('bm-daytype').textContent = dayTypeLabel(dt);
 			document.getElementById('bm-guests-echo').textContent = paying + ' জন' + (infants ? ' + ' + infants + ' শিশু (০–৪, ফ্রি)' : '');
-			document.getElementById('bm-total').textContent = money(c.total);
-			var advance = Math.ceil(c.total * (bhelaBM.advancePercent / 100));
-			document.getElementById('bm-advance').textContent = money(advance);
-
-			var savings = Math.max(0, c.regular - c.total);
-			savingsRow.hidden = savings <= 0;
-			if (savings > 0) document.getElementById('bm-savings').textContent = money(savings);
+			paintTotals(c.regular, c.total, dt);
 
 			breakdown.innerHTML = c.cabins.map(function (cb, n) {
 				var who = cb.adults + ' বড়';
@@ -1220,7 +1429,7 @@
 			// is NOT submitted until its name is added here. That is what happened to
 			// `address`: the field rendered, the guest filled it in, and the value was
 			// silently dropped on the way to the server.
-			['name', 'phone', 'email', 'address', 'date', 'message', 'bhela_bm_hp'].forEach(function (f) {
+			['name', 'phone', 'email', 'address', 'date', 'message', 'coupon', 'bhela_bm_hp'].forEach(function (f) {
 				params.append(f, fd.get(f) || '');
 			});
 			params.append('cabins', JSON.stringify(fullBoat() ? [] : activeCabins()));

@@ -544,3 +544,34 @@
 	#bm-otp-code { width: 100%; }
 	.bm-otp__check, .bm-otp__resend { flex: 1 1 auto; }
 }
+
+/* ---------- Discount: coupon box, struck rack price, offer badge ---------- */
+.bhela-bm-coupon { margin: .6rem 0 .2rem; }
+.bhela-bm-coupon label { display: block; font-size: .82rem; font-weight: 700; margin-bottom: .3rem; opacity: .85; }
+.bhela-bm-coupon__row { display: flex; gap: .4rem; }
+.bhela-bm-coupon__row input {
+	flex: 1 1 auto; min-width: 0; padding: .5rem .65rem; border-radius: 8px;
+	border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .06);
+	color: inherit; font: inherit; text-transform: uppercase; letter-spacing: .06em;
+}
+.bhela-bm-coupon__row button {
+	flex: 0 0 auto; padding: .5rem .9rem; border-radius: 8px; cursor: pointer;
+	border: 1px solid rgba(255, 255, 255, .35); background: transparent;
+	color: inherit; font: inherit; font-weight: 700;
+}
+.bhela-bm-coupon__row button:disabled { opacity: .5; cursor: default; }
+.bhela-bm-coupon__msg { margin: .35rem 0 0; font-size: .8rem; min-height: 1em; }
+.bhela-bm-coupon__msg.is-good { color: #7BE0A8; }
+.bhela-bm-coupon__msg.is-bad  { color: #FFAE8F; }
+.bhela-bm-coupon__msg.is-info { color: #F5C97B; }
+
+/* The rack price the guest is no longer paying. */
+#bm-rack { opacity: .6; font-weight: 400; margin-right: .35rem; }
+#bm-rack[hidden] { display: none; }
+
+/* Bordered, never filled — the badge has to survive a printed invoice and a
+   browser printing in economy colour mode. */
+.bhela-bm-price__row--offer strong {
+	display: inline-block; padding: .1rem .5rem; border-radius: 999px;
+	border: 1px solid currentColor; font-size: .76rem; letter-spacing: .04em;
+}

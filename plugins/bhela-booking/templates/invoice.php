@@ -67,6 +67,11 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 	.inv-no { text-align:right; }
 	.inv-no .num { font-size:20px; font-weight:700; color:#FFB88C; }
 	.badge { display:inline-block; margin-top:6px; padding:3px 14px; border-radius:20px; font-size:12px; font-weight:700; background:<?php echo esc_attr( bhela_bm_status_color( $invoice['status'] ) ); ?>; color:#fff; text-transform:uppercase; letter-spacing:.5px; white-space:nowrap; }
+	/* Bordered, never filled: a browser printing in economy colour mode drops
+	   backgrounds, and a discount the guest cannot see on their printed copy is a
+	   support call. */
+	.offer-badge { display:inline-block; padding:1px 8px; border:1px solid #C2410C; border-radius:999px; color:#C2410C; font-size:11px; font-weight:700; letter-spacing:.04em; }
+	.totals .row s { opacity:.6; font-weight:400; }
 	.inv-body { padding:32px 40px; }
 	.cols { display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap; margin-bottom:28px; }
 	.cols h3 { font-size:12px; text-transform:uppercase; letter-spacing:1px; color:#14676B; margin-bottom:8px; }
@@ -254,6 +259,24 @@ $day_labels = array( 'weekday' => 'Weekday (২০% ছাড়)', 'weekend' =>
 			</table>
 
 			<div class="totals">
+				<?php
+				// The promotion this booking was sold under. Read from the booking, never
+				// recomputed — an offer that has since ended must still explain this price.
+				$inv_rack = (int) ( $invoice['rack_total'] ?? 0 );
+				$inv_cut  = $inv_rack > $invoice['total'] ? $inv_rack - $invoice['total'] : 0;
+				$inv_dlab = (string) ( $invoice['disc_label'] ?? '' );
+				$inv_dpct = (int) ( $invoice['offer_pct'] ?? 0 );
+				?>
+				<?php if ( $inv_cut > 0 ) : ?>
+					<div class="row"><span>Rate / রেট</span><strong><s><?php echo esc_html( bhela_bm_money( $inv_rack ) ); ?></s></strong></div>
+					<div class="row discount"><span>
+						<?php if ( '' !== $inv_dlab ) : ?>
+							<span class="offer-badge"><?php echo esc_html( $inv_dlab ); ?><?php echo $inv_dpct > 0 ? esc_html( ' −' . $inv_dpct . '%' ) : ''; ?></span>
+						<?php else : ?>
+							Offer / অফার
+						<?php endif; ?>
+					</span><strong>− <?php echo esc_html( bhela_bm_money( $inv_cut ) ); ?></strong></div>
+				<?php endif; ?>
 				<div class="row"><span>Subtotal</span><strong><?php echo esc_html( bhela_bm_money( $base ) ); ?></strong></div>
 				<?php if ( $discount > 0 ) : ?>
 					<div class="row discount"><span>Discount / ছাড়</span><strong>− <?php echo esc_html( bhela_bm_money( $discount ) ); ?></strong></div>

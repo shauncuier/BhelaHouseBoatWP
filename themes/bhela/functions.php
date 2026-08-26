@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.32.0' );
+define( 'BHELA_VERSION', '2.33.0' );
 
 // Bump when bhela_menu_structure() changes: existing installs rebuild the
 // primary menu once, then it is left alone so owner edits stick.
@@ -83,6 +83,17 @@ function bhela_assets() {
 		'rates'       => $rates,
 		'weekendDays' => isset( $set['weekend_days'] ) ? array_map( 'intval', (array) $set['weekend_days'] ) : array( 5, 6 ),
 		'holidays'    => function_exists( 'bhela_bm_holiday_dates' ) ? bhela_bm_holiday_dates() : array(),
+		// The promotion, so the hero estimator quotes the same price the booking form
+		// does. Empty when the plugin is off — the estimator then shows rack rates,
+		// which is the honest fallback.
+		'offer'       => array(
+			'on'      => ! empty( $set['offer_on'] ) ? 1 : 0,
+			'regular' => max( 0, min( 90, (int) ( $set['offer_regular'] ?? 0 ) ) ),
+			'weekday' => max( 0, min( 90, (int) ( $set['offer_weekday'] ?? 0 ) ) ),
+			'from'    => (string) ( $set['offer_from'] ?? '' ),
+			'to'      => (string) ( $set['offer_to'] ?? '' ),
+			'label'   => (string) ( $set['offer_label'] ?? '' ),
+		),
 		'trips'       => $trips_out,
 		'whatsapp'    => preg_replace( '/[^0-9]/', '', bhela_contact( 'whatsapp' ) ),
 		'bookingUrl'  => bhela_page_url( 'book-now' ),

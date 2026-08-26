@@ -103,6 +103,15 @@ function bhela_bm_invoice_data( $booking_id ) {
 		'per_person'  => (int) $m( '_bhela_per_person' ),
 		'lines'       => is_array( json_decode( (string) $m( '_bhela_lines' ), true ) ) ? json_decode( (string) $m( '_bhela_lines' ), true ) : array(),
 		'total'       => (int) $m( '_bhela_total' ),
+		// The discount this booking was SOLD under, from stored meta rather than
+		// today's settings: when the promotion ends, the invoice must still say why the
+		// guest paid what they paid.
+		'rack_total'  => (int) $m( '_bhela_rack_total' ),
+		'disc_source' => (string) $m( '_bhela_discount_source' ),
+		'disc_label'  => (string) $m( '_bhela_discount_label' ),
+		'disc_amount' => (int) $m( '_bhela_discount_amount' ),
+		'offer_pct'   => (int) $m( '_bhela_offer_pct' ),
+		'coupon'      => (string) $m( '_bhela_coupon' ),
 		'base_price'  => (int) $m( '_bhela_base_price' ),
 		'advance'     => (int) $m( '_bhela_advance' ),
 		'paid'        => (int) $m( '_bhela_paid_amount' ),

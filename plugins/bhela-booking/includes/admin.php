@@ -979,7 +979,7 @@ function bhela_bm_settings_page() {
 
 	if ( isset( $_POST['bhela_bm_settings_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_settings_nonce'] ) ), 'bhela_bm_settings' ) ) {
 		$s = bhela_bm_get_settings();
-		foreach ( array( 'business_name', 'business_tagline', 'address', 'vessel_reg', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix', 'ops_manager', 'support_whatsapp', 'boarding_ghat', 'checkin_time', 'checkout_time', 'package_label' ) as $f ) {
+		foreach ( array( 'business_name', 'business_tagline', 'address', 'vessel_reg', 'offer_label', 'phone_1', 'phone_2', 'whatsapp', 'bkash_number', 'nagad_number', 'invoice_prefix', 'ops_manager', 'support_whatsapp', 'boarding_ghat', 'checkin_time', 'checkout_time', 'package_label' ) as $f ) {
 			$s[ $f ] = isset( $_POST[ $f ] ) ? sanitize_text_field( wp_unslash( $_POST[ $f ] ) ) : $s[ $f ];
 		}
 		$s['email'] = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : $s['email'];
@@ -1037,6 +1037,18 @@ function bhela_bm_settings_page() {
 		}
 		if ( isset( $_POST['cost_heads'] ) && function_exists( 'bhela_bm_save_cost_heads' ) ) {
 			bhela_bm_save_cost_heads( wp_unslash( $_POST['cost_heads'] ) );
+		}
+		// The offer percentages and its window. Clamped here as well as in
+		// bhela_bm_offer(), because a stored 500 would be a landmine for anything that
+		// reads the option without going through the resolver.
+		$s['offer_on']      = ! empty( $_POST['offer_on'] ) ? 1 : 0;
+		$s['offer_regular'] = max( 0, min( 90, (int) ( $_POST['offer_regular'] ?? 0 ) ) );
+		$s['offer_weekday'] = max( 0, min( 90, (int) ( $_POST['offer_weekday'] ?? 0 ) ) );
+		$s['offer_from']    = bhela_bm_report_date( $_POST['offer_from'] ?? '' );
+		$s['offer_to']      = bhela_bm_report_date( $_POST['offer_to'] ?? '' );
+
+		if ( isset( $_POST['coupons'] ) && function_exists( 'bhela_bm_save_coupons' ) ) {
+			bhela_bm_save_coupons( wp_unslash( $_POST['coupons'] ) );
 		}
 		if ( isset( $_POST['agencies'] ) && function_exists( 'bhela_bm_save_agencies' ) ) {
 			bhela_bm_save_agencies( wp_unslash( $_POST['agencies'] ) );
@@ -1116,6 +1128,7 @@ function bhela_bm_settings_page() {
 		'store'    => array( 'icon' => '📦', 'label' => __( 'Store Lists', 'bhela-booking' ) ),
 		'staff'    => array( 'icon' => '👷', 'label' => __( 'Staff', 'bhela-booking' ) ),
 		'agencies' => array( 'icon' => '🤝', 'label' => __( 'Agencies', 'bhela-booking' ) ),
+		'coupons'  => array( 'icon' => '🎟️', 'label' => __( 'Coupons', 'bhela-booking' ) ),
 	);
 	?>
 	<div class="wrap bha-set">
@@ -1225,6 +1238,82 @@ function bhela_bm_settings_page() {
 			</div><!-- /pricing -->
 
 			<div class="bha-set__panel" id="bhela-panel-rates" role="tabpanel" aria-labelledby="bhela-tab-rates">
+			<h2>🎉 <?php esc_html_e( 'Discount Offer', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'A promotion layered OVER the rates below — it never edits them. Switch it off and every price returns to normal, and the original stays available to show as a struck-through "was" price. Both percentages come off the Regular rate.', 'bhela-booking' ); ?></p>
+			<table class="form-table" style="max-width:900px">
+				<tr><th><?php esc_html_e( 'Offer running', 'bhela-booking' ); ?></th>
+					<td><label><input type="checkbox" name="offer_on" value="1" <?php checked( ! empty( $s['offer_on'] ) ); ?>> <?php esc_html_e( 'Yes — apply the discount below', 'bhela-booking' ); ?></label></td></tr>
+				<tr><th><?php esc_html_e( 'Badge text', 'bhela-booking' ); ?></th>
+					<td><input type="text" name="offer_label" value="<?php echo esc_attr( $s['offer_label'] ?? '' ); ?>" placeholder="EID OFFER">
+						<p class="description"><?php esc_html_e( 'Shown to the guest beside the discounted price. Leave blank for a plain "OFFER".', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th><?php esc_html_e( 'Weekend / Holiday %', 'bhela-booking' ); ?></th>
+					<td><input type="number" min="0" max="90" name="offer_regular" id="bhela-offer-regular" value="<?php echo esc_attr( (int) ( $s['offer_regular'] ?? 0 ) ); ?>" style="width:90px"> %</td></tr>
+				<tr><th><?php esc_html_e( 'Weekday %', 'bhela-booking' ); ?></th>
+					<td><input type="number" min="0" max="90" name="offer_weekday" id="bhela-offer-weekday" value="<?php echo esc_attr( (int) ( $s['offer_weekday'] ?? 0 ) ); ?>" style="width:90px"> %
+						<p class="description"><?php esc_html_e( 'The weekday rate is already 20% below Regular, so a weekday offer under 20% would raise the price — the engine keeps whichever is cheaper for the guest, never the higher one.', 'bhela-booking' ); ?></p></td></tr>
+				<tr><th><?php esc_html_e( 'Travel dates', 'bhela-booking' ); ?></th>
+					<td>
+						<input type="date" name="offer_from" value="<?php echo esc_attr( $s['offer_from'] ?? '' ); ?>">
+						&nbsp;→&nbsp;
+						<input type="date" name="offer_to" value="<?php echo esc_attr( $s['offer_to'] ?? '' ); ?>">
+						<p class="description"><?php esc_html_e( 'Matched against the guest’s travel date. Leave either blank for open-ended.', 'bhela-booking' ); ?></p>
+					</td></tr>
+			</table>
+
+			<?php
+			// The preview is computed from the SAME function the engine uses, so what
+			// the owner sees here cannot disagree with what a guest is charged. It
+			// updates live as the percentages are typed, because a discount you have
+			// to save-and-go-look-at is a discount that gets published wrong once.
+			?>
+			<table class="widefat striped" style="max-width:900px;margin-bottom:8px" id="bhela-offer-preview">
+				<thead><tr>
+					<th><?php esc_html_e( 'Cabin', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Regular', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Weekend / Holiday', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Weekday', 'bhela-booking' ); ?></th>
+				</tr></thead>
+				<tbody>
+				<?php foreach ( $rates as $pv_key => $pv ) : ?>
+					<tr data-regular="<?php echo esc_attr( (int) $pv['regular'] ); ?>" data-weekday="<?php echo esc_attr( (int) $pv['weekday'] ); ?>">
+						<td><?php echo esc_html( $pv['label'] ); ?></td>
+						<td class="bha-num"><?php echo esc_html( bhela_bm_money( (int) $pv['regular'] ) ); ?></td>
+						<td class="bha-num" data-cell="wknd"><?php echo esc_html( bhela_bm_money( bhela_bm_offer_rate( $pv, 'weekend' ) ) ); ?></td>
+						<td class="bha-num" data-cell="wkday"><?php echo esc_html( bhela_bm_money( bhela_bm_offer_rate( $pv, 'weekday' ) ) ); ?></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p class="description"><?php esc_html_e( 'Per person, as the guest will be charged. Updates as you type; save to apply.', 'bhela-booking' ); ?></p>
+			<script>
+			(function () {
+				var reg = document.getElementById('bhela-offer-regular');
+				var wkd = document.getElementById('bhela-offer-weekday');
+				var tbl = document.getElementById('bhela-offer-preview');
+				var onEl = document.querySelector('input[name="offer_on"]');
+				if (!reg || !wkd || !tbl || !onEl) return;
+				function money(n) { return '৳' + Number(n).toLocaleString('en-US'); }
+				function paint() {
+					var live = onEl.checked;
+					var pr = Math.max(0, Math.min(90, parseInt(reg.value, 10) || 0));
+					var pw = Math.max(0, Math.min(90, parseInt(wkd.value, 10) || 0));
+					Array.prototype.forEach.call(tbl.querySelectorAll('tbody tr'), function (tr) {
+						var r = parseInt(tr.getAttribute('data-regular'), 10) || 0;
+						var w = parseInt(tr.getAttribute('data-weekday'), 10) || 0;
+						// Mirrors bhela_bm_offer_rate(): min(standing, discounted).
+						var wknd = (live && pr > 0) ? Math.min(r, Math.round(r * (100 - pr) / 100)) : r;
+						var wday = (live && pw > 0) ? Math.min(w, Math.round(r * (100 - pw) / 100)) : w;
+						tr.querySelector('[data-cell="wknd"]').textContent = money(wknd);
+						tr.querySelector('[data-cell="wkday"]').textContent = money(wday);
+					});
+				}
+				[reg, wkd].forEach(function (el) { el.addEventListener('input', paint); });
+				onEl.addEventListener('change', paint);
+				paint();
+			}());
+			</script>
+			<hr style="margin:26px 0">
+
 			<h2><?php esc_html_e( 'Cabin Rates', 'bhela-booking' ); ?></h2>
 			<p class="bha-set__lead"><?php esc_html_e( 'Per person, for the 2 days 1 night package. The engine prices by how many people share a cabin, so the sharing number matters.', 'bhela-booking' ); ?></p>
 			<table class="widefat striped" style="max-width:900px">
@@ -1676,6 +1765,81 @@ function bhela_bm_settings_page() {
 				<span class="spacer"></span>
 				<span class="description"><?php esc_html_e( 'Saving applies every tab at once.', 'bhela-booking' ); ?></span>
 			</div>
+			<div class="bha-set__panel" id="bhela-panel-coupons" role="tabpanel" aria-labelledby="bhela-tab-coupons">
+			<h2><?php esc_html_e( 'Coupon Codes', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'Codes a guest types on the booking form. A coupon and the running offer never combine — whichever saves the guest more is the one applied, once. Codes are matched without case or dashes, so SAVE10, save10 and SAVE-10 are the same coupon.', 'bhela-booking' ); ?></p>
+			<?php $cp_rows = function_exists( 'bhela_bm_coupons' ) ? bhela_bm_coupons( true ) : array(); ?>
+			<table class="widefat striped" id="bhela-coupon-table">
+				<thead>
+					<tr>
+						<th style="width:150px"><?php esc_html_e( 'Code', 'bhela-booking' ); ?></th>
+						<th style="width:120px"><?php esc_html_e( 'Type', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'Value', 'bhela-booking' ); ?></th>
+						<th><?php esc_html_e( 'Badge text', 'bhela-booking' ); ?></th>
+						<th style="width:150px"><?php esc_html_e( 'Expires (travel)', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'Max uses', 'bhela-booking' ); ?></th>
+						<th style="width:90px"><?php esc_html_e( 'Used', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'Once/phone', 'bhela-booking' ); ?></th>
+						<th style="width:80px"><?php esc_html_e( 'Ended', 'bhela-booking' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php foreach ( $cp_rows as $cp_code => $cp ) : ?>
+					<?php $cp_spent = $cp['max_uses'] > 0 && $cp['uses'] >= $cp['max_uses']; ?>
+					<tr>
+						<td><input type="text" name="coupons[<?php echo esc_attr( $cp_code ); ?>][code]" value="<?php echo esc_attr( $cp_code ); ?>" style="width:100%;text-transform:uppercase;font-weight:700"></td>
+						<td>
+							<select name="coupons[<?php echo esc_attr( $cp_code ); ?>][type]" style="width:100%">
+								<option value="pct" <?php selected( 'pct', $cp['type'] ); ?>><?php esc_html_e( 'Percent %', 'bhela-booking' ); ?></option>
+								<option value="amount" <?php selected( 'amount', $cp['type'] ); ?>><?php esc_html_e( 'Taka ৳', 'bhela-booking' ); ?></option>
+							</select>
+						</td>
+						<td><input type="number" min="0" name="coupons[<?php echo esc_attr( $cp_code ); ?>][value]" value="<?php echo esc_attr( $cp['value'] ); ?>" style="width:100%"></td>
+						<td><input type="text" name="coupons[<?php echo esc_attr( $cp_code ); ?>][label]" value="<?php echo esc_attr( $cp['label'] ); ?>" placeholder="<?php echo esc_attr( $cp_code ); ?>" style="width:100%"></td>
+						<td><input type="date" name="coupons[<?php echo esc_attr( $cp_code ); ?>][expires]" value="<?php echo esc_attr( $cp['expires'] ); ?>" style="width:100%"></td>
+						<td><input type="number" min="0" name="coupons[<?php echo esc_attr( $cp_code ); ?>][max_uses]" value="<?php echo esc_attr( $cp['max_uses'] ); ?>" style="width:100%" placeholder="0"></td>
+						<td class="bha-num">
+							<?php
+							// `uses` is a ledger, not a setting: it is displayed and never posted,
+							// so opening this screen and pressing Save cannot reset a spent coupon.
+							echo esc_html( $cp['uses'] );
+							if ( $cp_spent ) {
+								echo ' ' . bhela_bm_status_pill( __( 'spent', 'bhela-booking' ), 'danger' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+							}
+							?>
+						</td>
+						<td><label><input type="checkbox" name="coupons[<?php echo esc_attr( $cp_code ); ?>][once_per_phone]" value="1" <?php checked( $cp['once_per_phone'] ); ?>> <?php esc_html_e( 'Yes', 'bhela-booking' ); ?></label></td>
+						<td><label><input type="checkbox" name="coupons[<?php echo esc_attr( $cp_code ); ?>][retired]" value="1" <?php checked( $cp['retired'] ); ?>> <?php esc_html_e( 'Hide', 'bhela-booking' ); ?></label></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p><button type="button" class="button" id="bhela-coupon-add">+ <?php esc_html_e( 'Add coupon', 'bhela-booking' ); ?></button></p>
+			<p class="description"><?php esc_html_e( 'Max uses 0 means unlimited. Clearing a code deletes the row — but a code still named on an old booking keeps reading correctly, so prefer Hide. The Used count is never reset by saving this screen.', 'bhela-booking' ); ?></p>
+			<script>
+			(function () {
+				var btn = document.getElementById('bhela-coupon-add');
+				if (!btn) return;
+				btn.addEventListener('click', function () {
+					var body = document.querySelector('#bhela-coupon-table tbody');
+					var k = 'new_' + Date.now().toString(36);
+					var tr = document.createElement('tr');
+					tr.innerHTML =
+						'<td><input type="text" name="coupons[' + k + '][code]" value="" style="width:100%;text-transform:uppercase;font-weight:700"></td>' +
+						'<td><select name="coupons[' + k + '][type]" style="width:100%"><option value="pct"><?php echo esc_js( __( 'Percent %', 'bhela-booking' ) ); ?></option><option value="amount"><?php echo esc_js( __( 'Taka ৳', 'bhela-booking' ) ); ?></option></select></td>' +
+						'<td><input type="number" min="0" name="coupons[' + k + '][value]" value="" style="width:100%"></td>' +
+						'<td><input type="text" name="coupons[' + k + '][label]" value="" style="width:100%"></td>' +
+						'<td><input type="date" name="coupons[' + k + '][expires]" value="" style="width:100%"></td>' +
+						'<td><input type="number" min="0" name="coupons[' + k + '][max_uses]" value="" placeholder="0" style="width:100%"></td>' +
+						'<td class="bha-num">0</td>' +
+						'<td><label><input type="checkbox" name="coupons[' + k + '][once_per_phone]" value="1" checked> <?php echo esc_js( __( 'Yes', 'bhela-booking' ) ); ?></label></td>' +
+						'<td><label><input type="checkbox" name="coupons[' + k + '][retired]" value="1"> <?php echo esc_js( __( 'Hide', 'bhela-booking' ) ); ?></label></td>';
+					body.appendChild(tr);
+				});
+			}());
+			</script>
+			</div>
+
 		</form>
 
 		<?php

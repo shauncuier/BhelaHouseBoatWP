@@ -95,9 +95,16 @@ preg_match_all( "/add_action\(\s*'(wp_ajax_(?!nopriv)[a-z_]+|admin_post_(?!nopri
 // nonce and cannot itself demand one, or a visitor on a cached page could
 // never obtain a valid one. It grants nothing new — the same nonce is already
 // printed into the public booking page — and it reads no data and writes none.
+//
+// bhela_bm_ajax_coupon_check is public because a guest applies a coupon before they
+// have any account, but it is the one that most resembles an oracle: it answers
+// "is this code valid" to anyone who asks. It therefore checks a nonce, throttles
+// FAILED attempts per IP, and refuses an unknown code with a generic message so it
+// cannot be used to enumerate the coupon list. It reads no guest data and writes
+// nothing — redeeming is a separate function, reached only when a booking is made.
 $public = array( 'bhela_bm_ajax_submit', 'bhela_bm_ajax_availability', 'bhela_bm_ajax_track',
 	'bhela_bm_otp_ajax_send', 'bhela_bm_otp_ajax_verify', 'bhela_bm_review_submit',
-	'bhela_bm_ajax_nonce' );
+	'bhela_bm_ajax_coupon_check', 'bhela_bm_ajax_nonce' );
 // A separate, narrower exemption. Being public is not a reason to skip the
 // nonce — every other endpoint above still checks one. Only an endpoint whose
 // job is to *hand out* the nonce can be excused from presenting one, and there

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.32.0
+ * Version: 2.33.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.32.0' );
+define( 'BHELA_BM_VERSION', '2.33.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -63,6 +63,16 @@ function bhela_bm_default_settings() {
 		// improvement to the shipped text would never reach a site that had saved
 		// its settings once.
 		'confirm_template' => '',
+		// A promotional layer OVER the rates, never a rewrite of them. Editing
+		// bhela_bm_rates to run a promotion destroys the rack rate: when the offer ends
+		// there is nothing to restore from, and no "was ৳40,000" to strike through.
+		// Both percentages come off `regular` — see bhela_bm_offer_rate().
+		'offer_on'      => 0,
+		'offer_label'   => '',   // badge text; blank falls back to a generic OFFER
+		'offer_regular' => 0,    // % off regular, weekends + holidays
+		'offer_weekday' => 0,    // % off regular, weekdays
+		'offer_from'    => '',   // travel date; blank = open-ended
+		'offer_to'      => '',
 		'advance_percent'  => 50,
 		'child_fee'        => 5000, // flat charge per 4–8 year old, any day type
 		'date_chips'       => 5,    // how many upcoming trips show as quick-pick chips (0 = hide)
@@ -353,6 +363,97 @@ function bhela_bm_day_type( $date ) {
 		return 'weekend';
 	}
 	return 'weekday';
+}
+
+/**
+ * Is the promotional offer running for this travel date, and at what percentage?
+ *
+ * One place decides it, because the engine, the admin preview, the invoice and both
+ * JavaScript mirrors all have to agree. A blank end date is open-ended, the same
+ * shape bhela_bm_b2b_range() settled on.
+ *
+ * Matched on the TRAVEL date rather than the booking date: every rate, holiday and
+ * report in this system is keyed on when the trip happens, and mixing the two is how
+ * a guest gets quoted one price and charged another.
+ *
+ * @param string $date Travel date, Y-m-d.
+ * @return array{active:bool,pct:int,label:string,day_type:string}
+ */
+function bhela_bm_offer( $date = '' ) {
+	$s   = bhela_bm_get_settings();
+	$dt  = $date ? bhela_bm_day_type( $date ) : 'weekend';
+	$out = array( 'active' => false, 'pct' => 0, 'pct_regular' => 0, 'pct_weekday' => 0,
+		'label' => '', 'day_type' => $dt );
+
+	if ( empty( $s['offer_on'] ) ) {
+		return $out;
+	}
+	$day  = bhela_bm_report_date( $date );
+	$from = bhela_bm_report_date( $s['offer_from'] ?? '' );
+	$to   = bhela_bm_report_date( $s['offer_to'] ?? '' );
+	if ( $day && $from && $day < $from ) {
+		return $out;
+	}
+	if ( $day && $to && $day > $to ) {
+		return $out;
+	}
+
+	// Weekends and holidays share a percentage: both are peak days priced at the
+	// regular rate, and the owner set one number for "not a weekday".
+	$reg_pct = max( 0, min( 90, (int) ( $s['offer_regular'] ?? 0 ) ) );
+	$wk_pct  = max( 0, min( 90, (int) ( $s['offer_weekday'] ?? 0 ) ) );
+	if ( $reg_pct <= 0 && $wk_pct <= 0 ) {
+		return $out;
+	}
+
+	// BOTH percentages are returned, not just the one for $date's own day type.
+	// Callers that have no date — the cabins page and the settings preview, which
+	// show a weekend AND a weekday column — asked for 'weekday' and silently got the
+	// weekend figure back, so the cabins page advertised a 20% weekday discount while
+	// the booking form charged 30%.
+	$out['active']      = true;
+	$out['pct_regular'] = $reg_pct;
+	$out['pct_weekday'] = $wk_pct;
+	$out['pct']         = ( 'weekday' === $dt ) ? $wk_pct : $reg_pct;
+	$out['label']       = trim( (string) ( $s['offer_label'] ?? '' ) );
+	if ( '' === $out['label'] ) {
+		$out['label'] = __( 'OFFER', 'bhela-booking' );
+	}
+	return $out;
+}
+
+/**
+ * The per-person rate actually charged, offer included.
+ *
+ * **Returns min( standing rate, offer rate ), and that clamp is the whole point.**
+ * The offer is computed off `regular`, while the weekday rate is ALREADY 20% off
+ * regular — so any weekday percentage below 20 produces a number HIGHER than the
+ * standing weekday rate. A 10% "offer" would quietly raise weekday Deluxe from
+ * ৳8,000 to ৳9,000.
+ *
+ * An offer that increases a price is the worst thing this feature could do, so it is
+ * made structurally impossible here rather than left for the owner to spot.
+ *
+ * @param array  $row      A rate row: {regular, weekday, ...}.
+ * @param string $day_type weekday | weekend | holiday.
+ * @param string $date     Travel date, for the offer window.
+ * @return int Rate in taka.
+ */
+function bhela_bm_offer_rate( $row, $day_type, $date = '' ) {
+	$standing = ( 'weekday' === $day_type ) ? (int) $row['weekday'] : (int) $row['regular'];
+	$offer    = bhela_bm_offer( $date );
+	if ( ! $offer['active'] ) {
+		return $standing;
+	}
+	// Keyed on the $day_type argument, NOT on whatever day $date falls on. The two
+	// can legitimately differ: a rate table shows a weekend and a weekday column at
+	// once, with no single date behind either.
+	$pct = ( 'weekday' === $day_type ) ? (int) $offer['pct_weekday'] : (int) $offer['pct_regular'];
+	if ( $pct <= 0 ) {
+		return $standing;
+	}
+	$discounted = (int) round( (int) $row['regular'] * ( 100 - $pct ) / 100 );
+	return min( $standing, $discounted );
 }
 
 /**
@@ -860,6 +961,7 @@ function bhela_bm_report_date( $value ) {
 }
 
 require_once BHELA_BM_PATH . 'includes/agencies.php';
+require_once BHELA_BM_PATH . 'includes/coupons.php';
 require_once BHELA_BM_PATH . 'includes/otp.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';

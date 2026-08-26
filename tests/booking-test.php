@@ -17,7 +17,7 @@
  */
 
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'ui', 'roles', 'log', 'trips', 'invoice', 'emails', 'admin', 'b2b-report' );
+bhela_test_modules( 'ui', 'roles', 'log', 'trips', 'invoice', 'emails', 'admin', 'b2b-report', 'coupons' );
 
 wp_set_current_user( 1 );
 
@@ -208,6 +208,18 @@ ok( 0 === array_sum( wp_list_pluck( $fb_plan, 'c48' ) ) + array_sum( wp_list_plu
 
 // Priced through the one engine, so weekday/holiday and the advance % apply as
 // they do anywhere else. These are the figures the booking form must also show.
+//
+// The promotional offer is switched OFF for this block, and put back afterwards.
+// These assertions are about the STANDING whole-boat rate, and they read live
+// settings — so with a real promotion configured they failed against the discounted
+// total and looked like a pricing regression. A pricing test must state the
+// discount state it is asserting rather than inheriting whatever the owner has
+// running today.
+$fb_settings = get_option( 'bhela_bm_settings' );
+$fb_tmp      = bhela_bm_get_settings();
+$fb_tmp['offer_on'] = 0;
+update_option( 'bhela_bm_settings', $fb_tmp );
+
 $fb_wknd = bhela_bm_full_boat_price( '2026-08-21' );   // Friday
 $fb_week = bhela_bm_full_boat_price( '2026-08-18' );   // Tuesday
 ok( ! is_wp_error( $fb_wknd ) && ! is_wp_error( $fb_week ), 'both day types price without error' );
@@ -219,6 +231,25 @@ ok( bhela_bm_max_guests() * (int) $fb_rate_w === (int) $fb_wknd['total'],
 ok( bhela_bm_max_guests() * (int) $fb_rate_d === (int) $fb_week['total'],
 	'weekday total is ' . bhela_bm_max_guests() . ' × ' . $fb_rate_d, bhela_bm_money( $fb_week['total'] ) );
 ok( (int) $fb_week['total'] < (int) $fb_wknd['total'], 'the weekday discount still applies to a whole boat' );
+
+// A running promotion reaches the whole boat too, because bhela_bm_full_boat_plan()
+// is priced THROUGH bhela_bm_calc_multi() rather than multiplied inline.
+$fb_tmp['offer_on']      = 1;
+$fb_tmp['offer_regular'] = 20;
+$fb_tmp['offer_weekday'] = 30;
+$fb_tmp['offer_label']   = 'ZZ FB';
+$fb_tmp['offer_from']    = '';
+$fb_tmp['offer_to']      = '';
+update_option( 'bhela_bm_settings', $fb_tmp );
+$fb_off = bhela_bm_full_boat_price( '2026-08-18' );
+ok( (int) $fb_off['total'] < (int) $fb_week['total'], 'a whole boat inherits the offer without special-casing',
+	bhela_bm_money( $fb_off['total'] ) . ' < ' . bhela_bm_money( $fb_week['total'] ) );
+
+if ( false === $fb_settings ) {
+	delete_option( 'bhela_bm_settings' );
+} else {
+	update_option( 'bhela_bm_settings', $fb_settings );
+}
 
 // The JS must reach the same number, and it computes it the same way rather than
 // from a literal — MAX_CABINS × MAX_CAP × occRate(MAX_CAP, dt). A divergence here
@@ -241,8 +272,14 @@ if ( is_wp_error( $fb_fe ) ) {
 } else {
 	$fb_id  = (int) $fb_fe['booking_id'];
 	$made[] = $fb_id;
-	ok( (int) $fb_wknd['total'] === (int) get_post_meta( $fb_id, '_bhela_total', true ),
-		'it stores the standard rate, not ৳0', get_post_meta( $fb_id, '_bhela_total', true ) );
+	// Priced fresh for the SAME date rather than compared with $fb_wknd, which was
+	// computed earlier with the promotion deliberately switched off. The point of
+	// this assertion is that the submission stores what the engine says and not ৳0 —
+	// so it must track whatever discount is configured, not a fixed figure.
+	$fb_expect = bhela_bm_full_boat_price( '2026-08-21' );
+	ok( ! is_wp_error( $fb_expect ) && (int) $fb_expect['total'] === (int) get_post_meta( $fb_id, '_bhela_total', true ),
+		'it stores what the engine prices, not ৳0', get_post_meta( $fb_id, '_bhela_total', true ) );
+	ok( (int) get_post_meta( $fb_id, '_bhela_total', true ) > 0, 'and that figure is positive' );
 	ok( (int) get_post_meta( $fb_id, '_bhela_advance', true ) > 0, 'and therefore an advance to ask for',
 		get_post_meta( $fb_id, '_bhela_advance', true ) );
 	ok( bhela_bm_max_guests() === (int) get_post_meta( $fb_id, '_bhela_guests', true ),
@@ -516,6 +553,175 @@ bk_money( $qr_id, 30000, 0 );
 $qr_html = bk_invoice_html( $qr_id );
 ok( false !== strpos( $qr_html, 'pay-qrs' ), 'and the invoice renders the QR block' );
 ok( 2 === substr_count( $qr_html, '<figure>' ), 'with both codes, not one', (string) substr_count( $qr_html, '<figure>' ) );
+echo "\n=== 3l. the offer layer, and the clamp that stops it raising a price ===\n";
+// A promotion OVER the rates, never a rewrite of them. Both percentages come off the
+// REGULAR rate, which is the decision that makes the arithmetic below look odd at a
+// glance: the weekday rate is already 20% under regular, so a 20% weekend offer
+// prices a weekend at exactly today's weekday price. That is correct.
+//
+// Safe to write to bhela_bm_settings and bhela_bm_coupons here: both are in
+// bhela_test_owner_options(), so the bootstrap restores whatever the owner had.
+$of_before  = get_option( 'bhela_bm_settings' );
+$cp_before  = get_option( 'bhela_bm_coupons' );
+$of_fri     = '2026-09-04';   // weekend
+$of_mon     = '2026-09-07';   // weekday
+$of_cab     = array( array( 'adults' => 4, 'c48' => 0, 'c04' => 0 ) );
+
+$of_set = function ( $on, $reg, $wk, $from = '', $to = '' ) {
+	$s = bhela_bm_get_settings();
+	$s['offer_on']      = $on ? 1 : 0;
+	$s['offer_regular'] = $reg;
+	$s['offer_weekday'] = $wk;
+	$s['offer_label']   = 'ZZ EID';
+	$s['offer_from']    = $from;
+	$s['offer_to']      = $to;
+	update_option( 'bhela_bm_settings', $s );
+};
+
+// The regression guard first: touching the pricing engine must change nothing while
+// the offer is off.
+$of_set( 0, 20, 30 );
+$of_off_wk = bhela_bm_calc_multi( $of_cab, $of_mon );
+$of_off_we = bhela_bm_calc_multi( $of_cab, $of_fri );
+ok( 32000 === (int) $of_off_wk['total'], 'offer OFF: weekday deluxe is unchanged at 32,000', (string) $of_off_wk['total'] );
+ok( 40000 === (int) $of_off_we['total'], 'offer OFF: weekend deluxe is unchanged at 40,000', (string) $of_off_we['total'] );
+ok( '' === (string) $of_off_wk['discount_source'], 'and nothing claims a discount' );
+
+$of_set( 1, 20, 30 );
+$of_want = array(
+	// sharing => regular, weekend -20, weekday -30
+	6 => array( 8000, 6400, 5600 ),
+	5 => array( 9000, 7200, 6300 ),
+	4 => array( 10000, 8000, 7000 ),
+	3 => array( 12000, 9600, 8400 ),
+	2 => array( 13000, 10400, 9100 ),
+);
+$of_bad = array();
+foreach ( $of_want as $of_share => $of_row ) {
+	$of_rate = bhela_bm_rate_for_occupancy( $of_share );
+	$of_got_we = bhela_bm_offer_rate( $of_rate, 'weekend', $of_fri );
+	$of_got_wk = bhela_bm_offer_rate( $of_rate, 'weekday', $of_mon );
+	if ( (int) $of_rate['regular'] !== $of_row[0] || $of_got_we !== $of_row[1] || $of_got_wk !== $of_row[2] ) {
+		$of_bad[] = sprintf( '%d-share: %d/%d/%d', $of_share, $of_rate['regular'], $of_got_we, $of_got_wk );
+	}
+}
+ok( ! $of_bad, 'every cabin tier prices to the taka, weekend and weekday', implode( ' · ', $of_bad ) );
+
+// The DATELESS call, which the cabins page and the settings preview both make: they
+// show a weekend and a weekday column side by side, with no single date behind
+// either. bhela_bm_offer() used to derive its own day type from the (absent) date
+// and hand back the WEEKEND percentage whatever it was asked for — so the cabins page
+// advertised a 20% weekday discount while the booking form charged 30%.
+$of_dl = bhela_bm_rate_for_occupancy( 4 );
+ok( 8000 === bhela_bm_offer_rate( $of_dl, 'weekend' ), 'with no date, the weekend column is still the weekend rate',
+	(string) bhela_bm_offer_rate( $of_dl, 'weekend' ) );
+ok( 7000 === bhela_bm_offer_rate( $of_dl, 'weekday' ), 'and the weekday column is the WEEKDAY rate, not the weekend one',
+	(string) bhela_bm_offer_rate( $of_dl, 'weekday' ) );
+$of_both = bhela_bm_offer();
+ok( 20 === (int) $of_both['pct_regular'] && 30 === (int) $of_both['pct_weekday'],
+	'and both percentages are reported, so no caller has to guess',
+	$of_both['pct_regular'] . '/' . $of_both['pct_weekday'] );
+
+$of_wk = bhela_bm_calc_multi( $of_cab, $of_mon );
+ok( 28000 === (int) $of_wk['total'], '4 adults, Deluxe, weekday: 40,000 becomes 28,000', (string) $of_wk['total'] );
+ok( 40000 === (int) $of_wk['rack_total'], 'the rack total is kept, for the struck-through price', (string) $of_wk['rack_total'] );
+ok( 12000 === (int) $of_wk['savings'] && 'offer' === $of_wk['discount_source'], 'saving 12,000, credited to the offer' );
+ok( 'ZZ EID' === (string) $of_wk['discount_label'] && 30 === (int) $of_wk['discount_pct'], 'named and measured for the badge' );
+
+// THE clamp. A weekday offer under 20% computes to more than the standing weekday
+// rate; an "offer" that raises a price is the worst thing this feature could do.
+$of_set( 1, 20, 10 );
+$of_deluxe = bhela_bm_rate_for_occupancy( 4 );
+ok( 9000 === (int) round( $of_deluxe['regular'] * 0.9 ), 'a 10% weekday offer computes to 9,000 …' );
+ok( 8000 === bhela_bm_offer_rate( $of_deluxe, 'weekday', $of_mon ), '… but the guest is still charged 8,000, never more' );
+
+// The window, on the travel date.
+$of_set( 1, 20, 30, '2026-10-01', '2026-10-31' );
+ok( ! bhela_bm_offer( $of_mon )['active'], 'a September trip is outside an October window' );
+ok( bhela_bm_offer( '2026-10-15' )['active'], 'and an October one is inside it' );
+$of_set( 1, 20, 30, '2026-10-01', '' );
+ok( bhela_bm_offer( '2027-05-01' )['active'], 'a blank end date is open-ended' );
+
+echo "\n=== 3m. coupons — best wins, and checking never spends one ===\n";
+$of_set( 1, 20, 30 );
+bhela_bm_save_coupons( array(
+	array( 'code' => 'ZZSAVE10', 'type' => 'pct',    'value' => 10,     'label' => 'ZZ Save', 'max_uses' => 0, 'once_per_phone' => 1 ),
+	array( 'code' => 'ZZVIP40',  'type' => 'pct',    'value' => 40,     'label' => 'ZZ VIP',  'max_uses' => 2, 'once_per_phone' => 1 ),
+	array( 'code' => 'ZZ5K',     'type' => 'amount', 'value' => 5000,   'label' => 'ZZ 5K',   'max_uses' => 0, 'once_per_phone' => 0 ),
+	array( 'code' => 'ZZHUGE',   'type' => 'amount', 'value' => 999999, 'label' => 'ZZ Huge', 'max_uses' => 0, 'once_per_phone' => 0 ),
+	array( 'code' => 'ZZOLD',    'type' => 'pct',    'value' => 50,     'label' => 'ZZ Old',  'expires' => '2026-01-01', 'max_uses' => 0 ),
+) );
+$of_ph = '01711111111';
+$cp = function ( $code ) use ( $of_cab, $of_mon, $of_ph ) {
+	return bhela_bm_calc_multi( $of_cab, $of_mon, $code, $of_ph );
+};
+
+// Best single discount wins — never both. The offer is worth 12,000 here.
+ok( 28000 === (int) $cp( 'ZZSAVE10' )['total'] && 'offer' === $cp( 'ZZSAVE10' )['discount_source'],
+	'a 10% coupon loses to the 30% offer, and does not stack', (string) $cp( 'ZZSAVE10' )['total'] );
+ok( 24000 === (int) $cp( 'ZZVIP40' )['total'] && 'coupon' === $cp( 'ZZVIP40' )['discount_source'],
+	'a 40% coupon beats the offer: 24,000, not 25,200', (string) $cp( 'ZZVIP40' )['total'] );
+ok( 28000 === (int) $cp( 'ZZ5K' )['total'], 'a ৳5,000 coupon also loses to the offer', (string) $cp( 'ZZ5K' )['total'] );
+ok( 0 === (int) $cp( 'ZZHUGE' )['total'], 'a coupon larger than the booking floors at zero, never negative', (string) $cp( 'ZZHUGE' )['total'] );
+ok( 28000 === (int) $cp( 'ZZOLD' )['total'], 'an expired coupon changes nothing' );
+ok( 28000 === (int) $cp( 'ZZNOSUCH' )['total'], 'and neither does an unknown one' );
+
+// Checking is read-only. A guest pressing Apply five times must not exhaust a
+// "first 20 bookings" coupon without booking anything.
+for ( $of_i = 0; $of_i < 5; $of_i++ ) {
+	bhela_bm_coupon_check( 'ZZVIP40', 40000, $of_mon, $of_ph );
+}
+ok( 0 === (int) bhela_bm_coupons( true )['ZZVIP40']['uses'], 'five checks spend nothing',
+	(string) bhela_bm_coupons( true )['ZZVIP40']['uses'] );
+bhela_bm_coupon_redeem( 'ZZVIP40', $of_ph, 0 );
+ok( 1 === (int) bhela_bm_coupons( true )['ZZVIP40']['uses'], 'one redemption spends exactly one' );
+
+ok( 'used' === bhela_bm_coupon_check( 'ZZVIP40', 40000, $of_mon, $of_ph )['reason'],
+	'the same mobile cannot use it twice' );
+ok( bhela_bm_coupon_check( 'ZZVIP40', 40000, $of_mon, '01722222222' )['ok'],
+	'but a different mobile still can' );
+
+bhela_bm_coupon_redeem( 'ZZVIP40', '01722222222', 0 );
+ok( 'exhausted' === bhela_bm_coupon_check( 'ZZVIP40', 40000, $of_mon, '01733333333' )['reason'],
+	'the cap of two is enforced' );
+ok( false === bhela_bm_coupon_redeem( 'ZZVIP40', '01733333333', 0 ), 'and redeeming past it refuses' );
+
+// A phone number is a uniqueness check here, not a contact list.
+$of_raw = get_option( 'bhela_bm_coupons' );
+ok( ! in_array( $of_ph, (array) ( $of_raw['ZZVIP40']['_used_by'] ?? array() ), true ),
+	'the number is stored hashed, never in the clear' );
+
+foreach ( array( 'zzsave10', ' ZZ-SAVE-10 ', 'ZzSave10' ) as $of_v ) {
+	ok( 'ZZSAVE10' === bhela_bm_coupon_code( $of_v ), 'code "' . trim( $of_v ) . '" normalises' );
+}
+
+echo "\n=== 3n. PHP and JS price the same booking identically ===\n";
+// The two engines have drifted before, and a guest who is quoted one number and
+// charged another is the failure that costs a booking. These read the JS source and
+// pin its rules against the PHP the server actually uses.
+$of_js = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/assets/booking.js' );
+$of_th = (string) file_get_contents( get_template_directory() . '/assets/js/theme.js' );
+ok( false !== strpos( $of_js, 'Math.min(standing, Math.round(r.regular * (100 - pct) / 100))' ),
+	'booking.js mirrors the clamp exactly' );
+ok( false !== strpos( $of_th, 'Math.min(standing, Math.round(r.regular * (100 - pct) / 100))' ),
+	'and so does the homepage estimator' );
+ok( false === strpos( $of_js, '−20%' ) && false === strpos( $of_th, '−20%' ),
+	'neither file hardcodes a discount percentage any more' );
+$of_cabtpl = (string) file_get_contents( get_template_directory() . '/page-templates/template-cabins.php' );
+ok( false !== strpos( $of_cabtpl, 'bhela_bm_offer_rate' ), 'the cabins page prices through the same function' );
+
+// A new input is not submitted until booking.js names it — §13.17, which cost the
+// guest address field an entire release.
+ok( (bool) preg_match( "/\[\s*'name',\s*'phone',\s*'email',\s*'address',\s*'date',\s*'message',\s*'coupon'/", $of_js ),
+	'and the coupon field is in the submit list, so it actually reaches the server' );
+
+// The browser is never told what a coupon is worth.
+ok( false === strpos( $of_js, 'bhelaBM.coupons' ), 'no coupon list is exposed to the browser' );
+
+if ( null === $of_before ) { delete_option( 'bhela_bm_settings' ); } else { update_option( 'bhela_bm_settings', $of_before ); }
+if ( null === $cp_before ) { delete_option( 'bhela_bm_coupons' ); } else { update_option( 'bhela_bm_coupons', $cp_before ); }
+ok( 0 === (int) ( bhela_bm_get_settings()['offer_on'] ?? 0 ) || $of_before === get_option( 'bhela_bm_settings' ),
+	'the owner’s real settings are put back exactly as they were' );
 echo "\n=== 3g. the commission is counted exactly once ===\n";
 $b2b_rows = bhela_bm_commission_rows( $friday, $friday );
 ok( 3500 === (int) $b2b_rows['total'], 'the day totals 3,500', (string) $b2b_rows['total'] );

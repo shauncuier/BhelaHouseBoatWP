@@ -302,6 +302,43 @@
 			// engine (bhela_bm_rate_for_occupancy). Multiplying a chosen cabin's
 			// headline rate by total guests under-quoted (4 guests in a 6-share
 			// cabin is a 4-share tier, not a 6-share one).
+			/**
+			 * The per-person rate the guest will actually be charged.
+			 *
+			 * Mirrors bhela_bm_offer_rate() in the plugin, min() included: the offer is
+			 * a percentage off REGULAR while the weekday rate already sits 20% below
+			 * regular, so a weekday offer under 20% would otherwise RAISE the price.
+			 * This estimator and the booking form must quote the same number, or the
+			 * homepage promises one price and the form charges another.
+			 */
+			function qeRate(r, weekday) {
+				var standing = weekday ? r.weekday : r.regular;
+				var o = bhelaTheme.offer || {};
+				if (!o.on) return standing;
+				var pct = weekday ? (o.weekday | 0) : (o.regular | 0);
+				if (pct <= 0 || pct > 90) return standing;
+				return Math.min(standing, Math.round(r.regular * (100 - pct) / 100));
+			}
+
+			/**
+			 * The caption before the cabin count, DERIVED from the rates.
+			 *
+			 * The discount used to be written out as a literal here. A hardcoded
+			 * percentage printed beside a live price becomes a lie the first time an
+			 * offer changes it, so it is computed.
+			 */
+			function qeCaption(weekday) {
+				var keys = Object.keys(bhelaTheme.rates || {});
+				if (!keys.length) return '';
+				var r = bhelaTheme.rates[keys[0]];
+				if (!r || !r.regular) return '';
+				var pct = Math.round((1 - qeRate(r, weekday) / r.regular) * 100);
+				if (pct <= 0) return '';
+				var o = bhelaTheme.offer || {};
+				var tag = (o.on && o.label) ? (o.label + ' ') : '';
+				return tag + (weekday ? 'Weekday' : 'Weekend') + ' −' + pct + '% 🔥 · ';
+			}
+
 			var occRates = {};
 			Object.keys(bhelaTheme.rates).forEach(function (k) {
 				var r = bhelaTheme.rates[k];
@@ -340,7 +377,7 @@
 						if (rest !== 0 && rest < 2) { continue; } // leftover can't form a cabin
 						if (cost[rest] === INF) { continue; }
 						var r = rateForOcc(p);
-						var c = (weekday ? r.weekday : r.regular) * p + cost[rest];
+						var c = qeRate(r, weekday) * p + cost[rest];
 						if (c < cost[t]) { cost[t] = c; pick[t] = p; }
 					}
 				}
@@ -360,7 +397,7 @@
 				var weekday = dayType(qeDate.value) === 'weekday';
 				var est = cheapest(Math.max(g, 2), weekday);
 				if (!est) { result.hidden = true; return; }
-				meta.textContent = (weekday ? 'Weekday −20% 🔥 · ' : '') + est.cabins + ' কেবিন';
+				meta.textContent = qeCaption(weekday) + est.cabins + ' কেবিন';
 				totalEl.textContent = '৳' + Number(est.sum).toLocaleString('en-IN');
 				result.hidden = false;
 			}

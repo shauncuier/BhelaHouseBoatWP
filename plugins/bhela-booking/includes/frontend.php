@@ -45,6 +45,16 @@ function bhela_bm_enqueue_assets() {
 		'holidays'       => bhela_bm_holiday_dates(),
 		'advancePercent' => (int) $settings['advance_percent'],
 		'childFee'       => (int) $settings['child_fee'],
+		// The OFFER only. A coupon's value is never sent to the browser: the form
+		// posts the code and renders whatever total the server comes back with.
+		'offer'          => array(
+			'on'      => ! empty( $settings['offer_on'] ) ? 1 : 0,
+			'regular' => max( 0, min( 90, (int) ( $settings['offer_regular'] ?? 0 ) ) ),
+			'weekday' => max( 0, min( 90, (int) ( $settings['offer_weekday'] ?? 0 ) ) ),
+			'from'    => (string) ( $settings['offer_from'] ?? '' ),
+			'to'      => (string) ( $settings['offer_to'] ?? '' ),
+			'label'   => (string) ( $settings['offer_label'] ?? '' ),
+		),
 		'whatsapp'       => preg_replace( '/[^0-9]/', '', $settings['whatsapp'] ),
 	) );
 }
@@ -225,8 +235,17 @@ function bhela_bm_booking_form_shortcode() {
 							<div id="bm-breakdown"></div>
 							<div class="bhela-bm-price__row"><span>দিনের ধরন</span><strong id="bm-daytype">—</strong></div>
 							<div class="bhela-bm-price__row"><span>মোট অতিথি</span><strong id="bm-guests-echo">—</strong></div>
-							<div class="bhela-bm-price__row"><span>মোট</span><strong id="bm-total">—</strong></div>
+							<div class="bhela-bm-price__row"><span>মোট</span><strong id="bm-total"><s id="bm-rack" hidden></s> <span id="bm-total-now">—</span></strong></div>
+							<div class="bhela-bm-price__row bhela-bm-price__row--offer" id="bm-offer-row" hidden><span>অফার</span><strong id="bm-offer-badge"></strong></div>
 							<div class="bhela-bm-price__row bhela-bm-price__row--save" id="bm-savings-row" hidden><span>আপনার সাশ্রয় 🎉</span><strong id="bm-savings">—</strong></div>
+							<div class="bhela-bm-coupon">
+								<label for="bhela-bm-coupon">🎟️ <?php esc_html_e( 'কুপন কোড', 'bhela-booking' ); ?></label>
+								<div class="bhela-bm-coupon__row">
+									<input type="text" id="bhela-bm-coupon" name="coupon" autocomplete="off" spellcheck="false" placeholder="<?php esc_attr_e( 'কোড থাকলে লিখুন', 'bhela-booking' ); ?>">
+									<button type="button" id="bhela-bm-coupon-apply"><?php esc_html_e( 'প্রয়োগ', 'bhela-booking' ); ?></button>
+								</div>
+								<p class="bhela-bm-coupon__msg" id="bhela-bm-coupon-msg" role="status" aria-live="polite"></p>
+							</div>
 							<div class="bhela-bm-price__row bhela-bm-price__row--advance"><span>অগ্রিম (<?php echo esc_html( bhela_bm_bn_num( (int) $settings['advance_percent'] ) ); ?>%)</span><strong id="bm-advance">—</strong></div>
 						</div>
 						<p class="bhela-bm-empty" id="bhela-bm-empty">তারিখ ও অতিথি সংখ্যা দিলে এখানে সেরা কেবিন অপশন ও দাম দেখা যাবে।</p>
@@ -275,7 +294,7 @@ add_shortcode( 'bhela_booking_form', 'bhela_bm_booking_form_shortcode' );
  * $cabins: array of ['adults' => n, 'c48' => n, 'c04' => n].
  * Returns array|WP_Error.
  */
-function bhela_bm_calc_multi( $cabins, $date ) {
+function bhela_bm_calc_multi( $cabins, $date, $coupon = '', $phone = '' ) {
 	$settings  = bhela_bm_get_settings();
 	$day_type  = bhela_bm_day_type( $date );
 	$max_cap   = max( array_keys( bhela_bm_rates_by_occupancy() ) );
@@ -315,7 +334,9 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 		$min_cap = min( array_keys( bhela_bm_rates_by_occupancy() ) );
 		$tier    = max( $adults, $min_cap );
 		$row     = bhela_bm_rate_for_occupancy( $tier );
-		$rate    = ( 'weekday' === $day_type ) ? (int) $row['weekday'] : (int) $row['regular'];
+		// The offer layer decides the rate; `$reg` stays the RACK rate, because that is
+		// what `savings` and the struck-through price both measure against.
+		$rate    = bhela_bm_offer_rate( $row, $day_type, $date );
 		$reg     = (int) $row['regular'];
 		// 4–8 children pay a flat fee, so it is the same on weekdays and weekends.
 		$line    = $adults * $rate + $c48 * $child_fee;
@@ -363,16 +384,27 @@ function bhela_bm_calc_multi( $cabins, $date ) {
 		return new WP_Error( 'over_capacity', sprintf( __( 'সর্বোচ্চ %1$d জন (%2$d টি কেবিন)। বড় গ্রুপের জন্য সরাসরি যোগাযোগ করুন।', 'bhela-booking' ), bhela_bm_max_guests(), bhela_bm_max_cabins() ) );
 	}
 
+	// One resolver decides whether the offer or a coupon applies — never both.
+	// Measured against the RACK total so the two are comparable in taka.
+	$disc  = bhela_bm_discount( $regular_total, $total, $date, $coupon, $phone );
+	$total = $disc['total'];
+
 	$advance = (int) ceil( $total * ( (float) $settings['advance_percent'] / 100 ) );
 
 	return array(
-		'day_type' => $day_type,
-		'lines'    => $lines,
-		'guests'   => $guests,
-		'total'    => $total,
-		'savings'  => max( 0, $regular_total - $total ),
-		'advance'  => $advance,
-		'due'      => $total - $advance,
+		'day_type'        => $day_type,
+		'lines'           => $lines,
+		'guests'          => $guests,
+		'rack_total'      => $regular_total,
+		'total'           => $total,
+		'savings'         => max( 0, $regular_total - $total ),
+		'discount_source' => $disc['source'],
+		'discount_label'  => $disc['label'],
+		'discount_amount' => $disc['amount'],
+		'discount_pct'    => $disc['pct'],
+		'coupon'          => $disc['coupon'],
+		'advance'         => $advance,
+		'due'             => $total - $advance,
 	);
 }
 
@@ -391,6 +423,9 @@ function bhela_bm_process_submission( $data ) {
 	$full_boat = ! empty( $data['full_boat'] );
 	$requested = max( 0, (int) ( $data['requested_price'] ?? 0 ) );
 	$disc_msg  = sanitize_textarea_field( $data['discount_msg'] ?? '' );
+	// The CODE only. Any total or discount the browser sends is ignored — the price
+	// is recomputed here from the code and the cabins.
+	$coupon    = sanitize_text_field( $data['coupon'] ?? '' );
 
 	if ( ! $name || ! $phone || ! $date ) {
 		return new WP_Error( 'missing', __( 'অনুগ্রহ করে নাম, মোবাইল নম্বর ও তারিখ পূরণ করুন।', 'bhela-booking' ) );
@@ -438,7 +473,7 @@ function bhela_bm_process_submission( $data ) {
 		$cabin_summary   = bhela_bm_full_boat_label();
 	} else {
 		$price = is_array( $cabins )
-			? bhela_bm_calc_multi( $cabins, $date )
+			? bhela_bm_calc_multi( $cabins, $date, $coupon, $normalized )
 			: new WP_Error( 'no_cabins', __( 'অন্তত একটি কেবিনে অতিথি সংখ্যা দিন।', 'bhela-booking' ) );
 		if ( is_wp_error( $price ) ) {
 			return $price; // pass through the specific reason (no cabins / needs an adult)
@@ -513,6 +548,26 @@ function bhela_bm_process_submission( $data ) {
 	update_post_meta( $post_id, '_bhela_advance', $price['advance'] );
 	update_post_meta( $post_id, '_bhela_manual_price', '1' ); // preserve multi-cabin total on admin save
 	update_post_meta( $post_id, '_bhela_full_boat', $full_boat ? '1' : '' );
+
+	// What this booking was SOLD under. A snapshot, like `_bhela_advance` and the B2B
+	// commission amount: the guest agreed to a number beside a named offer, and when
+	// the promotion ends their invoice must still say why they paid what they paid.
+	// Nothing recomputes these on read.
+	if ( ! empty( $price['discount_source'] ) ) {
+		update_post_meta( $post_id, '_bhela_discount_source', (string) $price['discount_source'] );
+		update_post_meta( $post_id, '_bhela_discount_amount', (int) $price['discount_amount'] );
+		update_post_meta( $post_id, '_bhela_discount_label', (string) $price['discount_label'] );
+		update_post_meta( $post_id, '_bhela_offer_pct', (int) $price['discount_pct'] );
+		update_post_meta( $post_id, '_bhela_rack_total', (int) $price['rack_total'] );
+	}
+
+	// Redeemed ONCE, here, and only when the coupon is the discount that actually
+	// applied. A code that lost the best-wins comparison was never spent, so it must
+	// not be counted against its usage limit.
+	if ( 'coupon' === ( $price['discount_source'] ?? '' ) && ! empty( $price['coupon'] ) ) {
+		update_post_meta( $post_id, '_bhela_coupon', (string) $price['coupon'] );
+		bhela_bm_coupon_redeem( $price['coupon'], $normalized, $post_id );
+	}
 	if ( $requested > 0 ) {
 		update_post_meta( $post_id, '_bhela_requested_price', $requested );
 	}
@@ -773,6 +828,81 @@ function bhela_bm_ajax_track() {
 }
 add_action( 'wp_ajax_bhela_bm_track', 'bhela_bm_ajax_track' );
 add_action( 'wp_ajax_nopriv_bhela_bm_track', 'bhela_bm_ajax_track' );
+
+/**
+ * AJAX: is this coupon code usable, and what would it save?
+ *
+ * READ-ONLY. It must not redeem — see bhela_bm_coupon_redeem(). A guest pressing
+ * Apply twice, or reloading, would otherwise burn a use each time and exhaust a
+ * "first 20 bookings" coupon on people who never booked.
+ *
+ * The total is recomputed here from the cabins the browser sends, never taken from
+ * it: the discount is money, and money is decided on the server.
+ */
+function bhela_bm_ajax_coupon_check() {
+	check_ajax_referer( 'bhela_bm_booking', 'nonce' );
+
+	$code   = sanitize_text_field( wp_unslash( $_POST['coupon'] ?? '' ) );
+	$date   = sanitize_text_field( wp_unslash( $_POST['date'] ?? '' ) );
+	$phone  = sanitize_text_field( wp_unslash( $_POST['phone'] ?? '' ) );
+	$cabins = json_decode( wp_unslash( $_POST['cabins'] ?? '' ), true );
+
+	// Per-IP throttle on FAILED attempts only, the same shape as the tracker above.
+	// A public "is this code valid" endpoint is a brute-force oracle otherwise, and a
+	// guest applying their own real coupon is never counted.
+	$ip  = bhela_bm_client_ip();
+	$key = 'bhela_bm_cpn_' . md5( $ip );
+	if ( (int) get_transient( $key ) >= 25 ) {
+		wp_send_json_error( array( 'message' => __( 'অনেকবার চেষ্টা হয়েছে — কিছুক্ষণ পর আবার চেষ্টা করুন।', 'bhela-booking' ) ) );
+	}
+
+	$price = is_array( $cabins ) ? bhela_bm_calc_multi( $cabins, $date ) : null;
+	if ( ! is_array( $price ) ) {
+		wp_send_json_error( array( 'message' => __( 'আগে তারিখ ও অতিথি সংখ্যা দিন।', 'bhela-booking' ) ) );
+	}
+
+	$chk = bhela_bm_coupon_check( $code, (int) $price['rack_total'], $date, $phone );
+	if ( ! $chk['ok'] ) {
+		set_transient( $key, (int) get_transient( $key ) + 1, HOUR_IN_SECONDS );
+		wp_send_json_error( array( 'message' => $chk['message'], 'reason' => $chk['reason'] ) );
+	}
+
+	// Priced again WITH the code, so what comes back is the real booking total and
+	// the best-wins comparison has already happened server-side.
+	$with = bhela_bm_calc_multi( $cabins, $date, $code, $phone );
+	if ( ! is_array( $with ) ) {
+		wp_send_json_error( array( 'message' => $chk['message'] ) );
+	}
+
+	if ( 'coupon' !== $with['discount_source'] ) {
+		// Valid, but the promotion already running saves more. Not an error — the
+		// guest keeps the better price, and saying "rejected" would be a lie.
+		wp_send_json_success( array(
+			'applied'  => false,
+			'total'    => (int) $with['total'],
+			'rack'     => (int) $with['rack_total'],
+			'savings'  => (int) $with['savings'],
+			'label'    => (string) $with['discount_label'],
+			'message'  => __( 'চলমান অফারেই বেশি ছাড় পাচ্ছেন — সেটিই রাখা হলো।', 'bhela-booking' ),
+		) );
+	}
+
+	wp_send_json_success( array(
+		'applied' => true,
+		'total'   => (int) $with['total'],
+		'rack'    => (int) $with['rack_total'],
+		'savings' => (int) $with['savings'],
+		'label'   => (string) $with['discount_label'],
+		'code'    => (string) $with['coupon'],
+		'message' => sprintf(
+			/* translators: %s: money saved */
+			__( 'কুপন প্রযোজ্য হয়েছে — সাশ্রয় %s', 'bhela-booking' ),
+			bhela_bm_money( (int) $with['discount_amount'] )
+		),
+	) );
+}
+add_action( 'wp_ajax_bhela_bm_coupon_check', 'bhela_bm_ajax_coupon_check' );
+add_action( 'wp_ajax_nopriv_bhela_bm_coupon_check', 'bhela_bm_ajax_coupon_check' );
 
 /** Inner markup for the tracking UI — shared by the form tab and the standalone shortcode. */
 function bhela_bm_track_panel_html() {
