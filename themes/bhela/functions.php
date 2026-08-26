@@ -9,7 +9,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_VERSION', '2.33.0' );
+define( 'BHELA_VERSION', '2.33.1' );
 
 // Bump when bhela_menu_structure() changes: existing installs rebuild the
 // primary menu once, then it is left alone so owner edits stick.
@@ -407,6 +407,42 @@ function bhela_cabins() {
 		$out[ $key ]['img'] = bhela_img( 'cabin_' . $key, isset( $images[ $key ] ) ? $images[ $key ] : 'hero/hero-haor.jpg', 'bhela-card' );
 	}
 	return $out;
+}
+
+/**
+ * The weekday discount actually in force, as a whole percentage.
+ *
+ * Derived, never written out. The homepage and the booking page each printed a
+ * literal "−২০%" beside the live estimator — so the moment a promotion changed the
+ * real figure, the badge contradicted the price directly beneath it. A guest looking
+ * at "−২০%" above a 30%-discounted total has been told two different things at once.
+ *
+ * Reads through bhela_bm_offer_rate(), the same function the pricing engine and both
+ * JavaScript mirrors use, so the number here cannot drift from what is charged.
+ * Returns 0 when there is no weekday discount at all, and the callers hide the badge.
+ *
+ * @return int Percentage off the regular rate on a weekday, 0–100.
+ */
+function bhela_weekday_discount_pct() {
+	if ( ! function_exists( 'bhela_bm_offer_rate' ) || ! function_exists( 'bhela_bm_get_rates' ) ) {
+		return 0;
+	}
+	$rates = bhela_bm_get_rates();
+	$row   = is_array( $rates ) ? reset( $rates ) : null;
+	if ( ! $row || empty( $row['regular'] ) ) {
+		return 0;
+	}
+	$pct = (int) round( ( 1 - bhela_bm_offer_rate( $row, 'weekday' ) / (int) $row['regular'] ) * 100 );
+	return max( 0, min( 100, $pct ) );
+}
+
+/** Western digits to Bengali, for a figure printed inside Bengali copy. */
+function bhela_bn_digits( $value ) {
+	return str_replace(
+		array( '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' ),
+		array( '০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯' ),
+		(string) $value
+	);
 }
 
 function bhela_money( $n ) {

@@ -731,6 +731,7 @@ echo "\n=== 3n. PHP and JS price the same booking identically ===\n";
 // The two engines have drifted before, and a guest who is quoted one number and
 // charged another is the failure that costs a booking. These read the JS source and
 // pin its rules against the PHP the server actually uses.
+$rates_all = bhela_bm_get_rates();
 $of_js = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/assets/booking.js' );
 $of_th = (string) file_get_contents( get_template_directory() . '/assets/js/theme.js' );
 ok( false !== strpos( $of_js, 'Math.min(standing, Math.round(r.regular * (100 - pct) / 100))' ),
@@ -749,6 +750,24 @@ ok( (bool) preg_match( "/\[\s*'name',\s*'phone',\s*'email',\s*'address',\s*'date
 
 // The browser is never told what a coupon is worth.
 ok( false === strpos( $of_js, 'bhelaBM.coupons' ), 'no coupon list is exposed to the browser' );
+
+// The two STAT BADGES on the homepage and the booking page printed a literal
+// "−২০%" beside the live estimator. A real browser test found the booking page
+// showing "−২০% Weekday অফার" directly above a total discounted by 30% — the
+// same page telling the guest two different things. They are derived now.
+$of_fp  = (string) file_get_contents( get_template_directory() . '/front-page.php' );
+$of_bp  = (string) file_get_contents( get_template_directory() . '/page-templates/template-booking.php' );
+$of_lit = '২০%</strong><span>Weekday';
+ok( false === strpos( $of_fp, $of_lit ), 'the homepage badge is not a hardcoded figure' );
+ok( false === strpos( $of_bp, $of_lit ), 'nor is the booking page badge' );
+ok( false !== strpos( $of_fp, 'bhela_weekday_discount_pct' ) && false !== strpos( $of_bp, 'bhela_weekday_discount_pct' ),
+	'both read the discount actually in force' );
+
+// And the helper agrees with the engine, since it reads the same function.
+$of_first = reset( $rates_all );
+$of_want  = (int) round( ( 1 - bhela_bm_offer_rate( $of_first, 'weekday' ) / (int) $of_first['regular'] ) * 100 );
+ok( $of_want === bhela_weekday_discount_pct(), 'and the figure matches the engine exactly',
+	bhela_weekday_discount_pct() . ' vs ' . $of_want );
 
 if ( null === $of_before ) { delete_option( 'bhela_bm_settings' ); } else { update_option( 'bhela_bm_settings', $of_before ); }
 if ( null === $cp_before ) { delete_option( 'bhela_bm_coupons' ); } else { update_option( 'bhela_bm_coupons', $cp_before ); }

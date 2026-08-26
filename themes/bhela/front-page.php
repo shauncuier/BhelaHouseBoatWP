@@ -53,7 +53,11 @@ $img = get_template_directory_uri() . '/assets/images';
 				<div class="hero__stat"><strong>★ ৪.৯</strong><span>গেস্ট রেটিং</span></div>
 				<div class="hero__stat"><strong>৬টি</strong><span>ফ্যামিলি কেবিন</span></div>
 				<div class="hero__stat"><strong>২দিন ১রাত</strong><span>অল-ইনক্লুসিভ</span></div>
-				<div class="hero__stat"><strong>-২০%</strong><span>Weekday অফার</span></div>
+				<?php // Derived, so the badge can never contradict the estimator beside it. ?>
+				<?php $wk_pct = bhela_weekday_discount_pct(); ?>
+				<?php if ( $wk_pct > 0 ) : ?>
+					<div class="hero__stat"><strong>-<?php echo esc_html( bhela_bn_digits( $wk_pct ) ); ?>%</strong><span>Weekday অফার</span></div>
+				<?php endif; ?>
 			</div>
 		</div>
 

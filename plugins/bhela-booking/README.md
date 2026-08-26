@@ -2,7 +2,7 @@
 
 Complete booking engine for **BHELA – The Haor Exclusive** houseboat. Cabin pricing, per-date cabin inventory, booking statuses, secure invoices, and email + SMS notifications.
 
-- **Version:** 2.33.0
+- **Version:** 2.33.1
 - **Requires:** WordPress 6.0+, PHP 8.0+
 - **Pairs with:** the `bhela` theme (Midnight Monsoon). Works standalone; the theme adds the booking pages.
 

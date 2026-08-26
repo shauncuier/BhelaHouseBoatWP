@@ -38,7 +38,11 @@ get_header();
 		<div class="book-stat"><strong>★ ৪.৯</strong><span>গেস্ট রেটিং</span></div>
 		<div class="book-stat"><strong>৬টি</strong><span>ফ্যামিলি কেবিন</span></div>
 		<div class="book-stat"><strong>২দিন ১রাত</strong><span>অল-ইনক্লুসিভ</span></div>
-		<div class="book-stat"><strong>−২০%</strong><span>Weekday অফার</span></div>
+		<?php // Derived: this sat directly above a 30%-discounted total reading "−২০%". ?>
+		<?php $wk_pct = bhela_weekday_discount_pct(); ?>
+		<?php if ( $wk_pct > 0 ) : ?>
+			<div class="book-stat"><strong>−<?php echo esc_html( bhela_bn_digits( $wk_pct ) ); ?>%</strong><span>Weekday অফার</span></div>
+		<?php endif; ?>
 	</div>
 </div></section>
 
