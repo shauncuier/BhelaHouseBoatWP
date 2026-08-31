@@ -106,6 +106,7 @@ function bhela_bm_investor_boxes() {
 	add_meta_box( 'bhela-inv-money', __( 'Investment', 'bhela-booking' ), 'bhela_bm_investor_money_box', 'bhela_investor', 'normal', 'high' );
 	add_meta_box( 'bhela-inv-detail', __( 'Investor Details', 'bhela-booking' ), 'bhela_bm_investor_detail_box', 'bhela_investor', 'normal', 'default' );
 	add_meta_box( 'bhela-inv-position', __( 'Position', 'bhela-booking' ), 'bhela_bm_investor_position_box', 'bhela_investor', 'side', 'default' );
+	add_meta_box( 'bhela-inv-login', __( 'Portal Login', 'bhela-booking' ), 'bhela_bm_investor_login_box', 'bhela_investor', 'side', 'default' );
 }
 add_action( 'add_meta_boxes_bhela_investor', 'bhela_bm_investor_boxes' );
 
@@ -280,6 +281,8 @@ function bhela_bm_investor_save( $post_id ) {
 		}
 	}
 
+	bhela_bm_investor_save_login( $post_id );
+
 	// A shareholding change moves everybody's percentage and every future payout, so
 	// it is recorded with both figures rather than just the new one.
 	if ( $before !== $shares ) {
@@ -296,6 +299,104 @@ function bhela_bm_investor_save( $post_id ) {
 	}
 }
 add_action( 'save_post_bhela_investor', 'bhela_bm_investor_save' );
+
+/**
+ * The portal login for this investor.
+ *
+ * Linking is one-to-one and enforced at read time by bhela_bm_current_investor(),
+ * which refuses when a user id resolves to more than one record. Creating the
+ * account here rather than by hand means the role is always right — an investor
+ * account created through Users → Add New could be given any role at all.
+ */
+function bhela_bm_investor_login_box( $post ) {
+	$uid  = bhela_bm_investor_user( $post->ID );
+	$user = $uid ? get_userdata( $uid ) : null;
+	?>
+	<?php if ( $user ) : ?>
+		<p><strong><?php echo esc_html( $user->user_login ); ?></strong><br>
+			<span class="description"><?php echo esc_html( $user->user_email ); ?></span></p>
+		<?php if ( ! in_array( 'bhela_investor', (array) $user->roles, true ) ) : ?>
+			<p class="bha-callout bha-callout--attention"><?php esc_html_e( 'This account does not hold the Investor role, so it may have wider access than the portal.', 'bhela-booking' ); ?></p>
+		<?php endif; ?>
+		<p><label><input type="checkbox" name="inv_unlink" value="1">
+			<?php esc_html_e( 'Unlink this login', 'bhela-booking' ); ?></label>
+			<span class="description"><?php esc_html_e( 'The WordPress account is kept; it simply stops resolving to this record.', 'bhela-booking' ); ?></span></p>
+	<?php else : ?>
+		<p class="description"><?php esc_html_e( 'No portal login yet. Enter an email to create one — the investor sets their own password from the reset link.', 'bhela-booking' ); ?></p>
+		<p><input type="email" class="widefat" name="inv_new_login" placeholder="<?php esc_attr_e( 'investor@example.com', 'bhela-booking' ); ?>"></p>
+		<p><label><input type="checkbox" name="inv_send_reset" value="1" checked>
+			<?php esc_html_e( 'Email them a set-password link', 'bhela-booking' ); ?></label></p>
+	<?php endif; ?>
+	<p class="description"><?php esc_html_e( 'The portal is read-only and shows this investor nothing but their own position.', 'bhela-booking' ); ?></p>
+	<?php
+}
+
+/** Create or unlink the portal account. Runs inside the record's own save. */
+function bhela_bm_investor_save_login( $post_id ) {
+	if ( ! current_user_can( 'edit_post', $post_id ) ) {
+		return;
+	}
+	if ( ! empty( $_POST['inv_unlink'] ) ) {
+		$was = bhela_bm_investor_user( $post_id );
+		delete_post_meta( $post_id, '_bhela_inv_user' );
+		if ( $was ) {
+			bhela_bm_audit( array(
+				'channel' => 'investor', 'action' => 'unlink', 'object_type' => 'investor',
+				'object_id' => $post_id, 'object_ref' => get_the_title( $post_id ),
+				'field' => 'user', 'old_value' => (string) $was, 'new_value' => '',
+			) );
+		}
+		return;
+	}
+
+	$email = sanitize_email( wp_unslash( $_POST['inv_new_login'] ?? '' ) );
+	if ( '' === $email || bhela_bm_investor_user( $post_id ) ) {
+		return;
+	}
+	// Only an administrator may mint an account: creating users is a bigger act than
+	// editing an investor record, and Investor Relations does not need it.
+	if ( ! current_user_can( 'create_users' ) ) {
+		return;
+	}
+
+	$uid = email_exists( $email );
+	if ( ! $uid ) {
+		$uid = wp_insert_user( array(
+			'user_login'   => $email,
+			'user_email'   => $email,
+			// Never a chosen or guessable password. The investor sets their own from
+			// the reset link; nobody at BHELA ever knows it.
+			'user_pass'    => wp_generate_password( 24, true, true ),
+			'display_name' => get_the_title( $post_id ),
+			'role'         => 'bhela_investor',
+		) );
+		if ( is_wp_error( $uid ) ) {
+			return;
+		}
+		if ( ! empty( $_POST['inv_send_reset'] ) ) {
+			retrieve_password( $email );
+		}
+	}
+
+	// Refuse to link an account that already belongs to another investor: one login,
+	// one record, checked before the link rather than discovered at read time.
+	$taken = get_posts( array(
+		'post_type' => 'bhela_investor', 'post_status' => 'any', 'posts_per_page' => 1,
+		'fields' => 'ids', 'no_found_rows' => true, 'post__not_in' => array( $post_id ),
+		'meta_key' => '_bhela_inv_user', 'meta_value' => (int) $uid,
+	) );
+	if ( $taken ) {
+		return;
+	}
+
+	update_post_meta( $post_id, '_bhela_inv_user', (int) $uid );
+	bhela_bm_audit( array(
+		'channel' => 'investor', 'action' => 'link', 'object_type' => 'investor',
+		'object_id' => $post_id, 'object_ref' => get_the_title( $post_id ),
+		'field' => 'user', 'new_value' => (string) $uid,
+	) );
+}
+
 
 /* =========================================================
  * Screens

@@ -1,0 +1,97 @@
+/* =========================================================
+   BHELA — Investor portal
+   Front-end, logged-in only. Deliberately quiet: this is a financial
+   statement, not a marketing page.
+   ========================================================= */
+
+.bhela-inv {
+	--inv-ink: #0A2A2F;
+	--inv-line: rgba(10, 42, 47, .14);
+	--inv-soft: #5E7472;
+	--inv-accent: #137A74;
+	--inv-danger: #b4530a;
+	max-width: 980px;
+	margin-inline: auto;
+	font-variant-numeric: tabular-nums;
+	color: var(--inv-ink);
+}
+
+.bhela-inv__head {
+	display: flex; flex-wrap: wrap; gap: 1rem;
+	align-items: flex-end; justify-content: space-between;
+	padding-bottom: 1rem; margin-bottom: 1.4rem;
+	border-bottom: 2px solid var(--inv-line);
+}
+.bhela-inv__head h2 { margin: 0 0 .2rem; }
+.bhela-inv__actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.bhela-inv__muted { color: var(--inv-soft); font-size: .92rem; margin: .2rem 0; }
+
+.bhela-inv__btn {
+	display: inline-block; padding: .55rem 1rem; border-radius: 8px;
+	background: var(--inv-accent); color: #fff; border: 1px solid var(--inv-accent);
+	font-weight: 600; cursor: pointer; text-decoration: none; font-size: .92rem;
+}
+.bhela-inv__btn--ghost { background: transparent; color: var(--inv-accent); }
+.bhela-inv__btn:hover { opacity: .9; color: #fff; }
+.bhela-inv__btn--ghost:hover { background: rgba(19, 122, 116, .08); color: var(--inv-accent); }
+
+/* KPIs */
+.bhela-inv__kpis {
+	display: grid; gap: .8rem; margin-bottom: 1.6rem;
+	grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.bhela-inv__kpi {
+	border: 1px solid var(--inv-line); border-left: 3px solid var(--inv-accent);
+	border-radius: 10px; padding: .7rem .9rem;
+	display: flex; flex-direction: column; gap: .15rem;
+}
+.bhela-inv__kpi span { font-size: .74rem; letter-spacing: .06em; text-transform: uppercase; color: var(--inv-soft); }
+.bhela-inv__kpi strong { font-size: 1.15rem; }
+
+/* Cards and tables */
+.bhela-inv__card {
+	border: 1px solid var(--inv-line); border-radius: 12px;
+	padding: 1.1rem 1.2rem; margin-bottom: 1.4rem;
+}
+.bhela-inv__card h3 { margin: 0 0 .8rem; font-size: 1.05rem; }
+.bhela-inv__scroll { overflow-x: auto; }
+.bhela-inv__table { width: 100%; border-collapse: collapse; font-size: .93rem; }
+.bhela-inv__table th {
+	text-align: left; padding: .5rem .6rem; border-bottom: 2px solid var(--inv-line);
+	font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--inv-soft);
+}
+.bhela-inv__table td { padding: .55rem .6rem; border-bottom: 1px solid var(--inv-line); }
+.bhela-inv__table .num, .bhela-inv__table th.num { text-align: right; }
+.bhela-inv__table tr.is-void td { opacity: .5; text-decoration: line-through; }
+.bhela-inv__void {
+	display: inline-block; margin-left: .4rem; padding: 0 .4rem; border-radius: 999px;
+	border: 1px solid var(--inv-danger); color: var(--inv-danger);
+	font-size: .7rem; font-weight: 700; text-decoration: none;
+}
+
+/* Login */
+.bhela-inv--login { max-width: 420px; }
+.bhela-inv--login label { display: block; margin-bottom: .8rem; font-weight: 600; font-size: .9rem; }
+.bhela-inv--login input[type="text"],
+.bhela-inv--login input[type="password"] {
+	display: block; width: 100%; margin-top: .3rem; padding: .55rem .7rem;
+	border: 1px solid var(--inv-line); border-radius: 8px; font: inherit;
+}
+.bhela-inv__check { font-weight: 400 !important; }
+.bhela-inv__err {
+	border: 1px solid var(--inv-danger); border-left-width: 3px; border-radius: 8px;
+	padding: .5rem .7rem; color: var(--inv-danger); font-size: .9rem;
+}
+
+/* Print: this is the statement an investor keeps. Borders, never fills —
+   browsers drop backgrounds in economy colour mode, and a statement whose
+   figures lose their structure on paper is not a statement. */
+@media print {
+	.bhela-inv__actions,
+	.site-header, .site-footer, .wa-float, .mobile-bar { display: none !important; }
+	.bhela-inv { max-width: 100%; color: #000; }
+	.bhela-inv__card, .bhela-inv__kpi { break-inside: avoid; page-break-inside: avoid; }
+	.bhela-inv__table { font-size: 11pt; }
+	.bhela-inv__table thead { display: table-header-group; }
+	.bhela-inv__scroll { overflow: visible; }
+}

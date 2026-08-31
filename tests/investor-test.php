@@ -11,7 +11,8 @@
 require __DIR__ . '/bootstrap.php';
 bhela_test_modules(
 	'ui', 'roles', 'log', 'audit', 'distribution-core', 'investors',
-	'investor-ledger', 'costs', 'expenses', 'salary', 'agencies', 'statement', 'distribution'
+	'investor-ledger', 'costs', 'expenses', 'salary', 'agencies', 'statement', 'distribution',
+	'investor-portal'
 );
 
 wp_set_current_user( 1 );
@@ -192,6 +193,108 @@ $iv_audit = (int) $wpdb->get_var( $wpdb->prepare(
 	'investor'
 ) );
 ok( $iv_audit >= 5, 'the distribution and every ledger row are recorded', (string) $iv_audit );
+
+echo "\n=== 11. the portal shows one investor their own position, and nothing else ===\n";
+// This is the assertion that matters. Every role before this one belonged to somebody
+// who works for BHELA; an investor is an outsider with a real login and a financial
+// interest in figures they must not be able to edit or compare with anyone else's.
+$iv_ua = wp_insert_user( array( 'user_login' => 'zz_inv_a', 'user_email' => 'zz_inv_a@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_investor' ) );
+$iv_ub = wp_insert_user( array( 'user_login' => 'zz_inv_b', 'user_email' => 'zz_inv_b@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_investor' ) );
+update_post_meta( $iv_a, '_bhela_inv_user', $iv_ua );
+update_post_meta( $iv_b, '_bhela_inv_user', $iv_ub );
+
+// Give B a movement of its own, so "A cannot see B" is a claim with content.
+bhela_bm_ledger_add( array( 'investor' => $iv_b, 'type' => 'payment', 'amount' => 4321, 'date' => $iv_month . '-25', 'note' => 'ZZ B only' ) );
+
+/** Resolve as a given user, from a cold cache — bhela_bm_current_investor() memoises. */
+function iv_as( $user_id ) {
+	// Via 0 first: wp_set_current_user() returns the cached user when the id has not
+	// changed (§13.15). The resolver's own cache is keyed by user id, so switching
+	// accounts inside one request resolves correctly without any reset here — which
+	// is the property this helper exists to exercise.
+	wp_set_current_user( 0 );
+	clean_user_cache( $user_id );
+	wp_set_current_user( $user_id );
+	return $user_id;
+}
+
+// The resolver takes a USER and returns a RECORD. There is no parameter for "which
+// investor", so there is no id in a URL to tamper with.
+$iv_ref = new ReflectionFunction( 'bhela_bm_current_investor' );
+ok( 0 === $iv_ref->getNumberOfParameters(), 'the resolver accepts no investor id at all — there is nothing to tamper with' );
+
+$iv_src = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/investor-portal.php' );
+ok( false === strpos( $iv_src, "\$_GET['investor']" ) && false === strpos( $iv_src, "\$_REQUEST['investor']" ),
+	'and the portal never reads an investor id from the request' );
+ok( false !== strpos( $iv_src, 'get_current_user_id()' ), 'it resolves from the logged-in user' );
+
+// bhela_bm_portal_data() takes no argument either.
+$iv_pref = new ReflectionFunction( 'bhela_bm_portal_data' );
+ok( 0 === $iv_pref->getNumberOfParameters(), 'and the data function cannot be asked about somebody else' );
+
+// A duplicate link must refuse rather than pick a winner: whichever sorted first
+// would decide whose money a person sees.
+update_post_meta( $iv_c, '_bhela_inv_user', $iv_ua );
+$iv_dupe = get_posts( array(
+	'post_type' => 'bhela_investor', 'post_status' => array( 'publish', 'private', 'draft' ),
+	'posts_per_page' => 5, 'fields' => 'ids', 'no_found_rows' => true,
+	'meta_key' => '_bhela_inv_user', 'meta_value' => $iv_ua,
+) );
+ok( 2 === count( $iv_dupe ), 'two records can end up claiming one login…' );
+ok( false !== strpos( $iv_src, 'count( $hit ) !== 1' ), '…and the resolver refuses rather than guessing which' );
+delete_post_meta( $iv_c, '_bhela_inv_user' );
+
+// The role itself grants nothing. The portal checks the record, not a capability.
+$iv_urole = get_role( 'bhela_investor' );
+foreach ( array( 'bhela_investors_view', 'bhela_view_statement', 'edit_posts', 'read_private_bhela_investors', 'bhela_investor_pay' ) as $iv_cap ) {
+	ok( ! $iv_urole->has_cap( $iv_cap ), "the investor role does not hold $iv_cap" );
+}
+ok( $iv_urole->has_cap( 'read' ), 'it holds only `read`, which is what lets it log in at all' );
+
+// wp-admin is closed to a pure investor login, on top of the empty role.
+ok( false !== strpos( $iv_src, "wp_safe_redirect( bhela_bm_portal_url() )" ), 'an investor reaching wp-admin is redirected out' );
+ok( false !== strpos( $iv_src, "wp_doing_ajax()" ), 'without breaking admin-ajax for logged-in front-end features' );
+
+// And the portal writes nothing, ever.
+ok( false === strpos( $iv_src, 'bhela_bm_ledger_add' ) && false === strpos( $iv_src, 'update_post_meta' ),
+	'the portal is read-only — a disputed figure is corrected by the office, with a trail' );
+
+echo "\n=== 12. the rendered portal contains one investor’s data only ===\n";
+iv_as( $iv_ua );
+ok( $iv_a === bhela_bm_current_investor(), 'A resolves to A’s record', (string) bhela_bm_current_investor() );
+
+// Render it the way a visitor gets it, and check B is nowhere in the output.
+$iv_html = bhela_bm_portal_shortcode();
+ok( false !== strpos( $iv_html, 'ZZ Inv A' ), 'A’s portal names A' );
+ok( false === strpos( $iv_html, 'ZZ Inv B' ), 'and never names B' );
+ok( false === strpos( $iv_html, 'ZZ B only' ), 'nor carries B’s transactions' );
+ok( false === strpos( $iv_html, '4,321' ) && false === strpos( $iv_html, '4321' ), 'nor B’s figures' );
+ok( false !== strpos( $iv_html, bhela_bm_money( 16435 ) ), 'while showing A’s own declared profit' );
+
+// A logged-out visitor gets the sign-in form, not a hint that records exist.
+wp_set_current_user( 0 );
+$iv_out = bhela_bm_portal_shortcode();
+ok( false === strpos( $iv_out, 'ZZ Inv A' ) && false === strpos( $iv_out, 'ZZ Inv B' ),
+	'a logged-out visitor is shown no investor at all' );
+ok( false !== strpos( $iv_out, 'bhela_inv_nonce' ), 'just a nonce-protected sign-in form' );
+
+// A logged-in user who is not an investor sees nothing either.
+iv_as( 1 );
+ok( 0 === bhela_bm_current_investor(), 'an administrator is not silently treated as an investor' );
+
+// Switching back must resolve to A again, not to whatever was cached. The resolver
+// memoises per user id precisely so a mid-request user change cannot hand somebody
+// the previous viewer's record.
+iv_as( $iv_ua );
+ok( $iv_a === bhela_bm_current_investor(), 'and switching users mid-request resolves correctly each time' );
+iv_as( $iv_ub );
+ok( $iv_b === bhela_bm_current_investor(), 'B resolves to B, immediately after A' );
+
+wp_set_current_user( 0 );
+wp_set_current_user( 1 );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $iv_ua );
+wp_delete_user( $iv_ub );
 
 /* ---------- cleanup ---------- */
 foreach ( get_posts( array( 'post_type' => 'bhela_inv_ledger', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
