@@ -19,6 +19,17 @@
 require __DIR__ . '/bootstrap.php';
 bhela_test_modules( 'ui', 'roles', 'log', 'trips', 'invoice', 'emails', 'admin', 'b2b-report', 'coupons' );
 
+// Front-end submissions in this harness are about pricing and attribution, not about
+// mobile verification — but bhela_bm_process_submission() refuses an unverified
+// number when OTP is switched on. Left to inherit live settings, every submit test
+// fails the moment the owner turns OTP on, and reads as a pricing regression. Third
+// time this pattern has bitten (the offer, the Full Boat rate, now this): a harness
+// must state the configuration it is asserting against.
+$bk_settings_before = get_option( 'bhela_bm_settings' );
+$bk_tmp             = bhela_bm_get_settings();
+$bk_tmp['otp_enabled'] = 0;
+update_option( 'bhela_bm_settings', $bk_tmp );
+
 wp_set_current_user( 1 );
 
 $monday = '2026-08-03'; // The production date from the bug report.
@@ -1118,4 +1129,11 @@ foreach ( $made as $id ) {
 	delete_transient( 'bhela_combo_err_' . $id );
 	wp_delete_post( $id, true );
 }
+// Put the owner's OTP setting back exactly as it was.
+if ( false === $bk_settings_before ) {
+	delete_option( 'bhela_bm_settings' );
+} else {
+	update_option( 'bhela_bm_settings', $bk_settings_before );
+}
+
 bhela_test_done();

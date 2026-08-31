@@ -746,6 +746,7 @@
 .bha-tag--cost { background: #9333ea; }
 .bha-tag--settings { background: #5e7472; }
 .bha-tag--gallery { background: #0891b2; }
+.bha-tag--investor { background: #b91c1c; }
 .bha-tag--error { background: var(--bha-danger); }
 
 /* Audit-trail channels. Separate from the log tags above because the two stores

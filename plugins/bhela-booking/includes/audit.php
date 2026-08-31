@@ -53,6 +53,7 @@ function bhela_bm_audit_channels() {
 		'period' => array( 'label' => __( 'Monthly Sheets', 'bhela-booking' ) ),
 		'lists'  => array( 'label' => __( 'Categories & Locations', 'bhela-booking' ) ),
 		'import' => array( 'label' => __( 'Imports', 'bhela-booking' ) ),
+		'investor' => array( 'label' => __( 'Investors', 'bhela-booking' ) ),
 	);
 }
 

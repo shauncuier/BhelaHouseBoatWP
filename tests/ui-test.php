@@ -252,8 +252,10 @@ foreach ( array( 'input', 'select', 'textarea', 'button' ) as $ctl ) {
 }
 // The rest of the stack must stay byte-identical to wp-admin's, which is what
 // makes a scope-wide font-family safe.
-ok( preg_match( '/--bha-font-money:[^;]*-apple-system, BlinkMacSystemFont, "Segoe UI",\s*
-?\s*Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif/s', $css ),
+// \s+ rather than a literal newline: this file and admin.css do not necessarily
+// share line endings, and a regex that embeds one is asserting about CRLF rather
+// than about the font stack. It failed exactly that way once.
+ok( preg_match( '/--bha-font-money:[^;]*-apple-system,\s+BlinkMacSystemFont,\s+"Segoe UI",\s+Roboto,\s+Oxygen-Sans,\s+Ubuntu,\s+Cantarell,\s+"Helvetica Neue",\s+sans-serif/s', $css ),
 	'and the stack behind it matches wp-admin exactly' );
 ok( preg_match( '/@font-face\s*\{[^}]*unicode-range:\s*U\+09F3/si', $css ),
 	'the custom face claims only U+09F3, so nothing else can change' );

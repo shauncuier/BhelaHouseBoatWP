@@ -245,6 +245,7 @@ function bhela_test_owner_options() {
 		// re-opens every spent coupon. Added with the feature, not after a harness
 		// needed it — that order has already cost this project three times.
 		'bhela_bm_coupons',
+		'bhela_bm_dist_runs',     // month => committed run. The one-run-per-month constraint
 		'bhela_bm_staff',         // salary roster
 		'bhela_bm_inv_categories',
 		'bhela_bm_inv_subcats',
@@ -333,6 +334,20 @@ function bhela_test_delete( $id ) {
 		bhela_bm_inv_unlocking( false );
 	}
 	delete_post_meta( $id, '_bhela_inv_locked' );
+	// A committed distribution run and its ledger rows refuse deletion outright —
+	// deliberately, and for administrators too. A harness still has to be able to
+	// clear its own fixtures, so it opens the plugin's own write window rather than
+	// weakening the guard for everyone.
+	if ( function_exists( 'bhela_bm_dist_writing' ) && function_exists( 'bhela_bm_dist_locked' ) && bhela_bm_dist_locked( $id ) ) {
+		bhela_bm_dist_writing( true );
+		remove_filter( 'pre_delete_post', 'bhela_bm_dist_block_delete', 10 );
+		remove_filter( 'pre_trash_post', 'bhela_bm_dist_block_delete', 10 );
+		wp_delete_post( $id, true );
+		add_filter( 'pre_delete_post', 'bhela_bm_dist_block_delete', 10, 3 );
+		add_filter( 'pre_trash_post', 'bhela_bm_dist_block_delete', 10, 2 );
+		bhela_bm_dist_writing( false );
+		return;
+	}
 	wp_delete_post( $id, true );
 }
 

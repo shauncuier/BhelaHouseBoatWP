@@ -41,6 +41,12 @@ function bhela_bm_extra_caps() {
 		'bhela_cost_check'    => __( 'Check cost sheets', 'bhela-booking' ),
 		'bhela_cost_approve'  => __( 'Approve cost sheets', 'bhela-booking' ),
 		'bhela_view_statement' => __( 'Monthly Statement', 'bhela-booking' ),
+		// Investors. Running a distribution is separate from recording a payment on
+		// purpose: closing a month declares what everyone is owed, paying is moving
+		// money, and one person should not necessarily do both.
+		'bhela_investors_view' => __( 'See the investor register', 'bhela-booking' ),
+		'bhela_dist_run'      => __( 'Run monthly profit distribution', 'bhela-booking' ),
+		'bhela_investor_pay'  => __( 'Record investor payments', 'bhela-booking' ),
 		// Inventory & Asset Register. bhela_inv_reopen is separate from
 		// bhela_inv_approve on purpose: reopening a closed month invalidates every
 		// later month's opening balance, which is a bigger act than closing one.
@@ -153,6 +159,30 @@ function bhela_bm_permissions() {
 			'help'     => __( 'Without this, only sheets the person created themselves.', 'bhela-booking' ),
 			'caps'     => array( 'edit_others_bhela_costs' ),
 			'requires' => 'costs_own',
+		),
+		'investors_view'  => array(
+			'label' => __( 'View investors', 'bhela-booking' ),
+			'help'  => __( 'See the investor register, ledgers and distribution runs.', 'bhela-booking' ),
+			'caps'  => array( 'bhela_investors_view', 'read_bhela_investor', 'read_private_bhela_investors' ),
+		),
+		'investors_edit'  => array(
+			'label'    => __( 'Edit investors', 'bhela-booking' ),
+			'help'     => __( 'Add and amend investor records, shares and documents.', 'bhela-booking' ),
+			'caps'     => array( 'edit_bhela_investors', 'edit_bhela_investor', 'edit_others_bhela_investors',
+				'edit_private_bhela_investors', 'edit_published_bhela_investors', 'publish_bhela_investors' ),
+			'requires' => 'investors_view',
+		),
+		'dist_run'        => array(
+			'label'    => __( 'Run profit distribution', 'bhela-booking' ),
+			'help'     => __( 'Close a month and write the profit owed to every investor. Cannot be undone without a reversal.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_dist_run' ),
+			'requires' => 'investors_view',
+		),
+		'investor_pay'    => array(
+			'label'    => __( 'Record investor payments', 'bhela-booking' ),
+			'help'     => __( 'Enter advances, payments and adjustments against an investor.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_pay' ),
+			'requires' => 'investors_view',
 		),
 		'costs_check'     => array(
 			'label'    => __( 'Check cost sheets', 'bhela-booking' ),
@@ -310,6 +340,23 @@ function bhela_bm_revoked_caps() {
  */
 function bhela_bm_role_defaults() {
 	return array(
+		// Investor Relations: the whole investor side, and nothing else. Deliberately
+		// separate from Accounts — the person who runs a distribution should not also
+		// be the person who approved the cost sheets it is computed from.
+		'bhela_investor_relations' => array(
+			'name'  => __( 'BHELA Investor Relations', 'bhela-booking' ),
+			'blurb' => __( 'Maintains the investor register, runs monthly profit distribution and records investor payments. Reads the Monthly Statement but cannot approve cost sheets.', 'bhela-booking' ),
+			'perms' => array( 'statement', 'investors_view', 'investors_edit', 'dist_run', 'investor_pay' ),
+		),
+		// An investor is NOT staff. This role holds no plugin permission at all — the
+		// portal checks every query against the viewer's own record instead. Granting
+		// even "view investors" here would let one investor read another's bank
+		// details, which is the single worst thing this feature could do.
+		'bhela_investor' => array(
+			'name'  => __( 'BHELA Investor', 'bhela-booking' ),
+			'blurb' => __( 'Signs in to the investor portal on the website only. Holds no admin capability whatsoever; sees nothing but their own position.', 'bhela-booking' ),
+			'perms' => array(),
+		),
 		'bhela_manager' => array(
 			'name'  => __( 'BHELA Manager', 'bhela-booking' ),
 			'blurb' => __( 'Runs day-to-day operations: bookings, trip calendar, reports, the item register and the monthly stock count, and checks cost sheets. Cannot approve costs, close a month, or change settings.', 'bhela-booking' ),
@@ -441,6 +488,7 @@ function bhela_bm_admin_caps() {
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_salary', 'bhela_salaries' ) );
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_inv_item', 'bhela_inv_items' ) );
 	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_inv_period', 'bhela_inv_periods' ) );
+	$caps = array_merge( $caps, bhela_bm_cpt_caps( 'bhela_investor', 'bhela_investors' ) );
 	return array_values( array_unique( $caps ) );
 }
 
@@ -457,7 +505,8 @@ function bhela_bm_owned_caps() {
 		bhela_bm_cpt_caps( 'bhela_expense', 'bhela_expenses' ),
 		bhela_bm_cpt_caps( 'bhela_salary', 'bhela_salaries' ),
 		bhela_bm_cpt_caps( 'bhela_inv_item', 'bhela_inv_items' ),
-		bhela_bm_cpt_caps( 'bhela_inv_period', 'bhela_inv_periods' )
+		bhela_bm_cpt_caps( 'bhela_inv_period', 'bhela_inv_periods' ),
+		bhela_bm_cpt_caps( 'bhela_investor', 'bhela_investors' )
 	) ) );
 }
 

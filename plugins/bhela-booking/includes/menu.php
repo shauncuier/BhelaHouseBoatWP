@@ -79,6 +79,15 @@ function bhela_bm_menu_groups() {
 			'pos'   => 28,
 			'caps'  => array( 'bhela_inv_view', 'bhela_inv_count', 'bhela_inv_audit' ),
 		),
+		'investors' => array(
+			'title' => __( 'Investors', 'bhela-booking' ),
+			'slug'  => 'bhela-bm-dist',
+			'icon'  => 'dashicons-groups',
+			'pos'   => 28.5,
+			// OR, like every other group: holding any one of these is reason enough for
+			// the menu to exist.
+			'caps'  => array( 'bhela_investors_view', 'bhela_dist_run', 'bhela_investor_pay' ),
+		),
 		'setup'    => array(
 			'title' => __( 'Setup', 'bhela-booking' ),
 			'slug'  => 'bhela-bm-settings',
@@ -210,6 +219,11 @@ function bhela_bm_menu_layout() {
 			'bhela-bm-inv-assets',                    // 🏷️ Asset Report
 			'bhela-bm-audit',                         // 🔩 Audit Trail
 		),
+		'investors' => array(
+			'edit.php?post_type=bhela_investor',      // 👤 Investors
+			'bhela-bm-dist',                          // 💰 Distribution
+			'bhela-bm-investor-report',               // 📊 Investor Report
+		),
 		'setup'    => array(
 			'bhela-bm-settings',                      // ⚙️ Settings
 			'bhela-bm-team',                          // 👥 Team
@@ -328,6 +342,7 @@ function bhela_bm_menu_move_cpts() {
 		'edit.php?post_type=bhela_expense'  => 'accounts',
 		'edit.php?post_type=bhela_salary'   => 'accounts',
 		'edit.php?post_type=bhela_inv_item' => 'store',
+		'edit.php?post_type=bhela_investor' => 'investors',
 		'edit.php?post_type=bhela_spot'     => 'setup',
 		'edit.php?post_type=bhela_gallery'  => 'setup',
 	);

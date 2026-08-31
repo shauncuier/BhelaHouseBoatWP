@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.33.1
+ * Version: 2.34.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.33.1' );
+define( 'BHELA_BM_VERSION', '2.34.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -73,6 +73,14 @@ function bhela_bm_default_settings() {
 		'offer_weekday' => 0,    // % off regular, weekdays
 		'offer_from'    => '',   // travel date; blank = open-ended
 		'offer_to'      => '',
+		// Investor share structure and the profit split. Configurable because a second
+		// boat or a fresh round would otherwise mean editing PHP — the brief is explicit
+		// that none of this may be hardcoded.
+		'inv_total_investment' => 11500000,
+		'inv_total_shares'     => 115,
+		'inv_per_share'        => 100000,
+		'inv_reserve_pct'      => 10,   // off-season, renovation, maintenance
+		'inv_investor_pct'     => 70,   // management takes the remainder, never its own %
 		'advance_percent'  => 50,
 		'child_fee'        => 5000, // flat charge per 4–8 year old, any day type
 		'date_chips'       => 5,    // how many upcoming trips show as quick-pick chips (0 = hide)
@@ -929,6 +937,9 @@ require_once BHELA_BM_PATH . 'includes/audit.php';
 // cannot live in inventory.php with the screens. This file therefore depends on
 // nothing above it.
 require_once BHELA_BM_PATH . 'includes/inventory-core.php';
+// Loaded unconditionally for the same reason inventory-core.php is: a committed
+// distribution must not be deletable from WP-CLI or cron.
+require_once BHELA_BM_PATH . 'includes/distribution-core.php';
 require_once BHELA_BM_PATH . 'includes/frontend.php';
 require_once BHELA_BM_PATH . 'includes/invoice.php';
 require_once BHELA_BM_PATH . 'includes/emails.php';
@@ -962,6 +973,9 @@ function bhela_bm_report_date( $value ) {
 
 require_once BHELA_BM_PATH . 'includes/agencies.php';
 require_once BHELA_BM_PATH . 'includes/coupons.php';
+require_once BHELA_BM_PATH . 'includes/investors.php';
+require_once BHELA_BM_PATH . 'includes/investor-ledger.php';
+require_once BHELA_BM_PATH . 'includes/distribution.php';
 require_once BHELA_BM_PATH . 'includes/otp.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';
@@ -978,6 +992,7 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/ui.php';
 	require_once BHELA_BM_PATH . 'includes/roles.php';
 	require_once BHELA_BM_PATH . 'includes/admin.php';
+	require_once BHELA_BM_PATH . 'includes/investor-admin.php';
 	require_once BHELA_BM_PATH . 'includes/dashboard.php';
 	require_once BHELA_BM_PATH . 'includes/reports.php';
 	require_once BHELA_BM_PATH . 'includes/costs.php';
