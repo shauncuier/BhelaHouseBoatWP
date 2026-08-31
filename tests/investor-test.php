@@ -12,7 +12,7 @@ require __DIR__ . '/bootstrap.php';
 bhela_test_modules(
 	'ui', 'roles', 'log', 'audit', 'distribution-core', 'investors',
 	'investor-ledger', 'costs', 'expenses', 'salary', 'agencies', 'statement', 'distribution',
-	'investor-portal'
+	'investor-portal', 'funds', 'cashflow'
 );
 
 wp_set_current_user( 1 );
@@ -32,11 +32,13 @@ function iv_reset( $month ) {
 		unset( $idx[ $month ] );
 		update_option( 'bhela_bm_dist_runs', $idx, false );
 	}
-	foreach ( get_posts( array(
-		'post_type' => 'bhela_inv_ledger', 'post_status' => 'publish',
-		'posts_per_page' => -1, 'fields' => 'ids',
-	) ) as $z ) {
-		bhela_test_delete( $z );
+	foreach ( array( 'bhela_inv_ledger', 'bhela_fund' ) as $type ) {
+		foreach ( get_posts( array(
+			'post_type' => $type, 'post_status' => 'publish',
+			'posts_per_page' => -1, 'fields' => 'ids',
+		) ) as $z ) {
+			bhela_test_delete( $z );
+		}
 	}
 }
 iv_reset( $iv_month );
@@ -296,9 +298,115 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 wp_delete_user( $iv_ua );
 wp_delete_user( $iv_ub );
 
+echo "\n=== 13. the reserve and management funds fill themselves ===\n";
+// Before this the reserve and management shares existed only as meta on a run: money
+// set aside on paper and then untracked. They are ledger rows now, so "what is left
+// in the reserve" has an answer that adds up.
+$iv_res = bhela_bm_fund_ledger( 'reserve' );
+$iv_mgt = bhela_bm_fund_ledger( 'management' );
+ok( 30000 === $iv_res['allocated'], 'committing the month allocated the 10% reserve', (string) $iv_res['allocated'] );
+ok( 81000 === $iv_mgt['allocated'], 'and the management 30%', (string) $iv_mgt['allocated'] );
+ok( 30000 === $iv_res['closing'] && 81000 === $iv_mgt['closing'], 'both balances start at what was allocated' );
+
+// The three shares must still add up to the gross they came from.
+ok( $iv_res['allocated'] + $iv_mgt['allocated'] + 189000 === 300000,
+	'reserve + management + investor pool = gross, to the taka',
+	$iv_res['allocated'] . '+' . $iv_mgt['allocated'] . '+189000' );
+
+// An allocation is arithmetic, not a decision — it cannot be typed in.
+$iv_hand = bhela_bm_fund_add( array( 'fund' => 'reserve', 'type' => 'allocation', 'amount' => 50000 ) );
+ok( is_wp_error( $iv_hand ) && 'no_run' === $iv_hand->get_error_code(),
+	'an allocation cannot be entered by hand — that would create money no month set aside' );
+
+// Nor can a run be allocated twice.
+bhela_bm_fund_allocate_run( $iv_run );
+ok( 30000 === bhela_bm_fund_ledger( 'reserve' )['allocated'], 'and a run cannot be allocated twice',
+	(string) bhela_bm_fund_ledger( 'reserve' )['allocated'] );
+
+echo "\n=== 14. spending against a fund ===\n";
+$iv_spend = bhela_bm_fund_add( array(
+	'fund' => 'reserve', 'type' => 'utilisation', 'amount' => 12000,
+	'head' => 'renovation', 'date' => $iv_month . '-15', 'note' => 'ZZ deck repair',
+) );
+ok( ! is_wp_error( $iv_spend ), 'spending is recorded' );
+$iv_res = bhela_bm_fund_ledger( 'reserve' );
+ok( 18000 === $iv_res['closing'], 'and comes off the balance: 30,000 − 12,000', (string) $iv_res['closing'] );
+ok( 12000 === $iv_res['used'] && 12000 === ( $iv_res['by_head']['renovation'] ?? 0 ), 'attributed to its head' );
+
+// Overdrawing is recorded, not blocked. The spending happened; refusing to record it
+// would just move the error somewhere the books cannot see.
+bhela_bm_fund_add( array( 'fund' => 'reserve', 'type' => 'utilisation', 'amount' => 25000, 'head' => 'emergency', 'date' => $iv_month . '-16', 'note' => 'ZZ engine' ) );
+ok( -7000 === bhela_bm_fund_ledger( 'reserve' )['closing'], 'an overdrawn fund goes negative rather than refusing the entry',
+	(string) bhela_bm_fund_ledger( 'reserve' )['closing'] );
+
+// A wrong entry is reversed, never edited.
+$iv_frev = bhela_bm_fund_reverse( $iv_spend, 'ZZ wrong head' );
+ok( ! is_wp_error( $iv_frev ), 'spending can be reversed with a reason' );
+ok( 5000 === bhela_bm_fund_ledger( 'reserve' )['closing'], 'and the balance comes back', (string) bhela_bm_fund_ledger( 'reserve' )['closing'] );
+ok( 0 === ( bhela_bm_fund_ledger( 'reserve' )['by_head']['renovation'] ?? 0 ), 'the reversed spend stops counting against its head' );
+ok( is_wp_error( bhela_bm_fund_reverse( $iv_spend, 'again' ) ), 'and it cannot be reversed twice' );
+
+$iv_alloc_row = 0;
+foreach ( bhela_bm_fund_ledger( 'reserve' )['rows'] as $r ) {
+	if ( 'allocation' === $r['type'] ) {
+		$iv_alloc_row = $r['id'];
+	}
+}
+$iv_arev = bhela_bm_fund_reverse( $iv_alloc_row, 'ZZ nope' );
+ok( is_wp_error( $iv_arev ) && 'is_allocation' === $iv_arev->get_error_code(),
+	'an allocation cannot be reversed — the run would say one thing and the fund another' );
+
+echo "\n=== 15. cash flow counts cash, not commitments ===\n";
+// Deliberately not the Monthly Statement in another hat: that answers whether trading
+// was profitable, this answers whether money moved. A business can be both profitable
+// and short of cash.
+$iv_cf = bhela_bm_cashflow( $iv_month . '-01', $iv_month . '-28' );
+$iv_out_labels = wp_list_pluck( $iv_cf['out'], 'label' );
+ok( in_array( 'Trip costs', $iv_out_labels, true ), 'trip costs are cash out' );
+ok( in_array( 'Investor payments', $iv_out_labels, true ), 'so are investor payments' );
+
+// The advance (5,000) counts; the reversed payment (2,000) does not — it was handed
+// back, so it never left.
+$iv_inv_out = 0;
+foreach ( $iv_cf['out'] as $r ) {
+	if ( 'Investor payments' === $r['label'] ) {
+		$iv_inv_out = $r['amount'];
+	}
+}
+// A's advance (5,000) plus B's payment (4,321). A's 2,000 payment was reversed, so
+// it is absent — money handed back never left the business, and counting it would
+// show cash going out twice for one mistake.
+ok( 9321 === $iv_inv_out, 'investor cash out is the advance plus B’s payment', (string) $iv_inv_out );
+ok( 11321 !== $iv_inv_out, 'and specifically EXCLUDES the reversed 2,000' );
+
+// The allocation is an internal earmark. Counting it as cash out would double up
+// against the trip costs and salaries it eventually pays for.
+$iv_alloc_as_cash = false;
+foreach ( $iv_cf['out'] as $r ) {
+	if ( 30000 === $r['amount'] || 81000 === $r['amount'] ) {
+		$iv_alloc_as_cash = true;
+	}
+}
+ok( ! $iv_alloc_as_cash, 'a fund ALLOCATION is never cash out — only what the fund spends is' );
+
+$iv_fund_out = 0;
+foreach ( $iv_cf['out'] as $r ) {
+	if ( false !== strpos( $r['label'], 'Reserve' ) ) {
+		$iv_fund_out = $r['amount'];
+	}
+}
+ok( 25000 === $iv_fund_out, 'and fund spending is, net of reversals', (string) $iv_fund_out );
+ok( $iv_cf['net'] === $iv_cf['in_total'] - $iv_cf['out_total'], 'net movement is in minus out' );
+
+// An inverted or empty range must return nothing rather than everything.
+ok( 0 === bhela_bm_cashflow( '2026-09-30', '2026-09-01' )['in_total'], 'an inverted range returns nothing' );
+ok( 0 === bhela_bm_cashflow( '', '' )['out_total'], 'and so does a blank one' );
+
 /* ---------- cleanup ---------- */
-foreach ( get_posts( array( 'post_type' => 'bhela_inv_ledger', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
-	bhela_test_delete( $z );
+foreach ( array( 'bhela_inv_ledger', 'bhela_fund' ) as $z_type ) {
+	foreach ( get_posts( array( 'post_type' => $z_type, 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
+		bhela_test_delete( $z );
+	}
 }
 if ( ! is_wp_error( $iv_run ) ) {
 	bhela_test_delete( $iv_run );

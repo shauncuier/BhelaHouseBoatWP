@@ -77,7 +77,8 @@ add_filter( 'pre_trash_post', 'bhela_bm_dist_block_delete', 10, 2 );
  * else — a stray update_post_meta(), quick edit, an import — is dropped.
  */
 function bhela_bm_dist_block_meta( $check, $object_id, $meta_key ) {
-	if ( 0 === strpos( (string) $meta_key, '_bhela_dist_' ) || 0 === strpos( (string) $meta_key, '_bhela_led_' ) ) {
+	if ( 0 === strpos( (string) $meta_key, '_bhela_dist_' ) || 0 === strpos( (string) $meta_key, '_bhela_led_' )
+		|| 0 === strpos( (string) $meta_key, '_bhela_fnd_' ) ) {
 		if ( bhela_bm_dist_locked( $object_id ) && ! bhela_bm_dist_writing() ) {
 			return false;
 		}

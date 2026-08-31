@@ -223,6 +223,8 @@ function bhela_bm_menu_layout() {
 			'edit.php?post_type=bhela_investor',      // 👤 Investors
 			'bhela-bm-dist',                          // 💰 Distribution
 			'bhela-bm-investor-report',               // 📊 Investor Report
+			'bhela-bm-funds',                         // 🏦 Funds
+			'bhela-bm-cashflow',                      // 💵 Cash Flow
 		),
 		'setup'    => array(
 			'bhela-bm-settings',                      // ⚙️ Settings

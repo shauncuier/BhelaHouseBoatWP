@@ -721,3 +721,302 @@ function bhela_bm_investor_admin_post() {
 	}
 }
 add_action( 'admin_init', 'bhela_bm_investor_admin_post' );
+
+/* =========================================================
+ * Funds and cash flow
+ * ========================================================= */
+
+function bhela_bm_funds_menu() {
+	add_submenu_page(
+		bhela_bm_menu_parent( 'investors' ),
+		__( 'Funds', 'bhela-booking' ),
+		__( '🏦 Funds', 'bhela-booking' ),
+		'bhela_investors_view',
+		'bhela-bm-funds',
+		'bhela_bm_funds_page'
+	);
+	add_submenu_page(
+		bhela_bm_menu_parent( 'investors' ),
+		__( 'Cash Flow', 'bhela-booking' ),
+		__( '💵 Cash Flow', 'bhela-booking' ),
+		'bhela_view_statement',
+		'bhela-bm-cashflow',
+		'bhela_bm_cashflow_page'
+	);
+}
+add_action( 'admin_menu', 'bhela_bm_funds_menu' );
+
+/** Reserve and management: what came in, what was spent, what is left. */
+function bhela_bm_funds_page() {
+	if ( ! current_user_can( 'bhela_investors_view' ) ) {
+		return;
+	}
+	$funds = bhela_bm_funds();
+	$fund  = sanitize_key( $_GET['fund'] ?? 'reserve' );
+	if ( ! isset( $funds[ $fund ] ) ) {
+		$fund = 'reserve';
+	}
+	$range = bhela_bm_b2b_range( $_GET['from'] ?? '', $_GET['to'] ?? '' );
+	$led   = bhela_bm_fund_ledger( $fund, $range['all'] ? '' : $range['from'], $range['all'] ? '' : $range['to'] );
+	$def   = $funds[ $fund ];
+	?>
+	<div class="wrap bha-page">
+		<?php bhela_bm_screen_header( '🏦', $def['label'], $def['blurb'] ); ?>
+
+		<div class="bha-bar">
+			<?php // No hidden post_type: this hangs off admin.php (§13.14). ?>
+			<form method="get">
+				<input type="hidden" name="page" value="bhela-bm-funds">
+				<div class="bha-field">
+					<label for="fnd-fund"><?php esc_html_e( 'Fund', 'bhela-booking' ); ?></label>
+					<select id="fnd-fund" name="fund">
+						<?php foreach ( $funds as $k => $f ) : ?>
+							<option value="<?php echo esc_attr( $k ); ?>" <?php selected( $fund, $k ); ?>><?php echo esc_html( $f['label'] ); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</div>
+				<div class="bha-field"><label for="fnd-from"><?php esc_html_e( 'From', 'bhela-booking' ); ?></label>
+					<input type="date" id="fnd-from" name="from" value="<?php echo esc_attr( $range['all'] ? '' : $range['from'] ); ?>"></div>
+				<div class="bha-field"><label for="fnd-to"><?php esc_html_e( 'To', 'bhela-booking' ); ?></label>
+					<input type="date" id="fnd-to" name="to" value="<?php echo esc_attr( $range['all'] ? '' : $range['to'] ); ?>"></div>
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'View', 'bhela-booking' ); ?></button>
+			</form>
+		</div>
+
+		<div class="bha-cards">
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Opening', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $led['opening'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Allocated in', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $led['allocated'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Spent', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $led['used'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Closing', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $led['closing'] ) ); ?></span></div>
+		</div>
+
+		<?php if ( $led['closing'] < 0 ) : ?>
+			<p class="bha-callout bha-callout--attention"><strong><?php esc_html_e( 'This fund is overdrawn.', 'bhela-booking' ); ?></strong>
+				<?php esc_html_e( 'More has been spent against it than was ever allocated. That is recorded rather than blocked — the spending happened — but it means the money came from somewhere else.', 'bhela-booking' ); ?></p>
+		<?php endif; ?>
+
+		<?php if ( current_user_can( 'bhela_investor_pay' ) ) : ?>
+			<div class="bha-panel">
+				<h2><?php esc_html_e( 'Record spending', 'bhela-booking' ); ?></h2>
+				<form method="post">
+					<?php wp_nonce_field( 'bhela_bm_fund', 'bhela_fund_nonce' ); ?>
+					<input type="hidden" name="fund" value="<?php echo esc_attr( $fund ); ?>">
+					<div class="bha-bar">
+						<div class="bha-field"><label><?php esc_html_e( 'Head', 'bhela-booking' ); ?></label>
+							<select name="head">
+								<?php foreach ( $def['heads'] as $hk => $hl ) : ?>
+									<option value="<?php echo esc_attr( $hk ); ?>"><?php echo esc_html( $hl ); ?></option>
+								<?php endforeach; ?>
+							</select></div>
+						<div class="bha-field"><label><?php esc_html_e( 'Amount ৳', 'bhela-booking' ); ?></label>
+							<input type="number" min="1" name="amount" required></div>
+						<div class="bha-field"><label><?php esc_html_e( 'Date', 'bhela-booking' ); ?></label>
+							<input type="date" name="date" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>"></div>
+						<div class="bha-field"><label><?php esc_html_e( 'Note', 'bhela-booking' ); ?></label>
+							<input type="text" name="note"></div>
+						<div class="bha-field"><label><?php esc_html_e( 'Bill / receipt URL', 'bhela-booking' ); ?></label>
+							<input type="url" name="doc" placeholder="<?php esc_attr_e( 'Media Library URL', 'bhela-booking' ); ?>"></div>
+						<button type="submit" class="button button-primary"><?php esc_html_e( 'Record', 'bhela-booking' ); ?></button>
+					</div>
+					<p class="description"><?php esc_html_e( 'Allocations are never entered here — they are written by the monthly distribution, because the reserve exists only because a percentage was taken off a month.', 'bhela-booking' ); ?></p>
+				</form>
+			</div>
+		<?php endif; ?>
+
+		<?php if ( $led['by_head'] ) : ?>
+			<div class="bha-panel">
+				<h2><?php esc_html_e( 'Spending by head', 'bhela-booking' ); ?></h2>
+				<table class="widefat striped" style="max-width:520px">
+					<tbody>
+					<?php foreach ( $led['by_head'] as $hk => $amt ) : ?>
+						<tr>
+							<td><?php echo esc_html( $def['heads'][ $hk ] ?? $hk ); ?></td>
+							<td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $amt ) ); ?></strong></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+		<?php endif; ?>
+
+		<div class="bha-panel">
+			<h2><?php esc_html_e( 'Movements', 'bhela-booking' ); ?></h2>
+			<div class="bha-scroll">
+			<table class="widefat striped">
+				<thead><tr>
+					<th><?php esc_html_e( 'Date', 'bhela-booking' ); ?></th>
+					<th><?php esc_html_e( 'Type', 'bhela-booking' ); ?></th>
+					<th><?php esc_html_e( 'Head / note', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Amount', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Balance', 'bhela-booking' ); ?></th>
+					<th class="bha-noprint"></th>
+				</tr></thead>
+				<tbody>
+				<?php if ( ! $led['rows'] ) : ?>
+					<tr><td colspan="6"><?php esc_html_e( 'Nothing yet. The fund fills when a month is distributed.', 'bhela-booking' ); ?></td></tr>
+				<?php endif; ?>
+				<?php foreach ( $led['rows'] as $r ) : ?>
+					<?php $undone = bhela_bm_fund_reversal_of( $r['id'] ); ?>
+					<tr<?php echo $undone ? ' style="opacity:.55"' : ''; ?>>
+						<td><?php echo esc_html( mysql2date( 'j M Y', $r['date'] ) ); ?></td>
+						<td><?php
+							$labels = array(
+								'allocation'  => __( 'Allocation', 'bhela-booking' ),
+								'utilisation' => __( 'Spending', 'bhela-booking' ),
+								'adjustment'  => __( 'Adjustment', 'bhela-booking' ),
+							);
+							echo esc_html( $labels[ $r['type'] ] ?? $r['type'] );
+						?></td>
+						<td><?php echo esc_html( $r['head'] ? ( $def['heads'][ $r['head'] ] ?? $r['head'] ) : '' ); ?>
+							<?php if ( $r['note'] ) : ?><span class="bha-sub"><?php echo esc_html( $r['note'] ); ?></span><?php endif; ?>
+							<?php if ( $r['doc'] ) : ?> <a href="<?php echo esc_url( $r['doc'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'bill', 'bhela-booking' ); ?></a><?php endif; ?></td>
+						<td class="bha-num"><?php echo esc_html( ( $r['signed'] > 0 ? '+' : '' ) . bhela_bm_money( $r['signed'] ) ); ?></td>
+						<td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $r['balance'] ) ); ?></strong></td>
+						<td class="bha-noprint">
+							<?php if ( 'utilisation' === $r['type'] && ! $undone && current_user_can( 'bhela_investor_pay' ) ) : ?>
+								<form method="post">
+									<?php wp_nonce_field( 'bhela_bm_fund_rev', 'bhela_fund_rev_nonce' ); ?>
+									<input type="hidden" name="row" value="<?php echo esc_attr( $r['id'] ); ?>">
+									<input type="text" name="reason" required placeholder="<?php esc_attr_e( 'reason', 'bhela-booking' ); ?>" style="width:120px">
+									<button class="button button-small"><?php esc_html_e( 'Reverse', 'bhela-booking' ); ?></button>
+								</form>
+							<?php elseif ( $undone ) : ?>
+								<?php echo bhela_bm_status_pill( __( 'reversed', 'bhela-booking' ), 'danger' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+							<?php endif; ?>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			</div>
+		</div>
+	</div>
+	<?php
+}
+
+/** Cash flow over a range. */
+function bhela_bm_cashflow_page() {
+	if ( ! current_user_can( 'bhela_view_statement' ) ) {
+		return;
+	}
+	$from = bhela_bm_report_date( $_GET['from'] ?? '' );
+	$to   = bhela_bm_report_date( $_GET['to'] ?? '' );
+	if ( '' === $from ) {
+		$from = gmdate( 'Y-m-01', strtotime( current_time( 'Y-m-d' ) ) );
+	}
+	if ( '' === $to || $to < $from ) {
+		$to = gmdate( 'Y-m-t', strtotime( $from ) );
+	}
+	$cf = bhela_bm_cashflow( $from, $to );
+
+	$csv = wp_nonce_url(
+		add_query_arg( array( 'action' => 'bhela_bm_cashflow_csv', 'from' => $from, 'to' => $to ), admin_url( 'admin-post.php' ) ),
+		'bhela_bm_cashflow_csv'
+	);
+	?>
+	<div class="wrap bha-page">
+		<?php
+		bhela_bm_screen_header(
+			'💵',
+			__( 'Cash Flow', 'bhela-booking' ),
+			__( 'Where the money actually went. Not the Monthly Statement in another hat — that answers whether trading was profitable, this answers whether cash moved, and a business can be profitable and short of cash at the same time.', 'bhela-booking' ),
+			'<button type="button" class="button" onclick="window.print()">🖨️ ' . esc_html__( 'Print', 'bhela-booking' ) . '</button>'
+			. ' <a class="button" href="' . esc_url( $csv ) . '">📊 ' . esc_html__( 'Download CSV', 'bhela-booking' ) . '</a>'
+		);
+		?>
+		<div class="bha-bar">
+			<form method="get">
+				<input type="hidden" name="page" value="bhela-bm-cashflow">
+				<div class="bha-field"><label for="cf-from"><?php esc_html_e( 'From', 'bhela-booking' ); ?></label>
+					<input type="date" id="cf-from" name="from" value="<?php echo esc_attr( $from ); ?>"></div>
+				<div class="bha-field"><label for="cf-to"><?php esc_html_e( 'To', 'bhela-booking' ); ?></label>
+					<input type="date" id="cf-to" name="to" value="<?php echo esc_attr( $to ); ?>"></div>
+				<button type="submit" class="button button-primary"><?php esc_html_e( 'View', 'bhela-booking' ); ?></button>
+			</form>
+		</div>
+
+		<div class="bha-cards">
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Cash in', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $cf['in_total'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Cash out', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $cf['out_total'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Net movement', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $cf['net'] ) ); ?></span></div>
+		</div>
+
+		<div class="bha-panel">
+			<table class="widefat striped" style="max-width:640px">
+				<thead><tr><th><?php esc_html_e( 'Cash in', 'bhela-booking' ); ?></th><th class="bha-num">৳</th></tr></thead>
+				<tbody>
+				<?php foreach ( $cf['in'] as $r ) : ?>
+					<tr><td><?php echo esc_html( $r['label'] ); ?></td><td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['amount'] ) ); ?></td></tr>
+				<?php endforeach; ?>
+				</tbody>
+				<tfoot><tr class="bha-row--total"><td><?php esc_html_e( 'Total in', 'bhela-booking' ); ?></td><td class="bha-num"><?php echo esc_html( bhela_bm_money( $cf['in_total'] ) ); ?></td></tr></tfoot>
+			</table>
+
+			<table class="widefat striped" style="max-width:640px;margin-top:1.4rem">
+				<thead><tr><th><?php esc_html_e( 'Cash out', 'bhela-booking' ); ?></th><th class="bha-num">৳</th></tr></thead>
+				<tbody>
+				<?php foreach ( $cf['out'] as $r ) : ?>
+					<tr><td><?php echo esc_html( $r['label'] ); ?></td><td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['amount'] ) ); ?></td></tr>
+				<?php endforeach; ?>
+				</tbody>
+				<tfoot><tr class="bha-row--total"><td><?php esc_html_e( 'Total out', 'bhela-booking' ); ?></td><td class="bha-num"><?php echo esc_html( bhela_bm_money( $cf['out_total'] ) ); ?></td></tr></tfoot>
+			</table>
+			<p class="bha-callout"><?php esc_html_e( 'A fund allocation is not cash out — it is an internal earmark. Counting it would double up against the trip costs and salaries it eventually pays for.', 'bhela-booking' ); ?></p>
+		</div>
+	</div>
+	<?php
+}
+
+/** CSV of the cash flow. */
+function bhela_bm_cashflow_csv() {
+	if ( ! current_user_can( 'bhela_view_statement' ) ) {
+		wp_die( esc_html__( 'Permission denied.', 'bhela-booking' ), 403 );
+	}
+	check_admin_referer( 'bhela_bm_cashflow_csv' );
+	$from = bhela_bm_report_date( $_GET['from'] ?? '' );
+	$to   = bhela_bm_report_date( $_GET['to'] ?? '' );
+	$cf   = bhela_bm_cashflow( $from, $to );
+
+	header( 'Content-Type: text/csv; charset=utf-8' );
+	header( 'Content-Disposition: attachment; filename="bhela-cashflow-' . $from . '_to_' . $to . '.csv"' );
+	$fh = fopen( 'php://output', 'w' );
+	fwrite( $fh, "\xEF\xBB\xBF" );
+	fputcsv( $fh, array( 'Direction', 'Line', 'Amount' ) );
+	foreach ( $cf['in'] as $r ) {
+		// Every free-text cell through bhela_bm_csv_cell(): a spreadsheet executes a
+		// cell that opens with '='.
+		fputcsv( $fh, array( 'In', bhela_bm_csv_cell( $r['label'] ), $r['amount'] ) );
+	}
+	fputcsv( $fh, array( 'In', 'TOTAL', $cf['in_total'] ) );
+	foreach ( $cf['out'] as $r ) {
+		fputcsv( $fh, array( 'Out', bhela_bm_csv_cell( $r['label'] ), $r['amount'] ) );
+	}
+	fputcsv( $fh, array( 'Out', 'TOTAL', $cf['out_total'] ) );
+	fputcsv( $fh, array() );
+	fputcsv( $fh, array( '', 'NET', $cf['net'] ) );
+	fclose( $fh );
+	exit;
+}
+add_action( 'admin_post_bhela_bm_cashflow_csv', 'bhela_bm_cashflow_csv' );
+
+/** Fund writes from the funds screen. */
+function bhela_bm_funds_admin_post() {
+	if ( ! is_admin() || ! current_user_can( 'bhela_investor_pay' ) ) {
+		return;
+	}
+	if ( isset( $_POST['bhela_fund_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_fund_nonce'] ) ), 'bhela_bm_fund' ) ) {
+		bhela_bm_fund_add( array(
+			'fund'   => sanitize_key( $_POST['fund'] ?? '' ),
+			'type'   => 'utilisation',
+			'amount' => (int) ( $_POST['amount'] ?? 0 ),
+			'head'   => sanitize_key( $_POST['head'] ?? '' ),
+			'date'   => sanitize_text_field( $_POST['date'] ?? '' ),
+			'note'   => sanitize_text_field( $_POST['note'] ?? '' ),
+			'doc'    => esc_url_raw( $_POST['doc'] ?? '' ),
+		) );
+	}
+	if ( isset( $_POST['bhela_fund_rev_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_fund_rev_nonce'] ) ), 'bhela_bm_fund_rev' ) ) {
+		bhela_bm_fund_reverse( (int) ( $_POST['row'] ?? 0 ), sanitize_text_field( $_POST['reason'] ?? '' ) );
+	}
+}
+add_action( 'admin_init', 'bhela_bm_funds_admin_post' );

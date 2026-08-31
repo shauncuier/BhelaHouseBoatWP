@@ -225,6 +225,13 @@ function bhela_bm_dist_commit( $month, $reserve_pct = null, $note = '' ) {
 		) );
 	}
 
+	// The reserve and management shares become real fund rows here. Before this they
+	// existed only as meta on the run — money set aside on paper and then untracked,
+	// so "what is left in the reserve" had no answer that added up.
+	if ( function_exists( 'bhela_bm_fund_allocate_run' ) ) {
+		bhela_bm_fund_allocate_run( $run );
+	}
+
 	$index           = get_option( 'bhela_bm_dist_runs', array() );
 	$index           = is_array( $index ) ? $index : array();
 	$index[ $month ] = $run;
