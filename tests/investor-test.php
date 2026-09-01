@@ -793,14 +793,53 @@ iv_as( $iv_rb );
 $iv_first = bhela_bm_payreq_approve( $iv_rr );
 ok( ! is_wp_error( $iv_first ), 'the first approval wins' );
 
-// The loser: force the state back to what the racing request had read, and approve
-// again. The ledger guard has to stop it even though the state now says `requested`.
+// The belt-and-braces guard: a request that already carries a ledger row is refused
+// whatever its state says.
 update_post_meta( $iv_rr, '_bhela_pr_state', 'requested' );
 $iv_second = bhela_bm_payreq_approve( $iv_rr );
 ok( is_wp_error( $iv_second ), 'the second is refused even with the state reset under it',
 	is_wp_error( $iv_second ) ? $iv_second->get_error_code() : 'ALLOWED' );
 ok( 'paid' === ( is_wp_error( $iv_second ) ? $iv_second->get_error_code() : '' ),
 	'and it is refused because a ledger row already exists, not by luck' );
+
+// --- and now the race itself, which the check above does NOT exercise ---
+//
+// In a real race both approvals read `ledger = 0`, so BOTH pass the guard above and
+// only the conditional UPDATE can stop the second one. That interleaving is
+// reproducible in one process through the object cache: put the winner's result in
+// the database WITHOUT clearing the cache, and the next call reads exactly what a
+// concurrent request would have been holding — state `requested`, ledger 0.
+global $wpdb;
+iv_as( $iv_ra );
+$iv_rr3 = bhela_bm_payreq_add( array( 'investor' => $iv_a, 'type' => 'payment', 'amount' => 3131, 'date' => $iv_month . '-21', 'note' => 'ZZ race real' ) );
+iv_as( $iv_rb );
+
+$iv_recv_r3 = bhela_bm_investor_roi( $iv_a )['received'];
+// Prime the meta cache first. update_post_meta() finishes by DELETING the cache
+// entry rather than refreshing it, so after bhela_bm_payreq_add() the cache is cold
+// and a later read would go to the database and see the winner's write — which is
+// the opposite of the state a racing request holds. One read puts 'requested' in the
+// cache, which is exactly what the loser was carrying.
+get_post_meta( $iv_rr3, '_bhela_pr_state', true );
+// The winner's write, straight to the table. No wp_cache_delete — that is the point.
+$wpdb->update(
+	$wpdb->postmeta,
+	array( 'meta_value' => 'approved' ),
+	array( 'post_id' => $iv_rr3, 'meta_key' => '_bhela_pr_state' )
+);
+ok( 'requested' === get_post_meta( $iv_rr3, '_bhela_pr_state', true ),
+	'the cache still reports what the racing request read', (string) get_post_meta( $iv_rr3, '_bhela_pr_state', true ) );
+ok( 0 === (int) get_post_meta( $iv_rr3, '_bhela_pr_ledger', true ), 'and no ledger row is on it yet' );
+
+$iv_loser = bhela_bm_payreq_approve( $iv_rr3 );
+ok( is_wp_error( $iv_loser ), 'the loser of the race is refused',
+	is_wp_error( $iv_loser ) ? $iv_loser->get_error_code() : 'ALLOWED' );
+ok( 'settled' === ( is_wp_error( $iv_loser ) ? $iv_loser->get_error_code() : '' ),
+	'by the conditional UPDATE finding no `requested` row — not by the ledger guard, which it passed',
+	is_wp_error( $iv_loser ) ? $iv_loser->get_error_code() : '' );
+ok( $iv_recv_r3 === bhela_bm_investor_roi( $iv_a )['received'], 'and no second payment is written',
+	$iv_recv_r3 . ' -> ' . bhela_bm_investor_roi( $iv_a )['received'] );
+wp_cache_delete( $iv_rr3, 'post_meta' );
 
 $iv_recv_after = bhela_bm_investor_roi( $iv_a )['received'];
 ok( $iv_recv_before + 5150 === $iv_recv_after, 'so the investor is paid exactly once',
@@ -830,9 +869,14 @@ ok( is_wp_error( $iv_exq ), 'a payment request against an exited investor is ref
 // An adjustment is still available: a final settlement is a decision with a reason,
 // not a routine payment.
 iv_as( 1 );
-$iv_exadj = bhela_bm_ledger_add( array( 'investor' => $iv_a, 'type' => 'adjustment', 'amount' => 0, 'date' => $iv_month . '-23', 'note' => 'ZZ exited note' ) );
-ok( ! is_wp_error( $iv_exadj ) || 'bad_amount' === $iv_exadj->get_error_code(),
-	'while an adjustment remains the way to record one' );
+// A real amount: bhela_bm_ledger_add() refuses 0 unconditionally, so the previous
+// version of this assertion read `false || true` and could never fail.
+$iv_exadj = bhela_bm_ledger_add( array( 'investor' => $iv_a, 'type' => 'adjustment', 'amount' => -250, 'date' => $iv_month . '-23', 'note' => 'ZZ exited settlement' ) );
+ok( ! is_wp_error( $iv_exadj ), 'while an adjustment against an exited investor is still allowed',
+	is_wp_error( $iv_exadj ) ? $iv_exadj->get_error_code() : 'ok' );
+if ( ! is_wp_error( $iv_exadj ) ) {
+	bhela_test_delete( $iv_exadj );
+}
 update_post_meta( $iv_a, '_bhela_inv_status', $iv_ex_was );
 
 // Listings are capped rather than unbounded: the dashboard reads the pending total on
@@ -840,7 +884,7 @@ update_post_meta( $iv_a, '_bhela_inv_status', $iv_ex_was );
 ok( bhela_bm_payreq_limit() > 0, 'the request listing is capped', (string) bhela_bm_payreq_limit() );
 ok( false === strpos( $iv_pr_src, "'posts_per_page' => -1" ), 'and no listing here is unbounded' );
 
-foreach ( array( $iv_rr, $iv_rr2 ) as $iv_z ) {
+foreach ( array( $iv_rr, $iv_rr2, $iv_rr3 ) as $iv_z ) {
 	if ( ! is_wp_error( $iv_z ) ) {
 		wp_delete_post( $iv_z, true );
 	}
@@ -850,6 +894,55 @@ wp_set_current_user( 1 );
 require_once ABSPATH . 'wp-admin/includes/user.php';
 wp_delete_user( $iv_ra );
 wp_delete_user( $iv_rb );
+
+echo "\n=== 23b. a fund row is locked, like every other money row ===\n";
+// `bhela_fund` was in no lock's post-type list, so the `_bhela_fnd_` branch of
+// bhela_bm_dist_block_meta() was dead code and bhela_bm_dist_block_delete() — which
+// shares the same predicate — did not cover fund rows either. A reserve allocation
+// was rewritable and hard-deletable from WP-CLI: a wider hole than the missing
+// add_post_metadata hook, because there was no lock at all rather than one with a gap.
+ok( bhela_bm_dist_locked( $iv_alloc_row ), 'a fund row reports itself locked' );
+
+$iv_fnd_was = (int) get_post_meta( $iv_alloc_row, '_bhela_fnd_amount', true );
+update_post_meta( $iv_alloc_row, '_bhela_fnd_amount', 999999 );
+ok( $iv_fnd_was === (int) get_post_meta( $iv_alloc_row, '_bhela_fnd_amount', true ),
+	'its amount cannot be rewritten', (string) get_post_meta( $iv_alloc_row, '_bhela_fnd_amount', true ) );
+bhela_bm_dist_writing( true );
+delete_post_meta( $iv_alloc_row, '_bhela_fnd_head' );
+bhela_bm_dist_writing( false );
+add_post_meta( $iv_alloc_row, '_bhela_fnd_head', 'ZZ forged' );
+ok( '' === get_post_meta( $iv_alloc_row, '_bhela_fnd_head', true ), 'nor a key added while it was absent',
+	var_export( get_post_meta( $iv_alloc_row, '_bhela_fnd_head', true ), true ) );
+
+wp_trash_post( $iv_alloc_row );
+ok( 'trash' !== get_post_status( $iv_alloc_row ), 'a fund row cannot be trashed' );
+wp_delete_post( $iv_alloc_row, true );
+ok( 'bhela_fund' === get_post_type( $iv_alloc_row ), 'nor hard-deleted — §13.35 says an allocation is not cancellable at all' );
+
+echo "\n=== 23c. and no lock can be walked past by deleting a key everywhere ===\n";
+// delete_post_meta_by_key() fires the same filter with an object id of 0 and
+// $delete_all true — "remove this key from EVERY post". A guard that resolves a lock
+// from the id saw 0, found nothing, and allowed it. All three locks were registered
+// for three arguments, so $delete_all was never even visible to them.
+$iv_led_rows = get_posts( array( 'post_type' => 'bhela_inv_ledger', 'post_status' => 'publish', 'posts_per_page' => 1, 'fields' => 'ids' ) );
+if ( $iv_led_rows ) {
+	$iv_led_one = $iv_led_rows[0];
+	$iv_amt_was = (string) get_post_meta( $iv_led_one, '_bhela_led_amount', true );
+	delete_post_meta_by_key( '_bhela_led_amount' );
+	ok( $iv_amt_was === (string) get_post_meta( $iv_led_one, '_bhela_led_amount', true ),
+		'a blanket delete of a ledger amount is refused', (string) get_post_meta( $iv_led_one, '_bhela_led_amount', true ) );
+}
+delete_post_meta_by_key( '_bhela_fnd_amount' );
+ok( $iv_fnd_was === (int) get_post_meta( $iv_alloc_row, '_bhela_fnd_amount', true ),
+	'and so is one of a fund amount', (string) get_post_meta( $iv_alloc_row, '_bhela_fnd_amount', true ) );
+
+// All three locks take five arguments on the delete filter, or $delete_all is invisible.
+foreach ( array( 'costs-core', 'distribution-core', 'inventory-core' ) as $iv_lock ) {
+	$iv_lsrc = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/' . $iv_lock . '.php' );
+	ok( false !== strpos( $iv_lsrc, "'delete_post_metadata_by_mid'" ), "$iv_lock covers delete-by-meta-id" );
+	ok( preg_match( '/delete_post_metadata.{0,80}?,\s*5\s*\)/', $iv_lsrc ) > 0,
+		"$iv_lock registers the delete filter for five arguments" );
+}
 
 echo "\n=== 24. overlapping seasons are reported, not silently resolved ===\n";
 // The docblock claimed the settings screen warned. Nothing did.

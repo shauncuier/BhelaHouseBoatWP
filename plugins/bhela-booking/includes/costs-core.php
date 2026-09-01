@@ -104,7 +104,46 @@ function bhela_bm_cost_block_meta( $check, $object_id, $meta_key ) {
 // distribution-core.php were written from a shortened reading of it.
 add_filter( 'add_post_metadata', 'bhela_bm_cost_block_meta', 10, 3 );
 add_filter( 'update_post_metadata', 'bhela_bm_cost_block_meta', 10, 3 );
-add_filter( 'delete_post_metadata', 'bhela_bm_cost_block_meta', 10, 3 );
+// Five arguments, not three: the fifth is $delete_all, and the guard below needs it.
+add_filter( 'delete_post_metadata', 'bhela_bm_cost_block_meta', 10, 5 );
+
+/**
+ * `delete_post_meta_by_key()` walks past a lock that only checks one post.
+ *
+ * `delete_metadata()` in delete-all mode fires this same filter with `$object_id`
+ * of 0 and `$delete_all` true, meaning "remove this key from EVERY post". A guard
+ * that resolves a post type from the id then sees 0, finds no post, and allows it —
+ * so one call could strip a locked key from every locked record at once. Worse, it
+ * was non-deterministic: on an admin screen where the global $post happened to be a
+ * locked record, `get_post_type( 0 )` fell back to it and the call was refused.
+ *
+ * The filter has taken five arguments since WP 3.1; all three locks were registered
+ * with three, so `$delete_all` was never even visible to them.
+ */
+function bhela_bm_cost_block_delete_all( $check, $object_id, $meta_key, $meta_value, $delete_all ) {
+	if ( $delete_all && in_array( (string) $meta_key, bhela_bm_cost_locked_keys(), true ) && ! bhela_bm_cost_writing() ) {
+		return false;
+	}
+	return $check;
+}
+add_filter( 'delete_post_metadata', 'bhela_bm_cost_block_delete_all', 9, 5 );
+
+/**
+ * And `delete_metadata_by_mid()`, which addresses a meta row by its own id.
+ *
+ * A different function with a different filter, reachable from the REST API and from
+ * `wp_delete_metadata_by_mid()`. It never mentions a post, so nothing above sees it;
+ * the row has to be resolved back to its post before the same question can be asked.
+ */
+function bhela_bm_cost_block_meta_by_mid( $check, $meta_id ) {
+	$row = get_metadata_by_mid( 'post', $meta_id );
+	if ( $row && bhela_bm_cost_block_meta( null, $row->post_id, $row->meta_key ) === false ) {
+		return false;
+	}
+	return $check;
+}
+add_filter( 'delete_post_metadata_by_mid', 'bhela_bm_cost_block_meta_by_mid', 10, 2 );
+add_filter( 'update_post_metadata_by_mid', 'bhela_bm_cost_block_meta_by_mid', 10, 2 );
 
 /** Whether a legitimate writer currently holds the pen. */
 function bhela_bm_cost_writing( $set = null ) {

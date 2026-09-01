@@ -512,11 +512,44 @@ echo "\n=== 11. the P&L list does not re-query a month per row ===\n";
 // bhela_bm_trip_report() re-queries every sheet in the row's own month to work out
 // the distribution share, so one call per row made the list O(n^2) — over a blank
 // filter, which means every trip on record. The list does not show the share.
+$rt_marks = array();
 $rt_src2 = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/trip-report.php' );
 ok( false !== strpos( $rt_src2, 'function bhela_bm_trip_rows' ), 'the list has its own cheap reader' );
-ok( 1 === substr_count( $rt_src2, 'bhela_bm_trip_report(' ) - substr_count( $rt_src2, 'function bhela_bm_trip_report(' ),
-	'and bhela_bm_trip_report() is called exactly once on the screen, for the single-sheet view',
-	(string) ( substr_count( $rt_src2, 'bhela_bm_trip_report(' ) - substr_count( $rt_src2, 'function bhela_bm_trip_report(' ) ) );
+
+// Measured, not inferred from a call count: what the finding was about is that the
+// work per row grew with the number of rows. Build one sheet, count the queries the
+// list costs; build four more, count again. Linear means the delta per sheet is
+// roughly flat — quadratic means it climbs with every row added.
+global $wpdb;
+$rt_perf = array();
+for ( $rt_n = 0; $rt_n < 5; $rt_n++ ) {
+	$rt_p = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ perf ' . $rt_n ) );
+	$rt_perf[] = $rt_p;
+	save( $rt_p, array( 'engine_fuel' => array( 'p1' => 1000 + $rt_n ) ) );
+	bhela_test_cost_meta( $rt_p, '_bhela_cost_trip_date', '2026-07-0' . ( $rt_n + 1 ) );
+	bhela_test_cost_meta( $rt_p, '_bhela_cost_status', 'approved' );
+
+	if ( 0 === $rt_n || 4 === $rt_n ) {
+		$rt_before = $wpdb->num_queries;
+		bhela_bm_trip_rows( '2026-07-01', '2026-07-31' );
+		$rt_cost_q = $wpdb->num_queries - $rt_before;
+		$rt_marks[ $rt_n ] = $rt_cost_q;
+	}
+}
+// The MARGINAL cost per added row is the discriminator, not a multiple of the
+// baseline. Measured both ways on this fixture: the cheap reader goes 2 -> 5 queries
+// (0.75 per added row, and the batched meta cache is why it is under one), while the
+// per-row bhela_bm_trip_report() version goes 4 -> 11 (1.75 per added row, because
+// each row re-queries its own month). A ceiling of one query per added row separates
+// them cleanly and survives an unrelated constant being added to either end — a
+// multiple of the baseline does not: `11 < 4 * 6` passed happily.
+$rt_marginal = ( $rt_marks[4] - $rt_marks[0] ) / 4;
+ok( $rt_marginal <= 1, 'the list costs at most one query per added row',
+	$rt_marks[0] . ' query(s) for 1 sheet, ' . $rt_marks[4] . ' for 5 (' . $rt_marginal . ' per added row)' );
+foreach ( $rt_perf as $rt_p ) {
+	bhela_test_cost_meta( $rt_p, '_bhela_cost_status', 'draft' );
+	bhela_test_delete( $rt_p );
+}
 
 // The two readings have to agree, or the list and the detail tell different stories.
 $rt_cmp = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ cmp' ) );

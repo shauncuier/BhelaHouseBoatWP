@@ -41,10 +41,15 @@ function bhela_bm_trip_sheets( $from, $to ) {
 	if ( '' === $from || '' === $to || $to < $from ) {
 		return array();
 	}
-	return get_posts( array(
+	// Capped rather than -1. The blank filter used to mean a two-year sentinel window
+	// and now genuinely means every trip on record, so the list grows with the
+	// business and nothing else bounds it. Hitting the cap is logged rather than
+	// passed over — a report that quietly stops at row 500 looks complete.
+	$limit = bhela_bm_trip_sheet_limit();
+	$ids   = get_posts( array(
 		'post_type'      => 'bhela_cost',
 		'post_status'    => 'publish',
-		'posts_per_page' => -1,
+		'posts_per_page' => $limit,
 		'fields'         => 'ids',
 		'no_found_rows'  => true,
 		'meta_key'       => '_bhela_cost_trip_date',
@@ -54,6 +59,46 @@ function bhela_bm_trip_sheets( $from, $to ) {
 			array( 'key' => '_bhela_cost_trip_date', 'value' => array( $from, $to ), 'compare' => 'BETWEEN', 'type' => 'DATE' ),
 		),
 	) );
+	if ( count( $ids ) >= $limit && function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'cost', sprintf(
+			/* translators: %d: the cap */
+			'Trip report listing hit its cap of %d sheets — narrow the dates to see the rest.',
+			$limit
+		) );
+	}
+	return $ids;
+}
+
+/** How many cost sheets one report listing will read. Filterable. */
+function bhela_bm_trip_sheet_limit() {
+	return (int) apply_filters( 'bhela_bm_trip_sheet_limit', 500 );
+}
+
+/**
+ * Sheets carrying no trip date at all.
+ *
+ * A date range cannot match a blank date, so these are invisible to every figure on
+ * both screens — including the one that now promises "every trip". That is §13.24's
+ * shape again, so the screen names them instead of leaving them out quietly. They
+ * cannot be approved either (`bhela_bm_cost_can_approve()` refuses), so this is
+ * always a small list of unfinished sheets.
+ *
+ * @return int[]
+ */
+function bhela_bm_trip_undated_sheets() {
+	$out = array();
+	foreach ( get_posts( array(
+		'post_type'      => 'bhela_cost',
+		'post_status'    => 'publish',
+		'posts_per_page' => 100,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+	) ) as $id ) {
+		if ( '' === bhela_bm_report_date( (string) get_post_meta( $id, '_bhela_cost_trip_date', true ) ) ) {
+			$out[] = (int) $id;
+		}
+	}
+	return $out;
 }
 
 /**
@@ -446,6 +491,26 @@ function bhela_bm_trip_pl_page() {
 				<button class="button button-primary"><?php esc_html_e( 'Filter', 'bhela-booking' ); ?></button>
 				<span class="bha-note"><?php esc_html_e( 'Leave both blank for every trip.', 'bhela-booking' ); ?></span>
 			</form>
+			<?php $undated = bhela_bm_trip_undated_sheets(); ?>
+			<?php if ( $undated ) : ?>
+				<p class="bha-callout bha-callout--attention">
+					<?php
+					printf(
+						/* translators: %d: number of sheets */
+						esc_html( _n(
+							'%d cost sheet has no trip date, so it belongs to no month and appears in no report — including this one. It cannot be approved until a date is set.',
+							'%d cost sheets have no trip date, so they belong to no month and appear in no report — including this one. They cannot be approved until a date is set.',
+							count( $undated ),
+							'bhela-booking'
+						) ),
+						count( $undated )
+					);
+					?>
+					<?php foreach ( $undated as $ud ) : ?>
+						<a href="<?php echo esc_url( (string) get_edit_post_link( $ud ) ); ?>"><?php echo esc_html( get_the_title( $ud ) ); ?></a>
+					<?php endforeach; ?>
+				</p>
+			<?php endif; ?>
 			<div class="bha-panel">
 				<div class="bha-scroll">
 				<table class="widefat striped">

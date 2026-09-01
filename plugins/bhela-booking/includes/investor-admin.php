@@ -676,6 +676,7 @@ function bhela_bm_investor_report_page() {
 						<?php foreach ( $pr_rows as $pr ) : ?>
 							<?php
 							$st   = bhela_bm_payreq_states();
+							$stn  = $st[ $pr['state'] ] ?? $st[''];
 							$who  = get_userdata( $pr['by'] );
 							$mine = get_current_user_id() === $pr['by'];
 							?>
@@ -690,7 +691,7 @@ function bhela_bm_investor_report_page() {
 								</td>
 								<td><?php echo esc_html( $who ? $who->display_name : '—' ); ?></td>
 								<td class="bha-num"><?php echo esc_html( bhela_bm_money( $pr['amount'] ) ); ?></td>
-								<td><?php echo bhela_bm_status_pill( $st[ $pr['state'] ]['label'], $st[ $pr['state'] ]['tone'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+								<td><?php echo bhela_bm_status_pill( $stn['label'], $stn['tone'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
 								<td class="bha-noprint">
 									<?php if ( 'requested' !== $pr['state'] ) : ?>
 										<span style="opacity:.6"><?php echo esc_html( $pr['reason'] ); ?></span>
@@ -804,6 +805,48 @@ function bhela_bm_investor_report_page() {
 }
 
 /** Ledger writes from the report screen. */
+/**
+ * Carry a refusal to the next page load.
+ *
+ * Every guard in this module returned a WP_Error that the handler then dropped on the
+ * floor. That was survivable while the only refusals were malformed input somebody
+ * could see was malformed — but a payment request against an exited investor, or an
+ * approval that lost a race, would reload the page with nothing created and nothing
+ * said. A correct policy that looks like a broken form is worse than no policy: the
+ * operator retries, and then rings somebody.
+ *
+ * A transient keyed to the user, because this runs on admin_init and the screen is
+ * rendered after a redirect-free POST — there is no request-scoped place to put it
+ * that the next page load can still see.
+ *
+ * @param mixed $result Whatever a writer returned. Non-WP_Error values are ignored.
+ */
+function bhela_bm_investor_notice( $result ) {
+	if ( ! is_wp_error( $result ) ) {
+		return;
+	}
+	set_transient(
+		'bhela_bm_inv_notice_' . get_current_user_id(),
+		$result->get_error_message(),
+		60
+	);
+}
+
+/** Print and clear anything bhela_bm_investor_notice() left. */
+function bhela_bm_investor_print_notice() {
+	$key = 'bhela_bm_inv_notice_' . get_current_user_id();
+	$msg = get_transient( $key );
+	if ( ! $msg ) {
+		return;
+	}
+	delete_transient( $key );
+	printf(
+		'<div class="notice notice-error is-dismissible"><p>%s</p></div>',
+		esc_html( $msg )
+	);
+}
+add_action( 'all_admin_notices', 'bhela_bm_investor_print_notice' );
+
 function bhela_bm_investor_admin_post() {
 	if ( ! is_admin() || ! current_user_can( 'bhela_investor_pay' ) ) {
 		return;
@@ -823,19 +866,18 @@ function bhela_bm_investor_admin_post() {
 		// Money OUT goes through approval; a correction does not. An adjustment is a
 		// signed fix that already leaves its own trail and reverses cleanly, whereas a
 		// payment is somebody deciding to hand over cash.
-		if ( in_array( $pr_type, array( 'payment', 'advance' ), true ) ) {
-			bhela_bm_payreq_add( $pr_args );
-		} else {
-			bhela_bm_ledger_add( $pr_args );
-		}
+		$pr_result = in_array( $pr_type, array( 'payment', 'advance' ), true )
+			? bhela_bm_payreq_add( $pr_args )
+			: bhela_bm_ledger_add( $pr_args );
+		bhela_bm_investor_notice( $pr_result );
 	}
 	if ( isset( $_POST['bhela_pr_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_pr_nonce'] ) ), 'bhela_bm_payreq' ) ) {
 		$pr_id = (int) ( $_POST['request'] ?? 0 );
-		if ( ! empty( $_POST['pr_reject'] ) ) {
-			bhela_bm_payreq_reject( $pr_id, sanitize_text_field( $_POST['pr_reason'] ?? '' ) );
-		} else {
-			bhela_bm_payreq_approve( $pr_id );
-		}
+		bhela_bm_investor_notice(
+			! empty( $_POST['pr_reject'] )
+				? bhela_bm_payreq_reject( $pr_id, sanitize_text_field( $_POST['pr_reason'] ?? '' ) )
+				: bhela_bm_payreq_approve( $pr_id )
+		);
 	}
 	if ( isset( $_POST['bhela_rev_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_rev_nonce'] ) ), 'bhela_bm_ledger_rev' ) ) {
 		bhela_bm_ledger_reverse( (int) ( $_POST['row'] ?? 0 ), sanitize_text_field( $_POST['reason'] ?? '' ) );

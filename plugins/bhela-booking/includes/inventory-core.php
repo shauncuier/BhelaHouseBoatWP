@@ -160,8 +160,8 @@ function bhela_bm_inv_unlocking( $set = null ) {
  * Returning a non-null value from update_post_metadata short-circuits
  * update_metadata() and is returned to the caller, so nothing is written. This is
  * not advisory: it is the difference between a lock and a disabled input. The cost
- * sheet has no equivalent, which is why an approved sheet's figures can still be
- * rewritten by one update_post_meta() call.
+ * sheet has had the same treatment since v2.37.0 — see includes/costs-core.php,
+ * which was written from this file.
  *
  * Scoped to `_bhela_inv_*` so core's own writes (`_edit_lock`, `_thumbnail_id`)
  * are untouched — a locked sheet still has to be openable in the editor.
@@ -185,7 +185,46 @@ function bhela_bm_inv_block_meta( $check, $object_id, $meta_key ) {
 }
 add_filter( 'update_post_metadata', 'bhela_bm_inv_block_meta', 10, 3 );
 add_filter( 'add_post_metadata', 'bhela_bm_inv_block_meta', 10, 3 );
-add_filter( 'delete_post_metadata', 'bhela_bm_inv_block_meta', 10, 3 );
+// Five arguments, not three: the fifth is $delete_all, which the guard below needs.
+add_filter( 'delete_post_metadata', 'bhela_bm_inv_block_meta', 10, 5 );
+
+/**
+ * Gap 2b — `delete_post_meta_by_key()` never names a post.
+ *
+ * `delete_metadata()` in delete-all mode fires the same filter with `$object_id` of
+ * 0 and `$delete_all` true, meaning "remove this key from EVERY post". The guard
+ * above resolves a lock from the id, sees 0, finds no sheet and allows it — so one
+ * call could strip `_bhela_inv_close` from every closed month at once. It was also
+ * non-deterministic: on an admin screen where the global $post happened to be a
+ * closed sheet, `get_post_type( 0 )` fell back to it and the call was refused.
+ *
+ * There is no "which sheet" to ask about here, so the answer is the safe one: a
+ * blanket delete of a key this module owns is refused outright.
+ */
+function bhela_bm_inv_block_delete_all( $check, $object_id, $meta_key, $meta_value, $delete_all ) {
+	if ( $delete_all && 0 === strpos( (string) $meta_key, '_bhela_inv_' ) && ! bhela_bm_inv_unlocking() ) {
+		return false;
+	}
+	return $check;
+}
+add_filter( 'delete_post_metadata', 'bhela_bm_inv_block_delete_all', 9, 5 );
+
+/**
+ * Gap 2c — and `delete_metadata_by_mid()`, which addresses a meta row by its own id.
+ *
+ * A different function with a different filter, reachable from the REST API and from
+ * `wp_delete_metadata_by_mid()`. It never mentions a post, so the row has to be
+ * resolved back to one before the same question can be asked.
+ */
+function bhela_bm_inv_block_meta_by_mid( $check, $meta_id ) {
+	$row = get_metadata_by_mid( 'post', $meta_id );
+	if ( $row && false === bhela_bm_inv_block_meta( null, $row->post_id, $row->meta_key ) ) {
+		return false;
+	}
+	return $check;
+}
+add_filter( 'delete_post_metadata_by_mid', 'bhela_bm_inv_block_meta_by_mid', 10, 2 );
+add_filter( 'update_post_metadata_by_mid', 'bhela_bm_inv_block_meta_by_mid', 10, 2 );
 
 /**
  * Gap 3a — deny the delete capability on a closed sheet, and on an item that

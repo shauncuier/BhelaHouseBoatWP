@@ -1467,9 +1467,12 @@ function bhela_bm_cost_save( $post_id, $post ) {
 		// Trip P&L showing heads that sum to one number beside a total that is
 		// another, which is exactly the disagreement the derived-earnings rule exists
 		// to prevent.
-		$stored_income = bhela_bm_cost_income_total( $post_id );
-		if ( $stored_income > 0 ) {
-			$earn = $stored_income;
+		// Keyed on whether the sheet HAS stored lines, not on whether they sum above
+		// zero: the rule is that the heads are the earnings whenever the sheet uses
+		// them, and a sheet whose lines all read zero still uses them.
+		$stored_lines = bhela_bm_cost_income( $post_id );
+		if ( $stored_lines ) {
+			$earn = array_sum( $stored_lines );
 		}
 	}
 	if ( isset( $_POST['bhela_cost_income_remark'] ) ) {

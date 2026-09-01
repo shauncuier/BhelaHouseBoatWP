@@ -46,10 +46,29 @@ function bhela_bm_register_dist_cpts() {
 }
 add_action( 'init', 'bhela_bm_register_dist_cpts' );
 
-/** Is this post a committed distribution run or a ledger row? */
+/**
+ * Is this post a committed distribution run, a ledger row, or a fund movement?
+ *
+ * `bhela_fund` was missing from this list from the day the funds shipped, which made
+ * the `_bhela_fnd_` branch of bhela_bm_dist_block_meta() below dead code and left
+ * `bhela_bm_dist_block_delete()` — which shares this predicate — not covering fund
+ * rows either. So a reserve allocation was freely rewritable and **hard-deletable**
+ * from WP-CLI or cron: a wider hole than the add_post_meta() one, because there was
+ * no lock at all rather than a lock with a gap.
+ *
+ * The intent was never in doubt. `bhela_bm_fund_add()` writes every one of its meta
+ * keys through `bhela_bm_dist_meta_write()`, which exists only to lift this guard —
+ * it was holding a pen for a lock that did not fire.
+ *
+ * It matters because the reserve balance is replayed from these rows, and it is what
+ * the investor portal shows and what cash flow reads. Deleting an allocation leaves
+ * the committed run saying one thing and the fund another, with nothing to reconcile
+ * them — and §13.35 is explicit that an allocation is the arithmetic of a committed
+ * month and must not be cancellable at all.
+ */
 function bhela_bm_dist_locked( $post_id ) {
 	$type = get_post_type( $post_id );
-	return in_array( $type, array( 'bhela_dist', 'bhela_inv_ledger' ), true );
+	return in_array( $type, array( 'bhela_dist', 'bhela_inv_ledger', 'bhela_fund' ), true );
 }
 
 /**
@@ -91,7 +110,55 @@ function bhela_bm_dist_block_meta( $check, $object_id, $meta_key ) {
 // whether the key exists; `add_post_meta()` fires only this one.
 add_filter( 'add_post_metadata', 'bhela_bm_dist_block_meta', 10, 3 );
 add_filter( 'update_post_metadata', 'bhela_bm_dist_block_meta', 10, 3 );
-add_filter( 'delete_post_metadata', 'bhela_bm_dist_block_meta', 10, 3 );
+add_filter( 'delete_post_metadata', 'bhela_bm_dist_block_meta', 10, 5 );
+
+/** The locked key prefixes, so the two guards below ask the same question. */
+function bhela_bm_dist_locked_prefixes() {
+	return array( '_bhela_dist_', '_bhela_led_', '_bhela_fnd_' );
+}
+
+/**
+ * `delete_post_meta_by_key()` walks past a lock that only checks one post.
+ *
+ * `delete_metadata()` in delete-all mode fires this same filter with `$object_id`
+ * of 0 and `$delete_all` true, meaning "remove this key from EVERY post". A guard
+ * that resolves a post type from the id then sees 0, finds no post, and allows it —
+ * so one call could strip a locked key from every locked record at once. Worse, it
+ * was non-deterministic: on an admin screen where the global $post happened to be a
+ * locked record, `get_post_type( 0 )` fell back to it and the call was refused.
+ *
+ * The filter has taken five arguments since WP 3.1; all three locks were registered
+ * with three, so `$delete_all` was never even visible to them.
+ */
+function bhela_bm_dist_block_delete_all( $check, $object_id, $meta_key, $meta_value, $delete_all ) {
+	if ( ! $delete_all || bhela_bm_dist_writing() ) {
+		return $check;
+	}
+	foreach ( bhela_bm_dist_locked_prefixes() as $prefix ) {
+		if ( 0 === strpos( (string) $meta_key, $prefix ) ) {
+			return false;
+		}
+	}
+	return $check;
+}
+add_filter( 'delete_post_metadata', 'bhela_bm_dist_block_delete_all', 9, 5 );
+
+/**
+ * And `delete_metadata_by_mid()`, which addresses a meta row by its own id.
+ *
+ * A different function with a different filter, reachable from the REST API and from
+ * `wp_delete_metadata_by_mid()`. It never mentions a post, so nothing above sees it;
+ * the row has to be resolved back to its post before the same question can be asked.
+ */
+function bhela_bm_dist_block_meta_by_mid( $check, $meta_id ) {
+	$row = get_metadata_by_mid( 'post', $meta_id );
+	if ( $row && bhela_bm_dist_block_meta( null, $row->post_id, $row->meta_key ) === false ) {
+		return false;
+	}
+	return $check;
+}
+add_filter( 'delete_post_metadata_by_mid', 'bhela_bm_dist_block_meta_by_mid', 10, 2 );
+add_filter( 'update_post_metadata_by_mid', 'bhela_bm_dist_block_meta_by_mid', 10, 2 );
 
 /** Whether a legitimate writer currently holds the pen. */
 function bhela_bm_dist_writing( $set = null ) {

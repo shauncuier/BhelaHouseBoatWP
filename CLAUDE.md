@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-09-01 · Theme & Plugin v2.37.1 (single shared version)
+> Last updated: 2026-09-01 · Theme & Plugin v2.37.2 (single shared version)
 
 ---
 
@@ -109,7 +109,7 @@ wp-content/                          ← Git root
 │   ├── run.php                      ← CLI runner — loads the PHP extensions each harness needs
 │   ├── bootstrap.php                ← Boots WP, resolves the LocalWP DB port, provides ok()
 │   ├── sweep.php                    ← Clears ZZ* fixtures left by a crashed run
-│   ├── *-test.php                   ← 9 headless harnesses
+│   ├── *-test.php                   ← 15 headless harnesses
 │   └── bhela-tests.php              ← Older browser suite (open as an admin)
 │
 ├── docs/
@@ -483,6 +483,15 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_trip_report($id)` | `includes/trip-report.php` | One trip end to end. Its `share` block is an **apportionment, not a record** — see §13.41 |
 | `bhela_bm_revenue_by_source($from,$to,$period)` | `includes/trip-report.php` | Revenue by head, grouped by day/month/year |
 | `bhela_bm_cost_locked($id)` | `includes/costs-core.php` | Is this an approved sheet. Loaded on every request, reads meta directly — see §13.39 |
+| `bhela_bm_cost_locked_keys()` | `includes/costs-core.php` | The meta a locked sheet refuses. `_bhela_cost_status` is deliberately absent — unlock must stay possible |
+| `bhela_bm_dist_locked($id)` | `includes/distribution-core.php` | Run, ledger row **or fund row**. `bhela_fund` was missing from it for two releases — see §13.54 |
+| `bhela_bm_trip_rows($from,$to)` | `includes/trip-report.php` | The five columns the P&L list draws. **Never `bhela_bm_trip_report()` per row** — see §13.52 |
+| `bhela_bm_trip_date_bound($which)` | `includes/trip-report.php` | Earliest/latest trip date on record. A blank filter's bound comes from the data, never a sentinel — §13.51 |
+| `bhela_bm_trip_undated_sheets()` | `includes/trip-report.php` | Sheets a date range cannot match. Named on screen rather than silently absent |
+| `bhela_bm_season_overlaps()` | `includes/seasons.php` | Overlapping season pairs. Reports, never refuses — the earliest start wins |
+| `bhela_bm_cost_status_tone($status)` | `includes/ui.php` | Cost-sheet status → pill tone. In `ui.php` on §13.22 grounds, preventatively |
+| `bhela_bm_payreq_limit()` | `includes/investor-payreq.php` | Listing cap. The pending TOTAL counts in SQL instead — a truncated total understates money owed |
+| `bhela_bm_investor_notice($result)` | `includes/investor-admin.php` | Carries a `WP_Error` from a guard to the next page load. A correct policy that looks like a broken form is worse than none |
 | `bhela_bm_cost_meta_write($id,$k,$v)` | `includes/costs-core.php` | The only legitimate way to write a locked sheet's figures |
 | `bhela_bm_payreq_add($args)` | `includes/investor-payreq.php` | Raise a payment request. Writes NO ledger row and moves no money |
 | `bhela_bm_payreq_approve($id)` | `includes/investor-payreq.php` | Approve, and only now write the ledger row. **Refuses the requester** — see §13.40 |
@@ -726,6 +735,11 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 51. **A sentinel date range is a silent filter wearing the costume of no filter.** Trip P&L resolved a blank filter to `2000-01-01 … +2 years`, which reads as "everything" and is not — a sheet dated earlier, or a trip booked further out, simply vanished. That is §13.24's failure in a new place, and the fix is the same shape: the bound comes from the data. `bhela_bm_trip_date_bound()` reads the earliest and latest trip date on any sheet, so a blank filter cannot exclude anything that exists.
 52. **`bhela_bm_trip_report()` is for one trip, never for a list.** It re-queries every sheet in the trip's own month to work out the distribution share, so calling it once per row made the P&L list O(n²) — over a default filter that means every trip on record. `bhela_bm_trip_rows()` reads the five columns the list actually draws; `roundtrip-test.php` §11 pins the two readings against each other so they cannot drift.
 53. **A comment that promises behaviour is a claim the tests should check.** `seasons.php` documented that "the settings screen warns rather than refusing" on overlapping seasons. Nothing warned — the sentence described an intention. `bhela_bm_season_overlaps()` and the notice now exist, and `investor-test.php` §24 asserts both the detection and that the earliest-starting season is the one that wins.
+
+54. **`bhela_fund` was in no lock's post-type list for two releases.** `bhela_bm_dist_block_meta()` guarded `_bhela_dist_`, `_bhela_led_` **and** `_bhela_fnd_` keys — but only when `bhela_bm_dist_locked()` said so, and that function listed only `bhela_dist` and `bhela_inv_ledger`. So the `_bhela_fnd_` branch was dead code, and `bhela_bm_dist_block_delete()` shares the same predicate, which left a reserve allocation freely rewritable and **hard-deletable** from WP-CLI. A wider hole than §13.49's, because there was no lock at all rather than a lock with a gap — and §13.35 is explicit that an allocation is the arithmetic of a committed month and must not be cancellable even by reversal. The intent was never in doubt: `bhela_bm_fund_add()` writes every key through `bhela_bm_dist_meta_write()`, which exists only to lift a guard that never fired. §13.37 explains why no harness saw it — `bhela_fund` is deliberately outside `bhela_test_isolate()`. The lesson generalises past the fix: **a lock has two lists, hooks and post types, and asserting the first proves nothing about the second.** `investor-test.php` §23b now drives add / update / trash / hard delete against a real fund row.
+55. **Two more delete routes walk past a lock that only ever asks about one post.** `delete_post_meta_by_key()` fires `delete_post_metadata` with `$object_id` of **0** and `$delete_all` true — "remove this key from every post" — so a guard that resolves a lock from the id found nothing and allowed it: one call could strip `_bhela_cost_total` from every approved sheet. It was also non-deterministic, because on a screen where the global `$post` happened to be a locked record, `get_post_type( 0 )` fell back to it and refused. All three locks were registered for **three** arguments, so `$delete_all` was never visible to them; the filter has passed five since WP 3.1. Separately, `delete_metadata_by_mid()` addresses a meta row by its own id through a different filter entirely, reachable from the REST API, and has to be resolved back to a post before the same question can be asked. Both are closed in all three locks now. Worth knowing which hooks *cannot* help: `added_post_meta` / `updated_post_meta` are post-hoc actions and cannot refuse, and `wp_insert_post( meta_input )` routes through `update_post_meta()` so it was already covered.
+56. **A test can pin the wrong guard and still go green on revert.** `investor-test.php` §22 was titled "one request pays once, even under a race" and did not test the race: it approved, forced the state back through the meta API, approved again, and was refused by the `ledger > 0` belt-and-braces check. In a genuine race **both** callers read `ledger = 0`, so both pass that check and only the conditional UPDATE stops the second — which nothing asserted. Reverting the fix looked like it proved the test, because the revert removed both guards at once. The interleaving is reproducible in one process through the object cache: prime the cache, write the winner's state with `$wpdb->update()` and **no** `wp_cache_delete()`, and the next call reads exactly what a concurrent request holds. Verified by reverting only the claim and keeping the ledger guard: the old assertions passed, the new one failed with a second ৳3,131 paid. Note `update_post_meta()` finishes by *deleting* its cache entry rather than refreshing it, so the priming read is required.
+57. **A performance assertion needs a threshold that separates the two implementations, not one that sounds generous.** The first version of §11's query-count check was `$after < $before * 6`. Measured both ways on the same fixture: the cheap reader costs 2 queries for one sheet and 5 for five; the per-row version costs 4 and 11. `11 < 4 * 6` passed, so the assertion would have shipped green against the very code it was written to reject. The **marginal** cost per added row does separate them — 0.75 against 1.75 — and survives an unrelated constant appearing at either end.
 
 
 > **Deployment: the portal must be served over HTTPS.** The sign-in form posts a password, and `wp_signon()` marks the session cookie secure only when `is_ssl()` is true. Over plain HTTP an investor's credentials and their session travel in clear on the network, and no amount of code here can compensate for it. This is the one item on this list that is a hosting decision rather than a bug.

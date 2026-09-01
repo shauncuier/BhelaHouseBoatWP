@@ -50,6 +50,10 @@ function bhela_bm_payreq_states() {
 		'requested' => array( 'label' => __( 'Awaiting approval', 'bhela-booking' ), 'tone' => 'attention' ),
 		'approved'  => array( 'label' => __( 'Approved & paid', 'bhela-booking' ),   'tone' => 'good' ),
 		'rejected'  => array( 'label' => __( 'Rejected', 'bhela-booking' ),          'tone' => 'danger' ),
+		// A record with no state meta at all. It cannot be claimed and so cannot be
+		// approved or rejected; saying so is better than rendering a blank pill or
+		// falling back to a state that implies it is actionable.
+		''          => array( 'label' => __( 'Unreadable — contact the office', 'bhela-booking' ), 'tone' => 'neutral' ),
 	);
 }
 
@@ -154,7 +158,11 @@ function bhela_bm_payreq( $id ) {
 		'reference' => (string) $m( 'reference' ),
 		'doc'       => (string) $m( 'doc' ),
 		'note'      => (string) $m( 'note' ),
-		'state'     => (string) $m( 'state' ) ?: 'requested',
+		// NOT defaulted to 'requested': the conditional UPDATE that claims a request
+		// can only match a row that exists, so a record with no state meta would read
+		// as claimable and never be claimable — permanently stuck. '' says so, and
+		// every caller treats it as unsettled-but-not-actionable.
+		'state'     => (string) $m( 'state' ),
 		'by'        => (int) $m( 'by' ),
 		'at'        => (string) $m( 'at' ),
 		'decided_by' => (int) $m( 'decided_by' ),
@@ -183,8 +191,12 @@ function bhela_bm_payreqs( $state = '', $investor = 0 ) {
 		'post_status'    => 'publish',
 		// Capped rather than -1. The dashboard reads the pending total on every load,
 		// and requests accumulate for the life of the business. 500 is far above any
-		// real backlog; bhela_bm_payreqs_capped() reports when it bites, because a
-		// silently truncated list of what is owed is worse than a slow one.
+		// real backlog, and hitting it is logged rather than passed over in silence.
+		//
+		// The CAP IS FOR THE LISTING ONLY. bhela_bm_payreq_pending_total() counts in
+		// SQL instead, because a truncated total understates money owed — which is a
+		// worse failure than a slow screen, and exactly what capping this was meant
+		// to avoid rather than cause.
 		'posts_per_page' => bhela_bm_payreq_limit(),
 		'fields'         => 'ids',
 		'no_found_rows'  => true,
@@ -261,7 +273,14 @@ function bhela_bm_payreq_approve( $id ) {
 	) );
 	// The UPDATE went round the meta API, so the cached value is now stale.
 	wp_cache_delete( $id, 'post_meta' );
-	if ( 1 !== (int) $claimed ) {
+	// false is a database error, not a lost race. Reporting it as "already settled"
+	// would send somebody looking for an approval that never happened.
+	if ( false === $claimed ) {
+		return new WP_Error( 'db', __( 'অনুরোধটি লক করা যায়নি। আবার চেষ্টা করুন।', 'bhela-booking' ) );
+	}
+	// > 0 rather than === 1: a duplicated meta row would update two and strand the
+	// request as approved with no payment behind it and no rollback.
+	if ( (int) $claimed < 1 ) {
 		return new WP_Error( 'settled', __( 'এই অনুরোধ আগেই নিষ্পত্তি হয়েছে।', 'bhela-booking' ) );
 	}
 
@@ -282,6 +301,20 @@ function bhela_bm_payreq_approve( $id ) {
 		// the investor a payment that never happened and could never be reversed,
 		// because there is nothing to reverse.
 		update_post_meta( $id, '_bhela_pr_state', 'requested' );
+		// And say so in the trail. An approval that was attempted and did not stick
+		// is exactly the kind of thing somebody asks about later, and the trail is
+		// the store that still has an answer.
+		bhela_bm_audit( array(
+			'channel'     => 'investor',
+			'action'      => 'pay_approve_failed',
+			'object_type' => 'payreq',
+			'object_id'   => $id,
+			'object_ref'  => get_the_title( $r['investor'] ),
+			'field'       => 'state',
+			'old_value'   => 'approved',
+			'new_value'   => 'requested',
+			'reason'      => $row->get_error_message(),
+		) );
 		return $row;
 	}
 
@@ -329,7 +362,10 @@ function bhela_bm_payreq_reject( $id, $reason ) {
 		$id
 	) );
 	wp_cache_delete( $id, 'post_meta' );
-	if ( 1 !== (int) $claimed ) {
+	if ( false === $claimed ) {
+		return new WP_Error( 'db', __( 'অনুরোধটি লক করা যায়নি। আবার চেষ্টা করুন।', 'bhela-booking' ) );
+	}
+	if ( (int) $claimed < 1 ) {
 		return new WP_Error( 'settled', __( 'এই অনুরোধ আগেই নিষ্পত্তি হয়েছে।', 'bhela-booking' ) );
 	}
 	update_post_meta( $id, '_bhela_pr_decided_by', get_current_user_id() );
@@ -350,12 +386,27 @@ function bhela_bm_payreq_reject( $id, $reason ) {
 	return true;
 }
 
-/** What is waiting on somebody, across every investor. */
+/**
+ * What is waiting on somebody, across every investor.
+ *
+ * Counted in SQL rather than by summing bhela_bm_payreqs(), which is capped: past the
+ * cap that summing would quietly UNDERSTATE the money owed, and this figure is the
+ * headline on the dashboard. It is also cheaper — two aggregates against the meta
+ * table instead of 500 get_post_meta() round trips on every admin page load.
+ */
 function bhela_bm_payreq_pending_total() {
-	$out = array( 'count' => 0, 'total' => 0 );
-	foreach ( bhela_bm_payreqs( 'requested' ) as $r ) {
-		$out['count']++;
-		$out['total'] += $r['amount'];
-	}
-	return $out;
+	global $wpdb;
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$row = $wpdb->get_row(
+		"SELECT COUNT(*) AS n, COALESCE( SUM( amt.meta_value + 0 ), 0 ) AS total
+		 FROM {$wpdb->postmeta} st
+		 INNER JOIN {$wpdb->posts} p ON p.ID = st.post_id AND p.post_status = 'publish'
+		 LEFT JOIN {$wpdb->postmeta} amt ON amt.post_id = st.post_id AND amt.meta_key = '_bhela_pr_amount'
+		 WHERE st.meta_key = '_bhela_pr_state' AND st.meta_value = 'requested'",
+		ARRAY_A
+	);
+	return array(
+		'count' => (int) ( $row['n'] ?? 0 ),
+		'total' => (int) ( $row['total'] ?? 0 ),
+	);
 }

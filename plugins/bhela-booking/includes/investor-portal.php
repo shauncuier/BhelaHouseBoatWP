@@ -205,6 +205,10 @@ function bhela_bm_portal_data() {
 	// them. An allocation only appears when a month is distributed, so a figure at
 	// most fifteen minutes stale cannot mislead anybody about their own position —
 	// which is replayed live, and always will be.
+	// NOTHING PER-INVESTOR MAY ENTER THIS ARRAY. The cache key is global and shared
+	// by every viewer, which is safe only while the payload is business-level. Adding
+	// an investor-specific figure here would leak one member's data to the next one
+	// through the cache, with nothing to signal it.
 	$funds = get_transient( 'bhela_bm_portal_funds' );
 	if ( ! is_array( $funds ) ) {
 		$funds = array();

@@ -57,8 +57,9 @@ function bhela_bm_screen_header( $icon, $title, $lead = '', $actions = '', $clas
  *
  * Here rather than in a screen file for the reason §13.22 gives about
  * bhela_bm_report_date(): a helper parked in one screen's file is a load-order
- * accident waiting to happen. The cost sheet, the Trip P&L list and anything later
- * all need the same answer.
+ * accident waiting to happen. Preventative rather than urgent — the Trip P&L list is
+ * its only caller today, and the point is that the next one does not have to depend
+ * on a report screen being loaded first.
  *
  * @param string $status draft | prepared | checked | approved
  * @return string One of the five tones.
