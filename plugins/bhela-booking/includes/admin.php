@@ -1035,6 +1035,12 @@ function bhela_bm_settings_page() {
 		if ( function_exists( 'bhela_bm_inv_save_lists' ) ) {
 			bhela_bm_inv_save_lists( wp_unslash( $_POST ) );
 		}
+		if ( isset( $_POST['seasons'] ) && function_exists( 'bhela_bm_save_seasons' ) ) {
+			bhela_bm_save_seasons( wp_unslash( $_POST['seasons'] ) );
+		}
+		if ( isset( $_POST['income_heads'] ) && function_exists( 'bhela_bm_save_income_heads' ) ) {
+			bhela_bm_save_income_heads( wp_unslash( $_POST['income_heads'] ) );
+		}
 		if ( isset( $_POST['cost_heads'] ) && function_exists( 'bhela_bm_save_cost_heads' ) ) {
 			bhela_bm_save_cost_heads( wp_unslash( $_POST['cost_heads'] ) );
 		}
@@ -1486,7 +1492,116 @@ function bhela_bm_settings_page() {
 			</div><!-- /sms -->
 
 			<div class="bha-set__panel" id="bhela-panel-heads" role="tabpanel" aria-labelledby="bhela-tab-heads">
-			<h2><?php esc_html_e( 'Trip Cost Heads', 'bhela-booking' ); ?></h2>
+			<h2><?php esc_html_e( 'Seasons', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'The haor year is not the calendar year, so name yours here. A season is only a label over a date range — every report keeps computing exactly what it computes now, it just gains a way to group by the period you actually think in. None are shipped: inventing your season dates would put a confident wrong answer on the screen.', 'bhela-booking' ); ?></p>
+			<?php $all_seasons = function_exists( 'bhela_bm_seasons' ) ? bhela_bm_seasons() : array(); ?>
+			<table class="widefat striped" id="bhela-seasons-table">
+				<thead>
+					<tr>
+						<th style="width:44px">#</th>
+						<th><?php esc_html_e( 'Season', 'bhela-booking' ); ?></th>
+						<th style="width:170px"><?php esc_html_e( 'From', 'bhela-booking' ); ?></th>
+						<th style="width:170px"><?php esc_html_e( 'To', 'bhela-booking' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php $sn = 0; foreach ( $all_seasons as $skey => $srow ) : $sn++; ?>
+					<tr>
+						<td><?php echo esc_html( $sn ); ?></td>
+						<td>
+							<input type="hidden" name="seasons[<?php echo esc_attr( $skey ); ?>][key]" value="<?php echo esc_attr( $skey ); ?>">
+							<input type="text" class="large-text" name="seasons[<?php echo esc_attr( $skey ); ?>][label]" value="<?php echo esc_attr( $srow['label'] ); ?>">
+						</td>
+						<td><input type="date" name="seasons[<?php echo esc_attr( $skey ); ?>][from]" value="<?php echo esc_attr( $srow['from'] ); ?>"></td>
+						<td><input type="date" name="seasons[<?php echo esc_attr( $skey ); ?>][to]" value="<?php echo esc_attr( $srow['to'] ); ?>"></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p><button type="button" class="button" id="bhela-seasons-add">+ <?php esc_html_e( 'Add season', 'bhela-booking' ); ?></button></p>
+			<p class="description"><?php esc_html_e( 'Clearing a season’s name deletes it. Nothing else changes: no figure anywhere is stored against a season, so removing one only removes a way of grouping.', 'bhela-booking' ); ?></p>
+			<script>
+			(function () {
+				var btn = document.getElementById('bhela-seasons-add');
+				if (!btn) return;
+				btn.addEventListener('click', function () {
+					var body = document.querySelector('#bhela-seasons-table tbody');
+					var key = 'new_' + Date.now().toString(36);
+					var tr = document.createElement('tr');
+					tr.innerHTML =
+						'<td>' + (body.rows.length + 1) + '</td>' +
+						'<td><input type="hidden" name="seasons[' + key + '][key]" value="">' +
+						'<input type="text" class="large-text" name="seasons[' + key + '][label]" placeholder="<?php echo esc_js( __( 'e.g. Monsoon 2026', 'bhela-booking' ) ); ?>"></td>' +
+						'<td><input type="date" name="seasons[' + key + '][from]"></td>' +
+						'<td><input type="date" name="seasons[' + key + '][to]"></td>';
+					body.appendChild(tr);
+					tr.querySelector('input[type=text]').focus();
+				});
+			})();
+			</script>
+
+			<h2 style="margin-top:28px"><?php esc_html_e( 'Trip Income Heads', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'What a trip can earn, broken down. Fill any of these on a cost sheet and the trip’s earnings become their total — which is what makes “how much did food earn us this season” a question with an answer.', 'bhela-booking' ); ?></p>
+			<?php
+			$all_income = bhela_bm_income_heads( true );
+			$raw_income = get_option( 'bhela_bm_income_heads', array() );
+			$income_use = bhela_bm_income_heads_in_use();
+			?>
+			<table class="widefat striped" id="bhela-income-table">
+				<thead>
+					<tr>
+						<th style="width:44px">#</th>
+						<th><?php esc_html_e( 'Source', 'bhela-booking' ); ?></th>
+						<th style="width:110px"><?php esc_html_e( 'In use', 'bhela-booking' ); ?></th>
+						<th style="width:130px"><?php esc_html_e( 'Retired', 'bhela-booking' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php $in = 0; foreach ( $all_income as $slug => $label ) : $in++; $iused = in_array( $slug, $income_use, true ); ?>
+					<tr>
+						<td><?php echo esc_html( $in ); ?></td>
+						<td>
+							<input type="hidden" name="income_heads[<?php echo esc_attr( $slug ); ?>][slug]" value="<?php echo esc_attr( $slug ); ?>">
+							<input type="text" class="large-text" name="income_heads[<?php echo esc_attr( $slug ); ?>][label]" value="<?php echo esc_attr( $label ); ?>">
+						</td>
+						<td><?php echo $iused ? '<span title="' . esc_attr__( 'Carries a figure on a saved cost sheet', 'bhela-booking' ) . '">✔</span>' : '—'; ?></td>
+						<td>
+							<label>
+								<input type="checkbox" name="income_heads[<?php echo esc_attr( $slug ); ?>][retired]" value="1"
+									<?php checked( ! empty( $raw_income[ $slug ]['retired'] ) ); ?>>
+								<?php esc_html_e( 'Hide', 'bhela-booking' ); ?>
+							</label>
+						</td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p>
+				<button type="button" class="button" id="bhela-income-add">+ <?php esc_html_e( 'Add source', 'bhela-booking' ); ?></button>
+			</p>
+			<p class="description">
+				<?php esc_html_e( 'Cabin booking is the one filled from the bookings on the trip date. Everything else is money taken on board that no booking record knows about, which is exactly why it needs a line of its own.', 'bhela-booking' ); ?>
+			</p>
+			<script>
+			(function () {
+				var btn = document.getElementById('bhela-income-add');
+				if (!btn) return;
+				btn.addEventListener('click', function () {
+					var body = document.querySelector('#bhela-income-table tbody');
+					var key = 'new_' + Date.now().toString(36);
+					var tr = document.createElement('tr');
+					tr.innerHTML =
+						'<td>' + (body.rows.length + 1) + '</td>' +
+						'<td><input type="hidden" name="income_heads[' + key + '][slug]" value="">' +
+						'<input type="text" class="large-text" name="income_heads[' + key + '][label]" placeholder="<?php echo esc_js( __( 'New source…', 'bhela-booking' ) ); ?>"></td>' +
+						'<td>—</td><td></td>';
+					body.appendChild(tr);
+					tr.querySelector('input[type=text]').focus();
+				});
+			})();
+			</script>
+
+			<h2 style="margin-top:28px"><?php esc_html_e( 'Trip Cost Heads', 'bhela-booking' ); ?></h2>
 			<p class="bha-set__lead"><?php esc_html_e( 'The standing expense lines on every trip cost sheet. Rename them, reorder them, add your own. One-off items belong on the sheet itself, not here.', 'bhela-booking' ); ?></p>
 			<?php
 			$all_heads = bhela_bm_cost_heads( true );

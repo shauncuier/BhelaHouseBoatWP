@@ -31,8 +31,8 @@ $legacy[20] = array( 'label' => 'Others (Any Bill & Purchase)', 'p1' => 250, 'p2
 $legacy[21] = array( 'label' => 'Cold Drinks', 'p1' => 470, 'p2' => 0, 'p3' => 0, 'remark' => '' );
 
 $old = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ legacy sheet' ) );
-update_post_meta( $old, '_bhela_cost_lines', wp_json_encode( $legacy, JSON_UNESCAPED_UNICODE ) );
-update_post_meta( $old, '_bhela_cost_total', 52205 );
+bhela_test_cost_meta( $old, '_bhela_cost_lines', wp_json_encode( $legacy, JSON_UNESCAPED_UNICODE ) );
+bhela_test_cost_meta( $old, '_bhela_cost_total', 52205 );
 
 $lines = bhela_bm_cost_lines( $old );
 ok( 15600 === ( line_by_label( $lines, 'Engine Fuel (Diesel)' )['sub'] ?? 0 ), 'fuel amount survived' );

@@ -26,11 +26,11 @@ foreach ( $trips as $t ) {
 	list( $date, $tid, $guests, $earn, $cost ) = $t;
 	$id = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZJ ' . $tid ) );
 	$made[] = $id;
-	update_post_meta( $id, '_bhela_cost_trip_date', $date );
-	update_post_meta( $id, '_bhela_cost_header', wp_json_encode( array( 'trip_id' => $tid, 'total_guest' => (string) $guests ) ) );
-	update_post_meta( $id, '_bhela_cost_earnings', $earn );
-	update_post_meta( $id, '_bhela_cost_total', $cost );
-	update_post_meta( $id, '_bhela_cost_status', 'approved' );
+	bhela_test_cost_meta( $id, '_bhela_cost_trip_date', $date );
+	bhela_test_cost_meta( $id, '_bhela_cost_header', wp_json_encode( array( 'trip_id' => $tid, 'total_guest' => (string) $guests ) ) );
+	bhela_test_cost_meta( $id, '_bhela_cost_earnings', $earn );
+	bhela_test_cost_meta( $id, '_bhela_cost_total', $cost );
+	bhela_test_cost_meta( $id, '_bhela_cost_status', 'approved' );
 }
 
 // What the Monthly Statement actually deducts. Note this is NOT every line in
@@ -74,10 +74,10 @@ ok( 86689 === $boosting + $website, 'boosting + website = 86,689, the PDF Digita
 echo "\n=== unapproved sheets are excluded and flagged ===\n";
 $draft = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZJ draft' ) );
 $made[] = $draft;
-update_post_meta( $draft, '_bhela_cost_trip_date', '2026-07-31' );
-update_post_meta( $draft, '_bhela_cost_earnings', 999999 );
-update_post_meta( $draft, '_bhela_cost_total', 111111 );
-update_post_meta( $draft, '_bhela_cost_status', 'prepared' );
+bhela_test_cost_meta( $draft, '_bhela_cost_trip_date', '2026-07-31' );
+bhela_test_cost_meta( $draft, '_bhela_cost_earnings', 999999 );
+bhela_test_cost_meta( $draft, '_bhela_cost_total', 111111 );
+bhela_test_cost_meta( $draft, '_bhela_cost_status', 'prepared' );
 $d2 = bhela_bm_statement_data( '2026-07' );
 ok( 1922500 === $d2['earnings'], 'a prepared sheet does NOT move the month', number_format( $d2['earnings'] ) );
 ok( 1 === count( $d2['pending'] ), 'it is reported as pending instead' );

@@ -28,11 +28,11 @@ foreach ( $spec as $i => $row ) {
 	list( $date, $status, $earn, $cost, $guests ) = $row;
 	$id = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZY sheet ' . $i ) );
 	$made[] = $id;
-	update_post_meta( $id, '_bhela_cost_trip_date', $date );
-	update_post_meta( $id, '_bhela_cost_status', $status );
-	update_post_meta( $id, '_bhela_cost_earnings', $earn );
-	update_post_meta( $id, '_bhela_cost_total', $cost );
-	update_post_meta( $id, '_bhela_cost_header', wp_json_encode( array( 'total_guest' => (string) $guests ) ) );
+	bhela_test_cost_meta( $id, '_bhela_cost_trip_date', $date );
+	bhela_test_cost_meta( $id, '_bhela_cost_status', $status );
+	bhela_test_cost_meta( $id, '_bhela_cost_earnings', $earn );
+	bhela_test_cost_meta( $id, '_bhela_cost_total', $cost );
+	bhela_test_cost_meta( $id, '_bhela_cost_header', wp_json_encode( array( 'total_guest' => (string) $guests ) ) );
 }
 // One expense in July.
 $exp = wp_insert_post( array( 'post_type' => 'bhela_expense', 'post_status' => 'publish', 'post_title' => 'ZZY expense' ) );
@@ -124,9 +124,9 @@ echo "\n=== 8b. a sheet with no trip date ===\n";
 // and no year and no screen could ever have shown it.
 $un = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZY undated' ) );
 $made[] = $un;
-update_post_meta( $un, '_bhela_cost_status', 'checked' );
-update_post_meta( $un, '_bhela_cost_total', 3318506 );
-update_post_meta( $un, '_bhela_cost_earnings', 0 );
+bhela_test_cost_meta( $un, '_bhela_cost_status', 'checked' );
+bhela_test_cost_meta( $un, '_bhela_cost_total', 3318506 );
+bhela_test_cost_meta( $un, '_bhela_cost_earnings', 0 );
 
 ok( in_array( $un, wp_list_pluck( bhela_bm_cost_undated(), 'id' ), true ), 'bhela_bm_cost_undated() finds it' );
 
@@ -152,12 +152,12 @@ ok( ! $leaked, 'its ৳3,318,506 reaches no year, in either year shape', implode
 // sidebar call — invoking the transition itself would exit() and take the
 // harness with it.
 ok( ! bhela_bm_cost_can_approve( $un ), 'an undated sheet cannot be approved' );
-update_post_meta( $un, '_bhela_cost_trip_date', '   ' );
+bhela_test_cost_meta( $un, '_bhela_cost_trip_date', '   ' );
 ok( ! bhela_bm_cost_can_approve( $un ), 'whitespace is not a date either' );
 
 // With a real date the guard lifts, the flag clears, and the money lands.
-update_post_meta( $un, '_bhela_cost_trip_date', '2026-07-15' );
-update_post_meta( $un, '_bhela_cost_status', 'approved' );
+bhela_test_cost_meta( $un, '_bhela_cost_trip_date', '2026-07-15' );
+bhela_test_cost_meta( $un, '_bhela_cost_status', 'approved' );
 ok( bhela_bm_cost_can_approve( $un ), 'dating it allows approval — the guard is about the date, not a block' );
 ok( ! in_array( $un, wp_list_pluck( bhela_bm_cost_undated(), 'id' ), true ), 'and clears the undated flag' );
 ok( 205000 + 3318506 === (int) bhela_bm_yearly_data( '2026', 'financial' )['totals']['cost'],
@@ -170,9 +170,9 @@ echo "\n=== 8c. earnings that went stale after sign-off ===\n";
 // reporting — a trip that lost money still shows it, with nothing to say so.
 $st = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZY stale' ) );
 $made[] = $st;
-update_post_meta( $st, '_bhela_cost_trip_date', '2026-10-10' );
-update_post_meta( $st, '_bhela_cost_status', 'approved' );
-update_post_meta( $st, '_bhela_cost_total', 50000 );
+bhela_test_cost_meta( $st, '_bhela_cost_trip_date', '2026-10-10' );
+bhela_test_cost_meta( $st, '_bhela_cost_status', 'approved' );
+bhela_test_cost_meta( $st, '_bhela_cost_total', 50000 );
 // The booking that existed when the sheet was signed off.
 $bk = wp_insert_post( array( 'post_type' => 'bhela_booking', 'post_status' => 'publish', 'post_title' => 'ZZY guest' ) );
 $made[] = $bk;
@@ -181,8 +181,8 @@ update_post_meta( $bk, '_bhela_status', 'confirmed' );
 update_post_meta( $bk, '_bhela_total', 200000 );
 
 // Saved from that booking, and never edited by hand.
-update_post_meta( $st, '_bhela_cost_earnings', 200000 );
-update_post_meta( $st, '_bhela_cost_earnings_auto', 200000 );
+bhela_test_cost_meta( $st, '_bhela_cost_earnings', 200000 );
+bhela_test_cost_meta( $st, '_bhela_cost_earnings_auto', 200000 );
 
 ok( ! bhela_bm_cost_earnings_drift( $st )['stale'], 'no drift while the bookings still agree' );
 
@@ -201,9 +201,9 @@ ok( 200000 === $d1['stored'], 'the signed figure is reported unchanged', bhela_b
 ok( 174000 === $d1['live'], 'alongside what the bookings now say', bhela_bm_money( $d1['live'] ) );
 
 // A hand-typed figure is a decision, not a cache — it must never be flagged.
-update_post_meta( $st, '_bhela_cost_earnings', 190000 );
+bhela_test_cost_meta( $st, '_bhela_cost_earnings', 190000 );
 ok( ! bhela_bm_cost_earnings_drift( $st )['stale'], 'a manually overridden figure is left alone' );
-update_post_meta( $st, '_bhela_cost_earnings', 200000 );
+bhela_test_cost_meta( $st, '_bhela_cost_earnings', 200000 );
 
 // The statement reports it without altering the total it counts.
 $oct = bhela_bm_statement_data( '2026-10' );

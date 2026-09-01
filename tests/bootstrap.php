@@ -179,7 +179,7 @@ function bhela_test_isolate() {
 		// titled by the plugin ("reserve allocation 29470") and would be hidden from
 		// the very harness that created them — those two are scoped by the harness
 		// instead, which deletes only the rows belonging to its own run.
-		'bhela_investor', 'bhela_inv_ledger',
+		'bhela_investor', 'bhela_inv_ledger', 'bhela_payreq',
 	);
 
 	// get_posts() sets suppress_filters => true, which skips posts_where
@@ -267,6 +267,12 @@ function bhela_test_owner_options() {
 		'bhela_bm_expense_types',
 		'bhela_bm_expense_methods',
 		'bhela_bm_cost_heads',
+		// Added WITH the features rather than after a harness cleared one. The income
+		// heads carry frozen slugs that every saved sheet's figures hang off, and the
+		// seasons are the owner's own names for their year — neither is derivable
+		// from anything, so neither survives being wiped by a test run.
+		'bhela_bm_income_heads',
+		'bhela_bm_seasons',
 	);
 }
 
@@ -335,6 +341,25 @@ function bhela_test_done() {
  *
  * @param int $id Post to remove.
  */
+/**
+ * Write `_bhela_cost_*` meta on a fixture, approved or not.
+ *
+ * An approved cost sheet's figures are locked against direct writes — including from
+ * an administrator, and including from here (see includes/costs-core.php). A harness
+ * still has to be able to build and mutate its own fixtures, so it opens the plugin's
+ * own write window rather than weakening the guard for everybody. Exactly the same
+ * arrangement bhela_test_delete() uses for a committed distribution.
+ *
+ * Not a way around the lock: roundtrip-test.php §8 asserts that a plain
+ * update_post_meta() on an approved sheet is refused, so the guard stays proven.
+ */
+function bhela_test_cost_meta( $id, $key, $value ) {
+	if ( function_exists( 'bhela_bm_cost_meta_write' ) ) {
+		return bhela_bm_cost_meta_write( (int) $id, $key, $value );
+	}
+	return update_post_meta( (int) $id, $key, $value );
+}
+
 function bhela_test_delete( $id ) {
 	$id = (int) $id;
 	if ( ! $id ) {

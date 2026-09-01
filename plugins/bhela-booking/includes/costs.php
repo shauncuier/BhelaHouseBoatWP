@@ -531,14 +531,35 @@ function bhela_bm_cost_lines( $post_id = 0 ) {
 	// Blank rows to type into, always a few spare. July's first real sheet used
 	// four one-off rows (Spoon, Pencil Battary, Electric Materials, Cold
 	// Drinks), so three was already one short.
+	//
+	// **A blank slot must never reuse a key that is already on the sheet**, and this
+	// is where a one-off row went missing after a save. A row typed into the first
+	// blank is stored under that blank's key — `new_0`. On the next render the stored
+	// row came back as `new_0` AND the generator, counting only empty rows, emitted a
+	// fresh blank `new_0` after it. The form then carried two inputs with the same
+	// name, the browser sent both, PHP kept the last — the empty one — and the row the
+	// preparer had typed was gone, with its money quietly off the trip's total.
+	//
+	// So the keys already in play are collected first and skipped. `$blanks` still
+	// counts the empty rows already rendered, so a sheet that has spare slots does
+	// not grow five more every time it is opened.
+	$used = array();
+	foreach ( $rows as $r ) {
+		$used[ $r['key'] ] = true;
+	}
 	$blanks = 0;
 	foreach ( $rows as $r ) {
 		if ( ! $r['fixed'] && 0 === $r['sub'] && '' === $r['label'] ) {
 			$blanks++;
 		}
 	}
+	$n = 0;
 	for ( $i = $blanks; $i < bhela_bm_cost_extra_rows(); $i++ ) {
-		$rows[] = bhela_bm_cost_row( 'new_' . $i, '', array(), false );
+		while ( isset( $used[ 'new_' . $n ] ) ) {
+			$n++;
+		}
+		$used[ 'new_' . $n ] = true;
+		$rows[] = bhela_bm_cost_row( 'new_' . $n, '', array(), false );
 	}
 
 	return $rows;
@@ -891,6 +912,21 @@ function bhela_bm_cost_sheet_cb( $post ) {
 	// so the preparer starts from the real number instead of a zero.
 	$stored_earn = get_post_meta( $post->ID, '_bhela_cost_earnings', true );
 	$earnings    = '' === $stored_earn ? $book['total'] : (int) $stored_earn;
+
+	// Income heads. A never-saved sheet starts with the booking figure sitting on
+	// Cabin booking rather than in the earnings box, so the preparer's first act is
+	// to say where the money came from instead of restating the total.
+	$income_heads   = bhela_bm_income_heads();
+	$income         = bhela_bm_cost_income( $post->ID );
+	$income_remarks = json_decode( (string) get_post_meta( $post->ID, '_bhela_cost_income_remark', true ), true );
+	$income_remarks = is_array( $income_remarks ) ? $income_remarks : array();
+	if ( ! $income && '' === $stored_earn && $book['total'] > 0 && isset( $income_heads['cabin'] ) ) {
+		$income = array( 'cabin' => (int) $book['total'] );
+	}
+	$income_total = array_sum( $income );
+	if ( $income_total > 0 ) {
+		$earnings = $income_total;
+	}
 	$profit      = $earnings - $total;
 	$ro          = $locked ? ' readonly disabled' : '';
 
@@ -977,6 +1013,36 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			</p>
 		<?php endif; ?>
 
+		<h3 class="bha-sheet__h"><?php esc_html_e( 'Income from this trip', 'bhela-booking' ); ?></h3>
+		<div class="bha-scroll">
+		<table class="widefat striped" id="bhela-cs-income">
+			<thead><tr>
+				<th class="bha-sheet__sl">#</th>
+				<th><?php esc_html_e( 'Source', 'bhela-booking' ); ?></th>
+				<th><?php esc_html_e( 'Amount ৳', 'bhela-booking' ); ?></th>
+				<th><?php esc_html_e( 'Remark', 'bhela-booking' ); ?></th>
+			</tr></thead>
+			<tbody>
+			<?php $inc_n = 0; ?>
+			<?php foreach ( $income_heads as $ik => $ilabel ) : ?>
+				<?php $inc_n++; ?>
+				<tr>
+					<td class="bha-sheet__sl"><?php echo (int) $inc_n; ?></td>
+					<td><?php echo esc_html( $ilabel ); ?></td>
+					<td><input type="number" min="0" step="1" data-income
+						name="bhela_cost_income[<?php echo esc_attr( $ik ); ?>]"
+						value="<?php echo esc_attr( isset( $income[ $ik ] ) && $income[ $ik ] ? $income[ $ik ] : '' ); ?>"<?php echo $ro; ?>></td>
+					<td><input type="text" name="bhela_cost_income_remark[<?php echo esc_attr( $ik ); ?>]"
+						value="<?php echo esc_attr( $income_remarks[ $ik ] ?? '' ); ?>"<?php echo $ro; ?>></td>
+				</tr>
+			<?php endforeach; ?>
+			</tbody>
+		</table>
+		</div>
+		<p class="bha-note">
+			<?php esc_html_e( 'Fill any of these and the trip’s earnings become their total — the Earnings box below stops being typeable, because two editable places holding one number is how they start to disagree. Cabin booking is filled from the bookings on this date; anything taken on board goes on its own line. Leave every line blank and the sheet behaves exactly as it always has.', 'bhela-booking' ); ?>
+		</p>
+
 		<div class="bha-cards" style="margin-top:18px">
 			<div class="bha-card">
 				<span class="bha-card__label"><?php esc_html_e( 'Total Cost for This Trip', 'bhela-booking' ); ?></span>
@@ -984,7 +1050,7 @@ function bhela_bm_cost_sheet_cb( $post ) {
 			</div>
 			<div class="bha-card" style="flex-basis:280px">
 				<span class="bha-card__label"><?php esc_html_e( 'Total Earnings from This Trip', 'bhela-booking' ); ?></span>
-				<input type="number" step="1" class="bha-card__input" id="bhela-cs-earn" name="bhela_cost_earnings" value="<?php echo esc_attr( $earnings ); ?>"<?php echo $ro; ?>>
+				<input type="number" step="1" class="bha-card__input" id="bhela-cs-earn" name="bhela_cost_earnings" value="<?php echo esc_attr( $earnings ); ?>"<?php echo $ro; ?><?php echo $income_total > 0 ? ' readonly' : ''; ?>>
 				<p class="bha-note" id="bhela-cs-hint">
 					<?php
 					if ( ! $date ) {
@@ -1024,6 +1090,11 @@ function bhela_bm_cost_sheet_cb( $post ) {
 		var warn   = document.getElementById('bhela-cs-warn');
 		var reset  = document.getElementById('bhela-cs-reset');
 		var earnEl = document.getElementById('bhela-cs-earn');
+		/* What the earnings box held before any head claimed it. Seeded from the
+		   server-rendered value and kept current while the box is still the
+		   preparer's own to type in. */
+		var earnManual     = earnEl ? earnEl.value : '';
+		var earnManualOwns = false;
 		var ajax   = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
 		var lookupNonce = <?php echo wp_json_encode( wp_create_nonce( 'bhela_bm_cost_lookup' ) ); ?>;
 		var locked = <?php echo $locked ? 'true' : 'false'; ?>;
@@ -1041,7 +1112,17 @@ function bhela_bm_cost_sheet_cb( $post ) {
 					if (!res || !res.success) return;
 					var d = res.data;
 					if (hint) hint.textContent = d.hint;
-					if (earnEl) earnEl.value = d.money.total;
+					/* Seed Cabin booking rather than the earnings box: the total is
+					   what the cabins earned, and saying so is the whole point of
+					   the heads. Only when it is empty or still holds the previous
+					   auto figure — a number typed by hand is a decision. */
+					var cabinEl = wrap.querySelector('[name="bhela_cost_income[cabin]"]');
+					var prevAuto = (reset && parseInt(reset.dataset.v, 10)) || 0;
+					if (cabinEl && !cabinEl.readOnly
+						&& (!cabinEl.value || (parseInt(cabinEl.value, 10) || 0) === prevAuto)) {
+						cabinEl.value = d.money.total;
+					}
+					if (earnEl && !earnEl.readOnly) earnEl.value = d.money.total;
 					if (reset) reset.dataset.v = d.money.total;
 					if (warn) warn.hidden = true;
 
@@ -1097,6 +1178,31 @@ function bhela_bm_cost_sheet_cb( $post ) {
 				total += sub;
 			});
 			document.getElementById('bhela-cs-total').textContent = money(total);
+
+			/* When any income head carries a figure, earnings ARE their sum and the
+			   box is not typeable. When they are all blank the box goes back to
+			   being the one place the number lives, exactly as before. */
+			var incomeSum = 0, incomeUsed = false;
+			wrap.querySelectorAll('[data-income]').forEach(function (inp) {
+				var v = parseInt(inp.value, 10) || 0;
+				if (v > 0) incomeUsed = true;
+				incomeSum += v;
+			});
+			if (earnEl && !locked) {
+				earnEl.readOnly = incomeUsed;
+				if (incomeUsed) {
+					earnEl.value = incomeSum;
+				} else if (earnManualOwns) {
+					/* Emptying the last head hands the box back — and it must hand
+					   back the figure that was in it, not the running sum from the
+					   keystroke before last. Clearing 90,000 then 12,000 left 12,000
+					   sitting in an editable box, which is a number nobody typed and
+					   which would have been saved as the trip's earnings. */
+					earnEl.value = earnManual;
+					earnManualOwns = false;
+				}
+			}
+
 			var earn = parseInt((earnEl || {}).value, 10) || 0;
 			var pEl = document.getElementById('bhela-cs-profit');
 			if (pEl) {
@@ -1113,7 +1219,14 @@ function bhela_bm_cost_sheet_cb( $post ) {
 		}
 
 		wrap.addEventListener('input', function (e) {
-			if (e.target.hasAttribute('data-amount') || e.target.id === 'bhela-cs-earn') recalc();
+			if (e.target.id === 'bhela-cs-earn' && !e.target.readOnly) {
+				earnManual = e.target.value;
+			}
+			if (e.target.hasAttribute('data-income')) {
+				earnManualOwns = true;
+			}
+			if (e.target.hasAttribute('data-amount') || e.target.hasAttribute('data-income')
+				|| e.target.id === 'bhela-cs-earn') recalc();
 		});
 
 		if (reset) {
@@ -1130,6 +1243,7 @@ function bhela_bm_cost_sheet_cb( $post ) {
 		var addBtn = document.getElementById('bhela-cs-add');
 		if (addBtn) {
 			var maxCustom = <?php echo (int) bhela_bm_cost_max_custom_rows(); ?>;
+			var customSeq = 0;
 			addBtn.addEventListener('click', function () {
 				var body = document.getElementById('bhela-cs-rows');
 				var custom = body.querySelectorAll('input[name$="[label]"]').length;
@@ -1137,7 +1251,15 @@ function bhela_bm_cost_sheet_cb( $post ) {
 					addBtn.disabled = true;
 					return;
 				}
-				var key = 'custom_' + Date.now().toString(36);
+				// Date.now() alone repeats when two rows are added inside the same
+				// millisecond, and two inputs with one name means the browser sends
+				// both and the server keeps only the last.
+				customSeq += 1;
+				var key = 'custom_' + Date.now().toString(36) + '_' + customSeq;
+				while (body.querySelector('[name^="bhela_cost_lines[' + key + ']"]')) {
+					customSeq += 1;
+					key = 'custom_' + Date.now().toString(36) + '_' + customSeq;
+				}
 				var tr = document.createElement('tr');
 				tr.innerHTML =
 					'<td class="bha-sheet__sl"></td>' +
@@ -1180,7 +1302,8 @@ function bhela_bm_cost_save( $post_id, $post ) {
 	if ( defined( 'DOING_AUTOSAVE' ) && DOING_AUTOSAVE ) {
 		return;
 	}
-	if ( ! isset( $_POST['bhela_bm_cost_nonce'] ) || ! wp_verify_nonce( $_POST['bhela_bm_cost_nonce'], 'bhela_bm_cost_save' ) ) {
+	if ( ! isset( $_POST['bhela_bm_cost_nonce'] )
+		|| ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_cost_nonce'] ) ), 'bhela_bm_cost_save' ) ) {
 		return;
 	}
 	if ( ! current_user_can( 'edit_post', $post_id ) ) {
@@ -1208,9 +1331,10 @@ function bhela_bm_cost_save( $post_id, $post ) {
 	// never rewrite what a saved sheet says it spent money on.
 	$heads  = bhela_bm_cost_heads( true );
 	$rows   = isset( $_POST['bhela_cost_lines'] ) && is_array( $_POST['bhela_cost_lines'] ) ? wp_unslash( $_POST['bhela_cost_lines'] ) : array();
-	$lines  = array();
-	$total  = 0;
-	$custom = 0;
+	$lines   = array();
+	$total   = 0;
+	$custom  = 0;
+	$dropped = 0;
 
 	foreach ( $rows as $key => $r ) {
 		$key = sanitize_key( $key );
@@ -1238,6 +1362,10 @@ function bhela_bm_cost_save( $post_id, $post ) {
 		if ( ! $known ) {
 			$custom++;
 			if ( $custom > bhela_bm_cost_max_custom_rows() ) {
+				// The cap exists so a crafted POST cannot grow a sheet without
+				// bound. Dropping a row in silence, though, looks exactly like the
+				// collision bug above from the preparer's side, so it says so.
+				$dropped++;
 				continue;
 			}
 		}
@@ -1250,6 +1378,35 @@ function bhela_bm_cost_save( $post_id, $post ) {
 			'remark' => $remark,
 		);
 		$total += $p1 + $p2 + $p3;
+	}
+	// A figure changing on a sheet somebody has already prepared or checked is the
+	// kind of change the trail exists for. A draft is still being typed, so auditing
+	// every keystroke-worth of it would bury the changes that matter.
+	if ( function_exists( 'bhela_bm_audit' )
+		&& in_array( get_post_meta( $post_id, '_bhela_cost_status', true ), array( 'prepared', 'checked' ), true ) ) {
+		$was_total = (int) get_post_meta( $post_id, '_bhela_cost_total', true );
+		if ( $was_total !== $total ) {
+			bhela_bm_audit( array(
+				'channel'     => 'cost',
+				'action'      => 'cost_total',
+				'object_type' => 'cost',
+				'object_id'   => $post_id,
+				'object_ref'  => get_the_title( $post_id ),
+				'field'       => 'total',
+				'old_value'   => (string) $was_total,
+				'new_value'   => (string) $total,
+			) );
+		}
+	}
+
+	if ( $dropped > 0 && function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'cost', sprintf(
+			/* translators: 1: sheet id, 2: rows dropped, 3: the cap */
+			'Cost sheet #%1$d: %2$d one-off row(s) not saved — the sheet is at its limit of %3$d.',
+			$post_id,
+			$dropped,
+			bhela_bm_cost_max_custom_rows()
+		) );
 	}
 	// JSON_FORCE_OBJECT: an all-numeric-key map would otherwise encode as a
 	// list and be misread as the old positional format on the next load.
@@ -1290,6 +1447,36 @@ function bhela_bm_cost_save( $post_id, $post ) {
 	$earn = isset( $_POST['bhela_cost_earnings'] ) && '' !== $_POST['bhela_cost_earnings']
 		? max( 0, (int) $_POST['bhela_cost_earnings'] )
 		: $book['total'];
+
+	// Income heads, and the one rule that keeps them from becoming a second set of
+	// books: when any head is filled the sheet's earnings ARE their sum. A sheet with
+	// none filled stores nothing and behaves exactly as it did before this existed,
+	// which is what lets this ship without changing an approved sheet's value.
+	$income = bhela_bm_income_read_post( isset( $_POST['bhela_cost_income'] ) ? wp_unslash( $_POST['bhela_cost_income'] ) : array() );
+	if ( $income['total'] > 0 ) {
+		$earn = $income['total'];
+		update_post_meta( $post_id, '_bhela_cost_income', wp_json_encode( $income['lines'], JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT ) );
+	} elseif ( isset( $_POST['bhela_cost_income'] ) ) {
+		// Every line cleared on a sheet that had them: honour it, and let the
+		// earnings box go back to being typeable.
+		delete_post_meta( $post_id, '_bhela_cost_income' );
+	}
+	if ( isset( $_POST['bhela_cost_income_remark'] ) ) {
+		$inc_remarks = array();
+		foreach ( (array) wp_unslash( $_POST['bhela_cost_income_remark'] ) as $ik => $iv ) {
+			$ik = sanitize_key( $ik );
+			$iv = sanitize_text_field( $iv );
+			if ( '' !== $ik && '' !== $iv ) {
+				$inc_remarks[ $ik ] = $iv;
+			}
+		}
+		if ( $inc_remarks ) {
+			update_post_meta( $post_id, '_bhela_cost_income_remark', wp_json_encode( $inc_remarks, JSON_UNESCAPED_UNICODE | JSON_FORCE_OBJECT ) );
+		} else {
+			delete_post_meta( $post_id, '_bhela_cost_income_remark' );
+		}
+	}
+
 	update_post_meta( $post_id, '_bhela_cost_earnings', $earn );
 
 	if ( '' === get_post_meta( $post_id, '_bhela_cost_status', true ) ) {
@@ -1401,6 +1588,29 @@ function bhela_bm_cost_transition() {
 			get_the_title( $sheet_id ),
 			$t['log'],
 			$user->display_name
+		) );
+	}
+
+	// The Activity Log answers "did that happen"; it is capped at 300 entries and has
+	// a Clear button. Approving a cost sheet is what lets its profit reach a monthly
+	// distribution and be declared owed to named investors, so "who approved this,
+	// and when" has to survive in the store that cannot be cleared (§3.7).
+	if ( function_exists( 'bhela_bm_audit' ) ) {
+		bhela_bm_audit( array(
+			'channel'     => 'cost',
+			'action'      => 'cost_' . $do,
+			'object_type' => 'cost',
+			'object_id'   => $sheet_id,
+			'object_ref'  => get_the_title( $sheet_id ),
+			'field'       => 'status',
+			'old_value'   => $status,
+			'new_value'   => $t['to'],
+			'reason'      => sprintf(
+				/* translators: 1: total, 2: earnings */
+				__( 'Total %1$s, earnings %2$s at the time of this step.', 'bhela-booking' ),
+				bhela_bm_money( (int) get_post_meta( $sheet_id, '_bhela_cost_total', true ) ),
+				bhela_bm_money( (int) get_post_meta( $sheet_id, '_bhela_cost_earnings', true ) )
+			),
 		) );
 	}
 

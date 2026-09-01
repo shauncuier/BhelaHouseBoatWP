@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-07-22 · Theme & Plugin v2.14.0 (single shared version)
+> Last updated: 2026-09-01 · Theme & Plugin v2.37.0 (single shared version)
 
 ---
 
@@ -85,6 +85,12 @@ wp-content/                          ← Git root
 │   │   ├── salary.php               ← Staff roster + monthly salary sheet
 │   │   ├── roles.php                ← Staff roles, plugin capabilities, Team reference screen
 │   │   ├── audit.php                ← Append-only audit trail: the one DB table, one writer, no clear button
+│   │   ├── costs-core.php           ← The approved-sheet lock. Loads on EVERY request (see §13.39)
+│   │   ├── income.php               ← Trip income heads. Fill any and the sheet's earnings ARE their sum
+│   │   ├── trip-report.php          ← Trip P&L (one trip end to end) + Revenue by Source
+│   │   ├── seasons.php              ← Named date ranges. A label over a range, never a second boundary
+│   │   ├── investor-payreq.php      ← Payment requests: the second signature before money moves
+│   │   ├── investor-dashboard.php   ← The investor dashboard, and the register/ledger/fund exports
 │   │   ├── inventory-core.php       ← Stock post types + the lock. Loads on EVERY request (see §3.8)
 │   │   ├── inventory.php            ← Stock lists, quantity model, monthly carry-forward, close workflow, screens
 │   │   ├── inventory-import.php     ← Column-mapped CSV importer: upload → map → dry run → commit
@@ -202,6 +208,8 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 | `bhela_bm_settings` | All business settings (phones, payment details, advance %, invoice prefix, weekend days, holidays, email/SMS config, `vessel_reg`, `offer_*`) |
 | `bhela_bm_dist_runs` | `YYYY-MM` => committed distribution run. **This option is the one-run-per-month constraint** |
 | `bhela_bm_coupons` | Coupon codes. `uses` / `_used_by` are a **ledger**, carried across saves and never posted by the form |
+| `bhela_bm_income_heads` | Owner-edited trip income heads. A slug is **frozen** — every saved sheet's figures hang off it |
+| `bhela_bm_seasons` | Owner-named date ranges. Nothing is ever stored *against* a season, so deleting one only removes a way of grouping |
 | `bhela_bm_rates` | Cabin rates array (regular + weekday per cabin) |
 | `bhela_bm_trips` | Trip calendar entries |
 | `bhela_bm_role_perms` | Per-role permission overrides set from the Team screen (only customised roles) |
@@ -238,7 +246,7 @@ to Quick Guide. `includes/menu.php` splits that into four, grouped by the job so
 | Menu | Slug / landing page | Rows |
 |---|---|---|
 | **Bookings** | `edit.php?post_type=bhela_booking` | All Bookings · Add New · 📊 Dashboard · 📄 Trip Report · 📅 Trip Calendar · ⭐ Reviews |
-| **Accounts** | `bhela-bm-statement` | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report · 🤝 B2B Report |
+| **Accounts** | `bhela-bm-statement` | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report · 🤝 B2B Report · 🧮 Trip P&L · 💹 Revenue by Source |
 | **Store** | `bhela-bm-inv-month` | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
 | **Setup** | `bhela-bm-settings` | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
 
@@ -468,6 +476,20 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_invoice_data($id)` | `includes/invoice.php` | Everything the printable template needs — split out so the invoice is renderable in a test |
 | `bhela_bm_csv_cell($value)` | `bhela-booking.php` | Neutralises a cell a spreadsheet would execute. **Every free-text export cell goes through it**; never a figure |
 | `bhela_bm_audit($args)` | `includes/audit.php` | The ONLY writer to the audit table, and it only inserts. See §3.7 |
+| `bhela_bm_income_heads($retired)` | `includes/income.php` | Trip income sources in force. Same retirement rule as the cost heads |
+| `bhela_bm_income_read_post($posted)` | `includes/income.php` | One place where "the heads ARE the earnings" lives. Unknown keys dropped, never stored |
+| `bhela_bm_cost_income($id)` | `includes/income.php` | A sheet's income by head. **Empty means the sheet does not use them** — which is what keeps every approved sheet's value unchanged |
+| `bhela_bm_income_rows($from,$to)` | `includes/income.php` | Income by head over a range, approved sheets only. `unsplit` is named, never folded into "Other" |
+| `bhela_bm_trip_report($id)` | `includes/trip-report.php` | One trip end to end. Its `share` block is an **apportionment, not a record** — see §13.41 |
+| `bhela_bm_revenue_by_source($from,$to,$period)` | `includes/trip-report.php` | Revenue by head, grouped by day/month/year |
+| `bhela_bm_cost_locked($id)` | `includes/costs-core.php` | Is this an approved sheet. Loaded on every request, reads meta directly — see §13.39 |
+| `bhela_bm_cost_meta_write($id,$k,$v)` | `includes/costs-core.php` | The only legitimate way to write a locked sheet's figures |
+| `bhela_bm_payreq_add($args)` | `includes/investor-payreq.php` | Raise a payment request. Writes NO ledger row and moves no money |
+| `bhela_bm_payreq_approve($id)` | `includes/investor-payreq.php` | Approve, and only now write the ledger row. **Refuses the requester** — see §13.40 |
+| `bhela_bm_seasons()` | `includes/seasons.php` | The owner's seasons. A season with no resolvable range is not a season |
+| `bhela_bm_season_investors($key)` | `includes/seasons.php` | Per-investor declared/paid **inside** a season. Not a lifetime balance |
+| `bhela_bm_investor_dash_data()` | `includes/investor-dashboard.php` | Everything the dashboard draws, split out so the figures are assertable |
+| `bhela_bm_portal_login_limit()` | `includes/investor-portal.php` | Failed portal sign-ins allowed per IP per hour. Filterable, 8 |
 | `bhela_bm_inv_line_check($line)` | `includes/inventory.php` | The quantity invariant: `good+rep+ur+dam === close`. Reports a mismatch, never rebalances it |
 | `bhela_bm_inv_line_key($item,$loc)` | `includes/inventory.php` | The line key. Returns the item ID today; the one place to change if stock ever splits by location |
 | `bhela_bm_inv_period_id($month,$create)` | `includes/inventory.php` | Resolves — or mints, behind an `add_option` mutex — the one record for a month |
@@ -589,7 +611,7 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Fourteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+Fifteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
 cost heads, the cost-sheet save round trip, the booking save handler, the stock register, every
 admin screen, WCAG contrast, the front end behind a page cache, OTP, the SMS gateway, the six
 version fields, and the yearly rollup.
@@ -615,7 +637,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all fourteen harnesses
+- [ ] `php tests/run.php` passes — all fifteen harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -689,6 +711,19 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 15. **`wp_set_current_user()` returns the cached user when the id has not changed.** Swapping a role on the same account and re-setting it keeps the old capabilities, so a per-role test reports identical menus for every role and passes by luck. Go via `wp_set_current_user( 0 )` first — `ui-test.php`'s `zz_menu()` does, and three role assertions were silently wrong until it did.
 
+39. **A one-off cost row used to vanish on the *second* save, and it was a key collision.** `bhela_bm_cost_lines()` offers five spare slots named `new_0…new_4`. A row typed into the first is stored under that slug — `new_0` — and the generator, which counted only *empty* rows, then emitted a **fresh blank `new_0`** after it. The form carried two inputs with one name, the browser sent both, PHP kept the last, and the last was the empty one: the row and its money disappeared off the trip's total. It looked intermittent because it only bit on the save *after* the one that stored the row, and a sheet with five one-offs lost **all five**. The generator now skips any key already on the sheet, and the JS "+ Add row" key carries a counter as well as a timestamp because two clicks inside one millisecond collided the same way. `roundtrip-test.php` §7 pins it, and was verified to fail against the old code.
+40. **`bhela_bm_cost_save()` guarded the metabox, and only the metabox.** §13.9 said as much when the stock lock was built — the cost sheet still left a direct `update_post_meta()`, trash, hard delete and quick edit wide open. That was a documented shortcoming while an approved sheet only fed a report; it stopped being one when the investor chain started reading approved sheets and nothing else. `bhela_bm_dist_preview()` takes its gross from `bhela_bm_statement_data()`, which sums approved sheets, and a committed distribution is immutable — so a sheet deletable from WP-CLI leaves profit **declared owed to named people** against a trip the books can no longer show. `includes/costs-core.php` closes all four, loads on **every** request (§13.9's reason: `wp_delete_post()` from cron never reaches an `is_admin()` block) and reads the status meta directly because `costs.php` is admin-only. `_bhela_cost_status` is deliberately **not** guarded: unlock is how a sheet is legitimately reopened, and a lock that cannot be lifted is a trap. A harness fixture therefore goes through `bhela_test_cost_meta()`, not `update_post_meta()`.
+41. **Paying an investor needed no second signature.** Cost sheets have required prepare → check → approve for a long time; handing money to a named person needed one person. `includes/investor-payreq.php` adds `requested → approved → ledger row written`, and it is a **separate record, not a status on a ledger row** — the ledger's rows are immutable by design and that is the single property that makes them worth trusting a year later. `bhela_investor_approve` is a distinct capability held by Manager and Administrator and **not** by Investor Relations, who raise them; on top of that `bhela_bm_payreq_approve()` refuses when `(int) $r['by'] === get_current_user_id()`, because a second signature the same hand can supply is not a second signature. A pending request appears on the investor screen, the dashboard and the portal, and in **no** balance, ROI or cash-flow figure. An *adjustment* still records straight away: it is a correction that reverses cleanly, not somebody deciding to hand over cash.
+42. **An audit trail that prints the old and new bank account is a second copy of the data it protects.** `bhela_bm_investor_save()` audited a shareholding change and nothing else, so an investor's account number could be repointed with no record at all — the highest-value tamper on the module. Every field is diffed and audited now, but the five fields in `bhela_bm_investor_secret_fields()` record **that** they changed, never the values: the trail is never pruned, has no clear button, and is readable by anyone who can open it. An ordinary field still carries its values, or the trail would be useless. The register CSV carries no account number and no NID either — an export leaves the building.
+43. **The portal had no attempt limit, because WordPress core has none.** `bhela_bm_portal_login()` now throttles per IP on **failed attempts only** — a correct sign-in clears the counter, which matters behind the shared and CGNAT addresses most users here are on, or one attacker locks out a whole building. The throttled response is **byte-for-byte the wrong-password page**: saying "too many attempts" confirms the account exists and that the limit is worth waiting out. `investor-test.php` §17 asserts the two pages are identical rather than grepping the source, because the source comment explaining the rule matched the grep.
+44. **Income heads are earnings, not a figure beside them.** Fill any head and `bhela_bm_cost_save()` sets `_bhela_cost_earnings` to their sum, and the earnings box stops being typeable — two editable places holding one number is how they start to disagree. A sheet with no heads stores nothing and behaves exactly as before, which is what lets this ship without changing a single approved sheet's value. Two live JS traps came out of rendering the real form: the box has to **hand back the figure that was in it** when the last head is cleared (clearing 90,000 then 12,000 left 12,000 sitting in an editable box — a number nobody typed, which would have been saved), and the date lookup seeds **Cabin booking** rather than the earnings box.
+45. **A season is a label over a date range, and must never become a second source for period boundaries.** The Monthly Statement and Yearly Report keep computing exactly what they compute; a season only hands them a from/to. The moment a season could define its own month boundaries there would be two answers to "what did July make". None are shipped: inventing somebody else's season dates puts a confident wrong answer on the screen, so the screens say so and ask for one.
+46. **The Trip P&L's contribution block is an apportionment, not a transaction.** A distribution is monthly — nothing anywhere says a given trip sent ৳4,000 to the reserve. What is true is that the trip made a stated share of the month's approved profit, so the same share of what that month distributed is attributable to it. It is computed only when the month has a committed run, and the screen says which it is in so many words.
+47. **The ৳ scanner in `ui-test.php` §5 reads every grouped figure as money, which held only while the audit trail had under a thousand rows.** Auditing every investor field pushed it past that and "1,021 events recorded" failed an assertion about money columns. A deliberately unmoneyed figure is now marked `.bha-plain` and the scanner drops those first, so the assertion keeps meaning "every money figure" rather than "every figure".
+48. **The investor screens were absent from `ui-test.php` §4 entirely.** Five screens rendering money, and nothing checked they render clean, carry the taka or keep their columns aligned — which is the gap that let a misaligned header ship across fourteen tables. All five are in the sweep now, along with Trip P&L, Revenue by Source and the investor dashboard.
+
+> **Deployment: the portal must be served over HTTPS.** The sign-in form posts a password, and `wp_signon()` marks the session cookie secure only when `is_ssl()` is true. Over plain HTTP an investor's credentials and their session travel in clear on the network, and no amount of code here can compensate for it. This is the one item on this list that is a hosting decision rather than a bug.
+
 ---
 
 ## 14. AI Assistant Instructions
@@ -734,7 +769,7 @@ git pull origin main
 # Push to GitHub
 git push origin main
 
-# Run the regression suite (thirteen harnesses)
+# Run the regression suite (fifteen harnesses)
 php tests/run.php
 
 # Validate JS syntax

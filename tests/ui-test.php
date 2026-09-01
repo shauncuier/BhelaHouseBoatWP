@@ -44,8 +44,8 @@ echo "\n=== 4. every screen renders clean ===\n";
 // A sheet of each kind, so the editors have real content to render.
 $made = array();
 $cost = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZUI cost' ) );
-update_post_meta( $cost, '_bhela_cost_trip_date', '2026-07-15' );
-update_post_meta( $cost, '_bhela_cost_status', 'checked' );
+bhela_test_cost_meta( $cost, '_bhela_cost_trip_date', '2026-07-15' );
+bhela_test_cost_meta( $cost, '_bhela_cost_status', 'checked' );
 $made[] = $cost;
 $exp = wp_insert_post( array( 'post_type' => 'bhela_expense', 'post_status' => 'publish', 'post_title' => 'ZZUI expense' ) );
 $made[] = $exp;
@@ -78,6 +78,8 @@ bhela_bm_inv_write_lines( $period, array( $ikey => array_merge( bhela_bm_inv_bla
 	'open' => 25, 'add' => 10, 'good' => 20, 'dam' => 14, 'count' => 34, 'rate' => 1200,
 ) ) ) );
 
+$GLOBALS['zz_cost'] = $cost;
+
 $screens = array(
 	'Dashboard'        => array( 'bhela_booking_page_bhela-bm-dashboard', array( 'page' => 'bhela-bm-dashboard' ), fn() => bhela_bm_dashboard_page() ),
 	'Trip Report'      => array( 'bhela_booking_page_bhela-bm-reports', array( 'page' => 'bhela-bm-reports', 'from' => '2026-07-01', 'to' => '2026-07-31', 'cancelled' => 1 ), fn() => bhela_bm_reports_page() ),
@@ -101,8 +103,19 @@ $screens = array(
 	'CSV Import'       => array( 'store_page_bhela-bm-inv-import', array( 'page' => 'bhela-bm-inv-import' ), fn() => bhela_bm_inv_import_page() ),
 	'Audit Trail'      => array( 'store_page_bhela-bm-audit', array( 'page' => 'bhela-bm-audit' ), fn() => bhela_bm_audit_page() ),
 	'Item editor'      => array( 'bhela_inv_item', array(), fn() => bhela_bm_inv_item_meta_cb( get_post( $GLOBALS['zz_item'] ) ) ),
+	// The investor chain shipped without a single one of its screens in this list,
+	// so nothing was checking they render clean, carry the taka on every figure or
+	// keep their columns aligned. That is exactly the gap that let a misaligned
+	// header ship on fourteen tables.
+	'Investor Dash'    => array( 'investors_page_bhela-bm-investor-dash', array( 'page' => 'bhela-bm-investor-dash' ), fn() => bhela_bm_investor_dash_page() ),
+	'Distribution'     => array( 'toplevel_page_bhela-bm-dist', array( 'page' => 'bhela-bm-dist', 'month' => '2026-07' ), fn() => bhela_bm_dist_page() ),
+	'Investor Report'  => array( 'investors_page_bhela-bm-investor-report', array( 'page' => 'bhela-bm-investor-report' ), fn() => bhela_bm_investor_report_page() ),
+	'Funds'            => array( 'investors_page_bhela-bm-funds', array( 'page' => 'bhela-bm-funds' ), fn() => bhela_bm_funds_page() ),
+	'Cash Flow'        => array( 'investors_page_bhela-bm-cashflow', array( 'page' => 'bhela-bm-cashflow', 'from' => '2026-07-01', 'to' => '2026-07-31' ), fn() => bhela_bm_cashflow_page() ),
+	'Trip P&L list'    => array( 'accounts_page_bhela-bm-trip-pl', array( 'page' => 'bhela-bm-trip-pl' ), fn() => bhela_bm_trip_pl_page() ),
+	'Trip P&L one'     => array( 'accounts_page_bhela-bm-trip-pl', array( 'page' => 'bhela-bm-trip-pl', 'sheet' => $GLOBALS['zz_cost'] ), fn() => bhela_bm_trip_pl_page() ),
+	'Revenue'          => array( 'accounts_page_bhela-bm-revenue', array( 'page' => 'bhela-bm-revenue', 'period' => 'month' ), fn() => bhela_bm_revenue_page() ),
 );
-$GLOBALS['zz_cost'] = $cost;
 $GLOBALS['zz_exp']  = $exp;
 $GLOBALS['zz_sal']  = $sal;
 $GLOBALS['zz_book'] = $book;
@@ -142,7 +155,11 @@ foreach ( array( '#1a7f37', '#b32d2e', '#b45309', '#dcdcde' ) as $hex ) {
 // the 1, so the pattern matches "064,000" instead and reports a symbol-less
 // figure that no reader ever sees. Stripping tags first tests what is actually
 // on screen, which is what the assertion is about.
-$text = wp_strip_all_tags( $all );
+// A .bha-plain figure is a count, not a sum — the audit trail's "1,021 events
+// recorded" is the case that forced this. Drop those before scanning, so the
+// assertion keeps meaning "every money figure" rather than "every figure".
+$money_html = preg_replace( '#<span class="bha-plain">.*?</span>#u', '', $all );
+$text       = wp_strip_all_tags( $money_html );
 preg_match_all( '/(?<![\d,])\d{1,3}(?:,\d{3})+(?![\d,])/u', $text, $plain );
 $bare = array_filter( $plain[0], function ( $n ) use ( $text ) {
 	return false === strpos( $text, '৳' . $n );

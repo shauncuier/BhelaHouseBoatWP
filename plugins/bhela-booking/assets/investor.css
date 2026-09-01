@@ -26,6 +26,17 @@
 .bhela-inv__actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .bhela-inv__muted { color: var(--inv-soft); font-size: .92rem; margin: .2rem 0; }
 
+/* Something waiting on somebody — a raised payment that has not been released.
+   Louder than __muted because it is news, quieter than an error because nothing
+   is wrong. */
+.bhela-inv__note {
+	margin: .6rem 0;
+	padding: .6rem .9rem;
+	border-left: 3px solid var(--inv-accent);
+	background: rgba(19, 122, 116, .07);
+	font-size: .92rem;
+}
+
 .bhela-inv__btn {
 	display: inline-block; padding: .55rem 1rem; border-radius: 8px;
 	background: var(--inv-accent); color: #fff; border: 1px solid var(--inv-accent);
@@ -86,6 +97,13 @@
 /* Print: this is the statement an investor keeps. Borders, never fills —
    browsers drop backgrounds in economy colour mode, and a statement whose
    figures lose their structure on paper is not a statement. */
+/* The statement, on paper.
+ *
+ * Borders, never fills. `print-color-adjust: economy` is the browser's default and
+ * it drops background colours, so a table striped with a grey fill prints as one
+ * undifferentiated block — the rows stop being separable exactly when somebody is
+ * reading them away from the screen. Every separation here is therefore a rule,
+ * which prints on any printer in any mode. */
 @media print {
 	.bhela-inv__actions,
 	.site-header, .site-footer, .wa-float, .mobile-bar { display: none !important; }
@@ -94,4 +112,28 @@
 	.bhela-inv__table { font-size: 11pt; }
 	.bhela-inv__table thead { display: table-header-group; }
 	.bhela-inv__scroll { overflow: visible; }
+
+	.bhela-inv__card,
+	.bhela-inv__kpi,
+	.bhela-inv__note {
+		background: none;
+		box-shadow: none;
+		border: 1px solid #000;
+	}
+	.bhela-inv__note { border-left-width: 3px; }
+	.bhela-inv__table th,
+	.bhela-inv__table td {
+		background: none !important;
+		border-bottom: 1px solid #555;
+	}
+	.bhela-inv__table thead th { border-bottom: 2px solid #000; font-weight: 700; }
+	/* A statement that does not say whose it is, and as at when, is not a statement.
+	   The heading carries the name; this carries the date the page was printed. */
+	.bhela-inv__head::after {
+		content: "";
+		display: block;
+		margin-top: .4rem;
+		border-bottom: 2px solid #000;
+	}
+	a[href]::after { content: ""; }   /* no URL spam beside every link */
 }

@@ -54,6 +54,9 @@ function bhela_bm_audit_channels() {
 		'lists'  => array( 'label' => __( 'Categories & Locations', 'bhela-booking' ) ),
 		'import' => array( 'label' => __( 'Imports', 'bhela-booking' ) ),
 		'investor' => array( 'label' => __( 'Investors', 'bhela-booking' ) ),
+		// 'period' next door is the monthly STOCK sheet, so this one is named for
+		// what it is rather than sharing the word "sheets" with it.
+		'cost'   => array( 'label' => __( 'Cost Sheets', 'bhela-booking' ) ),
 	);
 }
 
@@ -477,8 +480,8 @@ function bhela_bm_audit_page() {
 		<p class="bha-note"><?php
 			printf(
 				/* translators: %s: number of recorded events */
-				esc_html__( '%s events recorded. Nothing is ever removed, and there is deliberately no button here that could remove one — download the CSV if you want a copy off-site. The Activity Log is the other screen: that one is for "did that email go out", it is capped, and it can be cleared.', 'bhela-booking' ),
-				esc_html( number_format_i18n( bhela_bm_audit_count() ) )
+				wp_kses_post( __( '%s events recorded. Nothing is ever removed, and there is deliberately no button here that could remove one — download the CSV if you want a copy off-site. The Activity Log is the other screen: that one is for "did that email go out", it is capped, and it can be cleared.', 'bhela-booking' ) ),
+				'<span class="bha-plain">' . esc_html( number_format_i18n( bhela_bm_audit_count() ) ) . '</span>'
 			);
 		?></p>
 	</div>

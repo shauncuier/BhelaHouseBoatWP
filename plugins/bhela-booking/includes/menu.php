@@ -210,6 +210,8 @@ function bhela_bm_menu_layout() {
 			'bhela-bm-statement',                     // 📈 Monthly Statement
 			'bhela-bm-yearly',                        // 📚 Yearly Report
 			'bhela-bm-b2b',                           // 🤝 B2B Report
+			'bhela-bm-trip-pl',                       // 🧮 Trip P&L
+			'bhela-bm-revenue',                       // 💹 Revenue by Source
 		),
 		'store'    => array(
 			'edit.php?post_type=bhela_inv_item',      // 📦 Item Register
@@ -221,6 +223,7 @@ function bhela_bm_menu_layout() {
 		),
 		'investors' => array(
 			'edit.php?post_type=bhela_investor',      // 👤 Investors
+			'bhela-bm-investor-dash',                 // 🧭 Dashboard
 			'bhela-bm-dist',                          // 💰 Distribution
 			'bhela-bm-investor-report',               // 📊 Investor Report
 			'bhela-bm-funds',                         // 🏦 Funds

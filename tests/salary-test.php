@@ -11,9 +11,9 @@ $made = array();
 for ( $i = 1; $i <= 13; $i++ ) {
 	$id = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZS trip ' . $i ) );
 	$made[] = $id;
-	update_post_meta( $id, '_bhela_cost_trip_date', sprintf( '2026-07-%02d', $i * 2 ) );
-	update_post_meta( $id, '_bhela_cost_status', 'approved' );
-	update_post_meta( $id, '_bhela_cost_header', wp_json_encode( array( 'total_guest' => '25' ) ) );
+	bhela_test_cost_meta( $id, '_bhela_cost_trip_date', sprintf( '2026-07-%02d', $i * 2 ) );
+	bhela_test_cost_meta( $id, '_bhela_cost_status', 'approved' );
+	bhela_test_cost_meta( $id, '_bhela_cost_header', wp_json_encode( array( 'total_guest' => '25' ) ) );
 }
 
 echo "=== 1. trips completed comes from the approved sheets ===\n";

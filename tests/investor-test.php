@@ -130,14 +130,14 @@ echo "\n=== 3. an unapproved cost sheet pays nobody ===\n";
 // The existing prepare → check → approve chain is the gate on investor money. No
 // second approval workflow was invented; this asserts the first one still holds.
 $iv_sheet = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ investor sheet' ) );
-update_post_meta( $iv_sheet, '_bhela_cost_trip_date', $iv_month . '-05' );
-update_post_meta( $iv_sheet, '_bhela_cost_earnings', 500000 );
-update_post_meta( $iv_sheet, '_bhela_cost_total', 200000 );
-update_post_meta( $iv_sheet, '_bhela_cost_status', 'draft' );
+bhela_test_cost_meta( $iv_sheet, '_bhela_cost_trip_date', $iv_month . '-05' );
+bhela_test_cost_meta( $iv_sheet, '_bhela_cost_earnings', 500000 );
+bhela_test_cost_meta( $iv_sheet, '_bhela_cost_total', 200000 );
+bhela_test_cost_meta( $iv_sheet, '_bhela_cost_status', 'draft' );
 ok( 0 === bhela_bm_dist_preview( $iv_month )['gross'], 'a draft month has nothing to distribute' );
 ok( is_wp_error( bhela_bm_dist_commit( $iv_month ) ), 'and committing it is refused' );
 
-update_post_meta( $iv_sheet, '_bhela_cost_status', 'approved' );
+bhela_test_cost_meta( $iv_sheet, '_bhela_cost_status', 'approved' );
 $iv_p = bhela_bm_dist_preview( $iv_month );
 ok( 300000 === $iv_p['gross'], 'approving it makes ৳3,00,000 distributable', (string) $iv_p['gross'] );
 
@@ -452,7 +452,330 @@ ok( $iv_cf['net'] === $iv_cf['in_total'] - $iv_cf['out_total'], 'net movement is
 ok( 0 === bhela_bm_cashflow( '2026-09-30', '2026-09-01' )['in_total'], 'an inverted range returns nothing' );
 ok( 0 === bhela_bm_cashflow( '', '' )['out_total'], 'and so does a blank one' );
 
+
+echo "\n=== 16. every field change is on the record, and bank details are named not printed ===\n";
+// Before this, bhela_bm_investor_save() audited a shareholding change and nothing
+// else. An investor's bank account could be repointed with no trace at all, which is
+// the highest-value tamper on the whole module and exactly what the trail is for.
+$iv_acct_old = '1234567890';
+$iv_acct_new = '9999888877';
+update_post_meta( $iv_a, '_bhela_inv_bank_account', $iv_acct_old );
+$iv_before = count( bhela_bm_audit_history( 'investor', $iv_a ) );
+
+$_POST = array(
+	'bhela_bm_investor_nonce' => wp_create_nonce( 'bhela_bm_investor_save' ),
+	'inv_shares'              => bhela_bm_investor_shares( $iv_a ),
+	'inv_amount'              => (int) get_post_meta( $iv_a, '_bhela_inv_amount', true ),
+	'inv_date'                => (string) get_post_meta( $iv_a, '_bhela_inv_date', true ),
+	'inv_status'              => bhela_bm_investor_status( $iv_a ),
+	'inv_bank_account'        => $iv_acct_new,
+	'inv_mobile'              => '01711000111',
+);
+bhela_bm_investor_save( $iv_a );
+$_POST = array();
+
+$iv_hist = array_slice( bhela_bm_audit_history( 'investor', $iv_a ), $iv_before );
+$iv_bank_row  = null;
+$iv_phone_row = null;
+foreach ( $iv_hist as $h ) {
+	if ( 'bank_account' === $h['field'] ) {
+		$iv_bank_row = $h;
+	}
+	if ( 'mobile' === $h['field'] ) {
+		$iv_phone_row = $h;
+	}
+}
+ok( $iv_acct_new === (string) get_post_meta( $iv_a, '_bhela_inv_bank_account', true ), 'the account number is saved' );
+ok( null !== $iv_bank_row, 'and changing it writes an audit row naming the field' );
+if ( $iv_bank_row ) {
+	// The point of the exercise: a trail that printed both numbers would be a second,
+	// never-deleted copy of the very data it is protecting, readable by anyone who can
+	// open the Audit Trail.
+	ok( '' === (string) $iv_bank_row['old_value'] && '' === (string) $iv_bank_row['new_value'],
+		'with NEITHER account number in it' );
+	$iv_blob = wp_json_encode( $iv_bank_row );
+	ok( false === strpos( $iv_blob, $iv_acct_old ) && false === strpos( $iv_blob, $iv_acct_new ),
+		'and neither number anywhere else on the row either' );
+}
+// An ordinary field still records its values — hiding everything would make the trail
+// useless. Only bank and identity fields are held back.
+ok( null !== $iv_phone_row, 'an ordinary field change is audited too' );
+if ( $iv_phone_row ) {
+	ok( '01711000111' === (string) $iv_phone_row['new_value'], 'and it DOES carry the new value', (string) $iv_phone_row['new_value'] );
+}
+// Saving the same values again writes nothing: a trail full of no-op rows is a trail
+// nobody reads.
+$iv_before2 = count( bhela_bm_audit_history( 'investor', $iv_a ) );
+$_POST = array(
+	'bhela_bm_investor_nonce' => wp_create_nonce( 'bhela_bm_investor_save' ),
+	'inv_shares'              => bhela_bm_investor_shares( $iv_a ),
+	'inv_amount'              => (int) get_post_meta( $iv_a, '_bhela_inv_amount', true ),
+	'inv_date'                => (string) get_post_meta( $iv_a, '_bhela_inv_date', true ),
+	'inv_status'              => bhela_bm_investor_status( $iv_a ),
+	'inv_bank_account'        => $iv_acct_new,
+	'inv_mobile'              => '01711000111',
+);
+bhela_bm_investor_save( $iv_a );
+$_POST = array();
+ok( $iv_before2 === count( bhela_bm_audit_history( 'investor', $iv_a ) ), 'an unchanged save writes no audit row at all' );
+
+echo "\n=== 17. the portal login throttles guessing, and never punishes success ===\n";
+$iv_src_p  = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/investor-portal.php' );
+$iv_limit  = bhela_bm_portal_login_limit();
+$iv_ip_key = 'bhela_bm_inv_login_' . md5( bhela_bm_client_ip() );
+delete_transient( $iv_ip_key );
+
+ok( $iv_limit > 0 && $iv_limit <= 20, 'there is a failed-attempt limit', (string) $iv_limit );
+ok( false !== strpos( $iv_src_p, 'bhela_bm_client_ip()' ), 'keyed per IP, the same shape as the booking tracker' );
+// Counting successes would lock out everyone behind one CGNAT address the moment a
+// single neighbour typed a password wrong.
+ok( false !== strpos( $iv_src_p, 'delete_transient( $ip_key )' ), 'and a correct sign-in CLEARS the counter rather than adding to it' );
+// Drive it: failures accumulate, and the throttled response is indistinguishable.
+$_POST = array(
+	'bhela_inv_login' => '1',
+	'bhela_inv_nonce' => wp_create_nonce( 'bhela_inv_login' ),
+	'log'             => 'zz_nobody_here',
+	'pwd'             => 'wrong-on-purpose',
+);
+for ( $iv_try = 0; $iv_try < $iv_limit; $iv_try++ ) {
+	bhela_bm_portal_login();
+}
+ok( $iv_limit === (int) get_transient( $iv_ip_key ), 'each failure is counted once', (string) (int) get_transient( $iv_ip_key ) );
+$iv_blocked = bhela_bm_portal_login();
+ok( false !== strpos( $iv_blocked, 'bhela_inv_nonce' ), 'the next attempt gets the form back, not a lockout page' );
+// Byte-for-byte the same page a wrong password produces. Saying "too many
+// attempts" would confirm to an attacker that the account exists and that they
+// are hitting a real limit worth waiting out.
+delete_transient( $iv_ip_key );
+$iv_wrongpw = bhela_bm_portal_login();
+delete_transient( $iv_ip_key );
+set_transient( $iv_ip_key, $iv_limit, HOUR_IN_SECONDS );
+$iv_throttled = bhela_bm_portal_login();
+ok( $iv_throttled === $iv_wrongpw, 'and it is byte-for-byte the wrong-password page — a throttled attempt reveals nothing a wrong password does not' );
+ok( $iv_limit === (int) get_transient( $iv_ip_key ), 'and a refused attempt does not inflate the counter further' );
+$_POST = array();
+delete_transient( $iv_ip_key );
+
+echo "\n=== 18. a payment needs two people ===\n";
+// Cost sheets have required prepare -> check -> approve for a long time. Paying a
+// named person needed no second signature at all, which made it the weakest link in a
+// chain that is careful everywhere else.
+bhela_bm_install_roles();
+$iv_rel = get_role( 'bhela_investor_relations' );
+$iv_mgr = get_role( 'bhela_manager' );
+ok( $iv_rel->has_cap( 'bhela_investor_pay' ), 'Investor Relations can raise a payment' );
+ok( ! $iv_rel->has_cap( 'bhela_investor_approve' ), 'but CANNOT approve one — a second signature the same person supplies is not a second signature' );
+ok( $iv_mgr->has_cap( 'bhela_investor_approve' ), 'a Manager can approve' );
+ok( ! $iv_mgr->has_cap( 'bhela_investor_pay' ), 'and does not raise them by default either' );
+
+$iv_urq = wp_insert_user( array( 'user_login' => 'zz_pay_req', 'user_email' => 'zz_pay_req@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_investor_relations' ) );
+$iv_uap = wp_insert_user( array( 'user_login' => 'zz_pay_app', 'user_email' => 'zz_pay_app@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_manager' ) );
+
+$iv_pos0 = bhela_bm_investor_roi( $iv_a );
+$iv_cf0  = bhela_bm_cashflow( $iv_month . '-01', $iv_month . '-28' );
+
+iv_as( $iv_urq );
+$iv_req = bhela_bm_payreq_add( array(
+	'investor'  => $iv_a,
+	'type'      => 'payment',
+	'amount'    => 7777,
+	'date'      => $iv_month . '-26',
+	'method'    => 'bank',
+	'reference' => 'ZZ CHQ 001',
+	'note'      => 'ZZ payment request',
+) );
+ok( ! is_wp_error( $iv_req ) && $iv_req > 0, 'Investor Relations can raise a request' );
+
+// The whole claim: raising it moves nothing.
+$iv_pos1 = bhela_bm_investor_roi( $iv_a );
+ok( $iv_pos0['received'] === $iv_pos1['received'], 'a pending request pays nothing…', (string) $iv_pos1['received'] );
+ok( $iv_pos0['outstanding'] === $iv_pos1['outstanding'], '…and the outstanding balance does not move' );
+ok( $iv_pos0['roi'] === $iv_pos1['roi'], '…nor does ROI' );
+$iv_cf1 = bhela_bm_cashflow( $iv_month . '-01', $iv_month . '-28' );
+ok( $iv_cf0['out_total'] === $iv_cf1['out_total'], '…and no cash has left the business' );
+
+// A requester approving their own request defeats the point, so it is refused before
+// the capability is even reached.
+iv_as( $iv_urq );
+ok( is_wp_error( bhela_bm_payreq_approve( $iv_req ) ), 'the requester cannot approve their own request' );
+
+iv_as( $iv_uap );
+$iv_row = bhela_bm_payreq_approve( $iv_req );
+ok( ! is_wp_error( $iv_row ) && $iv_row > 0, 'a Manager can, and only now is a ledger row written' );
+
+$iv_pos2 = bhela_bm_investor_roi( $iv_a );
+ok( $iv_pos1['received'] + 7777 === $iv_pos2['received'], 'the payment lands exactly once', (string) $iv_pos2['received'] );
+ok( $iv_pos1['outstanding'] - 7777 === $iv_pos2['outstanding'], 'and the outstanding balance falls by exactly the amount' );
+
+// Approving twice must not pay twice.
+ok( is_wp_error( bhela_bm_payreq_approve( $iv_req ) ), 'an already-settled request cannot be approved again' );
+ok( $iv_pos2['received'] === bhela_bm_investor_roi( $iv_a )['received'], 'so the money moves once and only once' );
+
+// A rejection writes no ledger row, ever.
+iv_as( $iv_urq );
+$iv_req2 = bhela_bm_payreq_add( array( 'investor' => $iv_a, 'type' => 'advance', 'amount' => 3333, 'date' => $iv_month . '-27', 'note' => 'ZZ to reject' ) );
+iv_as( $iv_uap );
+ok( is_wp_error( bhela_bm_payreq_reject( $iv_req2, '' ) ), 'a rejection without a reason is refused' );
+ok( true === bhela_bm_payreq_reject( $iv_req2, 'ZZ not this month' ), 'and with one it is recorded' );
+ok( $iv_pos2['received'] === bhela_bm_investor_roi( $iv_a )['received'], 'a rejected request pays nothing' );
+ok( 0 === (int) get_post_meta( $iv_req2, '_bhela_pr_ledger', true ), 'and leaves no ledger row behind it' );
+
+// The ledger keeps meaning what it meant: what actually moved. The workflow lives on
+// its own record precisely so the append-only rows stay immutable.
+$iv_prsrc = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/investor-payreq.php' );
+ok( false === strpos( $iv_prsrc, '_bhela_led_state' ) && false === strpos( $iv_prsrc, '_bhela_led_approved' ),
+	'approval state is never written onto a ledger row' );
+
+wp_set_current_user( 0 );
+wp_set_current_user( 1 );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $iv_urq );
+wp_delete_user( $iv_uap );
+
+
+echo "\n=== 19. a season is a label over a range, never a second set of boundaries ===\n";
+$iv_seasons_was = get_option( 'bhela_bm_seasons', array() );
+
+// Shipped empty on purpose: inventing somebody else's season dates would put a
+// confident wrong answer on the screen.
+ok( is_array( bhela_bm_seasons() ), 'the season list is always an array' );
+
+bhela_bm_save_seasons( array(
+	array( 'key' => '', 'label' => 'ZZ Season', 'from' => $iv_month . '-01', 'to' => $iv_month . '-28' ),
+	// Every one of these is unusable as a range, and each is dropped rather than
+	// silently reporting on everything or on nothing.
+	array( 'key' => '', 'label' => 'ZZ No dates', 'from' => '', 'to' => '' ),
+	array( 'key' => '', 'label' => 'ZZ Backwards', 'from' => $iv_month . '-28', 'to' => $iv_month . '-01' ),
+	array( 'key' => '', 'label' => '', 'from' => '2026-01-01', 'to' => '2026-12-31' ),
+) );
+$iv_all_seasons = bhela_bm_seasons();
+ok( 1 === count( $iv_all_seasons ), 'only a season that resolves to a real range survives the save', (string) count( $iv_all_seasons ) );
+$iv_skey = array_key_first( $iv_all_seasons );
+ok( 'zz-season' === $iv_skey || 'zz_season' === $iv_skey, 'the key is minted from the label', (string) $iv_skey );
+
+$iv_sfound = bhela_bm_season_for( $iv_month . '-15' );
+ok( $iv_sfound && $iv_skey === $iv_sfound['key'], 'a date inside it resolves to it' );
+ok( null === bhela_bm_season_for( '2001-01-01' ), 'and one outside every season resolves to nothing' );
+ok( null === bhela_bm_season_for( '' ), 'a blank date resolves to nothing rather than to the first season' );
+
+// The claim that makes seasons safe: a season is the same figures as its raw range.
+$iv_sdata = bhela_bm_season_investors( $iv_skey );
+ok( null !== $iv_sdata, 'a season resolves to per-investor figures' );
+$iv_raw_declared = 0;
+foreach ( bhela_bm_investors() as $iv_sid ) {
+	foreach ( bhela_bm_investor_ledger( $iv_sid )['rows'] as $iv_r ) {
+		if ( $iv_r['date'] < $iv_month . '-01' || $iv_r['date'] > $iv_month . '-28' ) {
+			continue;
+		}
+		if ( bhela_bm_ledger_reversal_of( $iv_r['id'] ) || $iv_r['reverses'] ) {
+			continue;
+		}
+		if ( 'profit' === $iv_r['type'] ) {
+			$iv_raw_declared += $iv_r['amount'];
+		}
+	}
+}
+ok( $iv_raw_declared === $iv_sdata['declared'], 'and they equal the same dates asked for raw, to the taka',
+	$iv_raw_declared . ' vs ' . $iv_sdata['declared'] );
+ok( null === bhela_bm_season_investors( 'no_such_season' ), 'an unknown season reports nothing rather than everything' );
+
+echo "\n=== 20. the dashboard cannot disagree with the screens it summarises ===\n";
+$iv_dash = bhela_bm_investor_dash_data();
+$iv_sum_decl = 0;
+$iv_sum_recv = 0;
+$iv_sum_out  = 0;
+foreach ( bhela_bm_investors() as $iv_did ) {
+	$iv_dr        = bhela_bm_investor_roi( $iv_did );
+	$iv_sum_decl += $iv_dr['declared'];
+	$iv_sum_recv += $iv_dr['received'];
+	$iv_sum_out  += $iv_dr['outstanding'];
+}
+ok( $iv_sum_decl === $iv_dash['declared'], 'declared totals match the per-investor figures', $iv_sum_decl . ' vs ' . $iv_dash['declared'] );
+ok( $iv_sum_recv === $iv_dash['received'], 'so does received' );
+ok( $iv_sum_out === $iv_dash['outstanding'], 'so does outstanding' );
+ok( $iv_dash['shares']['issued'] === bhela_bm_share_totals()['issued'], 'and the share count is the register’s own' );
+
+// A pending request is surfaced but counted nowhere — the same claim §18 makes,
+// asserted here on the screen that would be most tempting to shortcut.
+$iv_dash_recv0 = $iv_dash['received'];
+$iv_dpr = bhela_bm_payreq_add( array( 'investor' => $iv_a, 'type' => 'payment', 'amount' => 4242, 'date' => $iv_month . '-28', 'note' => 'ZZ dash pending' ) );
+$iv_dash2 = bhela_bm_investor_dash_data();
+ok( $iv_dash2['pending']['count'] >= 1, 'the dashboard names what is waiting for approval' );
+ok( $iv_dash_recv0 === $iv_dash2['received'], 'and it is in no money figure on the screen', $iv_dash2['received'] . '' );
+if ( ! is_wp_error( $iv_dpr ) ) {
+	wp_delete_post( $iv_dpr, true );
+}
+
+// Each fund's balance is allocated less spent, replayed rather than stored.
+foreach ( $iv_dash['funds'] as $iv_fk => $iv_f ) {
+	$iv_fl = bhela_bm_fund_ledger( $iv_fk );
+	ok( (int) $iv_fl['closing'] === $iv_f['balance'], "the $iv_fk balance is the ledger's own closing figure",
+		$iv_fl['closing'] . ' vs ' . $iv_f['balance'] );
+}
+
+// An export leaves the building. Bank details must not be in it.
+$iv_dash_src = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/investor-dashboard.php' );
+ok( false === strpos( $iv_dash_src, '_bhela_inv_bank_account' ) && false === strpos( $iv_dash_src, '_bhela_inv_nid' ),
+	'the register CSV carries no account number and no NID' );
+ok( false !== strpos( $iv_dash_src, 'bhela_bm_csv_cell' ), 'and every free-text cell in it is neutralised' );
+
+update_option( 'bhela_bm_seasons', $iv_seasons_was, false );
+
+
+echo "\n=== 21. the portal answers more than six questions, and still only about one investor ===\n";
+// The portal shipped showing six figures against the brief's fifteen. What was
+// missing was everything that makes a number mean something: how THIS season is
+// going, what the company has set aside, and whether a payment is already on its way.
+$iv_pu = wp_insert_user( array( 'user_login' => 'zz_portal_kpi', 'user_email' => 'zz_portal_kpi@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_investor' ) );
+update_post_meta( $iv_a, '_bhela_inv_user', $iv_pu );
+
+bhela_bm_save_seasons( array(
+	array( 'key' => '', 'label' => 'ZZ Now', 'from' => gmdate( 'Y-m-d', strtotime( '-1 month' ) ), 'to' => gmdate( 'Y-m-d', strtotime( '+1 month' ) ) ),
+) );
+
+iv_as( $iv_pu );
+$iv_pd = bhela_bm_portal_data();
+ok( $iv_a === $iv_pd['id'], 'the portal still resolves to exactly one investor' );
+ok( isset( $iv_pd['season'] ) && null !== $iv_pd['season'], 'it knows which season today falls in' );
+ok( 'ZZ Now' === $iv_pd['season']['label'], 'and names it', (string) ( $iv_pd['season']['label'] ?? '' ) );
+ok( isset( $iv_pd['funds']['reserve'] ), 'the reserve allocation is on the portal' );
+ok( isset( $iv_pd['funds']['management'] ), 'and so is the management allocation' );
+// Totals only. §18's breakdown of what management spent on is internal — a portal is
+// not where that conversation happens.
+ok( ! isset( $iv_pd['funds']['reserve']['by_head'] ) && ! isset( $iv_pd['funds']['reserve']['rows'] ),
+	'as a total only, with no breakdown of what either fund was spent on' );
+
+// A pending request is shown but counted nowhere.
+iv_as( 1 );
+$iv_ppr = bhela_bm_payreq_add( array( 'investor' => $iv_a, 'type' => 'payment', 'amount' => 6060, 'date' => $iv_month . '-20', 'note' => 'ZZ portal pending' ) );
+iv_as( $iv_pu );
+$iv_pd2 = bhela_bm_portal_data();
+ok( 1 === $iv_pd2['pending']['count'] && 6060 === $iv_pd2['pending']['total'], 'a raised payment is visible to the investor',
+	$iv_pd2['pending']['count'] . ' / ' . $iv_pd2['pending']['total'] );
+ok( $iv_pd['roi']['received'] === $iv_pd2['roi']['received'], 'and is in no figure on the page — nothing has been paid' );
+ok( $iv_pd['roi']['outstanding'] === $iv_pd2['roi']['outstanding'], 'nor in the outstanding balance' );
+
+// Rendered, because the harnesses call data functions and never draw a page — which
+// is how the discount badge and the B2B date default both shipped broken.
+$iv_phtml = bhela_bm_portal_shortcode();
+ok( false !== strpos( $iv_phtml, 'ZZ Now' ), 'the season reaches the rendered page' );
+ok( false !== strpos( $iv_phtml, bhela_bm_money( 6060 ) ), 'so does the waiting payment' );
+ok( false === strpos( $iv_phtml, 'ZZ Inv B' ), 'and it still names no other investor' );
+ok( false !== strpos( $iv_phtml, 'bhela-inv__note' ), 'the waiting payment is marked as news rather than as a balance' );
+
+if ( ! is_wp_error( $iv_ppr ) ) {
+	wp_delete_post( $iv_ppr, true );
+}
+wp_set_current_user( 0 );
+wp_set_current_user( 1 );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $iv_pu );
+delete_post_meta( $iv_a, '_bhela_inv_user' );
+
 /* ---------- cleanup ---------- */
+foreach ( get_posts( array( 'post_type' => 'bhela_payreq', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
+	wp_delete_post( $z, true );
+}
 foreach ( get_posts( array( 'post_type' => 'bhela_inv_ledger', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
 	bhela_test_delete( $z );
 }

@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Bump when bhela_bm_role_defaults() or bhela_bm_permissions() changes, so
 // existing sites re-sync once against the new definition.
-define( 'BHELA_BM_ROLES_VERSION', 7 );
+define( 'BHELA_BM_ROLES_VERSION', 8 );
 
 /* =========================================================
  * CAPABILITY SETS
@@ -46,7 +46,12 @@ function bhela_bm_extra_caps() {
 		// money, and one person should not necessarily do both.
 		'bhela_investors_view' => __( 'See the investor register', 'bhela-booking' ),
 		'bhela_dist_run'      => __( 'Run monthly profit distribution', 'bhela-booking' ),
-		'bhela_investor_pay'  => __( 'Record investor payments', 'bhela-booking' ),
+		'bhela_investor_pay'  => __( 'Request investor payments', 'bhela-booking' ),
+		// Approving is a SEPARATE capability from requesting, and the default roles
+		// below keep them in different hands. A second signature the same person can
+		// supply is not a second signature, and bhela_bm_payreq_approve() also
+		// refuses when the approver is the requester.
+		'bhela_investor_approve' => __( 'Approve investor payments', 'bhela-booking' ),
 		// Inventory & Asset Register. bhela_inv_reopen is separate from
 		// bhela_inv_approve on purpose: reopening a closed month invalidates every
 		// later month's opening balance, which is a bigger act than closing one.
@@ -179,9 +184,15 @@ function bhela_bm_permissions() {
 			'requires' => 'investors_view',
 		),
 		'investor_pay'    => array(
-			'label'    => __( 'Record investor payments', 'bhela-booking' ),
-			'help'     => __( 'Enter advances, payments and adjustments against an investor.', 'bhela-booking' ),
+			'label'    => __( 'Request investor payments', 'bhela-booking' ),
+			'help'     => __( 'Raise a payment or advance for approval, and record corrections. Raising one moves no money.', 'bhela-booking' ),
 			'caps'     => array( 'bhela_investor_pay' ),
+			'requires' => 'investors_view',
+		),
+		'investor_approve' => array(
+			'label'    => __( 'Approve investor payments', 'bhela-booking' ),
+			'help'     => __( 'Release a requested payment. This is what actually moves money, and it is deliberately not held by the person who raises the request.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_approve' ),
 			'requires' => 'investors_view',
 		),
 		'costs_check'     => array(
@@ -347,6 +358,9 @@ function bhela_bm_role_defaults() {
 			'name'  => __( 'BHELA Investor Relations', 'bhela-booking' ),
 			'blurb' => __( 'Maintains the investor register, runs monthly profit distribution and records investor payments. Reads the Monthly Statement but cannot approve cost sheets.', 'bhela-booking' ),
 			'perms' => array( 'statement', 'investors_view', 'investors_edit', 'dist_run', 'investor_pay' ),
+			// Deliberately no 'investor_approve': the person who prepares a payment is
+			// not the person who releases it. Give it to a manager or keep it with the
+			// owner — the Team screen can change this, which is the point of it.
 		),
 		// An investor is NOT staff. This role holds no plugin permission at all — the
 		// portal checks every query against the viewer's own record instead. Granting
@@ -367,6 +381,8 @@ function bhela_bm_role_defaults() {
 				// but closing the month stays with management.
 				'inventory_view', 'inventory_items', 'inventory_lists', 'inventory_import',
 				'inventory_count', 'inventory_check',
+				// Releases an investor payment somebody else prepared.
+				'investors_view', 'investor_approve',
 			),
 		),
 		'bhela_booking_staff' => array(

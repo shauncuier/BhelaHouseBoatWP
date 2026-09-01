@@ -8,7 +8,7 @@ function by_label( $lines, $label ) { foreach ( $lines as $l ) { if ( $l['label'
 wp_set_current_user( 1 );
 $sheet = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ roundtrip' ) );
 
-function save( $sheet, $lines ) {
+function save( $sheet, $lines, $income = null ) {
 	$_POST = array(
 		'bhela_bm_cost_nonce'  => wp_create_nonce( 'bhela_bm_cost_save' ),
 		'bhela_cost_trip_date' => '2026-07-01',
@@ -16,6 +16,11 @@ function save( $sheet, $lines ) {
 		'bhela_cost_lines'     => $lines,
 		'bhela_cost_earnings'  => '142400',
 	);
+	// null means "this form has no income block at all" — a sheet saved by a build
+	// that predates income heads, which is the case that must not change value.
+	if ( null !== $income ) {
+		$_POST['bhela_cost_income'] = $income;
+	}
 	bhela_bm_cost_save( $sheet, get_post( $sheet ) );
 	$_POST = array();
 }
@@ -120,6 +125,310 @@ update_post_meta( $sheet, '_bhela_cost_status', 'approved' );
 $locked_total = (int) get_post_meta( $sheet, '_bhela_cost_total', true );
 save( $sheet, array( 'engine_fuel' => array( 'p1' => 999999 ) ) );
 ok( $locked_total === (int) get_post_meta( $sheet, '_bhela_cost_total', true ), 'locked sheet unchanged' );
+
+
+echo "\n=== 5. income heads, and the one rule that keeps them honest ===\n";
+$rt_inc = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ income' ) );
+
+// A sheet saved with no income block at all behaves exactly as it did before this
+// existed. This is the assertion that lets the feature ship: nothing already
+// approved can change value.
+save( $rt_inc, array( 'engine_fuel' => array( 'p1' => 10000 ) ) );
+ok( 142400 === (int) get_post_meta( $rt_inc, '_bhela_cost_earnings', true ), 'no income block: the typed earnings figure stands', (string) get_post_meta( $rt_inc, '_bhela_cost_earnings', true ) );
+ok( array() === bhela_bm_cost_income( $rt_inc ), 'and nothing is stored against the heads' );
+ok( 0 === bhela_bm_cost_income_total( $rt_inc ), 'so the income total is zero, which is what "not in use" means' );
+
+// Fill the heads and the earnings ARE their sum — note the typed 142,400 above is
+// deliberately still in the POST and is deliberately overruled.
+save( $rt_inc, array( 'engine_fuel' => array( 'p1' => 10000 ) ), array(
+	'cabin' => '90000', 'food' => '12000', 'bbq' => '4500', 'transport' => '3500',
+) );
+ok( 110000 === bhela_bm_cost_income_total( $rt_inc ), 'the heads add up', (string) bhela_bm_cost_income_total( $rt_inc ) );
+ok( 110000 === (int) get_post_meta( $rt_inc, '_bhela_cost_earnings', true ),
+	'and the sheet\'s earnings ARE that sum — not the number still sitting in the earnings box',
+	(string) get_post_meta( $rt_inc, '_bhela_cost_earnings', true ) );
+
+// An unrecognised key is a tampered or stale field. Keeping it would put money on
+// the sheet under a label nothing can render.
+save( $rt_inc, array( 'engine_fuel' => array( 'p1' => 10000 ) ), array(
+	'cabin' => '90000', 'not_a_head' => '50000',
+) );
+ok( 90000 === bhela_bm_cost_income_total( $rt_inc ), 'an unknown head is dropped rather than stored', (string) bhela_bm_cost_income_total( $rt_inc ) );
+ok( ! isset( bhela_bm_cost_income( $rt_inc )['not_a_head'] ), 'and does not appear on the sheet' );
+
+// Clearing every line hands the earnings box back.
+save( $rt_inc, array( 'engine_fuel' => array( 'p1' => 10000 ) ), array( 'cabin' => '0', 'food' => '' ) );
+ok( array() === bhela_bm_cost_income( $rt_inc ), 'clearing every line clears the block' );
+ok( 142400 === (int) get_post_meta( $rt_inc, '_bhela_cost_earnings', true ), 'and the typed earnings figure governs again',
+	(string) get_post_meta( $rt_inc, '_bhela_cost_earnings', true ) );
+
+echo "\n=== 6. revenue by source agrees with the sheets it reads ===\n";
+save( $rt_inc, array( 'engine_fuel' => array( 'p1' => 10000 ) ), array( 'cabin' => '90000', 'food' => '12000' ) );
+
+// A draft is a proposal. A revenue report that moved whenever somebody opened a
+// sheet and typed in it would not be a report.
+update_post_meta( $rt_inc, '_bhela_cost_status', 'draft' );
+$rt_rev = bhela_bm_revenue_by_source( '2026-07-01', '2026-07-31', 'month' );
+ok( 0 === $rt_rev['grand'] || ! isset( $rt_rev['totals']['food'] ) || 12000 !== $rt_rev['totals']['food'],
+	'a draft sheet contributes nothing' );
+
+update_post_meta( $rt_inc, '_bhela_cost_status', 'approved' );
+$rt_rev = bhela_bm_revenue_by_source( '2026-07-01', '2026-07-31', 'month' );
+ok( isset( $rt_rev['totals']['food'] ) && 12000 === (int) $rt_rev['totals']['food'], 'approving it brings the food line in',
+	(string) ( $rt_rev['totals']['food'] ?? 0 ) );
+ok( $rt_rev['grand'] >= 102000, 'and the grand total carries both heads', (string) $rt_rev['grand'] );
+
+// Every column plus the unsplit column equals the grand total. Two ways of adding
+// the same figures is how a silent disagreement starts, so they are pinned together.
+$rt_cols = array_sum( $rt_rev['totals'] ) + $rt_rev['unsplit'];
+ok( $rt_cols === $rt_rev['grand'], 'the columns and the total agree to the taka', $rt_cols . ' vs ' . $rt_rev['grand'] );
+$rt_periods = 0;
+foreach ( $rt_rev['periods'] as $rt_p ) {
+	$rt_periods += $rt_p['total'];
+}
+ok( $rt_periods === $rt_rev['grand'], 'and so do the rows', $rt_periods . ' vs ' . $rt_rev['grand'] );
+
+// One trip's own report has to say the same thing the range report does.
+$rt_one = bhela_bm_trip_report( $rt_inc );
+ok( 102000 === $rt_one['earnings'], 'the trip P&L reports the same revenue', (string) $rt_one['earnings'] );
+ok( 2 === count( $rt_one['income'] ), 'broken into two sources' );
+ok( $rt_one['earnings'] - $rt_one['cost'] === $rt_one['profit'], 'and profit is revenue minus cost' );
+ok( 100.0 === array_sum( wp_list_pluck( $rt_one['income'], 'pct' ) ), 'the source shares come to 100%',
+	(string) array_sum( wp_list_pluck( $rt_one['income'], 'pct' ) ) );
+
+// A spreadsheet executes a cell that opens with =. Every free-text cell in the
+// export goes through the neutraliser; no figure does.
+$rt_csv = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/trip-report.php' );
+ok( false !== strpos( $rt_csv, 'bhela_bm_csv_cell' ), 'the CSV neutralises its text cells' );
+ok( "'=cmd|' /C calc'!A0" === bhela_bm_csv_cell( '=cmd|\' /C calc\'!A0' ), 'and the neutraliser still does its job',
+	bhela_bm_csv_cell( '=cmd|\' /C calc\'!A0' ) );
+
+bhela_test_delete( $rt_inc );
+
+
+echo "\n=== 7. a one-off row survives being saved twice ===\n";
+// The client's report: "sometimes an extra field is auto-removed after save". It was
+// a key collision, and it only bit on the SECOND save, which is why it looked
+// intermittent. A row typed into a pre-rendered blank is stored under that blank's
+// own key — new_0 — and the render then emitted a FRESH blank new_0 after it. Two
+// inputs, one name: the browser sends both, PHP keeps the last, and the last is the
+// empty one. The typed row and its money vanished off the sheet's total.
+$rt_row = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ rowkeys' ) );
+
+save( $rt_row, array(
+	'engine_fuel' => array( 'p1' => 5000 ),
+	// Exactly what the form names its first spare slot.
+	'new_0'       => array( 'label' => 'Chair', 'p1' => 1200, 'remark' => '' ),
+) );
+ok( 'Chair' === ( bhela_bm_cost_stored_lines( $rt_row )['new_0']['label'] ?? '' ), 'a one-off typed into a blank slot is stored' );
+ok( 6200 === (int) get_post_meta( $rt_row, '_bhela_cost_total', true ), 'and its money is in the total', (string) get_post_meta( $rt_row, '_bhela_cost_total', true ) );
+
+// The render is where the bug lived: no key may appear twice, or the browser cannot
+// help but send one row's value under another row's name.
+$rt_rendered = bhela_bm_cost_lines( $rt_row );
+$rt_seen  = array();
+$rt_dupes = array();
+foreach ( $rt_rendered as $rt_r ) {
+	if ( isset( $rt_seen[ $rt_r['key'] ] ) ) {
+		$rt_dupes[] = $rt_r['key'];
+	}
+	$rt_seen[ $rt_r['key'] ] = true;
+}
+ok( ! $rt_dupes, 'the form emits no key twice', implode( ', ', $rt_dupes ) );
+
+// Now save the way a browser does: every rendered row, in render order, last one
+// winning on a repeated name. This is the assertion the old code failed.
+$rt_post = array();
+foreach ( $rt_rendered as $rt_r ) {
+	$rt_post[ $rt_r['key'] ] = array(
+		'label'  => $rt_r['fixed'] ? '' : $rt_r['label'],
+		'p1'     => $rt_r['p1'],
+		'p2'     => $rt_r['p2'],
+		'p3'     => $rt_r['p3'],
+		'remark' => $rt_r['remark'],
+	);
+}
+save( $rt_row, $rt_post );
+ok( 'Chair' === ( bhela_bm_cost_stored_lines( $rt_row )['new_0']['label'] ?? '' ), 'and it is still there after a second save',
+	wp_json_encode( bhela_bm_cost_stored_lines( $rt_row )['new_0'] ?? null ) );
+ok( 6200 === (int) get_post_meta( $rt_row, '_bhela_cost_total', true ), 'with the total unchanged',
+	(string) get_post_meta( $rt_row, '_bhela_cost_total', true ) );
+
+// A third round trip, because the collision appeared one save late the first time.
+$rt_post2 = array();
+foreach ( bhela_bm_cost_lines( $rt_row ) as $rt_r ) {
+	$rt_post2[ $rt_r['key'] ] = array(
+		'label'  => $rt_r['fixed'] ? '' : $rt_r['label'],
+		'p1'     => $rt_r['p1'],
+		'p2'     => $rt_r['p2'],
+		'p3'     => $rt_r['p3'],
+		'remark' => $rt_r['remark'],
+	);
+}
+save( $rt_row, $rt_post2 );
+ok( 'Chair' === ( bhela_bm_cost_stored_lines( $rt_row )['new_0']['label'] ?? '' ), 'and after a third' );
+
+// Several one-offs at once, each typed into a different blank, all keeping their own
+// label and figure — the form offers five slots and a real July sheet used fourteen.
+$rt_many = array( 'engine_fuel' => array( 'p1' => 1000 ) );
+$rt_names = array( 'Spoon' => 250, 'Pencil Battary' => 100, 'Electric Materials' => 1260, 'Cold Drinks' => 800, 'Silencer Screw' => 300 );
+$rt_i = 0;
+foreach ( $rt_names as $rt_label => $rt_amt ) {
+	$rt_many[ 'new_' . $rt_i ] = array( 'label' => $rt_label, 'p1' => $rt_amt, 'remark' => '' );
+	$rt_i++;
+}
+save( $rt_row, $rt_many );
+$rt_stored = bhela_bm_cost_stored_lines( $rt_row );
+$rt_kept = 0;
+foreach ( $rt_names as $rt_label => $rt_amt ) {
+	foreach ( $rt_stored as $rt_line ) {
+		if ( ( $rt_line['label'] ?? '' ) === $rt_label && (int) ( $rt_line['p1'] ?? 0 ) === $rt_amt ) {
+			$rt_kept++;
+		}
+	}
+}
+ok( 5 === $rt_kept, 'five one-off rows all survive one save', (string) $rt_kept );
+
+$rt_render2 = bhela_bm_cost_lines( $rt_row );
+$rt_seen2 = array();
+$rt_dup2  = array();
+foreach ( $rt_render2 as $rt_r ) {
+	if ( isset( $rt_seen2[ $rt_r['key'] ] ) ) {
+		$rt_dup2[] = $rt_r['key'];
+	}
+	$rt_seen2[ $rt_r['key'] ] = true;
+}
+ok( ! $rt_dup2, 'and the re-render still collides with nothing', implode( ', ', $rt_dup2 ) );
+
+$rt_post3 = array();
+foreach ( $rt_render2 as $rt_r ) {
+	$rt_post3[ $rt_r['key'] ] = array(
+		'label'  => $rt_r['fixed'] ? '' : $rt_r['label'],
+		'p1'     => $rt_r['p1'],
+		'p2'     => $rt_r['p2'],
+		'p3'     => $rt_r['p3'],
+		'remark' => $rt_r['remark'],
+	);
+}
+save( $rt_row, $rt_post3 );
+$rt_stored3 = bhela_bm_cost_stored_lines( $rt_row );
+$rt_kept3 = 0;
+foreach ( $rt_names as $rt_label => $rt_amt ) {
+	foreach ( $rt_stored3 as $rt_line ) {
+		if ( ( $rt_line['label'] ?? '' ) === $rt_label ) {
+			$rt_kept3++;
+		}
+	}
+}
+ok( 5 === $rt_kept3, 'all five are still there after the round trip', (string) $rt_kept3 );
+
+// Opening a sheet must not grow it five slots every time. The spare-slot count is
+// steady, or a sheet visited ten times would carry fifty empty rows.
+$rt_blanks_a = 0;
+foreach ( bhela_bm_cost_lines( $rt_row ) as $rt_r ) {
+	if ( ! $rt_r['fixed'] && 0 === $rt_r['sub'] && '' === $rt_r['label'] ) {
+		$rt_blanks_a++;
+	}
+}
+$rt_blanks_b = 0;
+foreach ( bhela_bm_cost_lines( $rt_row ) as $rt_r ) {
+	if ( ! $rt_r['fixed'] && 0 === $rt_r['sub'] && '' === $rt_r['label'] ) {
+		$rt_blanks_b++;
+	}
+}
+ok( $rt_blanks_a === $rt_blanks_b && $rt_blanks_a === bhela_bm_cost_extra_rows(),
+	'the number of spare slots is steady across renders', $rt_blanks_a . ' / ' . $rt_blanks_b );
+
+// The cap still bounds a crafted POST, and no longer does it in silence.
+$rt_crafted = array();
+for ( $rt_c = 0; $rt_c < bhela_bm_cost_max_custom_rows() + 12; $rt_c++ ) {
+	$rt_crafted[ 'atk_' . $rt_c ] = array( 'label' => 'ZZ atk ' . $rt_c, 'p1' => 1 );
+}
+save( $rt_row, $rt_crafted );
+$rt_atk = 0;
+foreach ( bhela_bm_cost_stored_lines( $rt_row ) as $rt_k => $rt_line ) {
+	if ( 0 === strpos( (string) $rt_k, 'atk_' ) ) {
+		$rt_atk++;
+	}
+}
+ok( $rt_atk === bhela_bm_cost_max_custom_rows(), 'the one-off cap holds against a crafted POST', (string) $rt_atk );
+$rt_src = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/costs.php' );
+ok( false !== strpos( $rt_src, '$dropped++' ) && false !== strpos( $rt_src, 'at its limit of' ),
+	'and says so rather than truncating in silence — silent truncation looks exactly like the bug above' );
+
+// The nonce is normalised before it is checked, like every other one in the plugin.
+ok( false !== strpos( $rt_src, "wp_verify_nonce( sanitize_text_field( wp_unslash( \$_POST['bhela_bm_cost_nonce'] ) )" ),
+	'the cost-sheet nonce goes through wp_unslash() before verification' );
+
+bhela_test_delete( $rt_row );
+
+
+echo "\n=== 8. an approved sheet is locked against more than the metabox ===\n";
+// bhela_bm_cost_save() has always refused an approved sheet, and that covered the
+// form. It covered nothing else: a direct update_post_meta(), trash, hard delete and
+// quick edit all walked straight past it. That was a documented shortcoming while an
+// approved sheet only fed a report — but the investor distribution now reads approved
+// sheets and nothing else, so a sheet deletable from WP-CLI leaves profit declared
+// owed to named people against a trip the books can no longer show.
+$rt_lock = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ locked' ) );
+save( $rt_lock, array( 'engine_fuel' => array( 'p1' => 7000 ) ) );
+update_post_meta( $rt_lock, '_bhela_cost_status', 'approved' );
+
+ok( bhela_bm_cost_locked( $rt_lock ), 'the sheet reports itself locked' );
+
+// 1. A direct meta write.
+$rt_total_was = (int) get_post_meta( $rt_lock, '_bhela_cost_total', true );
+update_post_meta( $rt_lock, '_bhela_cost_total', 999999 );
+ok( $rt_total_was === (int) get_post_meta( $rt_lock, '_bhela_cost_total', true ),
+	'a direct update_post_meta() on the total is refused', (string) get_post_meta( $rt_lock, '_bhela_cost_total', true ) );
+update_post_meta( $rt_lock, '_bhela_cost_earnings', 123456 );
+ok( 123456 !== (int) get_post_meta( $rt_lock, '_bhela_cost_earnings', true ), 'and so is one on the earnings' );
+update_post_meta( $rt_lock, '_bhela_cost_income', '{"cabin":1}' );
+ok( array() === bhela_bm_cost_income( $rt_lock ), 'and one on the income heads' );
+delete_post_meta( $rt_lock, '_bhela_cost_lines' );
+ok( '' !== get_post_meta( $rt_lock, '_bhela_cost_lines', true ), 'deleting the lines is refused too' );
+
+// 2. Trash and hard delete, as WP-CLI or a cron job would reach them — no is_admin()
+//    anywhere in the path.
+wp_trash_post( $rt_lock );
+ok( 'trash' !== get_post_status( $rt_lock ), 'an approved sheet cannot be trashed' );
+wp_delete_post( $rt_lock, true );
+ok( 'bhela_cost' === get_post_type( $rt_lock ), 'nor hard-deleted — by anyone, administrator included' );
+
+// 3. Quick edit and the delete links come off the row, so the list does not offer
+//    something that would silently do nothing.
+$rt_actions = apply_filters( 'post_row_actions', array( 'inline hide-if-no-js' => 'x', 'trash' => 'x', 'edit' => 'x' ), get_post( $rt_lock ) );
+ok( ! isset( $rt_actions['inline hide-if-no-js'] ), 'quick edit is not offered on a locked sheet' );
+ok( ! isset( $rt_actions['trash'] ), 'nor is Trash' );
+ok( isset( $rt_actions['edit'] ), 'but the sheet can still be opened and read' );
+
+// 4. The status itself is deliberately NOT guarded: unlocking is how an approved
+//    sheet is legitimately reopened, and a lock that cannot be lifted is a trap.
+update_post_meta( $rt_lock, '_bhela_cost_status', 'prepared' );
+ok( 'prepared' === get_post_meta( $rt_lock, '_bhela_cost_status', true ), 'the status can still be changed, so unlock still works' );
+ok( ! bhela_bm_cost_locked( $rt_lock ), 'and the sheet is editable again once it is' );
+update_post_meta( $rt_lock, '_bhela_cost_total', 4242 );
+ok( 4242 === (int) get_post_meta( $rt_lock, '_bhela_cost_total', true ), 'with its figures writable again', (string) get_post_meta( $rt_lock, '_bhela_cost_total', true ) );
+
+// 5. The guard loads on every request, not behind is_admin() — the whole reason it
+//    is in its own file. Asserted at source, because a test running in wp-admin
+//    cannot tell the difference.
+// php_strip_whitespace() drops the comments, so this asserts about the CODE. Over the
+// raw file it failed on the comment that explains why there is no is_admin() here —
+// a test that reads prose is testing the prose.
+$rt_core = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/costs-core.php' );
+ok( false === strpos( $rt_core, 'is_admin()' ), 'costs-core.php contains no is_admin() gate at all' );
+$rt_boot = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/bhela-booking.php' );
+ok( false !== strpos( $rt_boot, "includes/costs-core.php" ), 'and it is required unconditionally' );
+// It must not depend on costs.php, which is admin-only — a front-end or WP-CLI
+// request never loads that, which is exactly where the gaps were reachable from.
+ok( false === strpos( $rt_core, 'bhela_bm_cost_status(' ), 'and it reads the meta directly rather than calling an admin-only helper' );
+
+// The lock has to be lifted before the fixture can be cleaned up, which is the same
+// dance bhela_test_delete() does for a closed stock month.
+update_post_meta( $rt_lock, '_bhela_cost_status', 'draft' );
+bhela_test_delete( $rt_lock );
+ok( 'bhela_cost' !== get_post_type( $rt_lock ), 'an unlocked sheet deletes normally' );
 
 bhela_test_delete( $sheet );
 bhela_test_done();

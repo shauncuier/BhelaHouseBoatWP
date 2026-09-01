@@ -238,6 +238,21 @@ function bhela_bm_investor_position_box( $post ) {
 		esc_html__( 'Open ledger', 'bhela-booking' ) );
 }
 
+/**
+ * Fields whose VALUE must never reach the audit trail.
+ *
+ * A bank account number and an NID are exactly what an audit trail is protecting. A
+ * log that records the old and the new value in full becomes a second copy of the
+ * data — one that is deliberately never deleted, readable by anyone who can open the
+ * Audit Trail, and outside the investor record's own access control.
+ *
+ * So for these the trail records THAT the field changed, by whom and when. The values
+ * themselves live on the record, where the permissions are.
+ */
+function bhela_bm_investor_secret_fields() {
+	return array( 'nid', 'bank_account', 'bank_account_name', 'bank_routing', 'nominee_nid' );
+}
+
 function bhela_bm_investor_save( $post_id ) {
 	if ( ! isset( $_POST['bhela_bm_investor_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_investor_nonce'] ) ), 'bhela_bm_investor_save' ) ) {
 		return;
@@ -248,55 +263,71 @@ function bhela_bm_investor_save( $post_id ) {
 	if ( ! current_user_can( 'edit_post', $post_id ) ) {
 		return;
 	}
-	$shares = max( 0, (int) ( $_POST['inv_shares'] ?? 0 ) );
-	$before = bhela_bm_investor_shares( $post_id );
-	update_post_meta( $post_id, '_bhela_inv_shares', $shares );
-	update_post_meta( $post_id, '_bhela_inv_amount', max( 0, (int) ( $_POST['inv_amount'] ?? 0 ) ) );
-	update_post_meta( $post_id, '_bhela_inv_date', bhela_bm_report_date( $_POST['inv_date'] ?? '' ) );
-	$status = sanitize_key( $_POST['inv_status'] ?? 'active' );
-	update_post_meta( $post_id, '_bhela_inv_status', in_array( $status, array( 'active', 'suspended', 'exited' ), true ) ? $status : 'active' );
+
+	// Everything is collected first and written second, so one pass can compare the
+	// old value with the new. Auditing only the shareholding — which is all this did —
+	// meant an investor's bank account could be changed with no record at all, and
+	// changing where a payment lands is the highest-value tamper on this module.
+	$writes = array();
+
+	$writes['shares'] = max( 0, (int) ( $_POST['inv_shares'] ?? 0 ) );
+	$writes['amount'] = max( 0, (int) ( $_POST['inv_amount'] ?? 0 ) );
+	$writes['date']   = bhela_bm_report_date( $_POST['inv_date'] ?? '' );
+	$status           = sanitize_key( $_POST['inv_status'] ?? 'active' );
+	$writes['status'] = in_array( $status, array( 'active', 'suspended', 'exited' ), true ) ? $status : 'active';
 
 	foreach ( bhela_bm_investor_fields() as $group ) {
 		foreach ( $group['fields'] as $key => $def ) {
 			if ( ! isset( $_POST[ 'inv_' . $key ] ) ) {
 				continue;
 			}
-			$raw  = wp_unslash( $_POST[ 'inv_' . $key ] );
+			$rawv = wp_unslash( $_POST[ 'inv_' . $key ] );
 			$type = isset( $def['type'] ) ? $def['type'] : 'text';
 			// A signature is a URL, an address keeps its line breaks, a date is only
 			// a date. sanitize_text_field() on all of them would silently flatten the
 			// addresses and let a junk URL through.
 			if ( 'file' === $type ) {
-				$clean = esc_url_raw( $raw );
+				$writes[ $key ] = esc_url_raw( $rawv );
 			} elseif ( 'textarea' === $type ) {
-				$clean = sanitize_textarea_field( $raw );
+				$writes[ $key ] = sanitize_textarea_field( $rawv );
 			} elseif ( 'email' === $type ) {
-				$clean = sanitize_email( $raw );
+				$writes[ $key ] = sanitize_email( $rawv );
 			} elseif ( 'date' === $type ) {
-				$clean = bhela_bm_report_date( $raw );
+				$writes[ $key ] = bhela_bm_report_date( $rawv );
 			} else {
-				$clean = sanitize_text_field( $raw );
+				$writes[ $key ] = sanitize_text_field( $rawv );
 			}
-			update_post_meta( $post_id, '_bhela_inv_' . $key, $clean );
 		}
 	}
 
-	bhela_bm_investor_save_login( $post_id );
+	$secret = bhela_bm_investor_secret_fields();
+	$ref    = get_the_title( $post_id );
 
-	// A shareholding change moves everybody's percentage and every future payout, so
-	// it is recorded with both figures rather than just the new one.
-	if ( $before !== $shares ) {
+	foreach ( $writes as $key => $new ) {
+		$old = get_post_meta( $post_id, '_bhela_inv_' . $key, true );
+		if ( (string) $old === (string) $new ) {
+			continue;
+		}
+		update_post_meta( $post_id, '_bhela_inv_' . $key, $new );
+
+		$hide = in_array( $key, $secret, true );
 		bhela_bm_audit( array(
 			'channel'     => 'investor',
-			'action'      => 'shares',
+			'action'      => 'shares' === $key ? 'shares' : 'profile',
 			'object_type' => 'investor',
 			'object_id'   => $post_id,
-			'object_ref'  => get_the_title( $post_id ),
-			'field'       => 'shares',
-			'old_value'   => (string) $before,
-			'new_value'   => (string) $shares,
+			'object_ref'  => $ref,
+			'field'       => $key,
+			// Sensitive fields record the fact, never the figures.
+			'old_value'   => $hide ? '' : (string) $old,
+			'new_value'   => $hide ? '' : (string) $new,
+			'reason'      => $hide
+				? __( 'Value not recorded — this field holds bank or identity details.', 'bhela-booking' )
+				: '',
 		) );
 	}
+
+	bhela_bm_investor_save_login( $post_id );
 }
 add_action( 'save_post_bhela_investor', 'bhela_bm_investor_save' );
 
@@ -574,7 +605,10 @@ function bhela_bm_investor_report_page() {
 		);
 		?>
 		<?php if ( $one ) : ?>
-			<p><a class="button" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-investor-report' ) ); ?>">← <?php esc_html_e( 'All investors', 'bhela-booking' ); ?></a></p>
+			<p>
+				<a class="button" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-investor-report' ) ); ?>">← <?php esc_html_e( 'All investors', 'bhela-booking' ); ?></a>
+				<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_ledger_csv&investor=' . (int) $one ), 'bhela_bm_ledger_csv' ) ); ?>"><?php esc_html_e( 'Download CSV', 'bhela-booking' ); ?></a>
+			</p>
 			<?php
 			$led = bhela_bm_investor_ledger( $one );
 			$roi = bhela_bm_investor_roi( $one );
@@ -607,12 +641,80 @@ function bhela_bm_investor_report_page() {
 								<input type="date" name="date" value="<?php echo esc_attr( current_time( 'Y-m-d' ) ); ?>"></div>
 							<div class="bha-field"><label><?php esc_html_e( 'Method', 'bhela-booking' ); ?></label>
 								<input type="text" name="method" placeholder="<?php esc_attr_e( 'bank / cash', 'bhela-booking' ); ?>"></div>
+							<div class="bha-field"><label><?php esc_html_e( 'Reference', 'bhela-booking' ); ?></label>
+								<input type="text" name="reference" placeholder="<?php esc_attr_e( 'cheque / trx id', 'bhela-booking' ); ?>"></div>
+							<div class="bha-field"><label><?php esc_html_e( 'Document URL', 'bhela-booking' ); ?></label>
+								<input type="url" name="doc" placeholder="https://"></div>
 							<div class="bha-field"><label><?php esc_html_e( 'Note', 'bhela-booking' ); ?></label>
 								<input type="text" name="note"></div>
-							<button type="submit" class="button button-primary"><?php esc_html_e( 'Record', 'bhela-booking' ); ?></button>
+							<button type="submit" class="button button-primary"><?php esc_html_e( 'Submit', 'bhela-booking' ); ?></button>
 						</div>
-						<p class="description"><?php esc_html_e( 'Profit is never entered by hand — it comes from a distribution run, so the ledger always traces back to an approved month.', 'bhela-booking' ); ?></p>
+						<p class="description"><?php esc_html_e( 'A payment or an advance is raised as a request and moves no money until somebody else approves it — the investor’s outstanding does not change while it is waiting. An adjustment is a correction and is recorded straight away. Profit is never entered by hand: it comes from a distribution run, so the ledger always traces back to an approved month.', 'bhela-booking' ); ?></p>
 					</form>
+				</div>
+			<?php endif; ?>
+
+			<?php
+			$pr_rows = bhela_bm_payreqs( '', $one );
+			$pr_can  = current_user_can( 'bhela_investor_approve' );
+			?>
+			<?php if ( $pr_rows ) : ?>
+				<div class="bha-panel">
+					<h2><?php esc_html_e( 'Payment requests', 'bhela-booking' ); ?></h2>
+					<div class="bha-scroll">
+					<table class="widefat striped">
+						<thead><tr>
+							<th><?php esc_html_e( 'Date', 'bhela-booking' ); ?></th>
+							<th><?php esc_html_e( 'Type', 'bhela-booking' ); ?></th>
+							<th><?php esc_html_e( 'Reference', 'bhela-booking' ); ?></th>
+							<th><?php esc_html_e( 'Raised by', 'bhela-booking' ); ?></th>
+							<th class="bha-num"><?php esc_html_e( 'Amount', 'bhela-booking' ); ?></th>
+							<th><?php esc_html_e( 'State', 'bhela-booking' ); ?></th>
+							<th class="bha-noprint"></th>
+						</tr></thead>
+						<tbody>
+						<?php foreach ( $pr_rows as $pr ) : ?>
+							<?php
+							$st   = bhela_bm_payreq_states();
+							$who  = get_userdata( $pr['by'] );
+							$mine = get_current_user_id() === $pr['by'];
+							?>
+							<tr>
+								<td><?php echo esc_html( mysql2date( 'j M Y', $pr['date'] ) ); ?></td>
+								<td><?php echo esc_html( $pr['type'] ); ?></td>
+								<td>
+									<?php echo esc_html( $pr['reference'] ); ?>
+									<?php if ( $pr['doc'] ) : ?>
+										<a href="<?php echo esc_url( $pr['doc'] ); ?>" target="_blank" rel="noopener">📎</a>
+									<?php endif; ?>
+								</td>
+								<td><?php echo esc_html( $who ? $who->display_name : '—' ); ?></td>
+								<td class="bha-num"><?php echo esc_html( bhela_bm_money( $pr['amount'] ) ); ?></td>
+								<td><?php echo bhela_bm_status_pill( $st[ $pr['state'] ]['label'], $st[ $pr['state'] ]['tone'] ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+								<td class="bha-noprint">
+									<?php if ( 'requested' !== $pr['state'] ) : ?>
+										<span style="opacity:.6"><?php echo esc_html( $pr['reason'] ); ?></span>
+									<?php elseif ( ! $pr_can ) : ?>
+										<span style="opacity:.6"><?php esc_html_e( 'waiting on an approver', 'bhela-booking' ); ?></span>
+									<?php elseif ( $mine ) : ?>
+										<?php /* The whole point of the second signature. */ ?>
+										<span style="opacity:.6"><?php esc_html_e( 'you raised this — somebody else must approve it', 'bhela-booking' ); ?></span>
+									<?php else : ?>
+										<form method="post" style="display:flex;gap:4px;align-items:center">
+											<?php wp_nonce_field( 'bhela_bm_payreq', 'bhela_pr_nonce' ); ?>
+											<input type="hidden" name="request" value="<?php echo esc_attr( $pr['id'] ); ?>">
+											<button class="button button-primary button-small"><?php esc_html_e( 'Approve & pay', 'bhela-booking' ); ?></button>
+											<input type="text" name="pr_reason" placeholder="<?php esc_attr_e( 'reason', 'bhela-booking' ); ?>" style="width:110px">
+											<button class="button button-small" name="pr_reject" value="1"><?php esc_html_e( 'Reject', 'bhela-booking' ); ?></button>
+										</form>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+					</div>
+					<p class="description"><?php esc_html_e( 'A request appears in the ledger only once it is approved, so nothing here counts toward the figures above until somebody releases it.', 'bhela-booking' ); ?></p>
 				</div>
 			<?php endif; ?>
 
@@ -707,14 +809,33 @@ function bhela_bm_investor_admin_post() {
 		return;
 	}
 	if ( isset( $_POST['bhela_ledger_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_ledger_nonce'] ) ), 'bhela_bm_ledger' ) ) {
-		bhela_bm_ledger_add( array(
-			'investor' => (int) ( $_POST['investor'] ?? 0 ),
-			'type'     => sanitize_key( $_POST['type'] ?? '' ),
-			'amount'   => (int) ( $_POST['amount'] ?? 0 ),
-			'date'     => sanitize_text_field( $_POST['date'] ?? '' ),
-			'method'   => sanitize_text_field( $_POST['method'] ?? '' ),
-			'note'     => sanitize_text_field( $_POST['note'] ?? '' ),
-		) );
+		$pr_type = sanitize_key( $_POST['type'] ?? '' );
+		$pr_args = array(
+			'investor'  => (int) ( $_POST['investor'] ?? 0 ),
+			'type'      => $pr_type,
+			'amount'    => (int) ( $_POST['amount'] ?? 0 ),
+			'date'      => sanitize_text_field( $_POST['date'] ?? '' ),
+			'method'    => sanitize_text_field( $_POST['method'] ?? '' ),
+			'reference' => sanitize_text_field( $_POST['reference'] ?? '' ),
+			'doc'       => esc_url_raw( $_POST['doc'] ?? '' ),
+			'note'      => sanitize_text_field( $_POST['note'] ?? '' ),
+		);
+		// Money OUT goes through approval; a correction does not. An adjustment is a
+		// signed fix that already leaves its own trail and reverses cleanly, whereas a
+		// payment is somebody deciding to hand over cash.
+		if ( in_array( $pr_type, array( 'payment', 'advance' ), true ) ) {
+			bhela_bm_payreq_add( $pr_args );
+		} else {
+			bhela_bm_ledger_add( $pr_args );
+		}
+	}
+	if ( isset( $_POST['bhela_pr_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_pr_nonce'] ) ), 'bhela_bm_payreq' ) ) {
+		$pr_id = (int) ( $_POST['request'] ?? 0 );
+		if ( ! empty( $_POST['pr_reject'] ) ) {
+			bhela_bm_payreq_reject( $pr_id, sanitize_text_field( $_POST['pr_reason'] ?? '' ) );
+		} else {
+			bhela_bm_payreq_approve( $pr_id );
+		}
 	}
 	if ( isset( $_POST['bhela_rev_nonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_rev_nonce'] ) ), 'bhela_bm_ledger_rev' ) ) {
 		bhela_bm_ledger_reverse( (int) ( $_POST['row'] ?? 0 ), sanitize_text_field( $_POST['reason'] ?? '' ) );
@@ -761,7 +882,18 @@ function bhela_bm_funds_page() {
 	$def   = $funds[ $fund ];
 	?>
 	<div class="wrap bha-page">
-		<?php bhela_bm_screen_header( '🏦', $def['label'], $def['blurb'] ); ?>
+		<?php
+		bhela_bm_screen_header(
+			'🏦',
+			$def['label'],
+			$def['blurb'],
+			sprintf(
+				'<a class="button" href="%s">%s</a>',
+				esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_fund_csv&fund=' . rawurlencode( $fund ) ), 'bhela_bm_fund_csv' ) ),
+				esc_html__( 'Download CSV', 'bhela-booking' )
+			)
+		);
+		?>
 
 		<div class="bha-bar">
 			<?php // No hidden post_type: this hangs off admin.php (§13.14). ?>

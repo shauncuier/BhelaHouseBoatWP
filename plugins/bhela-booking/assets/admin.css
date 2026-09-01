@@ -364,6 +364,14 @@
 	margin: 0 0 14px;
 }
 
+/* A grouped figure that is deliberately NOT money: a row count, a tally. Marked so
+   it reads as a quantity rather than a sum, and so the ta-ka audit in ui-test can
+   tell the two apart instead of demanding a currency symbol on a count. */
+.bha-plain {
+	font-variant-numeric: tabular-nums;
+	font-weight: 600;
+}
+
 .bha-note {
 	margin: 10px 0 0;
 	font-size: 12px;
@@ -432,6 +440,17 @@
    the live recalculation rewrites the cell's text on every keystroke. */
 .bha-sheet [data-sub] {
 	font-weight: 700;
+}
+
+/* A section heading inside a sheet — the cost table and the income table are two
+   halves of one trip, so each says which half it is. */
+.bha-sheet__h {
+	margin: 22px 0 8px;
+	font-size: 13px;
+	font-weight: 700;
+	letter-spacing: .04em;
+	text-transform: uppercase;
+	color: var(--bha-muted);
 }
 
 .bha-sheet__add {

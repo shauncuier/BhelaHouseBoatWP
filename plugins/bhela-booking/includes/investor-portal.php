@@ -160,6 +160,62 @@ function bhela_bm_portal_data() {
 	}
 	krsort( $by_month );
 
+	// The season this investor is in the middle of, if the owner has named one. A
+	// cumulative ROI five years in tells you nothing about how this year is going,
+	// which is the question anybody actually holds a share to ask.
+	$season = null;
+	if ( function_exists( 'bhela_bm_season_for' ) ) {
+		$now = bhela_bm_season_for( current_time( 'Y-m-d' ) );
+		if ( $now ) {
+			$declared = 0;
+			$paid     = 0;
+			foreach ( $led['rows'] as $r ) {
+				if ( $r['date'] < $now['from'] || $r['date'] > $now['to'] ) {
+					continue;
+				}
+				if ( bhela_bm_ledger_reversal_of( $r['id'] ) || $r['reverses'] ) {
+					continue;
+				}
+				if ( 'profit' === $r['type'] ) {
+					$declared += $r['amount'];
+				} elseif ( in_array( $r['type'], array( 'payment', 'advance' ), true ) ) {
+					$paid += $r['amount'];
+				}
+			}
+			$season = array(
+				'label'    => $now['label'],
+				'from'     => $now['from'],
+				'to'       => $now['to'],
+				'declared' => $declared,
+				'paid'     => $paid,
+				'roi'      => $roi['investment'] > 0 ? round( $declared / $roi['investment'] * 100, 2 ) : 0.0,
+			);
+		}
+	}
+
+	// Business-level, not this investor's: the reserve and the management fund belong
+	// to the company. Totals only — §18's breakdown of what management spent on is an
+	// internal matter, and a portal is not where that conversation happens.
+	$funds = array();
+	if ( function_exists( 'bhela_bm_funds' ) ) {
+		foreach ( bhela_bm_funds() as $key => $fund ) {
+			$fl = bhela_bm_fund_ledger( $key );
+			$funds[ $key ] = array( 'label' => $fund['label'], 'allocated' => (int) $fl['allocated'] );
+		}
+	}
+
+	// A payment somebody has raised but nobody has released. Showing it matters: an
+	// investor who can see "৳50,000 approved and on its way" does not ring the office
+	// about a balance that is already being dealt with. It is deliberately NOT added
+	// to any figure above, because nothing has been paid.
+	$pending = array( 'count' => 0, 'total' => 0 );
+	if ( function_exists( 'bhela_bm_payreqs' ) ) {
+		foreach ( bhela_bm_payreqs( 'requested', $id ) as $pr ) {
+			$pending['count']++;
+			$pending['total'] += $pr['amount'];
+		}
+	}
+
 	return array(
 		'id'         => $id,
 		'name'       => get_the_title( $id ),
@@ -173,7 +229,20 @@ function bhela_bm_portal_data() {
 		'rows'       => $led['rows'],
 		'by_month'   => $by_month,
 		'position'   => bhela_bm_investor_position( $id ),
+		'season'     => $season,
+		'funds'      => $funds,
+		'pending'    => $pending,
 	);
+}
+
+/** The investment status, in the words an investor reads rather than a slug. */
+function bhela_bm_portal_status_label( $status ) {
+	$map = array(
+		'active'    => __( 'সক্রিয়', 'bhela-booking' ),
+		'suspended' => __( 'স্থগিত', 'bhela-booking' ),
+		'exited'    => __( 'প্রত্যাহৃত', 'bhela-booking' ),
+	);
+	return $map[ $status ] ?? $status;
 }
 
 /* =========================================================
@@ -210,8 +279,25 @@ add_shortcode( 'bhela_investor_portal', 'bhela_bm_portal_shortcode' );
 /** The sign-in form. */
 function bhela_bm_portal_login() {
 	$err = '';
+
+	// Per-IP throttle on FAILED attempts, the same shape as the booking tracker at
+	// includes/frontend.php:749. WordPress core does not limit login attempts at all,
+	// so without this an investor account — which fronts real money — can be guessed
+	// at indefinitely. Counting only failures matters behind the shared and CGNAT
+	// addresses most guests and investors here are on: somebody signing in correctly
+	// is never counted, so one attacker cannot lock out a whole building.
+	$ip_key = 'bhela_bm_inv_login_' . md5( bhela_bm_client_ip() );
+	$tries  = (int) get_transient( $ip_key );
+
 	if ( isset( $_POST['bhela_inv_login'] ) && ! empty( $_POST['bhela_inv_nonce'] )
 		&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_inv_nonce'] ) ), 'bhela_inv_login' ) ) {
+
+		if ( $tries >= bhela_bm_portal_login_limit() ) {
+			// Deliberately the same wording as a wrong password. Saying "too many
+			// attempts" would confirm to an attacker that the account exists and that
+			// they are hitting a real rate limit worth waiting out.
+			return bhela_bm_portal_login_form( __( 'ইউজারনেম বা পাসওয়ার্ড সঠিক নয়।', 'bhela-booking' ) );
+		}
 
 		$user = wp_signon( array(
 			'user_login'    => sanitize_text_field( wp_unslash( $_POST['log'] ?? '' ) ),
@@ -224,13 +310,28 @@ function bhela_bm_portal_login() {
 		if ( is_wp_error( $user ) ) {
 			// One message for every failure. Distinguishing "no such user" from "wrong
 			// password" tells an attacker which half they got right.
+			set_transient( $ip_key, $tries + 1, HOUR_IN_SECONDS );
 			$err = __( 'ইউজারনেম বা পাসওয়ার্ড সঠিক নয়।', 'bhela-booking' );
 		} else {
+			// A correct sign-in clears the counter: the person is who they said they
+			// were, and their neighbours on the same address should not inherit an
+			// attacker's failures.
+			delete_transient( $ip_key );
 			wp_safe_redirect( bhela_bm_portal_url() );
 			exit;
 		}
 	}
 
+	return bhela_bm_portal_login_form( $err );
+}
+
+/** How many failed attempts an address gets in an hour. Filterable. */
+function bhela_bm_portal_login_limit() {
+	return (int) apply_filters( 'bhela_bm_portal_login_limit', 8 );
+}
+
+/** The sign-in form itself, with an optional error. */
+function bhela_bm_portal_login_form( $err = '' ) {
 	ob_start();
 	?>
 	<div class="bhela-inv bhela-inv--login">
@@ -293,12 +394,38 @@ function bhela_bm_portal_render( $d ) {
 				array( __( 'বকেয়া', 'bhela-booking' ), $money( $d['roi']['outstanding'] ) ),
 				array( __( 'ROI (প্রাপ্ত)', 'bhela-booking' ), $d['roi']['roi'] . '%' ),
 				array( __( 'ROI (ঘোষিত)', 'bhela-booking' ), $d['roi']['roi_declared'] . '%' ),
+				array( __( 'অবস্থা', 'bhela-booking' ), bhela_bm_portal_status_label( $d['status'] ) ),
 			);
+			if ( $d['season'] ) {
+				$kpis[] = array(
+					/* translators: %s: season name */
+					sprintf( __( '%s — ঘোষিত', 'bhela-booking' ), $d['season']['label'] ),
+					$money( $d['season']['declared'] ),
+				);
+				$kpis[] = array(
+					/* translators: %s: season name */
+					sprintf( __( '%s — ROI', 'bhela-booking' ), $d['season']['label'] ),
+					$d['season']['roi'] . '%',
+				);
+			}
+			foreach ( $d['funds'] as $f ) {
+				$kpis[] = array( $f['label'], $money( $f['allocated'] ) );
+			}
 			foreach ( $kpis as $k ) :
 				?>
 				<div class="bhela-inv__kpi"><span><?php echo esc_html( $k[0] ); ?></span><strong><?php echo esc_html( $k[1] ); ?></strong></div>
 			<?php endforeach; ?>
 		</div>
+
+		<?php if ( $d['pending']['count'] > 0 ) : ?>
+			<p class="bhela-inv__note"><?php
+				printf(
+					/* translators: %s: amount */
+					esc_html__( '%s অনুমোদনের অপেক্ষায় আছে। অনুমোদনের আগে এটি উপরের কোনো হিসাবে যোগ হয়নি।', 'bhela-booking' ),
+					esc_html( $money( $d['pending']['total'] ) )
+				);
+			?></p>
+		<?php endif; ?>
 
 		<?php if ( $d['position']['last_payment'] ) : ?>
 			<p class="bhela-inv__muted"><?php
