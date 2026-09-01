@@ -1020,3 +1020,197 @@ function bhela_bm_funds_admin_post() {
 	}
 }
 add_action( 'admin_init', 'bhela_bm_funds_admin_post' );
+
+/* =========================================================
+ * The investor list table
+ * ========================================================= */
+
+/**
+ * Columns worth the width.
+ *
+ * The list shipped with Title and Date and nothing else, which told you an investor
+ * exists and when the record was typed — neither of which anybody opens this screen
+ * to find out. The questions it should answer at a glance are how much someone holds,
+ * what they are owed, and whether they can actually sign in.
+ */
+function bhela_bm_investor_columns( $columns ) {
+	return array(
+		'cb'          => $columns['cb'] ?? '',
+		'title'       => __( 'Investor', 'bhela-booking' ),
+		'inv_code'    => __( 'ID', 'bhela-booking' ),
+		'inv_shares'  => __( 'Shares', 'bhela-booking' ),
+		'inv_amount'  => __( 'Invested', 'bhela-booking' ),
+		'inv_profit'  => __( 'Declared', 'bhela-booking' ),
+		'inv_paid'    => __( 'Received', 'bhela-booking' ),
+		'inv_due'     => __( 'Outstanding', 'bhela-booking' ),
+		'inv_roi'     => __( 'ROI', 'bhela-booking' ),
+		'inv_login'   => __( 'Portal', 'bhela-booking' ),
+		'inv_status'  => __( 'Status', 'bhela-booking' ),
+	);
+}
+add_filter( 'manage_bhela_investor_posts_columns', 'bhela_bm_investor_columns' );
+
+function bhela_bm_investor_column_content( $column, $post_id ) {
+	// bhela_bm_investor_roi() replays the whole ledger, and every money column needs
+	// the same answer. Once per row, cached, rather than five times.
+	static $cache = array();
+	if ( ! isset( $cache[ $post_id ] ) ) {
+		$cache[ $post_id ] = bhela_bm_investor_roi( $post_id );
+	}
+	$r = $cache[ $post_id ];
+
+	switch ( $column ) {
+		case 'inv_code':
+			$code = (string) get_post_meta( $post_id, '_bhela_inv_code', true );
+			echo $code ? esc_html( $code ) : '<span style="opacity:.4">—</span>';
+			break;
+
+		case 'inv_shares':
+			$held = bhela_bm_investor_shares( $post_id );
+			if ( $held <= 0 ) {
+				// Zero shares means this record takes no part in any distribution.
+				// That is almost always an unfinished entry, so it says so.
+				echo bhela_bm_status_pill( __( 'no shares', 'bhela-booking' ), 'attention' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				break;
+			}
+			printf(
+				'<strong>%d</strong><br><span style="opacity:.6;font-size:11px">%s%%</span>',
+				(int) $held,
+				esc_html( (string) bhela_bm_investor_share_pct( $post_id ) )
+			);
+			break;
+
+		case 'inv_amount':
+			echo esc_html( bhela_bm_money( $r['investment'] ) );
+			break;
+
+		case 'inv_profit':
+			echo esc_html( bhela_bm_money( $r['declared'] ) );
+			break;
+
+		case 'inv_paid':
+			echo esc_html( bhela_bm_money( $r['received'] ) );
+			break;
+
+		case 'inv_due':
+			// The one figure somebody is chasing. Emphasised when there is any.
+			echo $r['outstanding'] > 0
+				? '<strong>' . esc_html( bhela_bm_money( $r['outstanding'] ) ) . '</strong>'
+				: '<span style="opacity:.5">' . esc_html( bhela_bm_money( 0 ) ) . '</span>';
+			break;
+
+		case 'inv_roi':
+			printf(
+				'<strong>%s%%</strong><br><span style="opacity:.6;font-size:11px">%s</span>',
+				esc_html( (string) $r['roi'] ),
+				/* translators: %s: ROI on profit declared but not yet paid */
+				esc_html( sprintf( __( '%s%% declared', 'bhela-booking' ), $r['roi_declared'] ) )
+			);
+			break;
+
+		case 'inv_login':
+			$uid  = bhela_bm_investor_user( $post_id );
+			$user = $uid ? get_userdata( $uid ) : null;
+			if ( ! $user ) {
+				echo bhela_bm_status_pill( __( 'no login', 'bhela-booking' ), 'neutral' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				break;
+			}
+			// A linked account that is not an investor role has wider access than the
+			// portal, which is worth seeing from the list rather than one record at a
+			// time.
+			$ok = in_array( 'bhela_investor', (array) $user->roles, true );
+			echo bhela_bm_status_pill( // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+				$ok ? __( 'linked', 'bhela-booking' ) : __( 'wider access', 'bhela-booking' ),
+				$ok ? 'good' : 'attention'
+			);
+			printf( '<br><span style="opacity:.6;font-size:11px">%s</span>', esc_html( $user->user_email ) );
+			break;
+
+		case 'inv_status':
+			$s     = bhela_bm_investor_status( $post_id );
+			$tones = array( 'active' => 'good', 'suspended' => 'attention', 'exited' => 'neutral' );
+			echo bhela_bm_status_pill( $s, $tones[ $s ] ?? 'neutral' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			break;
+	}
+}
+add_action( 'manage_bhela_investor_posts_custom_column', 'bhela_bm_investor_column_content', 10, 2 );
+
+/** Shares and the amount are real numbers, so sort them as numbers. */
+function bhela_bm_investor_sortable( $columns ) {
+	$columns['inv_shares'] = 'inv_shares';
+	$columns['inv_amount'] = 'inv_amount';
+	return $columns;
+}
+add_filter( 'manage_edit-bhela_investor_sortable_columns', 'bhela_bm_investor_sortable' );
+
+/**
+ * Sorting, and the default order.
+ *
+ * Largest holding first by default: the register is read to see who owns what, and
+ * alphabetical order buries that. The money columns are NOT sortable — every one of
+ * them is replayed from the ledger rather than stored, so there is no meta for the
+ * database to sort on, and faking one would be the cached-balance mistake all over
+ * again.
+ */
+function bhela_bm_investor_orderby( $query ) {
+	global $pagenow;
+	if ( ! is_admin() || 'edit.php' !== $pagenow || ! $query->is_main_query()
+		|| 'bhela_investor' !== ( $_GET['post_type'] ?? '' ) ) {
+		return;
+	}
+	$orderby = $query->get( 'orderby' );
+	if ( 'inv_shares' === $orderby || ( '' === $orderby && ! isset( $_GET['orderby'] ) ) ) {
+		$query->set( 'meta_key', '_bhela_inv_shares' );
+		$query->set( 'orderby', 'meta_value_num' );
+		if ( '' === $orderby ) {
+			$query->set( 'order', 'DESC' );
+		}
+	} elseif ( 'inv_amount' === $orderby ) {
+		$query->set( 'meta_key', '_bhela_inv_amount' );
+		$query->set( 'orderby', 'meta_value_num' );
+	}
+}
+add_action( 'pre_get_posts', 'bhela_bm_investor_orderby' );
+
+/**
+ * A summary line above the list.
+ *
+ * Whether the register adds up to the configured share total is the first thing to
+ * know and the easiest to get wrong, so it is stated here rather than discovered on
+ * the Distribution screen when a payout is already being prepared.
+ */
+function bhela_bm_investor_list_summary() {
+	global $typenow;
+	if ( 'bhela_investor' !== $typenow || 'edit.php' !== ( $GLOBALS['pagenow'] ?? '' ) ) {
+		return;
+	}
+	$t = bhela_bm_share_totals();
+	if ( $t['over'] ) {
+		$tone = 'notice-error';
+		$msg  = sprintf(
+			/* translators: 1: issued, 2: configured */
+			__( '%1$d shares are issued against %2$d configured. Distribution is blocked until this is resolved — the percentages already add to more than 100%%.', 'bhela-booking' ),
+			$t['issued'],
+			$t['configured']
+		);
+	} elseif ( $t['under'] ) {
+		$tone = 'notice-warning';
+		$msg  = sprintf(
+			/* translators: 1: issued, 2: configured, 3: shortfall */
+			__( '%1$d of %2$d shares issued. The remaining %3$d shares take no part in a distribution, so their portion of the investor pool stays with the business.', 'bhela-booking' ),
+			$t['issued'],
+			$t['configured'],
+			abs( $t['gap'] )
+		);
+	} else {
+		$tone = 'notice-success';
+		$msg  = sprintf(
+			/* translators: 1: issued, 2: investor count */
+			__( 'All %1$d shares are issued across %2$d investors. The register balances.', 'bhela-booking' ),
+			$t['issued'],
+			$t['investors']
+		);
+	}
+	printf( '<div class="notice %s inline" style="margin:12px 0"><p>%s</p></div>', esc_attr( $tone ), esc_html( $msg ) );
+}
+add_action( 'all_admin_notices', 'bhela_bm_investor_list_summary' );

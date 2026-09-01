@@ -610,6 +610,18 @@
 	white-space: nowrap;
 }
 
+/* A numeric HEADER has to be right-aligned too, or the label sits over the wrong
+   edge of its own column and the table reads as two unrelated halves. `.bha-num`
+   alone loses to WordPress's own `.widefat th { text-align: left }`, which is more
+   specific — so every money column in this plugin had a left-aligned heading above
+   right-aligned figures. Matching core's specificity fixes all of them at once. */
+.bhela-admin table.widefat th.bha-num,
+.bhela-admin table.widefat td.bha-num,
+.bhela-admin table.widefat tfoot td.bha-num,
+.bhela-admin table.widefat tfoot th.bha-num {
+	text-align: right;
+}
+
 .bha-num--due,
 .bha-owed {
 	font-weight: 700;

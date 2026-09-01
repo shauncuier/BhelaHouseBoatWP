@@ -255,6 +255,13 @@ foreach ( array( 'input', 'select', 'textarea', 'button' ) as $ctl ) {
 // \s+ rather than a literal newline: this file and admin.css do not necessarily
 // share line endings, and a regex that embeds one is asserting about CRLF rather
 // than about the font stack. It failed exactly that way once.
+// A money column's HEADING must be right-aligned too. `.bha-num` alone loses to
+// WordPress's own `.widefat th { text-align: left }`, so for a long time every one of
+// the plugin's ~191 numeric cells sat under a left-aligned label — the table read as
+// two halves that had nothing to do with each other.
+ok( (bool) preg_match( '/\.bhela-admin table\.widefat th\.bha-num[^{]*\{[^}]*text-align:\s*right/s', $css ),
+	'a numeric column heading is right-aligned, at core’s specificity' );
+
 ok( preg_match( '/--bha-font-money:[^;]*-apple-system,\s+BlinkMacSystemFont,\s+"Segoe UI",\s+Roboto,\s+Oxygen-Sans,\s+Ubuntu,\s+Cantarell,\s+"Helvetica Neue",\s+sans-serif/s', $css ),
 	'and the stack behind it matches wp-admin exactly' );
 ok( preg_match( '/@font-face\s*\{[^}]*unicode-range:\s*U\+09F3/si', $css ),
