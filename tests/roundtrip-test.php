@@ -430,5 +430,129 @@ update_post_meta( $rt_lock, '_bhela_cost_status', 'draft' );
 bhela_test_delete( $rt_lock );
 ok( 'bhela_cost' !== get_post_type( $rt_lock ), 'an unlocked sheet deletes normally' );
 
+
+echo "\n=== 9. the lock covers add_post_meta(), not only update ===\n";
+// The gap the shipped §8 missed. It probed keys that already EXISTED, and
+// update_post_meta() is caught either way because WordPress fires the update filter
+// before it checks existence. add_post_meta() fires `add_post_metadata` and nothing
+// else, so a locked key was writable while it was ABSENT — and _bhela_cost_income is
+// absent on every sheet approved before income heads existed, which is exactly the
+// meta Trip P&L and Revenue by Source read.
+$rt_add = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ addmeta' ) );
+save( $rt_add, array( 'engine_fuel' => array( 'p1' => 3000 ) ) );
+update_post_meta( $rt_add, '_bhela_cost_status', 'approved' );
+
+foreach ( bhela_bm_cost_locked_keys() as $rt_k ) {
+	// Absent first — that is the only state add_post_meta() can reach.
+	bhela_bm_cost_writing( true );
+	delete_post_meta( $rt_add, $rt_k );
+	bhela_bm_cost_writing( false );
+
+	add_post_meta( $rt_add, $rt_k, 'ZZ forged' );
+	ok( '' === get_post_meta( $rt_add, $rt_k, true ), "add_post_meta() on an absent $rt_k is refused",
+		var_export( get_post_meta( $rt_add, $rt_k, true ), true ) );
+}
+
+// And the writer still works through the same filters.
+bhela_bm_cost_meta_write( $rt_add, '_bhela_cost_total', 3000 );
+ok( 3000 === (int) get_post_meta( $rt_add, '_bhela_cost_total', true ), 'the plugin\'s own write window still writes',
+	(string) get_post_meta( $rt_add, '_bhela_cost_total', true ) );
+
+// All three hooks, asserted at source: the omission was one missing line and looked
+// exactly like the two that were there.
+$rt_core3 = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/costs-core.php' );
+foreach ( array( 'add_post_metadata', 'update_post_metadata', 'delete_post_metadata' ) as $rt_hook ) {
+	ok( false !== strpos( $rt_core3, "'$rt_hook'" ), "costs-core.php filters $rt_hook" );
+}
+// The same one-line omission was in the distribution lock, on the ledger.
+$rt_dist3 = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/distribution-core.php' );
+foreach ( array( 'add_post_metadata', 'update_post_metadata', 'delete_post_metadata' ) as $rt_hook ) {
+	ok( false !== strpos( $rt_dist3, "'$rt_hook'" ), "distribution-core.php filters $rt_hook" );
+}
+$rt_inv3 = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/inventory-core.php' );
+foreach ( array( 'add_post_metadata', 'update_post_metadata', 'delete_post_metadata' ) as $rt_hook ) {
+	ok( false !== strpos( $rt_inv3, "'$rt_hook'" ), "inventory-core.php filters $rt_hook" );
+}
+
+// The filter runs on every meta write in the site, so it must reject a foreign key
+// before it does any work.
+ok( false !== strpos( $rt_core3, "strpos( \$key, '_bhela_cost_' )" ),
+	'and it rejects a non-cost meta key before allocating anything' );
+
+update_post_meta( $rt_add, '_bhela_cost_status', 'draft' );
+bhela_test_delete( $rt_add );
+
+echo "\n=== 10. a save with no income block cannot contradict the stored heads ===\n";
+// The earnings figure and the income heads are the same number by design. A POST
+// carrying no income block at all — a programmatic save, or a form cached from before
+// the feature — used to leave the heads stored while taking the posted earnings, so
+// Trip P&L showed heads summing to one figure beside a total that was another.
+$rt_ni = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ noincome' ) );
+save( $rt_ni, array( 'engine_fuel' => array( 'p1' => 1000 ) ), array( 'cabin' => '80000', 'food' => '9000' ) );
+ok( 89000 === (int) get_post_meta( $rt_ni, '_bhela_cost_earnings', true ), 'the heads set the earnings',
+	(string) get_post_meta( $rt_ni, '_bhela_cost_earnings', true ) );
+
+// Now save with NO income key in the POST. save() posts earnings of 142400.
+save( $rt_ni, array( 'engine_fuel' => array( 'p1' => 1000 ) ) );
+ok( 89000 === bhela_bm_cost_income_total( $rt_ni ), 'the stored heads survive a POST that never mentioned them',
+	(string) bhela_bm_cost_income_total( $rt_ni ) );
+ok( 89000 === (int) get_post_meta( $rt_ni, '_bhela_cost_earnings', true ),
+	'and the earnings still equal them, rather than the figure in the POST',
+	(string) get_post_meta( $rt_ni, '_bhela_cost_earnings', true ) );
+
+// Explicitly clearing them is still honoured — that is a person deciding.
+save( $rt_ni, array( 'engine_fuel' => array( 'p1' => 1000 ) ), array( 'cabin' => '', 'food' => '' ) );
+ok( 0 === bhela_bm_cost_income_total( $rt_ni ), 'clearing them explicitly still clears them' );
+ok( 142400 === (int) get_post_meta( $rt_ni, '_bhela_cost_earnings', true ), 'and the earnings box governs again',
+	(string) get_post_meta( $rt_ni, '_bhela_cost_earnings', true ) );
+
+bhela_test_delete( $rt_ni );
+
+echo "\n=== 11. the P&L list does not re-query a month per row ===\n";
+// bhela_bm_trip_report() re-queries every sheet in the row's own month to work out
+// the distribution share, so one call per row made the list O(n^2) — over a blank
+// filter, which means every trip on record. The list does not show the share.
+$rt_src2 = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/trip-report.php' );
+ok( false !== strpos( $rt_src2, 'function bhela_bm_trip_rows' ), 'the list has its own cheap reader' );
+ok( 1 === substr_count( $rt_src2, 'bhela_bm_trip_report(' ) - substr_count( $rt_src2, 'function bhela_bm_trip_report(' ),
+	'and bhela_bm_trip_report() is called exactly once on the screen, for the single-sheet view',
+	(string) ( substr_count( $rt_src2, 'bhela_bm_trip_report(' ) - substr_count( $rt_src2, 'function bhela_bm_trip_report(' ) ) );
+
+// The two readings have to agree, or the list and the detail tell different stories.
+$rt_cmp = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ cmp' ) );
+save( $rt_cmp, array( 'engine_fuel' => array( 'p1' => 12000 ) ), array( 'cabin' => '70000', 'food' => '5000' ) );
+update_post_meta( $rt_cmp, '_bhela_cost_status', 'approved' );
+$rt_list = bhela_bm_trip_rows( '2026-07-01', '2026-07-31' );
+$rt_mine = null;
+foreach ( $rt_list as $rt_r ) {
+	if ( (int) $rt_r['id'] === (int) $rt_cmp ) {
+		$rt_mine = $rt_r;
+	}
+}
+$rt_full = bhela_bm_trip_report( $rt_cmp );
+ok( null !== $rt_mine, 'the sheet appears in the list' );
+if ( $rt_mine ) {
+	ok( $rt_mine['earnings'] === $rt_full['earnings'], 'list and detail agree on revenue', $rt_mine['earnings'] . ' vs ' . $rt_full['earnings'] );
+	ok( $rt_mine['cost'] === $rt_full['cost'], 'and on cost' );
+	ok( $rt_mine['profit'] === $rt_full['profit'], 'and on profit' );
+	ok( $rt_mine['sources'] === count( $rt_full['income'] ), 'and on the number of income sources' );
+}
+update_post_meta( $rt_cmp, '_bhela_cost_status', 'draft' );
+bhela_test_delete( $rt_cmp );
+
+echo "\n=== 12. a blank date filter really does mean every date ===\n";
+// A sentinel window reads as unbounded and is not: '2000-01-01' silently drops a
+// sheet dated earlier and a two-year ceiling drops a trip booked further out. §13.24
+// again, wearing a hat. The bound now comes from the data.
+$rt_old = wp_insert_post( array( 'post_type' => 'bhela_cost', 'post_status' => 'publish', 'post_title' => 'ZZ ancient' ) );
+save( $rt_old, array( 'engine_fuel' => array( 'p1' => 500 ) ) );
+bhela_test_cost_meta( $rt_old, '_bhela_cost_trip_date', '1998-03-04' );
+ok( bhela_bm_trip_date_bound( 'min' ) <= '1998-03-04', 'the lower bound reaches a sheet older than any sentinel',
+	bhela_bm_trip_date_bound( 'min' ) );
+$rt_src3 = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/trip-report.php' );
+ok( false === strpos( $rt_src3, "'2000-01-01'" ), 'and no hardcoded sentinel date is left in the file' );
+ok( false === strpos( $rt_src3, "'+2 years'" ), 'nor a hardcoded ceiling' );
+bhela_test_delete( $rt_old );
+
 bhela_test_delete( $sheet );
 bhela_test_done();

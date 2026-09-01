@@ -59,11 +59,37 @@ function bhela_bm_season( $key ) {
 }
 
 /**
+ * Overlapping season pairs, as labels.
+ *
+ * Overlaps are the owner's business, not an error: a two-day overlap at a boundary is
+ * a normal thing to have typed and not worth refusing a save over. But an overlap
+ * does change what `bhela_bm_season_for()` answers — the earliest-starting season
+ * wins, silently — so the settings screen says so. This function exists because the
+ * docblock below used to claim the screen warned when nothing did.
+ *
+ * @return array[] Each entry: array{a:string,b:string} of the two labels.
+ */
+function bhela_bm_season_overlaps() {
+	$all  = array_values( bhela_bm_seasons() );
+	$hits = array();
+	$n    = count( $all );
+	for ( $i = 0; $i < $n; $i++ ) {
+		for ( $j = $i + 1; $j < $n; $j++ ) {
+			// Ordered by `from`, so $all[$i] starts no later than $all[$j].
+			if ( $all[ $j ]['from'] <= $all[ $i ]['to'] ) {
+				$hits[] = array( 'a' => $all[ $i ]['label'], 'b' => $all[ $j ]['label'] );
+			}
+		}
+	}
+	return $hits;
+}
+
+/**
  * The season a date falls in, or null.
  *
- * Overlapping seasons are the owner's business; the first match wins and the settings
- * screen warns rather than refusing, because a two-day overlap at a boundary is a
- * normal thing to have typed and not worth blocking a save over.
+ * Overlapping seasons are the owner's business; the earliest-starting match wins,
+ * and `bhela_bm_season_overlaps()` is what lets the settings screen say so rather
+ * than leaving the choice invisible.
  */
 function bhela_bm_season_for( $date ) {
 	$date = bhela_bm_report_date( $date );

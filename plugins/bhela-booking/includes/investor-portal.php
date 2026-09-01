@@ -196,12 +196,25 @@ function bhela_bm_portal_data() {
 	// Business-level, not this investor's: the reserve and the management fund belong
 	// to the company. Totals only — §18's breakdown of what management spent on is an
 	// internal matter, and a portal is not where that conversation happens.
-	$funds = array();
-	if ( function_exists( 'bhela_bm_funds' ) ) {
-		foreach ( bhela_bm_funds() as $key => $fund ) {
-			$fl = bhela_bm_fund_ledger( $key );
-			$funds[ $key ] = array( 'label' => $fund['label'], 'allocated' => (int) $fl['allocated'] );
+	// Cached, because this is a front-end page and bhela_bm_fund_ledger() replays every
+	// row a fund has ever carried to produce one total. Every investor loading the
+	// portal was paying for both funds' full history to see two numbers.
+	//
+	// Fifteen minutes, and the cache is deliberately NOT per investor: these are
+	// business-level figures, identical for everybody, so one entry serves all of
+	// them. An allocation only appears when a month is distributed, so a figure at
+	// most fifteen minutes stale cannot mislead anybody about their own position —
+	// which is replayed live, and always will be.
+	$funds = get_transient( 'bhela_bm_portal_funds' );
+	if ( ! is_array( $funds ) ) {
+		$funds = array();
+		if ( function_exists( 'bhela_bm_funds' ) ) {
+			foreach ( bhela_bm_funds() as $key => $fund ) {
+				$fl = bhela_bm_fund_ledger( $key );
+				$funds[ $key ] = array( 'label' => $fund['label'], 'allocated' => (int) $fl['allocated'] );
+			}
 		}
+		set_transient( 'bhela_bm_portal_funds', $funds, 15 * MINUTE_IN_SECONDS );
 	}
 
 	// A payment somebody has raised but nobody has released. Showing it matters: an

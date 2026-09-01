@@ -93,6 +93,17 @@ add_action( 'init', 'bhela_bm_register_fund_cpt' );
  *                    head, ref, run, note, reverses.
  * @return int|WP_Error
  */
+/**
+ * Drop the portal's cached fund totals.
+ *
+ * Called by every writer below rather than left to expire: a fifteen-minute window is
+ * fine for drift nobody can see, but an investor who has just been told the reserve
+ * changed should not be shown the old figure.
+ */
+function bhela_bm_fund_flush_cache() {
+	delete_transient( 'bhela_bm_portal_funds' );
+}
+
 function bhela_bm_fund_add( $args ) {
 	$fund   = sanitize_key( $args['fund'] ?? '' );
 	$type   = sanitize_key( $args['type'] ?? '' );
@@ -159,6 +170,7 @@ function bhela_bm_fund_add( $args ) {
 		'reason'      => $meta['note'],
 	) );
 
+	bhela_bm_fund_flush_cache();
 	return $row;
 }
 

@@ -53,6 +53,27 @@ function bhela_bm_screen_header( $icon, $title, $lead = '', $actions = '', $clas
 }
 
 /**
+ * Cost-sheet status → pill tone.
+ *
+ * Here rather than in a screen file for the reason §13.22 gives about
+ * bhela_bm_report_date(): a helper parked in one screen's file is a load-order
+ * accident waiting to happen. The cost sheet, the Trip P&L list and anything later
+ * all need the same answer.
+ *
+ * @param string $status draft | prepared | checked | approved
+ * @return string One of the five tones.
+ */
+function bhela_bm_cost_status_tone( $status ) {
+	$map = array(
+		'draft'    => 'neutral',
+		'prepared' => 'progress',
+		'checked'  => 'progress',
+		'approved' => 'good',
+	);
+	return $map[ (string) $status ] ?? 'neutral';
+}
+
+/**
  * A status pill, identical wherever status is shown.
  *
  * Two things carry meaning. The tone is one of five named semantics, so

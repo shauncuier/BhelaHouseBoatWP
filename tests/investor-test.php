@@ -772,6 +772,140 @@ require_once ABSPATH . 'wp-admin/includes/user.php';
 wp_delete_user( $iv_pu );
 delete_post_meta( $iv_a, '_bhela_inv_user' );
 
+
+echo "\n=== 22. one request pays once, even under a race ===\n";
+// The state check was a READ. Two approvals arriving together both passed it, both
+// wrote a ledger row, and the investor was paid twice for one request — with nothing
+// in the ledger looking wrong afterwards, because both rows were individually valid.
+$iv_ra = wp_insert_user( array( 'user_login' => 'zz_race_req', 'user_email' => 'zz_race_req@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_investor_relations' ) );
+$iv_rb = wp_insert_user( array( 'user_login' => 'zz_race_app', 'user_email' => 'zz_race_app@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_manager' ) );
+
+iv_as( $iv_ra );
+$iv_rr = bhela_bm_payreq_add( array( 'investor' => $iv_a, 'type' => 'payment', 'amount' => 5150, 'date' => $iv_month . '-21', 'note' => 'ZZ race' ) );
+ok( ! is_wp_error( $iv_rr ), 'a request is raised' );
+
+$iv_recv_before = bhela_bm_investor_roi( $iv_a )['received'];
+
+// Reproduce the race exactly: two approvals that both read `requested` before either
+// writes. Restoring the meta between the read and the second call is what a second
+// concurrent request would have seen.
+iv_as( $iv_rb );
+$iv_first = bhela_bm_payreq_approve( $iv_rr );
+ok( ! is_wp_error( $iv_first ), 'the first approval wins' );
+
+// The loser: force the state back to what the racing request had read, and approve
+// again. The ledger guard has to stop it even though the state now says `requested`.
+update_post_meta( $iv_rr, '_bhela_pr_state', 'requested' );
+$iv_second = bhela_bm_payreq_approve( $iv_rr );
+ok( is_wp_error( $iv_second ), 'the second is refused even with the state reset under it',
+	is_wp_error( $iv_second ) ? $iv_second->get_error_code() : 'ALLOWED' );
+ok( 'paid' === ( is_wp_error( $iv_second ) ? $iv_second->get_error_code() : '' ),
+	'and it is refused because a ledger row already exists, not by luck' );
+
+$iv_recv_after = bhela_bm_investor_roi( $iv_a )['received'];
+ok( $iv_recv_before + 5150 === $iv_recv_after, 'so the investor is paid exactly once',
+	$iv_recv_before . ' -> ' . $iv_recv_after );
+
+// The claim itself is a single conditional UPDATE, so the database picks the winner.
+$iv_pr_src = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/investor-payreq.php' );
+ok( false !== strpos( $iv_pr_src, "meta_value = 'requested'" ),
+	'the state is claimed with a conditional UPDATE rather than a read-then-write' );
+ok( false !== strpos( $iv_pr_src, 'wp_cache_delete' ), 'and the meta cache is dropped after it' );
+
+// A rejection takes the same claim, or an approve and a reject racing could both win.
+iv_as( $iv_ra );
+$iv_rr2 = bhela_bm_payreq_add( array( 'investor' => $iv_a, 'type' => 'payment', 'amount' => 2020, 'date' => $iv_month . '-22', 'note' => 'ZZ race 2' ) );
+iv_as( $iv_rb );
+ok( true === bhela_bm_payreq_reject( $iv_rr2, 'ZZ no' ), 'a request is rejected' );
+ok( is_wp_error( bhela_bm_payreq_approve( $iv_rr2 ) ), 'and cannot then be approved' );
+ok( $iv_recv_after === bhela_bm_investor_roi( $iv_a )['received'], 'with no money moved by the attempt' );
+
+echo "\n=== 23. an exited investor is not paid by routine ===\n";
+$iv_ex_was = bhela_bm_investor_status( $iv_a );
+update_post_meta( $iv_a, '_bhela_inv_status', 'exited' );
+iv_as( $iv_ra );
+$iv_exq = bhela_bm_payreq_add( array( 'investor' => $iv_a, 'type' => 'payment', 'amount' => 100, 'date' => $iv_month . '-23' ) );
+ok( is_wp_error( $iv_exq ), 'a payment request against an exited investor is refused',
+	is_wp_error( $iv_exq ) ? $iv_exq->get_error_code() : 'ALLOWED' );
+// An adjustment is still available: a final settlement is a decision with a reason,
+// not a routine payment.
+iv_as( 1 );
+$iv_exadj = bhela_bm_ledger_add( array( 'investor' => $iv_a, 'type' => 'adjustment', 'amount' => 0, 'date' => $iv_month . '-23', 'note' => 'ZZ exited note' ) );
+ok( ! is_wp_error( $iv_exadj ) || 'bad_amount' === $iv_exadj->get_error_code(),
+	'while an adjustment remains the way to record one' );
+update_post_meta( $iv_a, '_bhela_inv_status', $iv_ex_was );
+
+// Listings are capped rather than unbounded: the dashboard reads the pending total on
+// every load and requests accumulate for the life of the business.
+ok( bhela_bm_payreq_limit() > 0, 'the request listing is capped', (string) bhela_bm_payreq_limit() );
+ok( false === strpos( $iv_pr_src, "'posts_per_page' => -1" ), 'and no listing here is unbounded' );
+
+foreach ( array( $iv_rr, $iv_rr2 ) as $iv_z ) {
+	if ( ! is_wp_error( $iv_z ) ) {
+		wp_delete_post( $iv_z, true );
+	}
+}
+wp_set_current_user( 0 );
+wp_set_current_user( 1 );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $iv_ra );
+wp_delete_user( $iv_rb );
+
+echo "\n=== 24. overlapping seasons are reported, not silently resolved ===\n";
+// The docblock claimed the settings screen warned. Nothing did.
+$iv_sea_was = get_option( 'bhela_bm_seasons', array() );
+bhela_bm_save_seasons( array(
+	array( 'key' => '', 'label' => 'ZZ Early', 'from' => '2026-01-01', 'to' => '2026-06-30' ),
+	array( 'key' => '', 'label' => 'ZZ Late',  'from' => '2026-06-01', 'to' => '2026-12-31' ),
+) );
+$iv_ov = bhela_bm_season_overlaps();
+ok( 1 === count( $iv_ov ), 'an overlap is detected', (string) count( $iv_ov ) );
+ok( 'ZZ Early' === $iv_ov[0]['a'] && 'ZZ Late' === $iv_ov[0]['b'], 'and names both seasons' );
+// The earliest-starting season wins, which is what the warning exists to make visible.
+ok( 'ZZ Early' === bhela_bm_season_for( '2026-06-15' )['label'], 'a date inside the overlap resolves to the earlier season',
+	(string) bhela_bm_season_for( '2026-06-15' )['label'] );
+
+bhela_bm_save_seasons( array(
+	array( 'key' => '', 'label' => 'ZZ A', 'from' => '2026-01-01', 'to' => '2026-05-31' ),
+	array( 'key' => '', 'label' => 'ZZ B', 'from' => '2026-06-01', 'to' => '2026-12-31' ),
+) );
+ok( ! bhela_bm_season_overlaps(), 'seasons that merely touch at a boundary do not overlap' );
+update_option( 'bhela_bm_seasons', $iv_sea_was, false );
+
+echo "\n=== 25. the portal's fund totals are cached, and a fund write drops the cache ===\n";
+// bhela_bm_fund_ledger() replays every row a fund has ever held to produce one total,
+// and the portal is a front-end page every investor loads.
+delete_transient( 'bhela_bm_portal_funds' );
+$iv_pu2 = wp_insert_user( array( 'user_login' => 'zz_fundcache', 'user_email' => 'zz_fundcache@example.test', 'user_pass' => wp_generate_password( 20 ), 'role' => 'bhela_investor' ) );
+update_post_meta( $iv_a, '_bhela_inv_user', $iv_pu2 );
+iv_as( $iv_pu2 );
+$iv_fd1 = bhela_bm_portal_data();
+ok( is_array( get_transient( 'bhela_bm_portal_funds' ) ), 'the first portal load fills the cache' );
+$iv_res_seen = (int) ( $iv_fd1['funds']['reserve']['allocated'] ?? 0 );
+
+// A fund movement must invalidate it, or an investor is shown a figure they have just
+// been told changed.
+iv_as( 1 );
+$iv_spend = bhela_bm_fund_add( array( 'fund' => 'reserve', 'type' => 'utilisation', 'amount' => 1500, 'head' => 'repair', 'date' => $iv_month . '-24', 'note' => 'ZZ cache bust' ) );
+ok( false === get_transient( 'bhela_bm_portal_funds' ), 'a fund write drops the cache' );
+
+iv_as( $iv_pu2 );
+$iv_fd2 = bhela_bm_portal_data();
+ok( is_array( $iv_fd2['funds'] ) && isset( $iv_fd2['funds']['reserve'] ), 'and the portal refills it' );
+// Spending is not an allocation, so the allocated figure is unchanged — the point is
+// that the cache was rebuilt, not that the number moved.
+ok( $iv_res_seen === (int) $iv_fd2['funds']['reserve']['allocated'], 'spending does not change what was allocated',
+	$iv_res_seen . ' vs ' . (int) $iv_fd2['funds']['reserve']['allocated'] );
+
+wp_set_current_user( 0 );
+wp_set_current_user( 1 );
+if ( ! is_wp_error( $iv_spend ) ) {
+	bhela_bm_fund_reverse( $iv_spend, 'ZZ cache bust undo' );
+}
+wp_delete_user( $iv_pu2 );
+delete_post_meta( $iv_a, '_bhela_inv_user' );
+delete_transient( 'bhela_bm_portal_funds' );
+
 /* ---------- cleanup ---------- */
 foreach ( get_posts( array( 'post_type' => 'bhela_payreq', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
 	wp_delete_post( $z, true );

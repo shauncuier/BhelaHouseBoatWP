@@ -85,6 +85,11 @@ function bhela_bm_dist_block_meta( $check, $object_id, $meta_key ) {
 	}
 	return $check;
 }
+// `add_post_metadata` was missing here too, and this is the ledger — an absent key
+// on a row could be created from outside the one writer. `update_post_meta()` is
+// caught either way because WordPress fires the update filter before checking
+// whether the key exists; `add_post_meta()` fires only this one.
+add_filter( 'add_post_metadata', 'bhela_bm_dist_block_meta', 10, 3 );
 add_filter( 'update_post_metadata', 'bhela_bm_dist_block_meta', 10, 3 );
 add_filter( 'delete_post_metadata', 'bhela_bm_dist_block_meta', 10, 3 );
 

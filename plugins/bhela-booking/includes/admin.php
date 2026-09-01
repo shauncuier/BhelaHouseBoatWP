@@ -1494,7 +1494,25 @@ function bhela_bm_settings_page() {
 			<div class="bha-set__panel" id="bhela-panel-heads" role="tabpanel" aria-labelledby="bhela-tab-heads">
 			<h2><?php esc_html_e( 'Seasons', 'bhela-booking' ); ?></h2>
 			<p class="bha-set__lead"><?php esc_html_e( 'The haor year is not the calendar year, so name yours here. A season is only a label over a date range — every report keeps computing exactly what it computes now, it just gains a way to group by the period you actually think in. None are shipped: inventing your season dates would put a confident wrong answer on the screen.', 'bhela-booking' ); ?></p>
-			<?php $all_seasons = function_exists( 'bhela_bm_seasons' ) ? bhela_bm_seasons() : array(); ?>
+			<?php
+			$all_seasons  = function_exists( 'bhela_bm_seasons' ) ? bhela_bm_seasons() : array();
+			$season_clash = function_exists( 'bhela_bm_season_overlaps' ) ? bhela_bm_season_overlaps() : array();
+			?>
+			<?php if ( $season_clash ) : ?>
+				<div class="notice notice-warning inline" style="margin:12px 0"><p>
+					<?php
+					$pairs = array();
+					foreach ( $season_clash as $clash ) {
+						$pairs[] = $clash['a'] . ' / ' . $clash['b'];
+					}
+					printf(
+						/* translators: %s: overlapping season pairs */
+						esc_html__( 'These seasons overlap: %s. Nothing is refused — but a date inside an overlap is reported under whichever season starts first, so the other one will look short. Adjust the dates if that is not what you meant.', 'bhela-booking' ),
+						esc_html( implode( ', ', $pairs ) )
+					);
+					?>
+				</p></div>
+			<?php endif; ?>
 			<table class="widefat striped" id="bhela-seasons-table">
 				<thead>
 					<tr>

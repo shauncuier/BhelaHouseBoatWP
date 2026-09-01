@@ -222,6 +222,68 @@ function bhela_bm_revenue_by_source( $from, $to, $period = 'month' ) {
 	return $out;
 }
 
+/**
+ * The five columns the P&L list draws, and nothing else.
+ *
+ * Deliberately NOT bhela_bm_trip_report() per row. That function re-queries every
+ * sheet in the row's own month to work out the distribution share, so calling it once
+ * per row made the list O(n²) — and with a blank filter the range is every trip on
+ * record. The list does not show the share, so it does not pay for it.
+ *
+ * @param string $from Y-m-d.
+ * @param string $to   Y-m-d.
+ * @return array
+ */
+function bhela_bm_trip_rows( $from, $to ) {
+	$out = array();
+	foreach ( bhela_bm_trip_sheets( $from, $to ) as $id ) {
+		$earnings = (int) get_post_meta( $id, '_bhela_cost_earnings', true );
+		$cost     = (int) get_post_meta( $id, '_bhela_cost_total', true );
+		$out[]    = array(
+			'id'       => (int) $id,
+			'title'    => get_the_title( $id ),
+			'date'     => (string) get_post_meta( $id, '_bhela_cost_trip_date', true ),
+			'status'   => (string) get_post_meta( $id, '_bhela_cost_status', true ),
+			'earnings' => $earnings,
+			'cost'     => $cost,
+			'profit'   => $earnings - $cost,
+			'sources'  => count( bhela_bm_cost_income( $id ) ),
+		);
+	}
+	return $out;
+}
+
+/**
+ * The earliest or latest trip date on any cost sheet, as a range bound.
+ *
+ * A blank filter means every date, and the bound has to come from the data for that
+ * to be true. A sentinel window ('2000-01-01' to two years out) reads as unbounded
+ * and is not: it silently drops a sheet outside it, which is §13.24's failure in a
+ * new place. Falls back to today when there are no sheets at all, so an empty
+ * install returns an empty report rather than an error.
+ *
+ * @param string $which 'min' or 'max'.
+ * @return string Y-m-d.
+ */
+function bhela_bm_trip_date_bound( $which = 'min' ) {
+	global $wpdb;
+	static $cache = array();
+	if ( isset( $cache[ $which ] ) ) {
+		return $cache[ $which ];
+	}
+	$fn = 'max' === $which ? 'MAX' : 'MIN';
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL
+	$bound = $wpdb->get_var(
+		"SELECT $fn( meta_value ) FROM {$wpdb->postmeta}
+		 WHERE meta_key = '_bhela_cost_trip_date' AND meta_value REGEXP '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'"
+	);
+	$cache[ $which ] = bhela_bm_report_date( (string) $bound );
+	if ( '' === $cache[ $which ] ) {
+		$cache[ $which ] = current_time( 'Y-m-d' );
+	}
+	return $cache[ $which ];
+}
+
 /* =========================================================
  * SCREENS
  * ========================================================= */
@@ -248,19 +310,20 @@ add_action( 'admin_menu', 'bhela_bm_trip_report_menu', 21 );
 
 /** Default range: this season so far, not this calendar month (§13.24's lesson). */
 function bhela_bm_trip_range() {
-	$from = bhela_bm_report_date( $_GET['from'] ?? '' );
-	$to   = bhela_bm_report_date( $_GET['to'] ?? '' );
-	if ( '' === $from && '' === $to ) {
-		// A blank range means every date. Starting narrow is how the B2B Report hid
-		// its own subject for a release — see CLAUDE.md §13.24.
-		$from = '2000-01-01';
-		$to   = gmdate( 'Y-m-d', strtotime( '+2 years' ) );
-	}
+	$from = bhela_bm_report_date( isset( $_GET['from'] ) ? wp_unslash( $_GET['from'] ) : '' );
+	$to   = bhela_bm_report_date( isset( $_GET['to'] ) ? wp_unslash( $_GET['to'] ) : '' );
+
+	// A blank date means EVERY date. Starting narrow is how the B2B Report hid its own
+	// subject for a release (§13.24), and a sentinel window is the same mistake
+	// wearing a hat: '2000-01-01' silently drops a sheet dated earlier, and a
+	// two-year ceiling drops a trip booked further out than that. So the bound comes
+	// from the data — the earliest and latest trip date on record — which cannot
+	// exclude anything that exists.
 	if ( '' === $from ) {
-		$from = '2000-01-01';
+		$from = bhela_bm_trip_date_bound( 'min' );
 	}
 	if ( '' === $to ) {
-		$to = gmdate( 'Y-m-d', strtotime( '+2 years' ) );
+		$to = bhela_bm_trip_date_bound( 'max' );
 	}
 	return array( $from, $to );
 }
@@ -280,8 +343,8 @@ function bhela_bm_trip_pl_page() {
 			__( 'One trip, end to end: what it earned and from what, what it cost and on what, and what it left behind.', 'bhela-booking' )
 		);
 		?>
-		<?php if ( $one && bhela_bm_trip_report( $one ) ) : ?>
-			<?php $t = bhela_bm_trip_report( $one ); ?>
+		<?php $t = $one ? bhela_bm_trip_report( $one ) : null; ?>
+		<?php if ( $t ) : ?>
 			<p>
 				<a class="button" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-trip-pl' ) ); ?>">← <?php esc_html_e( 'All trips', 'bhela-booking' ); ?></a>
 				<a class="button" href="<?php echo esc_url( get_edit_post_link( $one ) ); ?>"><?php esc_html_e( 'Open the cost sheet', 'bhela-booking' ); ?></a>
@@ -377,9 +440,9 @@ function bhela_bm_trip_pl_page() {
 			<form method="get" class="bha-bar">
 				<input type="hidden" name="page" value="bhela-bm-trip-pl">
 				<div class="bha-field"><label for="bhela-tp-from"><?php esc_html_e( 'From', 'bhela-booking' ); ?></label>
-					<input type="date" id="bhela-tp-from" name="from" value="<?php echo esc_attr( isset( $_GET['from'] ) ? bhela_bm_report_date( $_GET['from'] ) : '' ); ?>"></div>
+					<input type="date" id="bhela-tp-from" name="from" value="<?php echo esc_attr( isset( $_GET['from'] ) ? bhela_bm_report_date( wp_unslash( $_GET['from'] ) ) : '' ); ?>"></div>
 				<div class="bha-field"><label for="bhela-tp-to"><?php esc_html_e( 'To', 'bhela-booking' ); ?></label>
-					<input type="date" id="bhela-tp-to" name="to" value="<?php echo esc_attr( isset( $_GET['to'] ) ? bhela_bm_report_date( $_GET['to'] ) : '' ); ?>"></div>
+					<input type="date" id="bhela-tp-to" name="to" value="<?php echo esc_attr( isset( $_GET['to'] ) ? bhela_bm_report_date( wp_unslash( $_GET['to'] ) ) : '' ); ?>"></div>
 				<button class="button button-primary"><?php esc_html_e( 'Filter', 'bhela-booking' ); ?></button>
 				<span class="bha-note"><?php esc_html_e( 'Leave both blank for every trip.', 'bhela-booking' ); ?></span>
 			</form>
@@ -396,22 +459,21 @@ function bhela_bm_trip_pl_page() {
 						<th><?php esc_html_e( 'Breakdown', 'bhela-booking' ); ?></th>
 					</tr></thead>
 					<tbody>
-					<?php $sheets = bhela_bm_trip_sheets( $from, $to ); ?>
-					<?php if ( ! $sheets ) : ?>
+					<?php $rows = bhela_bm_trip_rows( $from, $to ); ?>
+					<?php if ( ! $rows ) : ?>
 						<tr><td colspan="7"><?php esc_html_e( 'No cost sheets in this range.', 'bhela-booking' ); ?></td></tr>
 					<?php endif; ?>
-					<?php foreach ( $sheets as $sid ) : ?>
-						<?php $t = bhela_bm_trip_report( $sid ); ?>
+					<?php foreach ( $rows as $r ) : ?>
 						<tr>
-							<td><?php echo esc_html( $t['date'] ? mysql2date( 'j M Y', $t['date'] ) : '—' ); ?></td>
-							<td><a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-trip-pl', array( 'sheet' => $sid ) ) ); ?>"><?php echo esc_html( $t['title'] ); ?></a></td>
-							<td><?php echo bhela_bm_status_pill( $t['status'] ? $t['status'] : 'draft', bhela_bm_cost_status_tone( $t['status'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
-							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['earnings'] ) ); ?></td>
-							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['cost'] ) ); ?></td>
-							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['profit'] ) ); ?></td>
+							<td><?php echo esc_html( $r['date'] ? mysql2date( 'j M Y', $r['date'] ) : '—' ); ?></td>
+							<td><a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-trip-pl', array( 'sheet' => $r['id'] ) ) ); ?>"><?php echo esc_html( $r['title'] ); ?></a></td>
+							<td><?php echo bhela_bm_status_pill( $r['status'] ? $r['status'] : 'draft', bhela_bm_cost_status_tone( $r['status'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['earnings'] ) ); ?></td>
+							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['cost'] ) ); ?></td>
+							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['profit'] ) ); ?></td>
 							<td>
-								<?php if ( $t['income'] ) : ?>
-									<?php echo bhela_bm_status_pill( sprintf( /* translators: %d: number of income sources */ _n( '%d source', '%d sources', count( $t['income'] ), 'bhela-booking' ), count( $t['income'] ) ), 'good' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+								<?php if ( $r['sources'] > 0 ) : ?>
+									<?php echo bhela_bm_status_pill( sprintf( /* translators: %d: number of income sources */ _n( '%d source', '%d sources', $r['sources'], 'bhela-booking' ), $r['sources'] ), 'good' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<?php else : ?>
 									<?php echo bhela_bm_status_pill( __( 'one figure', 'bhela-booking' ), 'neutral' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								<?php endif; ?>
@@ -427,23 +489,12 @@ function bhela_bm_trip_pl_page() {
 	<?php
 }
 
-/** Cost-sheet status → pill tone. Its own function so the report and the list agree. */
-function bhela_bm_cost_status_tone( $status ) {
-	$map = array(
-		'draft'    => 'neutral',
-		'prepared' => 'progress',
-		'checked'  => 'progress',
-		'approved' => 'good',
-	);
-	return $map[ $status ] ?? 'neutral';
-}
-
 function bhela_bm_revenue_page() {
 	if ( ! current_user_can( 'bhela_view_statement' ) ) {
 		wp_die( esc_html__( 'You do not have permission to view this report.', 'bhela-booking' ) );
 	}
 	list( $from, $to ) = bhela_bm_trip_range();
-	$period = sanitize_key( $_GET['period'] ?? 'month' );
+	$period = sanitize_key( wp_unslash( $_GET['period'] ?? 'month' ) );
 	$period = in_array( $period, array( 'day', 'month', 'year' ), true ) ? $period : 'month';
 	$d      = bhela_bm_revenue_by_source( $from, $to, $period );
 	?>
@@ -466,9 +517,9 @@ function bhela_bm_revenue_page() {
 		<form method="get" class="bha-bar">
 			<input type="hidden" name="page" value="bhela-bm-revenue">
 			<div class="bha-field"><label for="bhela-rv-from"><?php esc_html_e( 'From', 'bhela-booking' ); ?></label>
-				<input type="date" id="bhela-rv-from" name="from" value="<?php echo esc_attr( isset( $_GET['from'] ) ? bhela_bm_report_date( $_GET['from'] ) : '' ); ?>"></div>
+				<input type="date" id="bhela-rv-from" name="from" value="<?php echo esc_attr( isset( $_GET['from'] ) ? bhela_bm_report_date( wp_unslash( $_GET['from'] ) ) : '' ); ?>"></div>
 			<div class="bha-field"><label for="bhela-rv-to"><?php esc_html_e( 'To', 'bhela-booking' ); ?></label>
-				<input type="date" id="bhela-rv-to" name="to" value="<?php echo esc_attr( isset( $_GET['to'] ) ? bhela_bm_report_date( $_GET['to'] ) : '' ); ?>"></div>
+				<input type="date" id="bhela-rv-to" name="to" value="<?php echo esc_attr( isset( $_GET['to'] ) ? bhela_bm_report_date( wp_unslash( $_GET['to'] ) ) : '' ); ?>"></div>
 			<div class="bha-field"><label for="bhela-rv-period"><?php esc_html_e( 'Grouped by', 'bhela-booking' ); ?></label>
 				<select id="bhela-rv-period" name="period">
 					<option value="day" <?php selected( 'day', $period ); ?>><?php esc_html_e( 'Trip date', 'bhela-booking' ); ?></option>
@@ -556,7 +607,7 @@ function bhela_bm_revenue_csv() {
 	check_admin_referer( 'bhela_bm_revenue_csv' );
 
 	list( $from, $to ) = bhela_bm_trip_range();
-	$period = sanitize_key( $_GET['period'] ?? 'month' );
+	$period = sanitize_key( wp_unslash( $_GET['period'] ?? 'month' ) );
 	$d      = bhela_bm_revenue_by_source( $from, $to, $period );
 
 	nocache_headers();

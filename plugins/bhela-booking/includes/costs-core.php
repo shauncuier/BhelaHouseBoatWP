@@ -77,12 +77,32 @@ function bhela_bm_cost_locked_keys() {
 }
 
 function bhela_bm_cost_block_meta( $check, $object_id, $meta_key ) {
-	if ( in_array( (string) $meta_key, bhela_bm_cost_locked_keys(), true )
+	// This filter runs on EVERY meta write in the whole site, so the cheapest
+	// possible rejection comes first. Calling bhela_bm_cost_locked_keys() up front
+	// allocated a nine-element array on every one of them.
+	$key = (string) $meta_key;
+	if ( 0 !== strpos( $key, '_bhela_cost_' ) ) {
+		return $check;
+	}
+	if ( in_array( $key, bhela_bm_cost_locked_keys(), true )
 		&& bhela_bm_cost_locked( $object_id ) && ! bhela_bm_cost_writing() ) {
 		return false;
 	}
 	return $check;
 }
+// All THREE hooks, and the third one is the one that matters.
+//
+// `update_post_meta()` on a key that does not exist yet is caught by the update
+// filter — WordPress fires it before it checks existence. `add_post_meta()` is not:
+// it fires `add_post_metadata` and nothing else. Shipping only the first two left a
+// hole that was narrow but live, because a locked key is only reachable this way
+// while it is ABSENT — and `_bhela_cost_income` is absent on every sheet approved
+// before income heads existed. That is exactly the meta Trip P&L and Revenue by
+// Source read, so an approved sheet's revenue breakdown was forgeable from WP-CLI.
+//
+// inventory-core.php had all three from the start. This file and
+// distribution-core.php were written from a shortened reading of it.
+add_filter( 'add_post_metadata', 'bhela_bm_cost_block_meta', 10, 3 );
 add_filter( 'update_post_metadata', 'bhela_bm_cost_block_meta', 10, 3 );
 add_filter( 'delete_post_metadata', 'bhela_bm_cost_block_meta', 10, 3 );
 

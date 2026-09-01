@@ -566,6 +566,20 @@ ok( '' === $zz_shim( array( 'page' => 'bhela-bm-statement' ), 'admin.php' ), 'th
 remove_filter( 'wp_redirect', $zz_catch );
 $_GET = array();
 
+
+echo "\n=== 10. the cost-sheet tone map lives where every caller can reach it ===\n";
+// §13.22's lesson: a shared helper parked in one screen's file is a load-order
+// accident. This one was defined in trip-report.php while the cost sheet needed it.
+ok( function_exists( 'bhela_bm_cost_status_tone' ), 'bhela_bm_cost_status_tone() exists' );
+$ui_ui_src = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/ui.php' );
+ok( false !== strpos( $ui_ui_src, 'function bhela_bm_cost_status_tone' ), 'and it is defined in ui.php' );
+$ui_tr_src = (string) php_strip_whitespace( WP_PLUGIN_DIR . '/bhela-booking/includes/trip-report.php' );
+ok( false === strpos( $ui_tr_src, 'function bhela_bm_cost_status_tone' ), 'not in the report screen it happened to be written for' );
+foreach ( array( 'draft' => 'neutral', 'prepared' => 'progress', 'checked' => 'progress', 'approved' => 'good' ) as $ui_st => $ui_tone ) {
+	ok( $ui_tone === bhela_bm_cost_status_tone( $ui_st ), "$ui_st reads as $ui_tone" );
+}
+ok( 'neutral' === bhela_bm_cost_status_tone( 'nonsense' ), 'and an unknown status falls back rather than erroring' );
+
 echo "\n=== cleanup ===\n";
 foreach ( $made as $id ) { bhela_test_delete( $id ); }
 ok( true, 'fixtures removed' );

@@ -71,6 +71,15 @@ function bhela_bm_payreq_add( $args ) {
 	if ( ! $investor || 'bhela_investor' !== get_post_type( $investor ) ) {
 		return new WP_Error( 'no_investor', __( 'বিনিয়োগকারী নির্বাচন করুন।', 'bhela-booking' ) );
 	}
+	// An exited investor has been settled and has left. A payment raised against one
+	// is either a mistake or a final settlement that belongs on the record as an
+	// adjustment, with a reason attached — not as a routine payment nobody questions.
+	if ( 'exited' === bhela_bm_investor_status( $investor ) ) {
+		return new WP_Error(
+			'exited',
+			__( 'এই বিনিয়োগকারী প্রত্যাহৃত। প্রয়োজনে সমন্বয় (adjustment) হিসেবে কারণ লিখে রেকর্ড করুন।', 'bhela-booking' )
+		);
+	}
 	// Only money OUT goes through approval. A profit row comes from a distribution and
 	// an adjustment is a correction with its own reversal trail; neither is somebody
 	// deciding to hand over cash.
@@ -122,6 +131,11 @@ function bhela_bm_payreq_add( $args ) {
 	return $id;
 }
 
+/** How many requests a single listing will read. Filterable. */
+function bhela_bm_payreq_limit() {
+	return (int) apply_filters( 'bhela_bm_payreq_limit', 500 );
+}
+
 /** One request. */
 function bhela_bm_payreq( $id ) {
 	if ( 'bhela_payreq' !== get_post_type( $id ) ) {
@@ -167,7 +181,11 @@ function bhela_bm_payreqs( $state = '', $investor = 0 ) {
 	$args = array(
 		'post_type'      => 'bhela_payreq',
 		'post_status'    => 'publish',
-		'posts_per_page' => -1,
+		// Capped rather than -1. The dashboard reads the pending total on every load,
+		// and requests accumulate for the life of the business. 500 is far above any
+		// real backlog; bhela_bm_payreqs_capped() reports when it bites, because a
+		// silently truncated list of what is owed is worse than a slow one.
+		'posts_per_page' => bhela_bm_payreq_limit(),
 		'fields'         => 'ids',
 		'no_found_rows'  => true,
 		'orderby'        => 'ID',
@@ -177,11 +195,19 @@ function bhela_bm_payreqs( $state = '', $investor = 0 ) {
 		$args['meta_query'] = $meta;
 	}
 	$out = array();
-	foreach ( get_posts( $args ) as $id ) {
+	$ids = get_posts( $args );
+	foreach ( $ids as $id ) {
 		$r = bhela_bm_payreq( $id );
 		if ( $r ) {
 			$out[] = $r;
 		}
+	}
+	if ( count( $ids ) >= bhela_bm_payreq_limit() && function_exists( 'bhela_bm_log' ) ) {
+		bhela_bm_log( 'investor', sprintf(
+			/* translators: %d: the cap */
+			'Payment request listing hit its cap of %d — older requests are not shown.',
+			bhela_bm_payreq_limit()
+		) );
 	}
 	return $out;
 }
@@ -207,6 +233,37 @@ function bhela_bm_payreq_approve( $id ) {
 	if ( (int) $r['by'] === get_current_user_id() ) {
 		return new WP_Error( 'same_person', __( 'যিনি অনুরোধ করেছেন তিনি নিজে অনুমোদন করতে পারবেন না।', 'bhela-booking' ) );
 	}
+	// Belt to the braces on the state check above: a request that already carries a
+	// ledger row has been paid, whatever its state says.
+	if ( $r['ledger'] > 0 ) {
+		return new WP_Error( 'paid', __( 'এই অনুরোধের বিপরীতে পেমেন্ট ইতিমধ্যে রেকর্ড হয়েছে।', 'bhela-booking' ) );
+	}
+
+	// **Claim the request before writing anything.**
+	//
+	// The `'requested' !== $r['state']` check above is a read, and two approvals
+	// arriving together both pass it — then both write a ledger row, and the investor
+	// is paid twice for one request. Nothing in the ledger would look wrong
+	// afterwards, because both rows are individually valid.
+	//
+	// This is a single conditional UPDATE, so the database decides the winner: the
+	// row is locked for the duration and only one statement can find `requested`
+	// there. `rows_affected` of 1 means we hold the claim. It is the same discipline
+	// as the `add_option()` mutex behind one-distribution-per-month — the difference
+	// is that post meta has no unique index to lean on, so the condition goes in the
+	// WHERE clause instead.
+	global $wpdb;
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$claimed = $wpdb->query( $wpdb->prepare(
+		"UPDATE {$wpdb->postmeta} SET meta_value = 'approved'
+		 WHERE post_id = %d AND meta_key = '_bhela_pr_state' AND meta_value = 'requested'",
+		$id
+	) );
+	// The UPDATE went round the meta API, so the cached value is now stale.
+	wp_cache_delete( $id, 'post_meta' );
+	if ( 1 !== (int) $claimed ) {
+		return new WP_Error( 'settled', __( 'এই অনুরোধ আগেই নিষ্পত্তি হয়েছে।', 'bhela-booking' ) );
+	}
 
 	$row = bhela_bm_ledger_add( array(
 		'investor' => $r['investor'],
@@ -221,10 +278,13 @@ function bhela_bm_payreq_approve( $id ) {
 		),
 	) );
 	if ( is_wp_error( $row ) ) {
+		// Hand the claim back. Leaving it 'approved' with no ledger row would show
+		// the investor a payment that never happened and could never be reversed,
+		// because there is nothing to reverse.
+		update_post_meta( $id, '_bhela_pr_state', 'requested' );
 		return $row;
 	}
 
-	update_post_meta( $id, '_bhela_pr_state', 'approved' );
 	update_post_meta( $id, '_bhela_pr_decided_by', get_current_user_id() );
 	update_post_meta( $id, '_bhela_pr_decided_at', current_time( 'mysql' ) );
 	update_post_meta( $id, '_bhela_pr_ledger', (int) $row );
@@ -259,7 +319,19 @@ function bhela_bm_payreq_reject( $id, $reason ) {
 	if ( '' === trim( (string) $reason ) ) {
 		return new WP_Error( 'no_reason', __( 'কারণ লিখুন।', 'bhela-booking' ) );
 	}
-	update_post_meta( $id, '_bhela_pr_state', 'rejected' );
+	// The same conditional claim the approval takes, so an approve and a reject
+	// arriving together cannot both succeed and leave a paid-but-rejected request.
+	global $wpdb;
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	$claimed = $wpdb->query( $wpdb->prepare(
+		"UPDATE {$wpdb->postmeta} SET meta_value = 'rejected'
+		 WHERE post_id = %d AND meta_key = '_bhela_pr_state' AND meta_value = 'requested'",
+		$id
+	) );
+	wp_cache_delete( $id, 'post_meta' );
+	if ( 1 !== (int) $claimed ) {
+		return new WP_Error( 'settled', __( 'এই অনুরোধ আগেই নিষ্পত্তি হয়েছে।', 'bhela-booking' ) );
+	}
 	update_post_meta( $id, '_bhela_pr_decided_by', get_current_user_id() );
 	update_post_meta( $id, '_bhela_pr_decided_at', current_time( 'mysql' ) );
 	update_post_meta( $id, '_bhela_pr_reason', sanitize_textarea_field( $reason ) );

@@ -1460,6 +1460,17 @@ function bhela_bm_cost_save( $post_id, $post ) {
 		// Every line cleared on a sheet that had them: honour it, and let the
 		// earnings box go back to being typeable.
 		delete_post_meta( $post_id, '_bhela_cost_income' );
+	} else {
+		// No income block in the POST at all — a programmatic save, or a form cached
+		// from before this feature. The stored heads survive, so the earnings figure
+		// has to keep agreeing with them: taking the posted earnings here would leave
+		// Trip P&L showing heads that sum to one number beside a total that is
+		// another, which is exactly the disagreement the derived-earnings rule exists
+		// to prevent.
+		$stored_income = bhela_bm_cost_income_total( $post_id );
+		if ( $stored_income > 0 ) {
+			$earn = $stored_income;
+		}
 	}
 	if ( isset( $_POST['bhela_cost_income_remark'] ) ) {
 		$inc_remarks = array();
