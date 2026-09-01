@@ -24,21 +24,50 @@ $iv_month = '2026-07';
 $iv_made  = array();
 $iv_rows  = array();
 
-/** Clear anything an earlier pass committed — a run survives deletion by design. */
+/**
+ * Clear anything an earlier pass committed — a run survives deletion by design.
+ *
+ * Scoped to THIS MONTH's run and the fund rows that belong to it. Deleting every
+ * fund row would wipe real reserve history on a site that has any, which is the
+ * exact failure this project has already had twice with the period index and the
+ * agency directory.
+ */
 function iv_reset( $month ) {
 	$idx = get_option( 'bhela_bm_dist_runs', array() );
 	if ( is_array( $idx ) && ! empty( $idx[ $month ] ) ) {
-		bhela_test_delete( (int) $idx[ $month ] );
-		unset( $idx[ $month ] );
-		update_option( 'bhela_bm_dist_runs', $idx, false );
-	}
-	foreach ( array( 'bhela_inv_ledger', 'bhela_fund' ) as $type ) {
+		$run_id = (int) $idx[ $month ];
 		foreach ( get_posts( array(
-			'post_type' => $type, 'post_status' => 'publish',
-			'posts_per_page' => -1, 'fields' => 'ids',
+			'post_type' => 'bhela_fund', 'post_status' => 'publish',
+			'posts_per_page' => -1, 'fields' => 'ids', 'no_found_rows' => true,
+			'meta_key' => '_bhela_fnd_run', 'meta_value' => $run_id,
 		) ) as $z ) {
 			bhela_test_delete( $z );
 		}
+		bhela_test_delete( $run_id );
+		unset( $idx[ $month ] );
+		update_option( 'bhela_bm_dist_runs', $idx, false );
+	}
+	// Spending rows the previous pass left behind, found by their ZZ note.
+	foreach ( get_posts( array(
+		'post_type' => 'bhela_fund', 'post_status' => 'publish',
+		'posts_per_page' => -1, 'fields' => 'ids', 'no_found_rows' => true,
+	) ) as $z ) {
+		// CONTAINS, not starts-with: a reversal's note reads "#123 বাতিল — ZZ wrong
+		// head", so a prefix test left every reversal adjustment behind and the
+		// reserve grew by 12,000 on each run of the suite.
+		if ( false !== strpos( (string) get_post_meta( $z, '_bhela_fnd_note', true ), 'ZZ' ) ) {
+			bhela_test_delete( $z );
+		}
+	}
+	// Ledger rows are isolated to ZZ-titled fixtures, so this only ever reaches the
+	// harness's own. There is deliberately NO blanket "delete every fund row" here:
+	// one used to live at this spot and wiped real reserve history on the dev site,
+	// which is the third time this project has had a test destroy owner data.
+	foreach ( get_posts( array(
+		'post_type' => 'bhela_inv_ledger', 'post_status' => 'publish',
+		'posts_per_page' => -1, 'fields' => 'ids',
+	) ) as $z ) {
+		bhela_test_delete( $z );
 	}
 }
 iv_reset( $iv_month );
@@ -118,6 +147,13 @@ ok( 189000 === $iv_p['investor'] && 81000 === $iv_p['management'], 'then 70/30 a
 ok( $iv_p['reserve'] + $iv_p['distributable'] === $iv_p['gross'], 'reserve + distributable = gross, to the taka' );
 ok( $iv_p['investor'] + $iv_p['management'] === $iv_p['distributable'], 'investor + management = distributable, to the taka' );
 ok( 131479 === $iv_p['unallocated'], 'and the unissued shares’ portion is reported as unallocated', (string) $iv_p['unallocated'] );
+
+// Fund balances BEFORE this harness commits anything. Every fund assertion below is
+// a delta against these: a real site carries reserve history, and a test that assumes
+// an empty fund is asserting about the database rather than about the code. It failed
+// exactly that way the first time it met a site with a distribution already on it.
+$iv_res0 = bhela_bm_fund_ledger( 'reserve' );
+$iv_mgt0 = bhela_bm_fund_ledger( 'management' );
 
 echo "\n=== 5. a committed month stays committed ===\n";
 $iv_run = bhela_bm_dist_commit( $iv_month );
@@ -302,16 +338,24 @@ echo "\n=== 13. the reserve and management funds fill themselves ===\n";
 // Before this the reserve and management shares existed only as meta on a run: money
 // set aside on paper and then untracked. They are ledger rows now, so "what is left
 // in the reserve" has an answer that adds up.
+// Measured as a delta from whatever the site already held: a dev or live database
+// may carry real reserve history, and an assertion that assumes an empty fund is
+// asserting about the database rather than about the code.
 $iv_res = bhela_bm_fund_ledger( 'reserve' );
 $iv_mgt = bhela_bm_fund_ledger( 'management' );
-ok( 30000 === $iv_res['allocated'], 'committing the month allocated the 10% reserve', (string) $iv_res['allocated'] );
-ok( 81000 === $iv_mgt['allocated'], 'and the management 30%', (string) $iv_mgt['allocated'] );
-ok( 30000 === $iv_res['closing'] && 81000 === $iv_mgt['closing'], 'both balances start at what was allocated' );
+ok( 30000 === $iv_res['allocated'] - $iv_res0['allocated'], 'committing the month allocated the 10% reserve',
+	(string) ( $iv_res['allocated'] - $iv_res0['allocated'] ) );
+ok( 81000 === $iv_mgt['allocated'] - $iv_mgt0['allocated'], 'and the management 30%',
+	(string) ( $iv_mgt['allocated'] - $iv_mgt0['allocated'] ) );
+ok( 30000 === $iv_res['closing'] - $iv_res0['closing'] && 81000 === $iv_mgt['closing'] - $iv_mgt0['closing'],
+	'both balances move by exactly what was allocated' );
 
 // The three shares must still add up to the gross they came from.
-ok( $iv_res['allocated'] + $iv_mgt['allocated'] + 189000 === 300000,
+$iv_dres = $iv_res['allocated'] - $iv_res0['allocated'];
+$iv_dmgt = $iv_mgt['allocated'] - $iv_mgt0['allocated'];
+ok( $iv_dres + $iv_dmgt + 189000 === 300000,
 	'reserve + management + investor pool = gross, to the taka',
-	$iv_res['allocated'] . '+' . $iv_mgt['allocated'] . '+189000' );
+	$iv_dres . '+' . $iv_dmgt . '+189000' );
 
 // An allocation is arithmetic, not a decision — it cannot be typed in.
 $iv_hand = bhela_bm_fund_add( array( 'fund' => 'reserve', 'type' => 'allocation', 'amount' => 50000 ) );
@@ -320,8 +364,8 @@ ok( is_wp_error( $iv_hand ) && 'no_run' === $iv_hand->get_error_code(),
 
 // Nor can a run be allocated twice.
 bhela_bm_fund_allocate_run( $iv_run );
-ok( 30000 === bhela_bm_fund_ledger( 'reserve' )['allocated'], 'and a run cannot be allocated twice',
-	(string) bhela_bm_fund_ledger( 'reserve' )['allocated'] );
+ok( 30000 === bhela_bm_fund_ledger( 'reserve' )['allocated'] - $iv_res0['allocated'], 'and a run cannot be allocated twice',
+	(string) ( bhela_bm_fund_ledger( 'reserve' )['allocated'] - $iv_res0['allocated'] ) );
 
 echo "\n=== 14. spending against a fund ===\n";
 $iv_spend = bhela_bm_fund_add( array(
@@ -330,20 +374,26 @@ $iv_spend = bhela_bm_fund_add( array(
 ) );
 ok( ! is_wp_error( $iv_spend ), 'spending is recorded' );
 $iv_res = bhela_bm_fund_ledger( 'reserve' );
-ok( 18000 === $iv_res['closing'], 'and comes off the balance: 30,000 − 12,000', (string) $iv_res['closing'] );
-ok( 12000 === $iv_res['used'] && 12000 === ( $iv_res['by_head']['renovation'] ?? 0 ), 'attributed to its head' );
+ok( 18000 === $iv_res['closing'] - $iv_res0['closing'], 'and comes off the balance: 30,000 − 12,000',
+	(string) ( $iv_res['closing'] - $iv_res0['closing'] ) );
+ok( 12000 === $iv_res['used'] - $iv_res0['used']
+	&& 12000 === ( $iv_res['by_head']['renovation'] ?? 0 ) - ( $iv_res0['by_head']['renovation'] ?? 0 ),
+	'attributed to its head' );
 
 // Overdrawing is recorded, not blocked. The spending happened; refusing to record it
 // would just move the error somewhere the books cannot see.
 bhela_bm_fund_add( array( 'fund' => 'reserve', 'type' => 'utilisation', 'amount' => 25000, 'head' => 'emergency', 'date' => $iv_month . '-16', 'note' => 'ZZ engine' ) );
-ok( -7000 === bhela_bm_fund_ledger( 'reserve' )['closing'], 'an overdrawn fund goes negative rather than refusing the entry',
-	(string) bhela_bm_fund_ledger( 'reserve' )['closing'] );
+ok( -7000 === bhela_bm_fund_ledger( 'reserve' )['closing'] - $iv_res0['closing'],
+	'spending past the allocation is recorded, not refused',
+	(string) ( bhela_bm_fund_ledger( 'reserve' )['closing'] - $iv_res0['closing'] ) );
 
 // A wrong entry is reversed, never edited.
 $iv_frev = bhela_bm_fund_reverse( $iv_spend, 'ZZ wrong head' );
 ok( ! is_wp_error( $iv_frev ), 'spending can be reversed with a reason' );
-ok( 5000 === bhela_bm_fund_ledger( 'reserve' )['closing'], 'and the balance comes back', (string) bhela_bm_fund_ledger( 'reserve' )['closing'] );
-ok( 0 === ( bhela_bm_fund_ledger( 'reserve' )['by_head']['renovation'] ?? 0 ), 'the reversed spend stops counting against its head' );
+ok( 5000 === bhela_bm_fund_ledger( 'reserve' )['closing'] - $iv_res0['closing'], 'and the balance comes back',
+	(string) ( bhela_bm_fund_ledger( 'reserve' )['closing'] - $iv_res0['closing'] ) );
+ok( 0 === ( bhela_bm_fund_ledger( 'reserve' )['by_head']['renovation'] ?? 0 ) - ( $iv_res0['by_head']['renovation'] ?? 0 ),
+	'the reversed spend stops counting against its head' );
 ok( is_wp_error( bhela_bm_fund_reverse( $iv_spend, 'again' ) ), 'and it cannot be reversed twice' );
 
 $iv_alloc_row = 0;
@@ -403,11 +453,10 @@ ok( 0 === bhela_bm_cashflow( '2026-09-30', '2026-09-01' )['in_total'], 'an inver
 ok( 0 === bhela_bm_cashflow( '', '' )['out_total'], 'and so does a blank one' );
 
 /* ---------- cleanup ---------- */
-foreach ( array( 'bhela_inv_ledger', 'bhela_fund' ) as $z_type ) {
-	foreach ( get_posts( array( 'post_type' => $z_type, 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
-		bhela_test_delete( $z );
-	}
+foreach ( get_posts( array( 'post_type' => 'bhela_inv_ledger', 'post_status' => 'publish', 'posts_per_page' => -1, 'fields' => 'ids' ) ) as $z ) {
+	bhela_test_delete( $z );
 }
+iv_reset( $iv_month );
 if ( ! is_wp_error( $iv_run ) ) {
 	bhela_test_delete( $iv_run );
 	$iv_idx = get_option( 'bhela_bm_dist_runs', array() );

@@ -166,7 +166,21 @@ if ( ! function_exists( 'bhela_bm_get_settings' ) ) {
  * lets a harness still read back the fixture it just created.
  */
 function bhela_test_isolate() {
-	$ours = array( 'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking', 'bhela_review', 'bhela_inv_item', 'bhela_inv_period' );
+	// Every post type the plugin owns. A type missing from this list makes a harness
+	// read the REAL database: the investor types were absent at first, so seeding four
+	// demo investors on the dev site pushed issued shares over the configured total and
+	// 21 assertions failed at once, looking like a distribution bug rather than a test
+	// that could see data it had no business seeing.
+	$ours = array(
+		'bhela_cost', 'bhela_expense', 'bhela_salary', 'bhela_booking', 'bhela_review',
+		'bhela_inv_item', 'bhela_inv_period',
+		// Investors and ledger rows take their titles from the investor, so a ZZ
+		// fixture is matched by the LIKE below. Distribution runs and fund rows are
+		// titled by the plugin ("reserve allocation 29470") and would be hidden from
+		// the very harness that created them — those two are scoped by the harness
+		// instead, which deletes only the rows belonging to its own run.
+		'bhela_investor', 'bhela_inv_ledger',
+	);
 
 	// get_posts() sets suppress_filters => true, which skips posts_where
 	// entirely — the plugin reads almost everything through get_posts(), so a

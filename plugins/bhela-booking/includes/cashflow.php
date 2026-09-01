@@ -40,10 +40,16 @@ function bhela_bm_cashflow( $from, $to ) {
 	}
 
 	/* ---------- Cash in: what guests actually paid ---------- */
-	// Keyed on the PAYMENT date where one is recorded, falling back to the travel
-	// date. Cash flow is about when money moved, so a booking paid in June for an
-	// October trip is June's cash — using the travel date would report it four
-	// months late and make every month's closing balance wrong.
+	// **A booking records no payment DATE today**, only an amount and a method. So
+	// this is keyed on the travel date, which is a real limitation and not a rounding
+	// detail: a booking paid in June for an October trip is counted as October cash,
+	// four months after the money actually arrived.
+	//
+	// `_bhela_pay_date` is read first so that adding the field later fixes this
+	// everywhere at once, with no change here. Until then the label says "guest
+	// payments by trip date" rather than implying a precision the data does not have
+	// — a cash-flow line that quietly means something else is worse than a missing
+	// one, because it will be trusted.
 	$paid = 0;
 	$ids  = get_posts( array(
 		'post_type'      => 'bhela_booking',
@@ -69,7 +75,11 @@ function bhela_bm_cashflow( $from, $to ) {
 		}
 		$paid += $amount;
 	}
-	$out['in'][] = array( 'label' => __( 'Guest payments received', 'bhela-booking' ), 'amount' => $paid );
+	$out['in'][] = array(
+		'label'  => __( 'Guest payments (by trip date)', 'bhela-booking' ),
+		'amount' => $paid,
+		'note'   => __( 'Bookings do not record a payment date, so these are counted against the trip they belong to.', 'bhela-booking' ),
+	);
 
 	/* ---------- Cash out ---------- */
 	// Trip costs, from approved sheets only — a draft is a proposal, not a payment.
@@ -101,8 +111,12 @@ function bhela_bm_cashflow( $from, $to ) {
 		$last   = substr( $to, 0, 7 );
 		$guard  = 0;
 		while ( $cursor <= $last && $guard++ < 120 ) {
-			$salary += (int) bhela_bm_salary_month_total( $cursor );
-			$cursor  = gmdate( 'Y-m', strtotime( $cursor . '-01 +1 month' ) );
+			// ['total'], not the array itself. bhela_bm_salary_month_total() returns
+			// {total, sheets, ids}; casting that to int gives 1 per non-empty month,
+			// so a two-month range reported a wage bill of ৳2.
+			$month_bill = bhela_bm_salary_month_total( $cursor );
+			$salary    += (int) ( $month_bill['total'] ?? 0 );
+			$cursor     = gmdate( 'Y-m', strtotime( $cursor . '-01 +1 month' ) );
 		}
 	}
 	$out['out'][] = array( 'label' => __( 'Staff salary', 'bhela-booking' ), 'amount' => $salary );
