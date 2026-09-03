@@ -5,7 +5,7 @@
 
 **Pages**
 - `index.html` — **Overview**: project overview, what the client receives, business value, and why a custom theme + booking engine (vs templates/SaaS).
-- `manual.html` — **Owner's Manual**: plain-language Bangla guide to running the platform day to day, in 35 sections — bookings, invoices, rates, offers and coupons, availability, the confirmation message, trip costing and income by source, expenses, payroll, monthly and yearly accounts, seasons, stock, B2B partners, investors and profit distribution, business valuation and share issues, the investor portal, staff roles, blog, email/SMS and settings.
+- `manual.html` — **Owner's Manual**: plain-language Bangla guide to running the platform day to day, in 36 sections — bookings, invoices, rates, offers and coupons, availability, the confirmation message, trip costing and income by source, expenses, payroll, monthly and yearly accounts, seasons, stock, B2B partners, investors and profit distribution, business valuation and share issues, the investor portal and self-registration, staff roles, blog, email/SMS and settings.
 
 BHELA – The Haor Exclusive is a **custom WordPress booking platform** for a premium
 houseboat operating on Tanguar Haor, Sunamganj, Bangladesh. It is built from two
@@ -23,7 +23,10 @@ the bookings as well as the bookings themselves:
 - **The ownership side** — an investor register, monthly profit distribution by
   shareholding, an append-only ledger, reserve and management funds, cash flow, a
   business valuation history, share issues with honest dilution, and a private portal
-  where each investor sees their own position and nobody else's.
+  where each investor sees their own position and nobody else's. Investors sign in
+  with a one-time code sent to the number on their record rather than a password, and
+  can register themselves — an application the office approves before any login
+  exists.
 
 ## What the client receives
 
