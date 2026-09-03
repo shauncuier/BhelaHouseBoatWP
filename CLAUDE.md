@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-09-01 · Theme & Plugin v2.38.0 (single shared version)
+> Last updated: 2026-09-04 · Theme & Plugin v2.39.0 (single shared version)
 
 ---
 
@@ -95,6 +95,9 @@ wp-content/                          ← Git root
 │   │   ├── valuation-admin.php      ← The two screens and the valuation CSV
 │   │   ├── investor-payreq.php      ← Payment requests: the second signature before money moves
 │   │   ├── investor-dashboard.php   ← The investor dashboard, and the register/ledger/fund exports
+│   │   ├── investor-login.php       ← Passwordless sign-in: a code to the number on the record (§13.67)
+│   │   ├── investor-signup.php      ← Self-registration. An APPLICATION, never an account (§13.68)
+│   │   ├── investor-signup-admin.php ← 📝 Registrations: the queue, and the approval that mints a login
 │   │   ├── inventory-core.php       ← Stock post types + the lock. Loads on EVERY request (see §3.8)
 │   │   ├── inventory.php            ← Stock lists, quantity model, monthly carry-forward, close workflow, screens
 │   │   ├── inventory-import.php     ← Column-mapped CSV importer: upload → map → dry run → commit
@@ -113,7 +116,7 @@ wp-content/                          ← Git root
 │   ├── run.php                      ← CLI runner — loads the PHP extensions each harness needs
 │   ├── bootstrap.php                ← Boots WP, resolves the LocalWP DB port, provides ok()
 │   ├── sweep.php                    ← Clears ZZ* fixtures left by a crashed run
-│   ├── *-test.php                   ← 16 headless harnesses
+│   ├── *-test.php                   ← 17 headless harnesses
 │   └── bhela-tests.php              ← Older browser suite (open as an admin)
 │
 ├── docs/
@@ -225,6 +228,8 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 | `bhela_bm_inv_periods` | `YYYY-MM` => period post ID. **This option is the uniqueness constraint** for one-sheet-per-month |
 | `bhela_bm_inv_seq` | Per-category Item ID counter (`KIT` => 42). Numbers are never reused |
 | `bhela_bm_audit_db` | Audit-table schema version, compared on `admin_init` priority 5 |
+| `bhela_bm_inv_mobile_idx` | Version of the normalised-mobile index. The portal's sign-in lookup is unusable without it — see §13.67 |
+| `bhela_bm_portal_pages` | Set once, ever, when the two portal pages are provisioned. A page somebody deleted is never resurrected |
 
 The plugin owns exactly **one database table**, `{prefix}bhela_bm_audit` — see §3.7.
 
@@ -246,13 +251,14 @@ Bookings are stored as a **private Custom Post Type** (`bhela_booking`) with pos
 ### 3.9 Four admin menus, and why the parent is asked for rather than written down
 
 Everything used to hang off one **Bookings** menu — 22 rows, from Add New Booking to Audit Trail
-to Quick Guide. `includes/menu.php` splits that into four, grouped by the job someone is doing:
+to Quick Guide. `includes/menu.php` splits that into five, grouped by the job someone is doing:
 
 | Menu | Slug / landing page | Rows |
 |---|---|---|
 | **Bookings** | `edit.php?post_type=bhela_booking` | All Bookings · Add New · 📊 Dashboard · 📄 Trip Report · 📅 Trip Calendar · ⭐ Reviews |
 | **Accounts** | `bhela-bm-statement` | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report · 🤝 B2B Report · 🧮 Trip P&L · 💹 Revenue by Source |
 | **Store** | `bhela-bm-inv-month` | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
+| **Investors** | `bhela-bm-dist` | 👤 Investors · 🧭 Dashboard · 💰 Distribution · 📊 Investor Report · 📝 Registrations · 💎 Valuation · 🪙 Share Issue · 🏦 Funds · 💵 Cash Flow |
 | **Setup** | `bhela-bm-settings` | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
 
 Each group's `slug` is a real screen rather than an index page nobody maintains, so the parent
@@ -515,6 +521,21 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_share_issue_valuation_map()` | `includes/share-issue.php` | Valuation ⇒ issue, built once. The per-row lookup was a full query per row |
 | `bhela_bm_val_locked($id)` | `includes/valuation-core.php` | Approved valuation (state) or any share issue (from birth). Loads on every request |
 | `bhela_bm_portal_login_limit()` | `includes/investor-portal.php` | Failed portal sign-ins allowed per IP per hour. Filterable, 8 |
+| `bhela_bm_chal_start($purpose,$phone,$payload,$email,$deliver)` | `includes/investor-login.php` | Send a one-time code. `$deliver = false` builds a **decoy** — see §13.67 |
+| `bhela_bm_chal_verify($purpose,$id,$code)` | `includes/investor-login.php` | Prove a code, once. Returns the payload the challenge was opened with |
+| `bhela_bm_investor_by_mobile($raw)` | `includes/investor-login.php` | The record behind a typed number. Two records on one number **refuse**, never resolve |
+| `bhela_bm_investor_index_mobile($id)` | `includes/investor-login.php` | Keeps `_bhela_inv_mobile_n` in step. The stored mobile is free text; the lookup is not |
+| `bhela_bm_otp_login_allowed($user)` | `includes/investor-login.php` | **The privilege gate.** A code may sign in a pure portal account and nothing else — §13.67 |
+| `bhela_bm_login_step_code($ip,$tries,$blind)` | `includes/investor-login.php` | The only place an auth cookie is set. Returns a bool rather than exiting, so it is testable |
+| `bhela_bm_investor_unreachable()` | `includes/investor-login.php` | Logins no code can ever reach, because the record's number is not a mobile |
+| `bhela_bm_signup_groups()` | `includes/investor-signup.php` | The public form: `bhela_bm_investor_fields()` in Bangla, minus `code`, plus `name` and `note` |
+| `bhela_bm_signup_add($args)` | `includes/investor-signup.php` | File an application. Called only after the phone is proved; one pending per number |
+| `bhela_bm_signup_approve($id,$notify)` | `includes/investor-signup.php` | The ONLY thing that mints a portal login. Needs `bhela_investor_signup` |
+| `bhela_bm_signup_copy_to_record($row,$inv)` | `includes/investor-signup.php` | Fills EMPTY fields only. What the office typed always wins — §13.68 |
+| `bhela_bm_signup_ticket_add/ticket/spend()` | `includes/investor-signup.php` | The 30-minute proof that unlocks step three, and with it every upload |
+| `bhela_bm_investor_fields()` | `includes/investors.php` | The record, field for field. **Moved out of the admin screen** so the public form can read it (§13.22) |
+| `bhela_bm_investor_field_sanitize($def,$raw)` | `includes/investors.php` | One sanitiser for both forms. A select may only hold one of its own options |
+| `bhela_bm_investor_upload($field,$attach)` | `includes/investors.php` | A scan, mime-checked by content and stored under a random name — §13.69 |
 | `bhela_bm_inv_line_check($line)` | `includes/inventory.php` | The quantity invariant: `good+rep+ur+dam === close`. Reports a mismatch, never rebalances it |
 | `bhela_bm_inv_line_key($item,$loc)` | `includes/inventory.php` | The line key. Returns the item ID today; the one place to change if stock ever splits by location |
 | `bhela_bm_inv_period_id($month,$create)` | `includes/inventory.php` | Resolves — or mints, behind an `add_option` mutex — the one record for a month |
@@ -571,6 +592,8 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `[bhela_booking_form]` | `includes/frontend.php` | Multi-step booking wizard |
 | `[bhela_trip_calendar]` | `includes/trips.php` | Trip schedule with availability |
 | `[bhela_reviews]` | `includes/reviews.php` | Guest reviews grid |
+| `[bhela_investor_portal]` | `includes/investor-portal.php` | The investor portal, and the passwordless sign-in when logged out |
+| `[bhela_investor_register]` | `includes/investor-signup.php` | Investor self-registration — three steps, ending in an application |
 
 ---
 
@@ -636,10 +659,11 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Sixteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+Seventeen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
 cost heads, the cost-sheet save round trip, the booking save handler, the stock register, every
 admin screen, WCAG contrast, the front end behind a page cache, OTP, the SMS gateway, the six
-version fields, and the yearly rollup.
+version fields, the yearly rollup, valuation, and the portal's passwordless sign-in and
+self-registration.
 Exits non-zero on failure. Any PHP 8.x binary works — `run.php` loads the extensions each
 harness needs, so never hand-build a `php -d extension=…` command. The site must be running.
 
@@ -662,7 +686,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all sixteen harnesses
+- [ ] `php tests/run.php` passes — all seventeen harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -768,6 +792,17 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 65. **A record locked from birth cannot clean up after itself.** `bhela_bm_share_issue_commit()` aborts when the share total moved underneath it, and its `wp_delete_post()` was refused by its own lock — leaving an orphan issue record that `bhela_bm_share_issue_drift()` then counted as a real round, reporting drift on a correct register. `bhela_bm_val_delete()` is the sanctioned path: it lifts the two delete filters for exactly one call. The delete guards deliberately do **not** consult `bhela_bm_val_writing()` — a lock a flag can lift is not much of a lock — which is why this is a function with one caller rather than a condition inside the guard.
 66. **A figure counted in SQL is outside the harness's post-type isolation.** `bhela_bm_share_issue_drift()` counts and sums in SQL so a capped listing cannot understate it (the `bhela_bm_payreq_pending_total()` failure). The cost is that raw SQL never sees `posts_where`, so the harness reads every round the site has ever run — and `valuation-test.php` §8 asserted absolutes against it and broke the moment a previous run left a record behind. Deltas, per §13.38, and the same rule now has a second instance: **any figure a harness reads through raw SQL must be asserted as a delta.**
 
+
+
+67. **A sign-in form that behaves differently for a known number is a directory of BHELA's shareholders.** The portal is passwordless now — type the mobile on the record, get a six-digit code — and the first version of `bhela_bm_login_step_phone()` skipped straight to the code screen with an empty hidden `bhela_inv_chal` when the number matched nothing. The two pages then differed by nine bytes, which is all an attacker needs to test numbers. An unknown number now opens a **decoy** challenge: a real 32-character id, every rate limit consumed, a non-numeric "code" that no digits a person can type will ever match, and nothing sent anywhere. A throttled request goes the same way — `$blind` — rather than getting a "too many attempts" page of its own, which is §13.43's rule applied to a form that no longer has passwords. Two things are deliberately **not** equalised, and saying so is better than pretending: response TIME (a real send waits on the gateway, and adding a matching delay to every unknown number is a denial-of-service tool pointed at ourselves) and the delivery-failure message, which is about the site rather than the number. Three more rules carry the rest: the fallback email address comes from the **record**, never the request, or knowing a number would mean receiving its codes; the challenge payload lives server-side so the browser carries no user id to swap; and **`bhela_bm_otp_login_allowed()` refuses any account holding a role or capability beyond the portal's own** — an investor record linked to an administrator, which the Portal Login box does not stop and which is exactly how an owner who is also a shareholder would set themselves up, would otherwise turn one phone number into wp-admin. It checks capabilities as well as roles, because a capability granted to a single user is invisible to a role check. The lookup needs `_bhela_inv_mobile_n`: the stored mobile is free text ("+880 1712-345678") and no `meta_query` matches that against typed digits.
+68. **Registration files an APPLICATION, and only a person turns one into a login.** Proving you hold a phone proves you hold a phone; it is nowhere near enough to be shown what BHELA earned. So `bhela_bm_signup_add()` writes a `bhela_inv_signup` record and nothing else, and `bhela_bm_signup_approve()` — gated on its own capability `bhela_investor_signup`, held by Manager and Administrator, because minting an account that reads money is a bigger act than editing a record — is the only path to a user. An approval that has to invent an investor record gives it **zero shares and zero paid in**: what somebody types into a web page is not evidence that they invested. When the number already matches a record, approval **fills empty fields only** — a bank account the office typed off a signed form always wins, and the difference is shown on the Registrations screen rather than silently resolved. On disclosure: before the code is proved the form says nothing about whether a number is known; **after** it is proved, the visitor has demonstrated they hold that handset, so "this number already has access, sign in" is not enumeration.
+69. **Nothing may be uploaded until a number is proved, which is why the form has three screens and not two.** The scans are NID photographs and signatures; asking for them on the first screen makes the page an open file-drop for anyone who finds the URL. Step two mints a 30-minute ticket and step three is the only place `bhela_bm_investor_upload()` can be reached. The ticket is **not** consumed on a failed submit — an oversized scan would otherwise send the applicant back to wait for another code — and is spent when the application is filed, so a refresh cannot file it twice. Three rules on the upload itself: the mime type is checked by **content** against an explicit list, so `nid.pdf.php` never lands; the stored name is **random**, because files under `wp-content/uploads` are served straight off disk with no capability check and `nid-scan-rahim.jpg` is guessable; and the public path creates **no attachment post**, while the admin path does, so the office can find and delete what it uploaded.
+70. **The registration form renders `bhela_bm_investor_fields()`, which is why that registry had to leave the admin screen.** A separate thirty-field list on the public form is a list that drifts, and the failure is silent — the office simply never gets asked for the father's name. It lives in `includes/investors.php` now (§13.22's lesson, third instance), with `bhela_bm_investor_field_sanitize()` beside it so both forms agree on what a valid date of birth is. The field LIST is shared; the WORDING is not — `bhela_bm_signup_labels()` / `_options()` / `_help()` give Bangla for the public page, and the registry's own `help` is **dropped** rather than translated, because most of it is advice about wp-admin. That one only showed up on screen: the signature field printed "Upload the scan to the Media Library and paste its URL here" directly beneath a file picker, and every harness assertion about which fields exist passed throughout.
+71. **A portal login with no shares is shown none of the company's money.** Until self-registration existed, every portal account was one the office had deliberately linked to a real shareholding, so `bhela_bm_portal_data()` could hand every viewer the reserve and management fund totals. Now a person can register, be approved for access, and sit at zero shares while the office works out what they bought — and a brand-new account was looking at ৳79,569 of management fund. The gate is on the holding, not on the account: one share brings the figures back. Caught by loading the portal after registering through it, which is the same lesson as §13.29 and §13.44 — the harnesses call data functions and never draw a page.
+
+72. **An unverified email is not an identity, and must never be a join key.** Registration proves a phone number; the address is a delivery fallback and step three lets the applicant type any address at all. `bhela_bm_signup_make_user()` originally called `email_exists()` and, on a hit, **returned that user** — so an applicant who typed a stranger's address had their new investor record linked to that stranger's WordPress account, and approval then issued a working auth cookie for it. Type your own mobile, type somebody else's email, take the code on your own handset, sign in as them. Against a plain `subscriber` that is a complete takeover, because `bhela_bm_investor_block_admin()` only turns away accounts holding the **investor** role — a subscriber walks into `/wp-admin/profile.php` and rewrites the password. Against an investor victim it is "only" a permanent portal lockout for them plus a live cookie, because `bhela_bm_current_investor()` refuses when one login resolves to two records — and the office's natural fix, deleting the bogus record, hands the attacker the victim's real position. A registration now always mints its **own** account; a colliding address is dropped from the new user and flagged on the Registrations screen (`_bhela_sgn_email_clash`) rather than joined on. The approval path also picked up the `$taken` guard that `bhela_bm_investor_save_login()` has always run — it was the only writer of `_bhela_inv_user` that did not check whether the user was already claimed. And where the code travelled by **email**, step three can no longer replace the address it was read from: that address is the one thing such an application has actually proved.
+73. **A code that went by email proves an address, not a handset — so it cannot claim a record the office already holds.** `sms_enabled` ships **off**, and `bhela_bm_provision_portal_pages()` publishes `/investor-register/` regardless, so on an unconfigured site *every* code goes to the address the applicant typed. That is fine for a new number, where the applicant is only claiming themselves. It is not fine when the number already matches a real investor: somebody could name a shareholder's mobile, take the code at their own inbox, and be approved straight onto that shareholding — and the login persists after SMS comes back, because nothing stops an investor account using WordPress's ordinary password reset. `bhela_bm_signup_approve()` now **refuses** that one combination (existing record + non-SMS proof) with `unproved_link`, and the screen offers a checkbox saying the approver confirmed the person by phone. An SMS-proved match needs no confirmation, and an unknown number never needs one. Note what is deliberately *not* done: the fallback is not withheld from known numbers at step one, because a registration that errors for numbers on the register and succeeds for numbers that are not is §13.67's enumeration oracle in a new place. The check belongs at the gate that binds, not at the gate that sends.
+74. **A test that greps a whole document for a four-digit number will eventually match a hash.** `booking-test.php` §3f asserts a B2B commission of 3,500 appears on none of the guest-facing surfaces — by searching the rendered text for `3500`. The confirmation message and the customer email both carry `{invoice_link}`, whose `key=` is a 32-character `wp_hash()`; roughly one key in 2,300 contains those digits by chance, and when one does the assertion fails on exactly those two surfaces and never on the invoice, which does not print its own URL. It looked like a leak and was a coincidence. The key is masked before the numeric comparison only — the agency name and reference are still matched against the whole document, so a genuine leak into a link is still caught, and injecting `{commission}` into the shipped template was verified to still fail the assertion.
 
 > **Deployment: the portal must be served over HTTPS.** The sign-in form posts a password, and `wp_signon()` marks the session cookie secure only when `is_ssl()` is true. Over plain HTTP an investor's credentials and their session travel in clear on the network, and no amount of code here can compensate for it. This is the one item on this list that is a hosting decision rather than a bug.
 

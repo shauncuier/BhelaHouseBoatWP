@@ -94,6 +94,64 @@
 	padding: .5rem .7rem; color: var(--inv-danger); font-size: .9rem;
 }
 
+/* Passwordless sign-in and registration.
+   Both forms are the login card widened as far as their content needs and no
+   further: a stranger filling in six fields on a phone should not be reading a
+   line of text the width of a desktop. */
+.bhela-inv--login input[type="email"],
+.bhela-inv--login textarea {
+	display: block; width: 100%; margin-top: .3rem; padding: .55rem .7rem;
+	border: 1px solid var(--inv-line); border-radius: 8px; font: inherit;
+}
+.bhela-inv--login select,
+.bhela-inv--login input[type="date"],
+.bhela-inv--login input[type="file"] {
+	display: block; width: 100%; margin-top: .3rem; padding: .5rem .6rem;
+	border: 1px solid var(--inv-line); border-radius: 8px; font: inherit;
+	background: #fff;
+}
+.bhela-inv--login input[type="file"] { padding: .4rem; font-size: .9rem; }
+.bhela-inv--wide { max-width: 680px; }
+
+/* The three steps, named. A form that asks for a NID and a bank account without
+   saying how much further there is to go is a form people abandon halfway. */
+.bhela-inv__steps {
+	display: flex; gap: .4rem; list-style: none; margin: 0 0 1rem; padding: 0;
+	font-size: .78rem; letter-spacing: .04em; text-transform: uppercase;
+	color: var(--inv-soft); counter-reset: bha-step;
+}
+.bhela-inv__steps li {
+	flex: 1; padding: .35rem 0 .45rem; border-top: 3px solid var(--inv-line);
+	counter-increment: bha-step;
+}
+.bhela-inv__steps li::before { content: counter(bha-step) ". "; }
+.bhela-inv__steps li.is-now { border-top-color: var(--inv-accent); color: var(--inv-accent); font-weight: 700; }
+
+.bhela-inv__group {
+	border: 1px solid var(--inv-line); border-radius: 10px;
+	padding: .9rem 1rem .4rem; margin: 0 0 1rem;
+}
+.bhela-inv__group legend {
+	padding: 0 .4rem; font-weight: 700; font-size: .9rem; color: var(--inv-accent);
+}
+.bhela-inv__help {
+	display: block; margin-top: .25rem; font-weight: 400;
+	font-size: .8rem; color: var(--inv-soft);
+}
+.bhela-inv__again { margin-top: .6rem; }
+.bhela-inv__link {
+	background: none; border: 0; padding: 0; font: inherit; cursor: pointer;
+	color: var(--inv-accent); text-decoration: underline;
+}
+/* The honeypot. Off-screen rather than display:none — a bot that reads computed
+   styles skips a hidden field, and this one is only worth having if it is filled
+   in. aria-hidden is not set for the same reason it is not on the booking form:
+   a screen reader user tabbing into it would still be told nothing useful, and
+   the field is removed from the tab order instead. */
+.bhela-inv__hp {
+	position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden;
+}
+
 /* Print: this is the statement an investor keeps. Borders, never fills —
    browsers drop backgrounds in economy colour mode, and a statement whose
    figures lose their structure on paper is not a statement. */

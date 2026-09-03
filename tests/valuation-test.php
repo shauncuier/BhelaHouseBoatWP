@@ -18,6 +18,50 @@ bhela_test_modules( 'ui', 'roles', 'reports', 'costs' );
 wp_set_current_user( 0 );
 wp_set_current_user( 1 );
 
+/* ---------- scope ----------
+ *
+ * A valuation and a share issue are titled by the plugin from their own figures, not
+ * from a fixture's name, so `bhela_test_isolate()`'s `post_title LIKE 'ZZ%'` cannot
+ * see them and they are deliberately left out of it (§13.37). The consequence bit:
+ * section 1 asserts what a site with NO approved valuation reads like, and the dev
+ * site has had a real ৳1.70 Cr valuation approved on it since — so the harness was
+ * measuring the database rather than the code, exactly the failure §13.38 and §13.66
+ * are about.
+ *
+ * So this harness keeps a scope of its own. Every record it creates is registered on
+ * `save_post`, and everything else is filtered out of both post types — which means
+ * section 1 runs against genuinely nothing, on any site, however much real data it
+ * carries.
+ */
+$GLOBALS['vt_own_ids'] = array();
+$GLOBALS['vt_scope']   = true;
+
+foreach ( array( 'bhela_valuation', 'bhela_share_issue' ) as $vt_type ) {
+	add_action( "save_post_{$vt_type}", function ( $post_id ) {
+		$GLOBALS['vt_own_ids'][] = (int) $post_id;
+	} );
+}
+
+// get_posts() sets suppress_filters => true, which skips posts_where entirely — the
+// plugin reads through get_posts(), so a posts_where filter alone silently does
+// nothing. pre_get_posts fires either way. Same shape as the bootstrap's isolation.
+add_action( 'pre_get_posts', function ( $query ) {
+	if ( array_intersect( (array) $query->get( 'post_type' ), array( 'bhela_valuation', 'bhela_share_issue' ) ) ) {
+		$query->set( 'suppress_filters', false );
+	}
+} );
+add_filter( 'posts_where', function ( $where, $query ) {
+	global $wpdb;
+	if ( empty( $GLOBALS['vt_scope'] ) ) {
+		return $where;
+	}
+	if ( ! array_intersect( (array) $query->get( 'post_type' ), array( 'bhela_valuation', 'bhela_share_issue' ) ) ) {
+		return $where;
+	}
+	$ids = array_map( 'intval', (array) $GLOBALS['vt_own_ids'] );
+	return $where . " AND {$wpdb->posts}.ID IN (" . ( $ids ? implode( ',', $ids ) : '0' ) . ')';
+}, 10, 2 );
+
 /* ---------- fixtures ---------- */
 
 $vt_settings_was = get_option( 'bhela_bm_settings', array() );
@@ -218,6 +262,11 @@ if ( $vt_mine ) {
 	ok( 1478260 === $vt_mine['value'], 'while the holding VALUE is unchanged', (string) $vt_mine['value'] );
 }
 
+// The drift reader counts in SQL (§13.66) so a capped listing cannot understate the
+// money — which also means it is the ONE figure in this harness that sees the whole
+// site, scope filter or not. Baseline it before committing, and assert the change.
+$vt_drift0 = bhela_bm_share_issue_drift();
+
 echo "\n=== 7. committing the round ===\n";
 $vt_b = wp_insert_post( array( 'post_type' => 'bhela_investor', 'post_status' => 'publish', 'post_title' => 'ZZ Val B' ) );
 update_post_meta( $vt_b, '_bhela_inv_status', 'active' );
@@ -259,17 +308,30 @@ ok( is_wp_error( $vt_reopen ) && 'in_use' === $vt_reopen->get_error_code(),
 	is_wp_error( $vt_reopen ) ? $vt_reopen->get_error_code() : 'ALLOWED' );
 
 echo "\n=== 8. drift is reported, never corrected ===\n";
-// DELTAS, not absolutes (§13.38). bhela_bm_share_issue_drift() counts in SQL so a
-// capped listing cannot understate it, and raw SQL is deliberately outside the
-// harness's post-type isolation — so these figures see every round the site has ever
-// run, not only this harness's.
+// DELTAS, not absolutes — §13.38, and §13.66 for this function specifically.
+// bhela_bm_share_issue_drift() counts and sums in SQL so a capped listing cannot
+// understate the money, and raw SQL never sees `posts_where`: it reads every round the
+// site has ever run, including real ones an owner committed in wp-admin. Asserting
+// `expected === configured` here therefore breaks the first time somebody uses the
+// feature for real, which is exactly what happened — a genuine 10-share round on the
+// dev site made `expected` 132 against a configured 122, and the harness called its
+// own fixture arithmetic a bug.
 $vt_drift = bhela_bm_share_issue_drift();
-ok( ! $vt_drift['drift'], 'the configured total agrees with the issue history' );
-ok( $vt_drift['configured'] === $vt_drift['expected'], 'expected equals configured to the share',
-	$vt_drift['expected'] . ' vs ' . $vt_drift['configured'] );
-ok( $vt_drift['issued'] >= 7, 'and this harness’s 7 shares are inside the issued total', (string) $vt_drift['issued'] );
+ok( 7 === $vt_drift['issued'] - $vt_drift0['issued'],
+	'the committed round added exactly its 7 shares to the issue history',
+	( $vt_drift['issued'] - $vt_drift0['issued'] ) . ' of 7' );
+ok( 7 === $vt_drift['expected'] - $vt_drift0['expected'],
+	'and moved the total the history expects by the same 7' );
+ok( 1 === $vt_drift['rounds'] - $vt_drift0['rounds'], 'one round, counted once' );
 
+// Now put the configured total where the history says it should be, and the reader
+// should report no discrepancy at all. Setting it from `expected` rather than from a
+// literal is the whole point: the harness cannot know what rounds a real site has run.
 $vt_expected_was = $vt_drift['expected'];
+vt_configure( $vt_expected_was, 100000, 11500000 );
+$vt_drift1 = bhela_bm_share_issue_drift();
+ok( ! $vt_drift1['drift'], 'a configured total matching the history reports no drift' );
+ok( 0 === $vt_drift1['gap'], 'with no gap', (string) $vt_drift1['gap'] );
 vt_configure( $vt_expected_was + 78, 100000, 11500000 );   // somebody edits by hand
 $vt_drift2 = bhela_bm_share_issue_drift();
 ok( $vt_drift2['drift'], 'a hand-edited total is reported as a discrepancy' );
@@ -320,11 +382,16 @@ ok( false !== strpos( $vt_iss_src, 'SELECT COUNT(*)' ), 'drift counts in SQL rat
 ok( false === strpos( $vt_iss_src, "'posts_per_page' => -1" ), 'and no listing here is unbounded' );
 
 // Drive it: the SQL must agree with the listing while the listing is not truncated.
+// This is the one assertion that compares the two readings, so it has to see the same
+// data — the harness's own scope filter narrows the listing and not the raw SQL, which
+// would make them disagree for a reason that has nothing to do with the cap.
+$GLOBALS['vt_scope'] = false;
 $vt_d = bhela_bm_share_issue_drift();
 $vt_manual = 0;
 foreach ( bhela_bm_share_issues() as $vt_r ) {
 	$vt_manual += $vt_r['shares'];
 }
+$GLOBALS['vt_scope'] = true;
 ok( $vt_manual === $vt_d['issued'], 'the SQL sum agrees with the rows below the cap',
 	$vt_manual . ' vs ' . $vt_d['issued'] );
 ok( $vt_d['rounds'] >= 1, 'and the round is counted', (string) $vt_d['rounds'] );
@@ -361,7 +428,13 @@ update_option( 'bhela_bm_settings', $vt_fix );
 // ten lakh before this was fixed.
 $vt_tot = bhela_bm_holding_totals();
 ok( $vt_tot['stale'], 'a valuation with shares issued after it is reported as out of date' );
-ok( 7 === $vt_tot['issued_since'], 'naming how many shares were issued since', (string) $vt_tot['issued_since'] );
+// Against the valuation's OWN snapshot, not against a literal 7: on a site that has
+// run real rounds the configured total is higher than this harness's fixtures, and the
+// figure the screen has to print is the gap the valuation is actually behind by.
+$vt_since = (int) bhela_bm_share_config()['total_shares'] - 115;
+ok( $vt_since === $vt_tot['issued_since'],
+	'naming how many shares were issued since it was signed off',
+	$vt_tot['issued_since'] . ' of ' . $vt_since );
 ok( 0 === $vt_tot['rounding'] && 0 === $vt_tot['unissued'],
 	'and no reconciliation is attempted against a total that has moved' );
 

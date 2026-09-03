@@ -18,90 +18,6 @@ if ( ! defined( 'ABSPATH' ) ) {
  * The investor record
  * ========================================================= */
 
-/**
- * The record, field for field as the onboarding form asks for it.
- *
- * These mirror BHELA's live "Investor Information & Nominee Declaration Form", so a
- * completed form can be typed in without anything being dropped or invented. Where
- * the form separates two things - present and permanent address, father and mother,
- * account name and number - this does too. Merging them loses information that a
- * bank transfer or a succession claim later needs exactly as it was written down.
- */
-function bhela_bm_investor_fields() {
-	return array(
-		'identity' => array(
-			'label'  => __( 'Section A - Investor Details', 'bhela-booking' ),
-			'fields' => array(
-				'code'      => array( 'label' => __( 'Investor ID', 'bhela-booking' ) ),
-				'father'    => array( 'label' => __( 'Father name', 'bhela-booking' ) ),
-				'mother'    => array( 'label' => __( 'Mother name', 'bhela-booking' ) ),
-				'dob'       => array( 'label' => __( 'Date of birth', 'bhela-booking' ), 'type' => 'date' ),
-				'nid'       => array( 'label' => __( 'NID / Passport / Birth certificate', 'bhela-booking' ) ),
-				'address'   => array( 'label' => __( 'Present address', 'bhela-booking' ), 'type' => 'textarea' ),
-				'address_p' => array( 'label' => __( 'Permanent address', 'bhela-booking' ), 'type' => 'textarea' ),
-				'mobile'    => array( 'label' => __( 'Mobile', 'bhela-booking' ) ),
-				'email'     => array( 'label' => __( 'Email', 'bhela-booking' ), 'type' => 'email' ),
-			),
-		),
-		'bank'     => array(
-			'label'  => __( 'Section B - Payment and Bank', 'bhela-booking' ),
-			'fields' => array(
-				'pay_mode'          => array(
-					'label'   => __( 'Mode of payment', 'bhela-booking' ),
-					'type'    => 'select',
-					'options' => array(
-						''       => __( 'Not recorded', 'bhela-booking' ),
-						'cash'   => __( 'Cash', 'bhela-booking' ),
-						'bank'   => __( 'Bank transfer', 'bhela-booking' ),
-						'cheque' => __( 'Cheque', 'bhela-booking' ),
-						'other'  => __( 'Other', 'bhela-booking' ),
-					),
-				),
-				'pay_mode_other'    => array( 'label' => __( 'If other, specify', 'bhela-booking' ) ),
-				'bank_name'         => array( 'label' => __( 'Bank name', 'bhela-booking' ) ),
-				'bank_branch'       => array( 'label' => __( 'Branch name', 'bhela-booking' ) ),
-				'bank_account_name' => array( 'label' => __( 'Account name', 'bhela-booking' ) ),
-				'bank_account'      => array( 'label' => __( 'Account number', 'bhela-booking' ) ),
-				'bank_routing'      => array( 'label' => __( 'Routing number', 'bhela-booking' ) ),
-			),
-		),
-		'nominee'  => array(
-			'label'  => __( 'Section C - Nominee', 'bhela-booking' ),
-			'fields' => array(
-				'nominee_name'     => array( 'label' => __( 'Full name', 'bhela-booking' ) ),
-				'nominee_relation' => array( 'label' => __( 'Relation to investor', 'bhela-booking' ) ),
-				'nominee_dob'      => array( 'label' => __( 'Date of birth', 'bhela-booking' ), 'type' => 'date' ),
-				'nominee_nid'      => array( 'label' => __( 'NID / Passport / Birth certificate', 'bhela-booking' ) ),
-				'nominee_mobile'   => array( 'label' => __( 'Mobile', 'bhela-booking' ) ),
-				'nominee_address'  => array( 'label' => __( 'Address', 'bhela-booking' ), 'type' => 'textarea' ),
-			),
-		),
-		'declaration' => array(
-			'label'  => __( 'Section D - Declaration', 'bhela-booking' ),
-			'fields' => array(
-				'declared'     => array(
-					'label'   => __( 'Declaration signed', 'bhela-booking' ),
-					'type'    => 'select',
-					'options' => array(
-						''    => __( 'Not recorded', 'bhela-booking' ),
-						'yes' => __( 'Yes - nominee rights confirmed', 'bhela-booking' ),
-						'no'  => __( 'No', 'bhela-booking' ),
-					),
-					'help'    => __( 'The declaration on the form: the information is correct, and the nominee holds all rights to this investment in the investor absence.', 'bhela-booking' ),
-				),
-				'declared_on'  => array( 'label' => __( 'Date signed', 'bhela-booking' ), 'type' => 'date' ),
-				'sig_investor' => array(
-					'label' => __( 'Investor signature', 'bhela-booking' ),
-					'type'  => 'file',
-					'help'  => __( 'Upload the scan to the Media Library and paste its URL here. The record keeps a link, not a second copy.', 'bhela-booking' ),
-				),
-				'sig_nominee'  => array( 'label' => __( 'Nominee signature', 'bhela-booking' ), 'type' => 'file' ),
-				'agreement'    => array( 'label' => __( 'Agreement / KYC document', 'bhela-booking' ), 'type' => 'file' ),
-			),
-		),
-	);
-}
-
 function bhela_bm_investor_boxes() {
 	add_meta_box( 'bhela-inv-money', __( 'Investment', 'bhela-booking' ), 'bhela_bm_investor_money_box', 'bhela_investor', 'normal', 'high' );
 	add_meta_box( 'bhela-inv-detail', __( 'Investor Details', 'bhela-booking' ), 'bhela_bm_investor_detail_box', 'bhela_investor', 'normal', 'default' );
@@ -165,6 +81,20 @@ function bhela_bm_investor_money_box( $post ) {
 	<?php
 }
 
+/**
+ * Let the investor edit screen carry files.
+ *
+ * WordPress's post form is not multipart unless something says so, and nothing warns:
+ * the file input renders, the person picks a scan, and $_FILES arrives empty on save.
+ */
+function bhela_bm_investor_form_enctype() {
+	$screen = get_current_screen();
+	if ( $screen && 'bhela_investor' === $screen->post_type ) {
+		echo ' enctype="multipart/form-data"';
+	}
+}
+add_action( 'post_edit_form_tag', 'bhela_bm_investor_form_enctype' );
+
 function bhela_bm_investor_detail_box( $post ) {
 	foreach ( bhela_bm_investor_fields() as $group ) {
 		echo '<h4 style="margin:1.2em 0 .2em">' . esc_html( $group['label'] ) . '</h4><table class="form-table">';
@@ -195,6 +125,16 @@ function bhela_bm_investor_detail_box( $post ) {
 					esc_attr( $key ),
 					esc_attr( $val ),
 					esc_attr__( 'Media Library URL', 'bhela-booking' )
+				);
+				// Or just pick the file. Pasting a URL means going to the Media
+				// Library, uploading, copying the link and coming back — four steps
+				// for something the browser can do in one, which is why half these
+				// fields were empty on records that had the scans on paper.
+				printf(
+					'<br><input type="file" name="inv_file_%s" accept="%s"> <span class="description">%s</span>',
+					esc_attr( $key ),
+					esc_attr( implode( ',', bhela_bm_investor_upload_accept() ) ),
+					esc_html__( 'Choosing a file replaces the URL above.', 'bhela-booking' )
 				);
 				if ( $val ) {
 					printf(
@@ -261,21 +201,6 @@ function bhela_bm_investor_position_box( $post ) {
 		esc_html__( 'Open ledger', 'bhela-booking' ) );
 }
 
-/**
- * Fields whose VALUE must never reach the audit trail.
- *
- * A bank account number and an NID are exactly what an audit trail is protecting. A
- * log that records the old and the new value in full becomes a second copy of the
- * data — one that is deliberately never deleted, readable by anyone who can open the
- * Audit Trail, and outside the investor record's own access control.
- *
- * So for these the trail records THAT the field changed, by whom and when. The values
- * themselves live on the record, where the permissions are.
- */
-function bhela_bm_investor_secret_fields() {
-	return array( 'nid', 'bank_account', 'bank_account_name', 'bank_routing', 'nominee_nid' );
-}
-
 function bhela_bm_investor_save( $post_id ) {
 	if ( ! isset( $_POST['bhela_bm_investor_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_bm_investor_nonce'] ) ), 'bhela_bm_investor_save' ) ) {
 		return;
@@ -301,25 +226,24 @@ function bhela_bm_investor_save( $post_id ) {
 
 	foreach ( bhela_bm_investor_fields() as $group ) {
 		foreach ( $group['fields'] as $key => $def ) {
+			// A chosen file beats whatever is in the URL box: the person just picked
+			// it, and silently keeping the old link would look like the upload failed.
+			if ( 'file' === ( $def['type'] ?? '' ) && ! empty( $_FILES[ 'inv_file_' . $key ]['name'] ) ) {
+				$up = bhela_bm_investor_upload( 'inv_file_' . $key, true );
+				if ( ! is_wp_error( $up ) ) {
+					$writes[ $key ] = $up;
+					continue;
+				}
+				// Say so rather than dropping it on the floor.
+				bhela_bm_investor_notice( $up );
+			}
 			if ( ! isset( $_POST[ 'inv_' . $key ] ) ) {
 				continue;
 			}
-			$rawv = wp_unslash( $_POST[ 'inv_' . $key ] );
-			$type = isset( $def['type'] ) ? $def['type'] : 'text';
-			// A signature is a URL, an address keeps its line breaks, a date is only
-			// a date. sanitize_text_field() on all of them would silently flatten the
-			// addresses and let a junk URL through.
-			if ( 'file' === $type ) {
-				$writes[ $key ] = esc_url_raw( $rawv );
-			} elseif ( 'textarea' === $type ) {
-				$writes[ $key ] = sanitize_textarea_field( $rawv );
-			} elseif ( 'email' === $type ) {
-				$writes[ $key ] = sanitize_email( $rawv );
-			} elseif ( 'date' === $type ) {
-				$writes[ $key ] = bhela_bm_report_date( $rawv );
-			} else {
-				$writes[ $key ] = sanitize_text_field( $rawv );
-			}
+			// One sanitiser, shared with the public registration form. A signature is
+			// a URL, an address keeps its line breaks, a date is only a date, and a
+			// select may only hold one of its own options.
+			$writes[ $key ] = bhela_bm_investor_field_sanitize( $def, wp_unslash( $_POST[ 'inv_' . $key ] ) );
 		}
 	}
 
@@ -350,6 +274,14 @@ function bhela_bm_investor_save( $post_id ) {
 		) );
 	}
 
+	// The lookup the portal signs people in with reads a NORMALISED copy of the
+	// mobile, because what is typed here is free text — "+880 1712-345678" and
+	// "01712345678" are one number and no meta_query matches both. Rebuilt on every
+	// save so it cannot drift; see bhela_bm_investor_index_mobile().
+	if ( function_exists( 'bhela_bm_investor_index_mobile' ) ) {
+		bhela_bm_investor_index_mobile( $post_id );
+	}
+
 	bhela_bm_investor_save_login( $post_id );
 }
 add_action( 'save_post_bhela_investor', 'bhela_bm_investor_save' );
@@ -376,10 +308,17 @@ function bhela_bm_investor_login_box( $post ) {
 			<?php esc_html_e( 'Unlink this login', 'bhela-booking' ); ?></label>
 			<span class="description"><?php esc_html_e( 'The WordPress account is kept; it simply stops resolving to this record.', 'bhela-booking' ); ?></span></p>
 	<?php else : ?>
-		<p class="description"><?php esc_html_e( 'No portal login yet. Enter an email to create one — the investor sets their own password from the reset link.', 'bhela-booking' ); ?></p>
+		<p class="description"><?php esc_html_e( 'No portal login yet. Enter an email to create one. There is no password to set — the investor signs in with a code sent to the Mobile number on this record, so make sure that field is right.', 'bhela-booking' ); ?></p>
 		<p><input type="email" class="widefat" name="inv_new_login" placeholder="<?php esc_attr_e( 'investor@example.com', 'bhela-booking' ); ?>"></p>
-		<p><label><input type="checkbox" name="inv_send_reset" value="1" checked>
-			<?php esc_html_e( 'Email them a set-password link', 'bhela-booking' ); ?></label></p>
+		<p><label><input type="checkbox" name="inv_send_reset" value="1">
+			<?php esc_html_e( 'Also email them a set-password link', 'bhela-booking' ); ?></label>
+			<span class="description"><?php esc_html_e( 'Rarely needed. A password is not used by the portal.', 'bhela-booking' ); ?></span></p>
+	<?php endif; ?>
+	<?php
+	$mob = bhela_bm_normalize_mobile( get_post_meta( $post->ID, '_bhela_inv_mobile', true ) );
+	if ( $uid && ! $mob ) :
+		?>
+		<p class="bha-callout bha-callout--attention"><?php esc_html_e( 'The Mobile field holds no usable number, so no sign-in code can reach this investor. Fix it or they cannot get in.', 'bhela-booking' ); ?></p>
 	<?php endif; ?>
 	<p class="description"><?php esc_html_e( 'The portal is read-only and shows this investor nothing but their own position.', 'bhela-booking' ); ?></p>
 	<?php

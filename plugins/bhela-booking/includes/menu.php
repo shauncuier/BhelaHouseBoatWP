@@ -226,6 +226,7 @@ function bhela_bm_menu_layout() {
 			'bhela-bm-investor-dash',                 // 🧭 Dashboard
 			'bhela-bm-dist',                          // 💰 Distribution
 			'bhela-bm-investor-report',               // 📊 Investor Report
+			'bhela-bm-signups',                       // 📝 Registrations
 			'bhela-bm-valuation',                     // 💎 Valuation
 			'bhela-bm-share-issue',                   // 🪙 Share Issue
 			'bhela-bm-funds',                         // 🏦 Funds

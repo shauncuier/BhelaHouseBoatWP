@@ -2,7 +2,7 @@
 /** Dev helper: render every BHELA admin screen and check the design system. */
 
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'yearly', 'salary', 'dashboard', 'guide', 'log', 'audit', 'inventory-core', 'inventory', 'inventory-import' );
+bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'yearly', 'salary', 'dashboard', 'guide', 'log', 'audit', 'inventory-core', 'inventory', 'inventory-import', 'investor-signup-admin' );
 wp_set_current_user( 1 );
 
 echo "=== 1. helpers ===\n";
@@ -117,6 +117,7 @@ $screens = array(
 	'Valuation'        => array( 'investors_page_bhela-bm-valuation', array( 'page' => 'bhela-bm-valuation' ), fn() => bhela_bm_valuation_page() ),
 	'Share Issue'      => array( 'investors_page_bhela-bm-share-issue', array( 'page' => 'bhela-bm-share-issue', 'target' => '1000000' ), fn() => bhela_bm_share_issue_page() ),
 	'Revenue'          => array( 'accounts_page_bhela-bm-revenue', array( 'page' => 'bhela-bm-revenue', 'period' => 'month' ), fn() => bhela_bm_revenue_page() ),
+	'Registrations'    => array( 'investors_page_bhela-bm-signups', array( 'page' => 'bhela-bm-signups' ), fn() => bhela_bm_signup_page() ),
 );
 $GLOBALS['zz_exp']  = $exp;
 $GLOBALS['zz_sal']  = $sal;

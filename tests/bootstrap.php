@@ -180,6 +180,9 @@ function bhela_test_isolate() {
 		// the very harness that created them — those two are scoped by the harness
 		// instead, which deletes only the rows belonging to its own run.
 		'bhela_investor', 'bhela_inv_ledger', 'bhela_payreq',
+		// A registration titles itself "{name} {mobile}", and the name comes from the
+		// fixture — so a ZZ applicant produces a ZZ title and this one DOES belong here.
+		'bhela_inv_signup',
 		// A valuation's title is minted from its own date and total, not from a
 		// fixture's name, so it does NOT belong here either — same reason as
 		// bhela_dist and bhela_fund (§13.37). The harness scopes its own records.
@@ -257,6 +260,10 @@ function bhela_test_owner_options() {
 		'bhela_bm_trips',         // trip calendar entries, including holiday flags
 		'bhela_bm_role_perms',    // per-role permissions set from the Team screen
 		'bhela_bm_inv_seq',       // per-category Item ID counter; losing it reuses numbers
+		// The normalised-mobile index version. A harness runs under post-type isolation,
+		// so rebuilding it here would mark the index built from ZZ records alone and
+		// leave every REAL investor unfindable by the portal's sign-in lookup.
+		'bhela_bm_inv_mobile_idx',
 		'bhela_bm_inv_periods',   // month => post id. Also the one-sheet-per-month constraint
 		'bhela_bm_agencies',      // B2B partner directory, including live referral tokens
 		// Owner-built AND a live ledger: `uses` records real redemptions, so losing it

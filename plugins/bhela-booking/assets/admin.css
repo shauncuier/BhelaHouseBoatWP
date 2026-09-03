@@ -1570,3 +1570,16 @@
 		color: #000 !important;
 	}
 }
+
+/* Registrations: the full application, folded away.
+   A queue of thirty-field applications cannot show every field inline, and a link to
+   a second screen loses the comparison with the record beside it. <details> keeps
+   both — closed by default, so the list still reads as a list. */
+.bha-sgn-detail { margin-top: .5rem; }
+.bha-sgn-detail > summary {
+	cursor: pointer; color: var(--bha-teal);
+	font-size: 12px; font-weight: 600;
+}
+.bha-sgn-detail h4 { margin: .9em 0 .3em; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.bha-sgn-detail table { margin-bottom: .4rem; }
+.bha-sgn-detail th { font-weight: 600; }

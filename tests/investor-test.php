@@ -20,6 +20,18 @@ bhela_bm_install_roles();
 wp_set_current_user( 0 );
 wp_set_current_user( 1 );
 
+// §13.32: a harness states the configuration it asserts against. Every percentage,
+// every split and every unallocated figure below is measured against 115 shares at
+// ৳1,00,000 — and the register moves the moment somebody issues shares for real. That
+// is exactly what happened: a genuine 10-share round took the configured total to 125,
+// and ten assertions here failed at once looking like a distribution bug. Restored by
+// the bootstrap's owner-option guard, which is why bhela_bm_settings is on that list.
+$iv_cfg = bhela_bm_get_settings();
+$iv_cfg['inv_total_shares']     = 115;
+$iv_cfg['inv_per_share']        = 100000;
+$iv_cfg['inv_total_investment'] = 11500000;
+update_option( 'bhela_bm_settings', $iv_cfg );
+
 $iv_month = '2026-07';
 $iv_made  = array();
 $iv_rows  = array();
@@ -519,42 +531,186 @@ bhela_bm_investor_save( $iv_a );
 $_POST = array();
 ok( $iv_before2 === count( bhela_bm_audit_history( 'investor', $iv_a ) ), 'an unchanged save writes no audit row at all' );
 
-echo "\n=== 17. the portal login throttles guessing, and never punishes success ===\n";
-$iv_src_p  = (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/includes/investor-portal.php' );
+echo "\n=== 17. the portal login: a code, a throttle, and nothing that tells one number from another ===\n";
+// Sign-in is passwordless now: the number on the record gets a one-time code. SMS is
+// switched off for this section so the code travels by the email fallback, where it
+// can be captured -- 13.32, a harness states the configuration it asserts against.
+// Testing the SMS path would be testing the gateway.
+$iv_set_was = get_option( 'bhela_bm_settings', array() );
+$iv_s_tmp   = bhela_bm_get_settings();
+$iv_s_tmp['sms_enabled'] = 0;
+update_option( 'bhela_bm_settings', $iv_s_tmp );
+
+$GLOBALS['iv_mail'] = array();
+$iv_mail_cb = function ( $null, $atts ) {
+	$GLOBALS['iv_mail'][] = $atts;
+	return true;   // also makes wp_mail() report success on a site that cannot send
+};
+add_filter( 'pre_wp_mail', $iv_mail_cb, 10, 2 );
+
+$iv_phone  = '01799000011';
 $iv_limit  = bhela_bm_portal_login_limit();
 $iv_ip_key = 'bhela_bm_inv_login_' . md5( bhela_bm_client_ip() );
-delete_transient( $iv_ip_key );
 
+// A login of its own. Section 12 deletes the accounts section 11 created, so reusing
+// $iv_ua here silently tested nothing: bhela_bm_otp_login_allowed() refuses a user id
+// that no longer resolves, so every number looked unknown and no code was ever sent.
+$iv_lu = wp_insert_user( array(
+	'user_login' => 'zz_inv_login',
+	'user_email' => 'zz_inv_login@example.test',
+	'user_pass'  => wp_generate_password( 20 ),
+	'role'       => 'bhela_investor',
+) );
+update_post_meta( $iv_a, '_bhela_inv_user', (int) $iv_lu );
+update_post_meta( $iv_a, '_bhela_inv_mobile', $iv_phone );
+update_post_meta( $iv_a, '_bhela_inv_email', 'zz_inv_login@example.test' );
+bhela_bm_investor_index_mobile( $iv_a );
+ok( (int) $iv_lu === bhela_bm_investor_user( $iv_a ) && false !== get_userdata( $iv_lu ),
+	'the record has a live portal login to sign in with' );
+
+/** Clear all four ceilings, so one assertion cannot fail because of the last one. */
+function iv_clear_limits( $phone ) {
+	delete_transient( 'bhela_bm_inv_login_' . md5( bhela_bm_client_ip() ) );
+	delete_transient( 'bhela_bm_chalip_' . md5( bhela_bm_client_ip() ) );
+	delete_transient( 'bhela_bm_chalcool_' . md5( $phone ) );
+	delete_transient( 'bhela_bm_chalday_' . md5( $phone ) );
+}
+
+/** Submit the sign-in form the way a browser does -- nonce and all. */
+function iv_post( $fields ) {
+	$_POST = array_merge( array( 'bhela_inv_nonce' => wp_create_nonce( 'bhela_inv_login' ) ), $fields );
+	bhela_bm_portal_state( array() );
+	bhela_bm_login_handle();
+	$state = bhela_bm_portal_state();
+	$page  = bhela_bm_portal_login_form();
+	$_POST = array();
+	return array( $state, $page );
+}
+
+/** The last code that went out by email. */
+function iv_last_code() {
+	$mail = end( $GLOBALS['iv_mail'] );
+	return ( $mail && ! empty( $mail['message'] ) && preg_match( '/(\d{6})/', $mail['message'], $m ) ) ? $m[1] : '';
+}
+
+wp_set_current_user( 0 );
 ok( $iv_limit > 0 && $iv_limit <= 20, 'there is a failed-attempt limit', (string) $iv_limit );
-ok( false !== strpos( $iv_src_p, 'bhela_bm_client_ip()' ), 'keyed per IP, the same shape as the booking tracker' );
+
+// --- a real number gets a real code, at the address on the RECORD ---
+iv_clear_limits( $iv_phone );
+list( $iv_st1, ) = iv_post( array( 'bhela_inv_step' => 'phone', 'bhela_inv_phone' => $iv_phone ) );
+ok( 'code' === $iv_st1['step'] && 32 === strlen( $iv_st1['chal'] ), 'a known number opens a challenge' );
+$iv_code = iv_last_code();
+ok( 6 === strlen( $iv_code ), 'and a six-digit code went out', $iv_code );
+$iv_mail_last = end( $GLOBALS['iv_mail'] );
+ok( 'zz_inv_login@example.test' === ( is_array( $iv_mail_last['to'] ) ? reset( $iv_mail_last['to'] ) : $iv_mail_last['to'] ),
+	'to the address on the record', is_array( $iv_mail_last['to'] ) ? reset( $iv_mail_last['to'] ) : (string) $iv_mail_last['to'] );
+
+// --- the code signs the investor in, and clears the counter ---
 // Counting successes would lock out everyone behind one CGNAT address the moment a
-// single neighbour typed a password wrong.
-ok( false !== strpos( $iv_src_p, 'delete_transient( $ip_key )' ), 'and a correct sign-in CLEARS the counter rather than adding to it' );
-// Drive it: failures accumulate, and the throttled response is indistinguishable.
+// single neighbour mistyped, which is most of this user base.
+set_transient( $iv_ip_key, 3, HOUR_IN_SECONDS );
 $_POST = array(
-	'bhela_inv_login' => '1',
 	'bhela_inv_nonce' => wp_create_nonce( 'bhela_inv_login' ),
-	'log'             => 'zz_nobody_here',
-	'pwd'             => 'wrong-on-purpose',
+	'bhela_inv_step'  => 'code',
+	'bhela_inv_chal'  => $iv_st1['chal'],
+	'bhela_inv_code'  => $iv_code,
 );
+// wp_set_auth_cookie() calls setcookie(), and a CLI harness has already printed a
+// screenful of output — so PHP warns three times about headers it cannot send. The
+// cookie is not what is under test; who wp_set_current_user() lands on is.
+set_error_handler( function ( $no, $str ) {
+	return false !== strpos( $str, 'Cannot modify header information' );
+} );
+$iv_in = bhela_bm_login_step_code( $iv_ip_key, 3 );
+restore_error_handler();
+$_POST = array();
+ok( true === $iv_in, 'the right code signs the investor in' );
+ok( (int) $iv_lu === get_current_user_id(), 'as the linked user and nobody else', (string) get_current_user_id() );
+ok( $iv_a === bhela_bm_current_investor(), 'resolving to their own record' );
+ok( false === get_transient( $iv_ip_key ), 'and a correct sign-in CLEARS the counter rather than adding to it' );
+wp_set_current_user( 0 );
+
+// --- failures accumulate, one per attempt ---
+iv_clear_limits( $iv_phone );
 for ( $iv_try = 0; $iv_try < $iv_limit; $iv_try++ ) {
-	bhela_bm_portal_login();
+	// Both ceilings, not just the cooldown: the daily cap is 6 and the attempt limit
+	// is 8, so without this two attempts are refused before they reach the lookup —
+	// and a refusal is not a failure, so the counter stops short of the limit.
+	delete_transient( 'bhela_bm_chalcool_' . md5( '01799009999' ) );
+	delete_transient( 'bhela_bm_chalday_' . md5( '01799009999' ) );
+	iv_post( array( 'bhela_inv_step' => 'phone', 'bhela_inv_phone' => '01799009999' ) );
 }
 ok( $iv_limit === (int) get_transient( $iv_ip_key ), 'each failure is counted once', (string) (int) get_transient( $iv_ip_key ) );
-$iv_blocked = bhela_bm_portal_login();
-ok( false !== strpos( $iv_blocked, 'bhela_inv_nonce' ), 'the next attempt gets the form back, not a lockout page' );
-// Byte-for-byte the same page a wrong password produces. Saying "too many
-// attempts" would confirm to an attacker that the account exists and that they
-// are hitting a real limit worth waiting out.
+
+/** Blank the two values that must differ between any two requests. */
+function iv_normalise( $page, $chal ) {
+	$page = str_replace( $chal, 'CHALLENGE', $page );
+	return preg_replace( '/value="[a-f0-9]{10}"/', 'NONCE', $page );
+}
+
+// --- at the limit the request goes BLIND: same page, and nothing sent ---
+$iv_mail_before = count( $GLOBALS['iv_mail'] );
+delete_transient( 'bhela_bm_chalcool_' . md5( $iv_phone ) );
+list( $iv_st_bl, $iv_pg_bl ) = iv_post( array( 'bhela_inv_step' => 'phone', 'bhela_inv_phone' => $iv_phone ) );
+ok( 'code' === $iv_st_bl['step'] && 32 === strlen( $iv_st_bl['chal'] ),
+	'a throttled attempt still advances to the code step, with a real challenge id' );
+ok( $iv_mail_before === count( $GLOBALS['iv_mail'] ),
+	'but no code is sent -- a throttled request is never looked up at all' );
+
 delete_transient( $iv_ip_key );
-$iv_wrongpw = bhela_bm_portal_login();
+delete_transient( 'bhela_bm_chalcool_' . md5( $iv_phone ) );
+list( $iv_st_ok, $iv_pg_ok ) = iv_post( array( 'bhela_inv_step' => 'phone', 'bhela_inv_phone' => $iv_phone ) );
+ok( iv_normalise( $iv_pg_bl, $iv_st_bl['chal'] ) === iv_normalise( $iv_pg_ok, $iv_st_ok['chal'] ),
+	'and the page is byte-for-byte the page an unthrottled attempt produces -- a throttle that announces itself is one an attacker can pace around' );
+
+// --- a throttled CODE submit reads as an ordinary wrong guess ---
+$iv_wrong_args = array(
+	'bhela_inv_step' => 'code',
+	'bhela_inv_chal' => $iv_st_ok['chal'],
+	'bhela_inv_mask' => bhela_bm_chal_mask( $iv_phone ),
+	'bhela_inv_code' => '000000',
+);
 delete_transient( $iv_ip_key );
+list( , $iv_pg_wrong ) = iv_post( $iv_wrong_args );
 set_transient( $iv_ip_key, $iv_limit, HOUR_IN_SECONDS );
-$iv_throttled = bhela_bm_portal_login();
-ok( $iv_throttled === $iv_wrongpw, 'and it is byte-for-byte the wrong-password page — a throttled attempt reveals nothing a wrong password does not' );
+list( , $iv_pg_thr ) = iv_post( $iv_wrong_args );
+ok( iv_normalise( $iv_pg_thr, $iv_st_ok['chal'] ) === iv_normalise( $iv_pg_wrong, $iv_st_ok['chal'] ),
+	'a refused-because-throttled code reads exactly like a wrong one' );
 ok( $iv_limit === (int) get_transient( $iv_ip_key ), 'and a refused attempt does not inflate the counter further' );
+
+// --- and being throttled means a CORRECT code does not get in either ---
+iv_clear_limits( $iv_phone );
+list( $iv_st2, ) = iv_post( array( 'bhela_inv_step' => 'phone', 'bhela_inv_phone' => $iv_phone ) );
+$iv_code2 = iv_last_code();
+set_transient( $iv_ip_key, $iv_limit, HOUR_IN_SECONDS );
+$_POST = array(
+	'bhela_inv_nonce' => wp_create_nonce( 'bhela_inv_login' ),
+	'bhela_inv_step'  => 'code',
+	'bhela_inv_chal'  => $iv_st2['chal'],
+	'bhela_inv_code'  => $iv_code2,
+);
+$iv_blocked_in = bhela_bm_login_step_code( $iv_ip_key, $iv_limit, true );
 $_POST = array();
-delete_transient( $iv_ip_key );
+ok( false === $iv_blocked_in, 'a correct code is refused while the address is throttled' );
+ok( 0 === get_current_user_id(), 'and nobody was signed in' );
+
+// --- a submit with no valid nonce does nothing whatsoever ---
+iv_clear_limits( $iv_phone );
+$_POST = array( 'bhela_inv_step' => 'phone', 'bhela_inv_phone' => $iv_phone, 'bhela_inv_nonce' => 'rubbish' );
+bhela_bm_portal_state( array() );
+bhela_bm_login_handle();
+$_POST = array();
+ok( array() === bhela_bm_portal_state(), 'a request with a bad nonce is not processed at all' );
+
+remove_filter( 'pre_wp_mail', $iv_mail_cb, 10 );
+iv_clear_limits( $iv_phone );
+iv_clear_limits( '01799009999' );
+update_option( 'bhela_bm_settings', $iv_set_was );
+delete_post_meta( $iv_a, '_bhela_inv_user' );
+require_once ABSPATH . 'wp-admin/includes/user.php';
+wp_delete_user( $iv_lu );
+iv_as( 1 );
 
 echo "\n=== 18. a payment needs two people ===\n";
 // Cost sheets have required prepare -> check -> approve for a long time. Paying a

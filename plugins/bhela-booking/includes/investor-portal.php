@@ -209,16 +209,27 @@ function bhela_bm_portal_data() {
 	// by every viewer, which is safe only while the payload is business-level. Adding
 	// an investor-specific figure here would leak one member's data to the next one
 	// through the cache, with nothing to signal it.
-	$funds = get_transient( 'bhela_bm_portal_funds' );
-	if ( ! is_array( $funds ) ) {
-		$funds = array();
-		if ( function_exists( 'bhela_bm_funds' ) ) {
-			foreach ( bhela_bm_funds() as $key => $fund ) {
-				$fl = bhela_bm_fund_ledger( $key );
-				$funds[ $key ] = array( 'label' => $fund['label'], 'allocated' => (int) $fl['allocated'] );
+	//
+	// And a holder of NO shares is shown none of it. Until self-registration existed,
+	// every portal login was one the office had deliberately linked to a real
+	// shareholding. Now a person can register themselves, be approved for access, and
+	// sit at zero shares while the office works out what they actually bought — and
+	// the company's reserve balance is not theirs to read in the meantime. Only
+	// rendering the page after registering through it showed this: a brand-new
+	// zero-share account was looking at ৳79,569 of management fund.
+	$funds = array();
+	if ( bhela_bm_investor_shares( $id ) > 0 ) {
+		$funds = get_transient( 'bhela_bm_portal_funds' );
+		if ( ! is_array( $funds ) ) {
+			$funds = array();
+			if ( function_exists( 'bhela_bm_funds' ) ) {
+				foreach ( bhela_bm_funds() as $key => $fund ) {
+					$fl            = bhela_bm_fund_ledger( $key );
+					$funds[ $key ] = array( 'label' => $fund['label'], 'allocated' => (int) $fl['allocated'] );
+				}
 			}
+			set_transient( 'bhela_bm_portal_funds', $funds, 15 * MINUTE_IN_SECONDS );
 		}
-		set_transient( 'bhela_bm_portal_funds', $funds, 15 * MINUTE_IN_SECONDS );
 	}
 
 	// A payment somebody has raised but nobody has released. Showing it matters: an
@@ -299,85 +310,26 @@ function bhela_bm_portal_shortcode() {
 }
 add_shortcode( 'bhela_investor_portal', 'bhela_bm_portal_shortcode' );
 
-/** The sign-in form. */
+/**
+ * The sign-in form.
+ *
+ * The password form this replaced is gone: sign-in is by a one-time code sent to the
+ * mobile number on the investor record — see includes/investor-login.php, which holds
+ * both the handler and the form. Two things stayed exactly as they were, because they
+ * were right: bhela_bm_portal_login_limit() still caps failures per address, and a
+ * throttled attempt still renders byte-for-byte the ordinary failure page (§13.43).
+ *
+ * The POST is handled on `template_redirect` rather than here. A successful sign-in
+ * sets a cookie and redirects, and this function runs inside `the_content`, by which
+ * point a theme may already have flushed the headers both of those need.
+ */
 function bhela_bm_portal_login() {
-	$err = '';
-
-	// Per-IP throttle on FAILED attempts, the same shape as the booking tracker at
-	// includes/frontend.php:749. WordPress core does not limit login attempts at all,
-	// so without this an investor account — which fronts real money — can be guessed
-	// at indefinitely. Counting only failures matters behind the shared and CGNAT
-	// addresses most guests and investors here are on: somebody signing in correctly
-	// is never counted, so one attacker cannot lock out a whole building.
-	$ip_key = 'bhela_bm_inv_login_' . md5( bhela_bm_client_ip() );
-	$tries  = (int) get_transient( $ip_key );
-
-	if ( isset( $_POST['bhela_inv_login'] ) && ! empty( $_POST['bhela_inv_nonce'] )
-		&& wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['bhela_inv_nonce'] ) ), 'bhela_inv_login' ) ) {
-
-		if ( $tries >= bhela_bm_portal_login_limit() ) {
-			// Deliberately the same wording as a wrong password. Saying "too many
-			// attempts" would confirm to an attacker that the account exists and that
-			// they are hitting a real rate limit worth waiting out.
-			return bhela_bm_portal_login_form( __( 'ইউজারনেম বা পাসওয়ার্ড সঠিক নয়।', 'bhela-booking' ) );
-		}
-
-		$user = wp_signon( array(
-			'user_login'    => sanitize_text_field( wp_unslash( $_POST['log'] ?? '' ) ),
-			// Not sanitised on purpose: a password is compared, never stored or
-			// echoed, and stripping characters would silently break valid ones.
-			'user_password' => (string) ( $_POST['pwd'] ?? '' ),
-			'remember'      => ! empty( $_POST['rememberme'] ),
-		), is_ssl() );
-
-		if ( is_wp_error( $user ) ) {
-			// One message for every failure. Distinguishing "no such user" from "wrong
-			// password" tells an attacker which half they got right.
-			set_transient( $ip_key, $tries + 1, HOUR_IN_SECONDS );
-			$err = __( 'ইউজারনেম বা পাসওয়ার্ড সঠিক নয়।', 'bhela-booking' );
-		} else {
-			// A correct sign-in clears the counter: the person is who they said they
-			// were, and their neighbours on the same address should not inherit an
-			// attacker's failures.
-			delete_transient( $ip_key );
-			wp_safe_redirect( bhela_bm_portal_url() );
-			exit;
-		}
-	}
-
-	return bhela_bm_portal_login_form( $err );
+	return bhela_bm_portal_login_form();
 }
 
 /** How many failed attempts an address gets in an hour. Filterable. */
 function bhela_bm_portal_login_limit() {
 	return (int) apply_filters( 'bhela_bm_portal_login_limit', 8 );
-}
-
-/** The sign-in form itself, with an optional error. */
-function bhela_bm_portal_login_form( $err = '' ) {
-	ob_start();
-	?>
-	<div class="bhela-inv bhela-inv--login">
-		<div class="bhela-inv__card">
-			<h2><?php esc_html_e( 'বিনিয়োগকারী লগইন', 'bhela-booking' ); ?></h2>
-			<?php if ( $err ) : ?>
-				<p class="bhela-inv__err"><?php echo esc_html( $err ); ?></p>
-			<?php endif; ?>
-			<form method="post">
-				<?php wp_nonce_field( 'bhela_inv_login', 'bhela_inv_nonce' ); ?>
-				<label><?php esc_html_e( 'ইউজারনেম বা ইমেইল', 'bhela-booking' ); ?>
-					<input type="text" name="log" autocomplete="username" required></label>
-				<label><?php esc_html_e( 'পাসওয়ার্ড', 'bhela-booking' ); ?>
-					<input type="password" name="pwd" autocomplete="current-password" required></label>
-				<label class="bhela-inv__check"><input type="checkbox" name="rememberme" value="1">
-					<?php esc_html_e( 'মনে রাখুন', 'bhela-booking' ); ?></label>
-				<button type="submit" name="bhela_inv_login" value="1" class="bhela-inv__btn"><?php esc_html_e( 'লগইন', 'bhela-booking' ); ?></button>
-			</form>
-			<p class="bhela-inv__muted"><a href="<?php echo esc_url( wp_lostpassword_url( bhela_bm_portal_url() ) ); ?>"><?php esc_html_e( 'পাসওয়ার্ড ভুলে গেছেন?', 'bhela-booking' ); ?></a></p>
-		</div>
-	</div>
-	<?php
-	return ob_get_clean();
 }
 
 /** Dashboard + statement. */

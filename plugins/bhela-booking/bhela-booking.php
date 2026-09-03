@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.38.0
+ * Version: 2.39.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.38.0' );
+define( 'BHELA_BM_VERSION', '2.39.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -990,6 +990,8 @@ require_once BHELA_BM_PATH . 'includes/investor-dashboard.php';
 require_once BHELA_BM_PATH . 'includes/investor-payreq.php';
 require_once BHELA_BM_PATH . 'includes/cashflow.php';
 require_once BHELA_BM_PATH . 'includes/investor-portal.php';
+require_once BHELA_BM_PATH . 'includes/investor-login.php';
+require_once BHELA_BM_PATH . 'includes/investor-signup.php';
 require_once BHELA_BM_PATH . 'includes/otp.php';
 require_once BHELA_BM_PATH . 'includes/trips.php';
 require_once BHELA_BM_PATH . 'includes/reviews.php';
@@ -1007,6 +1009,7 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/roles.php';
 	require_once BHELA_BM_PATH . 'includes/admin.php';
 	require_once BHELA_BM_PATH . 'includes/investor-admin.php';
+	require_once BHELA_BM_PATH . 'includes/investor-signup-admin.php';
 	require_once BHELA_BM_PATH . 'includes/dashboard.php';
 	require_once BHELA_BM_PATH . 'includes/reports.php';
 	require_once BHELA_BM_PATH . 'includes/costs.php';

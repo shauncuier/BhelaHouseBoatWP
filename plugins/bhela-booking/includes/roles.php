@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Bump when bhela_bm_role_defaults() or bhela_bm_permissions() changes, so
 // existing sites re-sync once against the new definition.
-define( 'BHELA_BM_ROLES_VERSION', 9 );
+define( 'BHELA_BM_ROLES_VERSION', 10 );
 
 /* =========================================================
  * CAPABILITY SETS
@@ -53,6 +53,10 @@ function bhela_bm_extra_caps() {
 		// refuses when the approver is the requester.
 		'bhela_investor_approve' => __( 'Approve investor payments and valuations', 'bhela-booking' ),
 		'bhela_investor_valuation' => __( 'Record a business valuation', 'bhela-booking' ),
+		// Approving a portal registration MINTS A LOGIN that reads real financial
+		// figures. That is a bigger act than editing an investor record, so it is its
+		// own capability rather than something 'edit investors' quietly implies.
+		'bhela_investor_signup' => __( 'Approve investor portal registrations', 'bhela-booking' ),
 		// Inventory & Asset Register. bhela_inv_reopen is separate from
 		// bhela_inv_approve on purpose: reopening a closed month invalidates every
 		// later month's opening balance, which is a bigger act than closing one.
@@ -200,6 +204,12 @@ function bhela_bm_permissions() {
 			'label'    => __( 'Record a business valuation', 'bhela-booking' ),
 			'help'     => __( 'Enter what BHELA is currently worth. Recording one decides nothing on its own — it stays a draft until somebody else approves it.', 'bhela-booking' ),
 			'caps'     => array( 'bhela_investor_valuation' ),
+			'requires' => 'investors_view',
+		),
+		'investor_signup' => array(
+			'label'    => __( 'Approve portal registrations', 'bhela-booking' ),
+			'help'     => __( 'Turn an investor registration into a working login. The applicant has only proved they hold the phone; whether they are who they say they are is the approver judgement.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_signup' ),
 			'requires' => 'investors_view',
 		),
 		'costs_check'     => array(
@@ -388,8 +398,9 @@ function bhela_bm_role_defaults() {
 				// but closing the month stays with management.
 				'inventory_view', 'inventory_items', 'inventory_lists', 'inventory_import',
 				'inventory_count', 'inventory_check',
-				// Releases an investor payment somebody else prepared.
-				'investors_view', 'investor_approve',
+				// Releases an investor payment somebody else prepared, and decides
+				// who gets a portal login.
+				'investors_view', 'investor_approve', 'investor_signup',
 			),
 		),
 		'bhela_booking_staff' => array(

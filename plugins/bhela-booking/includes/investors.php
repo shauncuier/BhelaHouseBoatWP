@@ -62,6 +62,244 @@ function bhela_bm_register_investor_cpt() {
 add_action( 'init', 'bhela_bm_register_investor_cpt' );
 
 /* =========================================================
+ * The record, field for field
+ *
+ * This registry lived in includes/investor-admin.php, which is admin-only. The public
+ * registration form asks for exactly the same information, so it has to be readable on
+ * a front-end request too — and a second copy of a 30-field list is a copy that drifts.
+ * CLAUDE.md 13.22 is the same lesson from bhela_bm_report_date().
+ * ========================================================= */
+
+/**
+ * The record, field for field as the onboarding form asks for it.
+ *
+ * These mirror BHELA's live "Investor Information & Nominee Declaration Form", so a
+ * completed form can be typed in without anything being dropped or invented. Where
+ * the form separates two things - present and permanent address, father and mother,
+ * account name and number - this does too. Merging them loses information that a
+ * bank transfer or a succession claim later needs exactly as it was written down.
+ */
+function bhela_bm_investor_fields() {
+	return array(
+		'identity' => array(
+			'label'  => __( 'Section A - Investor Details', 'bhela-booking' ),
+			'fields' => array(
+				'code'      => array( 'label' => __( 'Investor ID', 'bhela-booking' ) ),
+				'father'    => array( 'label' => __( 'Father name', 'bhela-booking' ) ),
+				'mother'    => array( 'label' => __( 'Mother name', 'bhela-booking' ) ),
+				'dob'       => array( 'label' => __( 'Date of birth', 'bhela-booking' ), 'type' => 'date' ),
+				'nid'       => array( 'label' => __( 'NID / Passport / Birth certificate', 'bhela-booking' ) ),
+				'address'   => array( 'label' => __( 'Present address', 'bhela-booking' ), 'type' => 'textarea' ),
+				'address_p' => array( 'label' => __( 'Permanent address', 'bhela-booking' ), 'type' => 'textarea' ),
+				'mobile'    => array( 'label' => __( 'Mobile', 'bhela-booking' ) ),
+				'email'     => array( 'label' => __( 'Email', 'bhela-booking' ), 'type' => 'email' ),
+			),
+		),
+		'bank'     => array(
+			'label'  => __( 'Section B - Payment and Bank', 'bhela-booking' ),
+			'fields' => array(
+				'pay_mode'          => array(
+					'label'   => __( 'Mode of payment', 'bhela-booking' ),
+					'type'    => 'select',
+					'options' => array(
+						''       => __( 'Not recorded', 'bhela-booking' ),
+						'cash'   => __( 'Cash', 'bhela-booking' ),
+						'bank'   => __( 'Bank transfer', 'bhela-booking' ),
+						'cheque' => __( 'Cheque', 'bhela-booking' ),
+						'other'  => __( 'Other', 'bhela-booking' ),
+					),
+				),
+				'pay_mode_other'    => array( 'label' => __( 'If other, specify', 'bhela-booking' ) ),
+				'bank_name'         => array( 'label' => __( 'Bank name', 'bhela-booking' ) ),
+				'bank_branch'       => array( 'label' => __( 'Branch name', 'bhela-booking' ) ),
+				'bank_account_name' => array( 'label' => __( 'Account name', 'bhela-booking' ) ),
+				'bank_account'      => array( 'label' => __( 'Account number', 'bhela-booking' ) ),
+				'bank_routing'      => array( 'label' => __( 'Routing number', 'bhela-booking' ) ),
+			),
+		),
+		'nominee'  => array(
+			'label'  => __( 'Section C - Nominee', 'bhela-booking' ),
+			'fields' => array(
+				'nominee_name'     => array( 'label' => __( 'Full name', 'bhela-booking' ) ),
+				'nominee_relation' => array( 'label' => __( 'Relation to investor', 'bhela-booking' ) ),
+				'nominee_dob'      => array( 'label' => __( 'Date of birth', 'bhela-booking' ), 'type' => 'date' ),
+				'nominee_nid'      => array( 'label' => __( 'NID / Passport / Birth certificate', 'bhela-booking' ) ),
+				'nominee_mobile'   => array( 'label' => __( 'Mobile', 'bhela-booking' ) ),
+				'nominee_address'  => array( 'label' => __( 'Address', 'bhela-booking' ), 'type' => 'textarea' ),
+			),
+		),
+		'declaration' => array(
+			'label'  => __( 'Section D - Declaration', 'bhela-booking' ),
+			'fields' => array(
+				'declared'     => array(
+					'label'   => __( 'Declaration signed', 'bhela-booking' ),
+					'type'    => 'select',
+					'options' => array(
+						''    => __( 'Not recorded', 'bhela-booking' ),
+						'yes' => __( 'Yes - nominee rights confirmed', 'bhela-booking' ),
+						'no'  => __( 'No', 'bhela-booking' ),
+					),
+					'help'    => __( 'The declaration on the form: the information is correct, and the nominee holds all rights to this investment in the investor absence.', 'bhela-booking' ),
+				),
+				'declared_on'  => array( 'label' => __( 'Date signed', 'bhela-booking' ), 'type' => 'date' ),
+				'sig_investor' => array(
+					'label' => __( 'Investor signature', 'bhela-booking' ),
+					'type'  => 'file',
+					'help'  => __( 'Upload the scan to the Media Library and paste its URL here. The record keeps a link, not a second copy.', 'bhela-booking' ),
+				),
+				'sig_nominee'  => array( 'label' => __( 'Nominee signature', 'bhela-booking' ), 'type' => 'file' ),
+				'agreement'    => array( 'label' => __( 'Agreement / KYC document', 'bhela-booking' ), 'type' => 'file' ),
+			),
+		),
+	);
+}
+
+/**
+ * Fields whose VALUE must never reach the audit trail.
+ *
+ * A bank account number and an NID are exactly what an audit trail is protecting. A
+ * log that records the old and the new value in full becomes a second copy of the
+ * data — one that is deliberately never deleted, readable by anyone who can open the
+ * Audit Trail, and outside the investor record's own access control.
+ *
+ * So for these the trail records THAT the field changed, by whom and when. The values
+ * themselves live on the record, where the permissions are.
+ */
+function bhela_bm_investor_secret_fields() {
+	return array( 'nid', 'bank_account', 'bank_account_name', 'bank_routing', 'nominee_nid' );
+}
+
+/**
+ * Sanitise one field's posted value according to its own type.
+ *
+ * Shared by the admin metabox and the public registration form, because two
+ * implementations of "what is a valid date of birth" is how they start to disagree.
+ * sanitize_text_field() on everything would flatten the addresses and wave through a
+ * junk URL; a select is checked against its OWN options, so a crafted post cannot put
+ * a value in there that the screen would then fail to render.
+ *
+ * @param array  $def Field definition from bhela_bm_investor_fields().
+ * @param mixed  $raw Unslashed posted value.
+ * @return string
+ */
+function bhela_bm_investor_field_sanitize( $def, $raw ) {
+	$type = isset( $def['type'] ) ? $def['type'] : 'text';
+
+	if ( 'file' === $type ) {
+		return esc_url_raw( $raw );
+	}
+	if ( 'textarea' === $type ) {
+		return sanitize_textarea_field( $raw );
+	}
+	if ( 'email' === $type ) {
+		return sanitize_email( $raw );
+	}
+	if ( 'date' === $type ) {
+		return bhela_bm_report_date( $raw );
+	}
+	if ( 'select' === $type ) {
+		$val = sanitize_text_field( $raw );
+		return isset( $def['options'][ $val ] ) ? $val : '';
+	}
+	return sanitize_text_field( $raw );
+}
+
+/**
+ * File types a scan or a signature may be.
+ *
+ * Deliberately short. These fields hold a photograph of a document, so images and PDF
+ * cover every real case, and every extension left out is one fewer thing an upload
+ * endpoint can be talked into storing.
+ */
+function bhela_bm_investor_upload_types() {
+	return array(
+		'jpg|jpeg' => 'image/jpeg',
+		'png'      => 'image/png',
+		'webp'     => 'image/webp',
+		'pdf'      => 'application/pdf',
+	);
+}
+
+/** The same list as an `accept` attribute. */
+function bhela_bm_investor_upload_accept() {
+	return array( 'image/jpeg', 'image/png', 'image/webp', 'application/pdf' );
+}
+
+/** Biggest file a scan may be. Filterable — a phone camera can exceed this. */
+function bhela_bm_investor_upload_max() {
+	return (int) apply_filters( 'bhela_bm_investor_upload_max', 8 * MB_IN_BYTES );
+}
+
+/**
+ * Take one uploaded scan and return its URL.
+ *
+ * Three rules, each because of what these files are:
+ *
+ * - **The mime type is checked by CONTENT, not by the name.** `wp_handle_upload()` with
+ *   an explicit `mimes` list runs the extension against the real type, so `nid.pdf.php`
+ *   does not become an executable sitting in uploads.
+ * - **The stored name is random.** These are NID scans and signatures. Files under
+ *   wp-content/uploads are served straight off disk with no capability check, so the
+ *   only thing standing between a scan and a stranger is that its URL cannot be
+ *   guessed — `nid-scan-rahim.jpg` can be.
+ * - **No attachment post on the public path.** An attachment is a queryable object with
+ *   its own permalink page; a registration should not create one. The admin path does
+ *   attach, so the office can find and delete these from the Media Library.
+ *
+ * @param string $field Key in $_FILES.
+ * @param bool   $attach Register it in the Media Library (admin path only).
+ * @return string|WP_Error URL.
+ */
+function bhela_bm_investor_upload( $field, $attach = false ) {
+	if ( empty( $_FILES[ $field ]['name'] ) ) {
+		return new WP_Error( 'nofile', __( 'কোনো ফাইল পাওয়া যায়নি।', 'bhela-booking' ) );
+	}
+	$file = $_FILES[ $field ];
+
+	if ( ! empty( $file['error'] ) ) {
+		return new WP_Error( 'upload', __( 'ফাইল আপলোড হয়নি — আবার চেষ্টা করুন।', 'bhela-booking' ) );
+	}
+	if ( (int) $file['size'] > bhela_bm_investor_upload_max() ) {
+		return new WP_Error( 'toobig', sprintf(
+			/* translators: %d: megabytes */
+			__( 'ফাইলটি বড় — সর্বোচ্চ %d MB।', 'bhela-booking' ),
+			(int) ( bhela_bm_investor_upload_max() / MB_IN_BYTES )
+		) );
+	}
+
+	require_once ABSPATH . 'wp-admin/includes/file.php';
+
+	// Random name, extension preserved. The extension still has to survive the mime
+	// check below, so this cannot be used to smuggle one.
+	$ext  = strtolower( pathinfo( $file['name'], PATHINFO_EXTENSION ) );
+	$file['name'] = 'bhela-doc-' . wp_generate_password( 20, false ) . ( $ext ? '.' . $ext : '' );
+
+	$moved = wp_handle_upload( $file, array(
+		'test_form' => false,
+		'mimes'     => bhela_bm_investor_upload_types(),
+	) );
+	if ( ! is_array( $moved ) || ! empty( $moved['error'] ) ) {
+		return new WP_Error( 'upload', is_array( $moved ) && ! empty( $moved['error'] )
+			? (string) $moved['error']
+			: __( 'ফাইলের ধরন সমর্থিত নয় — ছবি বা PDF দিন।', 'bhela-booking' ) );
+	}
+
+	if ( $attach ) {
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+		$id = wp_insert_attachment( array(
+			'post_mime_type' => $moved['type'],
+			'post_title'     => basename( $moved['file'] ),
+			'post_status'    => 'inherit',
+		), $moved['file'] );
+		if ( ! is_wp_error( $id ) && $id ) {
+			wp_update_attachment_metadata( $id, wp_generate_attachment_metadata( $id, $moved['file'] ) );
+		}
+	}
+
+	return $moved['url'];
+}
+
+/* =========================================================
  * Share configuration
  * ========================================================= */
 

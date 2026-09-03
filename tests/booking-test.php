@@ -449,7 +449,16 @@ $b2b_inv  = bk_invoice_html( $b2b );
 $b2b_conf = bhela_bm_confirm_text( $b2b );
 $b2b_mail = bhela_bm_email_customer_html( $b2b, 'confirmed' );
 foreach ( array( 'invoice' => $b2b_inv, 'confirmation message' => $b2b_conf, 'customer email' => $b2b_mail ) as $where => $doc ) {
-	ok( false === strpos( $doc, '3,500' ) && false === strpos( $doc, '3500' ),
+	// The secure invoice key is 32 hex characters (wp_hash), and the confirmation
+	// message and the customer email both carry it inside {invoice_link}. About one
+	// key in 2,300 contains the digits "3500" somewhere by pure chance, which failed
+	// this assertion at random on exactly those two surfaces and never on the invoice
+	// — the invoice does not print its own URL. A token in a query string is not a
+	// figure shown to a guest, so it is masked before the numeric check. Everything
+	// else, including the agency name and reference, is still matched against the
+	// whole document, where a leak into a link would still be caught.
+	$doc_num = preg_replace( '/key=[0-9a-f]{32}/i', 'key=INVOICE_KEY', $doc );
+	ok( false === strpos( $doc_num, '3,500' ) && false === strpos( $doc_num, '3500' ),
 		"the commission is absent from the $where" );
 	ok( false === strpos( $doc, 'ZZ Travel Compass' ), "and so is the agency name — $where" );
 	ok( false === strpos( $doc, 'TC-99' ), "and the agency reference — $where" );
