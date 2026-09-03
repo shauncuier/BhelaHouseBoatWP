@@ -233,9 +233,15 @@ function bhela_bm_portal_data() {
 		}
 	}
 
+	// Capital value, from an APPROVED valuation only. A draft is somebody still
+	// working, and a figure an investor has already seen is a figure they will ask to
+	// be paid — so nothing reaches this page until it has been signed off.
+	$holding = function_exists( 'bhela_bm_investor_holding' ) ? bhela_bm_investor_holding( $id ) : null;
+
 	return array(
 		'id'         => $id,
 		'name'       => get_the_title( $id ),
+		'holding'    => $holding,
 		'code'       => (string) get_post_meta( $id, '_bhela_inv_code', true ),
 		'status'     => bhela_bm_investor_status( $id ),
 		'joined'     => (string) get_post_meta( $id, '_bhela_inv_date', true ),
@@ -413,6 +419,17 @@ function bhela_bm_portal_render( $d ) {
 				array( __( 'ROI (ঘোষিত)', 'bhela-booking' ), $d['roi']['roi_declared'] . '%' ),
 				array( __( 'অবস্থা', 'bhela-booking' ), bhela_bm_portal_status_label( $d['status'] ) ),
 			);
+			// The capital side. Deliberately after the cash figures and never summed
+			// with them: one is money already received, the other is what the shares
+			// would be worth if the business were sold at the approved valuation.
+			if ( ! empty( $d['holding'] ) && $d['holding']['valued'] ) {
+				$kpis[] = array( __( 'বর্তমান শেয়ার মূল্য', 'bhela-booking' ), $money( $d['holding']['share_value'] ) );
+				$kpis[] = array( __( 'বর্তমান হোল্ডিং মূল্য', 'bhela-booking' ), $money( $d['holding']['holding'] ) );
+				$kpis[] = array(
+					__( 'মূলধন বৃদ্ধি', 'bhela-booking' ),
+					( $d['holding']['appreciation'] >= 0 ? '+' : '' ) . $money( $d['holding']['appreciation'] ),
+				);
+			}
 			if ( $d['season'] ) {
 				$kpis[] = array(
 					/* translators: %s: season name */
@@ -433,6 +450,17 @@ function bhela_bm_portal_render( $d ) {
 				<div class="bhela-inv__kpi"><span><?php echo esc_html( $k[0] ); ?></span><strong><?php echo esc_html( $k[1] ); ?></strong></div>
 			<?php endforeach; ?>
 		</div>
+
+		<?php if ( ! empty( $d['holding'] ) && $d['holding']['valued'] ) : ?>
+			<p class="bhela-inv__note"><?php
+				printf(
+					/* translators: 1: share value, 2: valuation date */
+					esc_html__( 'বর্তমান শেয়ার মূল্য %1$s — %2$s তারিখের অনুমোদিত মূল্যায়ন অনুযায়ী। এটি একটি প্রাক্কলিত ন্যায্য মূল্য, নিশ্চিত বিক্রয়মূল্য নয়; শেয়ার বিক্রি না করা পর্যন্ত এই বৃদ্ধি নগদ নয়। আপনার প্রাপ্ত লাভ এর সাথে যোগ হয়নি — সেটি আলাদা করে উপরে দেখানো আছে।', 'bhela-booking' ),
+					esc_html( $money( $d['holding']['share_value'] ) ),
+					esc_html( mysql2date( 'j M Y', $d['holding']['as_at'] ) )
+				);
+			?></p>
+		<?php endif; ?>
 
 		<?php if ( $d['pending']['count'] > 0 ) : ?>
 			<p class="bhela-inv__note"><?php

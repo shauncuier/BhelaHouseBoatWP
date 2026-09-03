@@ -43,7 +43,7 @@ ok( get_role( 'bhela_cost_preparer' )->has_cap( 'read' ), '…and `read` survive
 ok( get_role( 'bhela_cost_preparer' )->has_cap( 'edit_bhela_costs' ), '…and the role still works' );
 
 echo "\n=== 4. the role sync re-runs on upgrade ===\n";
-ok( 8 === BHELA_BM_ROLES_VERSION, 'BHELA_BM_ROLES_VERSION bumped', (string) BHELA_BM_ROLES_VERSION );
+ok( 9 === BHELA_BM_ROLES_VERSION, 'BHELA_BM_ROLES_VERSION bumped', (string) BHELA_BM_ROLES_VERSION );
 update_option( 'bhela_bm_roles_version', 6 );
 get_role( 'bhela_manager' )->add_cap( 'upload_files' );
 bhela_bm_maybe_install_roles();

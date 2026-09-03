@@ -180,6 +180,10 @@ function bhela_test_isolate() {
 		// the very harness that created them — those two are scoped by the harness
 		// instead, which deletes only the rows belonging to its own run.
 		'bhela_investor', 'bhela_inv_ledger', 'bhela_payreq',
+		// A valuation's title is minted from its own date and total, not from a
+		// fixture's name, so it does NOT belong here either — same reason as
+		// bhela_dist and bhela_fund (§13.37). The harness scopes its own records.
+
 	);
 
 	// get_posts() sets suppress_filters => true, which skips posts_where
@@ -377,6 +381,17 @@ function bhela_test_delete( $id ) {
 	// deliberately, and for administrators too. A harness still has to be able to
 	// clear its own fixtures, so it opens the plugin's own write window rather than
 	// weakening the guard for everyone.
+	// The same window, for an approved valuation and a committed share issue.
+	if ( function_exists( 'bhela_bm_val_writing' ) && function_exists( 'bhela_bm_val_locked' ) && bhela_bm_val_locked( $id ) ) {
+		bhela_bm_val_writing( true );
+		remove_filter( 'pre_delete_post', 'bhela_bm_val_block_delete', 10 );
+		remove_filter( 'pre_trash_post', 'bhela_bm_val_block_delete', 10 );
+		wp_delete_post( $id, true );
+		add_filter( 'pre_delete_post', 'bhela_bm_val_block_delete', 10, 3 );
+		add_filter( 'pre_trash_post', 'bhela_bm_val_block_delete', 10, 2 );
+		bhela_bm_val_writing( false );
+		return;
+	}
 	if ( function_exists( 'bhela_bm_dist_writing' ) && function_exists( 'bhela_bm_dist_locked' ) && bhela_bm_dist_locked( $id ) ) {
 		bhela_bm_dist_writing( true );
 		remove_filter( 'pre_delete_post', 'bhela_bm_dist_block_delete', 10 );

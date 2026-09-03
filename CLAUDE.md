@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-09-01 · Theme & Plugin v2.37.2 (single shared version)
+> Last updated: 2026-09-01 · Theme & Plugin v2.38.0 (single shared version)
 
 ---
 
@@ -89,6 +89,10 @@ wp-content/                          ← Git root
 │   │   ├── income.php               ← Trip income heads. Fill any and the sheet's earnings ARE their sum
 │   │   ├── trip-report.php          ← Trip P&L (one trip end to end) + Revenue by Source
 │   │   ├── seasons.php              ← Named date ranges. A label over a range, never a second boundary
+│   │   ├── valuation.php            ← What BHELA is worth. Share value is DERIVED; the share count is snapshotted
+│   │   ├── valuation-core.php       ← The lock on an approved valuation and a committed issue. Every request
+│   │   ├── share-issue.php          ← Pre-money → post-money. Whole shares, honest dilution
+│   │   ├── valuation-admin.php      ← The two screens and the valuation CSV
 │   │   ├── investor-payreq.php      ← Payment requests: the second signature before money moves
 │   │   ├── investor-dashboard.php   ← The investor dashboard, and the register/ledger/fund exports
 │   │   ├── inventory-core.php       ← Stock post types + the lock. Loads on EVERY request (see §3.8)
@@ -109,7 +113,7 @@ wp-content/                          ← Git root
 │   ├── run.php                      ← CLI runner — loads the PHP extensions each harness needs
 │   ├── bootstrap.php                ← Boots WP, resolves the LocalWP DB port, provides ok()
 │   ├── sweep.php                    ← Clears ZZ* fixtures left by a crashed run
-│   ├── *-test.php                   ← 15 headless harnesses
+│   ├── *-test.php                   ← 16 headless harnesses
 │   └── bhela-tests.php              ← Older browser suite (open as an admin)
 │
 ├── docs/
@@ -210,6 +214,7 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 | `bhela_bm_coupons` | Coupon codes. `uses` / `_used_by` are a **ledger**, carried across saves and never posted by the form |
 | `bhela_bm_income_heads` | Owner-edited trip income heads. A slug is **frozen** — every saved sheet's figures hang off it |
 | `bhela_bm_seasons` | Owner-named date ranges. Nothing is ever stored *against* a season, so deleting one only removes a way of grouping |
+| `bhela_bm_settings` → `inv_*` | Share structure. `inv_total_shares` is **written only by a committed share issue**; the settings screen renders it read-only and reports drift rather than accepting an edit |
 | `bhela_bm_rates` | Cabin rates array (regular + weekday per cabin) |
 | `bhela_bm_trips` | Trip calendar entries |
 | `bhela_bm_role_perms` | Per-role permission overrides set from the Team screen (only customised roles) |
@@ -498,6 +503,17 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_seasons()` | `includes/seasons.php` | The owner's seasons. A season with no resolvable range is not a season |
 | `bhela_bm_season_investors($key)` | `includes/seasons.php` | Per-investor declared/paid **inside** a season. Not a lifetime balance |
 | `bhela_bm_investor_dash_data()` | `includes/investor-dashboard.php` | Everything the dashboard draws, split out so the figures are assertable |
+| `bhela_bm_share_value($val)` | `includes/valuation.php` | What one share is worth. **Falls back to `inv_per_share`** when nothing is approved — that fallback is the whole compatibility story |
+| `bhela_bm_valuation_current($reset)` | `includes/valuation.php` | The latest APPROVED valuation, or null. A draft is nobody's baseline |
+| `bhela_bm_valuation_history($approved)` | `includes/valuation.php` | Every valuation with growth against its predecessor; the earliest against `inv_total_investment` |
+| `bhela_bm_investor_holding($id,$val)` | `includes/valuation.php` | Cost basis, holding value, appreciation. **Never merged into `bhela_bm_investor_roi()`** — see §13.58 |
+| `bhela_bm_holding_totals()` | `includes/valuation.php` | Every investor's capital position on one valuation read, not N |
+| `bhela_bm_share_issue_preview($shares,$target)` | `includes/share-issue.php` | Pure. What a round WOULD do; the screen shows this and the commit writes exactly it |
+| `bhela_bm_share_issue_commit($args)` | `includes/share-issue.php` | **The only sanctioned writer of `inv_total_shares`** |
+| `bhela_bm_share_issue_drift()` | `includes/share-issue.php` | Configured total vs the issue history. Reports, never corrects |
+| `bhela_bm_val_delete($id)` | `includes/valuation-core.php` | The only sanctioned delete of a locked record. One caller: the commit's abort — see §13.65 |
+| `bhela_bm_share_issue_valuation_map()` | `includes/share-issue.php` | Valuation ⇒ issue, built once. The per-row lookup was a full query per row |
+| `bhela_bm_val_locked($id)` | `includes/valuation-core.php` | Approved valuation (state) or any share issue (from birth). Loads on every request |
 | `bhela_bm_portal_login_limit()` | `includes/investor-portal.php` | Failed portal sign-ins allowed per IP per hour. Filterable, 8 |
 | `bhela_bm_inv_line_check($line)` | `includes/inventory.php` | The quantity invariant: `good+rep+ur+dam === close`. Reports a mismatch, never rebalances it |
 | `bhela_bm_inv_line_key($item,$loc)` | `includes/inventory.php` | The line key. Returns the item ID today; the one place to change if stock ever splits by location |
@@ -620,7 +636,7 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Fifteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+Sixteen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
 cost heads, the cost-sheet save round trip, the booking save handler, the stock register, every
 admin screen, WCAG contrast, the front end behind a page cache, OTP, the SMS gateway, the six
 version fields, and the yearly rollup.
@@ -646,7 +662,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all fifteen harnesses
+- [ ] `php tests/run.php` passes — all sixteen harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -741,6 +757,17 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 56. **A test can pin the wrong guard and still go green on revert.** `investor-test.php` §22 was titled "one request pays once, even under a race" and did not test the race: it approved, forced the state back through the meta API, approved again, and was refused by the `ledger > 0` belt-and-braces check. In a genuine race **both** callers read `ledger = 0`, so both pass that check and only the conditional UPDATE stops the second — which nothing asserted. Reverting the fix looked like it proved the test, because the revert removed both guards at once. The interleaving is reproducible in one process through the object cache: prime the cache, write the winner's state with `$wpdb->update()` and **no** `wp_cache_delete()`, and the next call reads exactly what a concurrent request holds. Verified by reverting only the claim and keeping the ledger guard: the old assertions passed, the new one failed with a second ৳3,131 paid. Note `update_post_meta()` finishes by *deleting* its cache entry rather than refreshing it, so the priming read is required.
 57. **A performance assertion needs a threshold that separates the two implementations, not one that sounds generous.** The first version of §11's query-count check was `$after < $before * 6`. Measured both ways on the same fixture: the cheap reader costs 2 queries for one sheet and 5 for five; the per-row version costs 4 and 11. `11 < 4 * 6` passed, so the assertion would have shipped green against the very code it was written to reject. The **marginal** cost per added row does separate them — 0.75 against 1.75 — and survives an unrelated constant appearing at either end.
 
+58. **Capital value and profit received are two kinds of money and are never added together.** One is unrealised — what the shares would fetch if the business were sold at the approved valuation — and the other is cash already in somebody's hand. A single "total return" figure tells an investor they have received money that is still in the boat. So `bhela_bm_investor_roi()` keeps meaning exactly what it meant (`investment` is what was paid in, `roi` is cash received ÷ invested) and `bhela_bm_investor_holding()` is a separate reader; every surface shows them in separate blocks, and the portal says in words that the gain is not cash. This is §13.44's rule ("two editable places holding one number") applied to a pair of figures that must stay apart rather than converge.
+59. **A share's value changes; the share COUNT does not.** 115 shares stay 115 while the business grows — the valuation moves and `bhela_bm_share_value()` follows. New shares exist only when new money arrives, priced from an approved valuation, which is what makes the dilution fair: a 10-share holder goes from 8.696% to 8.197% while their holding value does not move at all, because the business took in cash worth exactly what the new shares are worth. That sentence is the answer to "why did my percentage go down". Issuing at the historic ৳1,00,000 after the business has grown is refused outright, not warned about — it is the transfer of value this module exists to prevent.
+60. **A valuation snapshots its share count but derives its per-share value.** The two look like the same kind of figure and are not: `_bhela_val_shares` is a historical fact (what the divisor was that day, so a later issue cannot rewrite what a past valuation said), while per-share is `total ÷ shares` computed on every read (§13.8 — a derived figure that gets cached is a figure that goes stale). Growth % is likewise derived, against the previous **approved** valuation, falling back to `inv_total_investment` — which until v2.38.0 was a setting no code read at all.
+61. **`bhela_bm_investor_amount()` must be read BEFORE a share issue raises the count.** It falls back to `shares × inv_per_share` when no paid-in amount was recorded, so reading it afterwards prices the just-issued shares at the OLD price and adds them to the basis again — a new investor's cost basis came out ৳7,00,000 too high, and appreciation with it. Caught by `valuation-test.php` §7 asserting the basis equals what was actually paid.
+62. **The five `inv_*` settings had no admin UI at all until v2.38.0.** They existed only as defaults in `bhela_bm_default_settings()`, the save handler never touched them, and the code comment beside them claimed they were "configurable because a second boat or a fresh round would otherwise mean editing PHP". They were not. `inv_total_investment` was read by nothing whatsoever. The settings block added with the valuation module exposes four of them and renders `inv_total_shares` **read-only**, because a share issue is its only sanctioned writer and a settings box that could disagree with the issue history would put the divisor under every percentage out of step with the record of why it changed.
+
+63. **A valuation is PRE-money, and it goes out of date the moment shares are issued against it.** `bhela_bm_holding_totals()` first tried to reconcile the holdings against the valuation total and produced a "rounding remainder" of **minus ten lakh** — because the divisor had moved from 115 to 122 while the recorded total was still the pre-money ৳1.70 Cr. There is no arithmetic that fixes this, because the post-money figure is a fact nothing has recorded yet. So the reconciliation is attempted only while `_bhela_val_shares` still equals the configured total, and otherwise `stale` and `issued_since` say plainly that a new valuation is needed. Reconciling against a number that has moved is worse than not reconciling: it produces a figure that looks like an error in the books.
+64. **Holdings are rounded per share, and the gap is named rather than allocated away.** ৳1.70 Cr over 115 shares is ৳1,47,826.09, so `shares × per_share` is ten taka short of the valuation. §13.30's largest-remainder split would close it exactly — and is deliberately NOT used here, because an investor checking `10 × ৳1,47,826` on a calculator must get the number on their statement. The dashboard instead names both parts of the difference: the value of unissued shares, and the rounding remainder. A figure somebody can reproduce beats a total that reconciles.
+65. **A record locked from birth cannot clean up after itself.** `bhela_bm_share_issue_commit()` aborts when the share total moved underneath it, and its `wp_delete_post()` was refused by its own lock — leaving an orphan issue record that `bhela_bm_share_issue_drift()` then counted as a real round, reporting drift on a correct register. `bhela_bm_val_delete()` is the sanctioned path: it lifts the two delete filters for exactly one call. The delete guards deliberately do **not** consult `bhela_bm_val_writing()` — a lock a flag can lift is not much of a lock — which is why this is a function with one caller rather than a condition inside the guard.
+66. **A figure counted in SQL is outside the harness's post-type isolation.** `bhela_bm_share_issue_drift()` counts and sums in SQL so a capped listing cannot understate it (the `bhela_bm_payreq_pending_total()` failure). The cost is that raw SQL never sees `posts_where`, so the harness reads every round the site has ever run — and `valuation-test.php` §8 asserted absolutes against it and broke the moment a previous run left a record behind. Deltas, per §13.38, and the same rule now has a second instance: **any figure a harness reads through raw SQL must be asserted as a delta.**
+
 
 > **Deployment: the portal must be served over HTTPS.** The sign-in form posts a password, and `wp_signon()` marks the session cookie secure only when `is_ssl()` is true. Over plain HTTP an investor's credentials and their session travel in clear on the network, and no amount of code here can compensate for it. This is the one item on this list that is a hosting decision rather than a bug.
 
@@ -789,7 +816,7 @@ git pull origin main
 # Push to GitHub
 git push origin main
 
-# Run the regression suite (fifteen harnesses)
+# Run the regression suite (sixteen harnesses)
 php tests/run.php
 
 # Validate JS syntax

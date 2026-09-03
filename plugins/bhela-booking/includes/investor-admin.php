@@ -233,6 +233,29 @@ function bhela_bm_investor_position_box( $post ) {
 	$row( __( 'Outstanding', 'bhela-booking' ), bhela_bm_money( $pos['outstanding'] ) );
 	$row( __( 'ROI (received)', 'bhela-booking' ), $roi['roi'] . '%' );
 	$row( __( 'ROI (declared)', 'bhela-booking' ), $roi['roi_declared'] . '%' );
+
+	// The capital side, under a rule of its own so nobody reads it as more cash.
+	$h = bhela_bm_investor_holding( $post->ID );
+	echo '<hr style="margin:.8rem 0">';
+	$row( __( 'Current share value', 'bhela-booking' ), bhela_bm_money( $h['share_value'] ) );
+	$row( __( 'Holding value', 'bhela-booking' ), bhela_bm_money( $h['holding'] ) );
+	$row(
+		__( 'Capital appreciation', 'bhela-booking' ),
+		( $h['appreciation'] >= 0 ? '+' : '' ) . bhela_bm_money( $h['appreciation'] )
+	);
+	printf(
+		'<p class="bha-note">%s</p>',
+		esc_html(
+			$h['valued']
+				? sprintf(
+					/* translators: %s: valuation date */
+					__( 'Valued as at %s. Unrealised — not added to anything above.', 'bhela-booking' ),
+					mysql2date( 'j M Y', $h['as_at'] )
+				)
+				: __( 'No approved valuation — this is the original issue price.', 'bhela-booking' )
+		)
+	);
+
 	printf( '<p><a class="button" href="%s">%s</a></p>',
 		esc_url( bhela_bm_admin_url( 'bhela-bm-investor-report', array( 'investor' => $post->ID ) ) ),
 		esc_html__( 'Open ledger', 'bhela-booking' ) );
@@ -621,6 +644,29 @@ function bhela_bm_investor_report_page() {
 				<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'ROI', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( $roi['roi'] ); ?>%</span></div>
 			</div>
 
+			<?php $h = bhela_bm_investor_holding( $one ); ?>
+			<h3 class="bha-sheet__h"><?php esc_html_e( 'Capital value', 'bhela-booking' ); ?></h3>
+			<div class="bha-cards">
+				<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Current share value', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $h['share_value'] ) ); ?></span></div>
+				<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Holding value', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $h['holding'] ) ); ?></span></div>
+				<div class="bha-card">
+					<span class="bha-card__label"><?php esc_html_e( 'Capital appreciation', 'bhela-booking' ); ?></span>
+					<span class="bha-card__value <?php echo $h['appreciation'] < 0 ? 'is-danger' : 'is-good'; ?>"><?php echo esc_html( bhela_bm_money( $h['appreciation'] ) ); ?></span>
+					<p class="bha-note"><?php echo esc_html( ( $h['appr_pct'] >= 0 ? '+' : '' ) . $h['appr_pct'] ); ?>%</p>
+				</div>
+			</div>
+			<p class="bha-note">
+				<?php
+				echo $h['valued']
+					? esc_html( sprintf(
+						/* translators: 1: date */
+						__( 'Based on the valuation approved as at %1$s. This is what the shares are worth, not money received — the figures above it are the cash side, and the two are never added together.', 'bhela-booking' ),
+						mysql2date( 'j M Y', $h['as_at'] )
+					) )
+					: esc_html__( 'No valuation has been approved, so this uses the original issue price. Record one under Valuation to see what the holding is worth today.', 'bhela-booking' );
+				?>
+			</p>
+
 			<?php if ( current_user_can( 'bhela_investor_pay' ) ) : ?>
 				<div class="bha-panel">
 					<h2><?php esc_html_e( 'Record a movement', 'bhela-booking' ); ?></h2>
@@ -778,10 +824,12 @@ function bhela_bm_investor_report_page() {
 						<th class="bha-num"><?php esc_html_e( 'Received', 'bhela-booking' ); ?></th>
 						<th class="bha-num"><?php esc_html_e( 'Outstanding', 'bhela-booking' ); ?></th>
 						<th class="bha-num"><?php esc_html_e( 'ROI', 'bhela-booking' ); ?></th>
+						<th class="bha-num"><?php esc_html_e( 'Holding value', 'bhela-booking' ); ?></th>
 					</tr></thead>
 					<tbody>
 					<?php foreach ( bhela_bm_investors() as $id ) : ?>
 						<?php $r = bhela_bm_investor_roi( $id ); ?>
+						<?php $rh = bhela_bm_investor_holding( $id ); ?>
 						<tr>
 							<td><a href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-investor-report', array( 'investor' => $id ) ) ); ?>"><?php echo esc_html( get_the_title( $id ) ); ?></a>
 								<?php if ( 'active' !== bhela_bm_investor_status( $id ) ) : ?>
@@ -793,6 +841,7 @@ function bhela_bm_investor_report_page() {
 							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['received'] ) ); ?></td>
 							<td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $r['outstanding'] ) ); ?></strong></td>
 							<td class="bha-num"><?php echo esc_html( $r['roi'] ); ?>%</td>
+							<td class="bha-num"><?php echo esc_html( bhela_bm_money( $rh['holding'] ) ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 					</tbody>
@@ -1218,6 +1267,7 @@ function bhela_bm_investor_columns( $columns ) {
 		'inv_paid'    => __( 'Received', 'bhela-booking' ),
 		'inv_due'     => __( 'Outstanding', 'bhela-booking' ),
 		'inv_roi'     => __( 'ROI', 'bhela-booking' ),
+			'inv_value'   => __( 'Holding value', 'bhela-booking' ),
 		'inv_login'   => __( 'Portal', 'bhela-booking' ),
 		'inv_status'  => __( 'Status', 'bhela-booking' ),
 	);
@@ -1280,6 +1330,21 @@ function bhela_bm_investor_column_content( $column, $post_id ) {
 				/* translators: %s: ROI on profit declared but not yet paid */
 				esc_html( sprintf( __( '%s%% declared', 'bhela-booking' ), $r['roi_declared'] ) )
 			);
+			break;
+
+		case 'inv_value':
+			// Cost basis and current value, one above the other, because either alone
+			// invites the wrong conclusion.
+			$h = bhela_bm_investor_holding( $post_id );
+			printf(
+				'<strong>%s</strong><br><span style="opacity:.6;font-size:11px">%s%s</span>',
+				esc_html( bhela_bm_money( $h['holding'] ) ),
+				$h['appreciation'] >= 0 ? '+' : '',
+				esc_html( bhela_bm_money( $h['appreciation'] ) )
+			);
+			if ( ! $h['valued'] ) {
+				echo '<br><span style="opacity:.5;font-size:11px">' . esc_html__( 'issue price', 'bhela-booking' ) . '</span>';
+			}
 			break;
 
 		case 'inv_login':

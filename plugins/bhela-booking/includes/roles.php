@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Bump when bhela_bm_role_defaults() or bhela_bm_permissions() changes, so
 // existing sites re-sync once against the new definition.
-define( 'BHELA_BM_ROLES_VERSION', 8 );
+define( 'BHELA_BM_ROLES_VERSION', 9 );
 
 /* =========================================================
  * CAPABILITY SETS
@@ -51,7 +51,8 @@ function bhela_bm_extra_caps() {
 		// below keep them in different hands. A second signature the same person can
 		// supply is not a second signature, and bhela_bm_payreq_approve() also
 		// refuses when the approver is the requester.
-		'bhela_investor_approve' => __( 'Approve investor payments', 'bhela-booking' ),
+		'bhela_investor_approve' => __( 'Approve investor payments and valuations', 'bhela-booking' ),
+		'bhela_investor_valuation' => __( 'Record a business valuation', 'bhela-booking' ),
 		// Inventory & Asset Register. bhela_inv_reopen is separate from
 		// bhela_inv_approve on purpose: reopening a closed month invalidates every
 		// later month's opening balance, which is a bigger act than closing one.
@@ -190,9 +191,15 @@ function bhela_bm_permissions() {
 			'requires' => 'investors_view',
 		),
 		'investor_approve' => array(
-			'label'    => __( 'Approve investor payments', 'bhela-booking' ),
-			'help'     => __( 'Release a requested payment. This is what actually moves money, and it is deliberately not held by the person who raises the request.', 'bhela-booking' ),
+			'label'    => __( 'Approve payments, valuations and share issues', 'bhela-booking' ),
+			'help'     => __( 'Release a requested payment, approve a business valuation, and issue new shares. All three change what investors are told they are owed or own, and none is held by the person who prepares them.', 'bhela-booking' ),
 			'caps'     => array( 'bhela_investor_approve' ),
+			'requires' => 'investors_view',
+		),
+		'investor_valuation' => array(
+			'label'    => __( 'Record a business valuation', 'bhela-booking' ),
+			'help'     => __( 'Enter what BHELA is currently worth. Recording one decides nothing on its own — it stays a draft until somebody else approves it.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_valuation' ),
 			'requires' => 'investors_view',
 		),
 		'costs_check'     => array(
@@ -357,7 +364,7 @@ function bhela_bm_role_defaults() {
 		'bhela_investor_relations' => array(
 			'name'  => __( 'BHELA Investor Relations', 'bhela-booking' ),
 			'blurb' => __( 'Maintains the investor register, runs monthly profit distribution and records investor payments. Reads the Monthly Statement but cannot approve cost sheets.', 'bhela-booking' ),
-			'perms' => array( 'statement', 'investors_view', 'investors_edit', 'dist_run', 'investor_pay' ),
+			'perms' => array( 'statement', 'investors_view', 'investors_edit', 'dist_run', 'investor_pay', 'investor_valuation' ),
 			// Deliberately no 'investor_approve': the person who prepares a payment is
 			// not the person who releases it. Give it to a manager or keep it with the
 			// owner — the Team screen can change this, which is the point of it.

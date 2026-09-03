@@ -114,6 +114,8 @@ $screens = array(
 	'Cash Flow'        => array( 'investors_page_bhela-bm-cashflow', array( 'page' => 'bhela-bm-cashflow', 'from' => '2026-07-01', 'to' => '2026-07-31' ), fn() => bhela_bm_cashflow_page() ),
 	'Trip P&L list'    => array( 'accounts_page_bhela-bm-trip-pl', array( 'page' => 'bhela-bm-trip-pl' ), fn() => bhela_bm_trip_pl_page() ),
 	'Trip P&L one'     => array( 'accounts_page_bhela-bm-trip-pl', array( 'page' => 'bhela-bm-trip-pl', 'sheet' => $GLOBALS['zz_cost'] ), fn() => bhela_bm_trip_pl_page() ),
+	'Valuation'        => array( 'investors_page_bhela-bm-valuation', array( 'page' => 'bhela-bm-valuation' ), fn() => bhela_bm_valuation_page() ),
+	'Share Issue'      => array( 'investors_page_bhela-bm-share-issue', array( 'page' => 'bhela-bm-share-issue', 'target' => '1000000' ), fn() => bhela_bm_share_issue_page() ),
 	'Revenue'          => array( 'accounts_page_bhela-bm-revenue', array( 'page' => 'bhela-bm-revenue', 'period' => 'month' ), fn() => bhela_bm_revenue_page() ),
 );
 $GLOBALS['zz_exp']  = $exp;

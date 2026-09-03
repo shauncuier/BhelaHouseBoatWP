@@ -2,7 +2,7 @@
 /**
  * Plugin Name: BHELA Booking Engine
  * Description: Complete booking engine for BHELA – The Haor Exclusive: cabin pricing (weekday/holiday), booking statuses, invoices with secure customer links, and email notifications.
- * Version: 2.37.2
+ * Version: 2.38.0
  * Author: 3s-Soft
  * Author URI: https://3s-soft.com
  * License: GPLv2 or later
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'BHELA_BM_VERSION', '2.37.2' );
+define( 'BHELA_BM_VERSION', '2.38.0' );
 define( 'BHELA_BM_PATH', plugin_dir_path( __FILE__ ) );
 define( 'BHELA_BM_URL', plugin_dir_url( __FILE__ ) );
 
@@ -940,6 +940,7 @@ require_once BHELA_BM_PATH . 'includes/inventory-core.php';
 // Loaded unconditionally for the same reason inventory-core.php is: a committed
 // distribution must not be deletable from WP-CLI or cron.
 require_once BHELA_BM_PATH . 'includes/distribution-core.php';
+require_once BHELA_BM_PATH . 'includes/valuation-core.php';
 // And again for the approved cost sheet. It used to be only a report, so the
 // metabox guard was enough; the investor distribution now reads approved sheets
 // and nothing else, so a sheet deletable from WP-CLI leaves declared profit
@@ -982,6 +983,9 @@ require_once BHELA_BM_PATH . 'includes/investors.php';
 require_once BHELA_BM_PATH . 'includes/investor-ledger.php';
 require_once BHELA_BM_PATH . 'includes/distribution.php';
 require_once BHELA_BM_PATH . 'includes/funds.php';
+require_once BHELA_BM_PATH . 'includes/valuation.php';
+require_once BHELA_BM_PATH . 'includes/share-issue.php';
+require_once BHELA_BM_PATH . 'includes/valuation-admin.php';
 require_once BHELA_BM_PATH . 'includes/investor-dashboard.php';
 require_once BHELA_BM_PATH . 'includes/investor-payreq.php';
 require_once BHELA_BM_PATH . 'includes/cashflow.php';

@@ -1035,6 +1035,22 @@ function bhela_bm_settings_page() {
 		if ( function_exists( 'bhela_bm_inv_save_lists' ) ) {
 			bhela_bm_inv_save_lists( wp_unslash( $_POST ) );
 		}
+		// Share structure. These five keys shipped as defaults with no admin UI at all,
+		// so the structure was effectively unchangeable despite the code claiming it was
+		// configurable. `inv_total_shares` is deliberately NOT saved here — a share
+		// issue is the only sanctioned writer of it (see bhela_bm_share_issue_commit),
+		// and a settings box that silently disagreed with the issue history would put
+		// the divisor under every percentage out of step with the record of why.
+		foreach ( array( 'inv_total_investment', 'inv_per_share' ) as $inv_key ) {
+			if ( isset( $_POST[ $inv_key ] ) ) {
+				$s[ $inv_key ] = max( 0, (int) $_POST[ $inv_key ] );
+			}
+		}
+		foreach ( array( 'inv_reserve_pct', 'inv_investor_pct' ) as $inv_key ) {
+			if ( isset( $_POST[ $inv_key ] ) ) {
+				$s[ $inv_key ] = max( 0, min( 100, (int) $_POST[ $inv_key ] ) );
+			}
+		}
 		if ( isset( $_POST['seasons'] ) && function_exists( 'bhela_bm_save_seasons' ) ) {
 			bhela_bm_save_seasons( wp_unslash( $_POST['seasons'] ) );
 		}
@@ -1492,7 +1508,89 @@ function bhela_bm_settings_page() {
 			</div><!-- /sms -->
 
 			<div class="bha-set__panel" id="bhela-panel-heads" role="tabpanel" aria-labelledby="bhela-tab-heads">
-			<h2><?php esc_html_e( 'Seasons', 'bhela-booking' ); ?></h2>
+			<h2><?php esc_html_e( 'Share Structure', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'How the equity is divided, and what a share was originally worth. Every ownership percentage and every profit distribution divides by the share total, so these are the most load-bearing numbers in the plugin.', 'bhela-booking' ); ?></p>
+			<?php
+			$inv_cfg   = function_exists( 'bhela_bm_share_config' ) ? bhela_bm_share_config() : array( 'total_investment' => 0, 'total_shares' => 0, 'per_share' => 0 );
+			$inv_drift = function_exists( 'bhela_bm_share_issue_drift' ) ? bhela_bm_share_issue_drift() : array( 'drift' => false );
+			$inv_val   = function_exists( 'bhela_bm_valuation_current' ) ? bhela_bm_valuation_current() : null;
+			?>
+			<table class="form-table" role="presentation">
+				<tr>
+					<th scope="row"><label for="inv_total_investment"><?php esc_html_e( 'Initial equity value ৳', 'bhela-booking' ); ?></label></th>
+					<td>
+						<input type="number" min="0" step="1" id="inv_total_investment" name="inv_total_investment" value="<?php echo esc_attr( $inv_cfg['total_investment'] ); ?>" class="regular-text">
+						<p class="description"><?php esc_html_e( 'What the business was worth when the shares were first issued. It is the baseline the earliest valuation’s growth is measured against, and nothing else reads it — changing it does not move any investor’s money.', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="inv_per_share"><?php esc_html_e( 'Original share value ৳', 'bhela-booking' ); ?></label></th>
+					<td>
+						<input type="number" min="0" step="1" id="inv_per_share" name="inv_per_share" value="<?php echo esc_attr( $inv_cfg['per_share'] ); ?>" class="regular-text">
+						<p class="description"><?php esc_html_e( 'The price a share was first sold at. Used as the cost basis when an investor’s paid-in amount was never recorded, and as the share value on a site that has never approved a valuation.', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Total shares', 'bhela-booking' ); ?></th>
+					<td>
+						<p><strong class="bha-plain"><?php echo esc_html( number_format_i18n( $inv_cfg['total_shares'] ) ); ?></strong></p>
+						<p class="description">
+							<?php
+							printf(
+								/* translators: %s: link to the share issue screen */
+								wp_kses_post( __( 'Read-only on purpose. A <a href="%s">share issue</a> is the only thing that changes this, so the total and the record of why it changed cannot drift apart. Editing it by hand would silently re-scale every ownership percentage and every future distribution.', 'bhela-booking' ) ),
+								esc_url( function_exists( 'bhela_bm_admin_url' ) ? bhela_bm_admin_url( 'bhela-bm-share-issue' ) : '#' )
+							);
+							?>
+						</p>
+						<?php if ( ! empty( $inv_drift['drift'] ) ) : ?>
+							<p class="description" style="color:#b32d2e">
+								<?php
+								printf(
+									/* translators: 1: configured, 2: expected */
+									esc_html__( 'This says %1$d but the issue history adds up to %2$d. Nothing has been corrected automatically — a person needs to decide which is right.', 'bhela-booking' ),
+									(int) $inv_drift['configured'],
+									(int) $inv_drift['expected']
+								);
+								?>
+							</p>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Current share value', 'bhela-booking' ); ?></th>
+					<td>
+						<p><strong><?php echo esc_html( function_exists( 'bhela_bm_share_value' ) ? bhela_bm_money( bhela_bm_share_value() ) : '—' ); ?></strong></p>
+						<p class="description">
+							<?php
+							echo $inv_val
+								? esc_html( sprintf(
+									/* translators: %s: valuation date */
+									__( 'Derived from the valuation approved as at %s. Recorded under Investors → Valuation, never typed here.', 'bhela-booking' ),
+									mysql2date( 'j M Y', $inv_val['date'] )
+								) )
+								: esc_html__( 'No valuation approved yet, so this is the original share value above. Record one under Investors → Valuation.', 'bhela-booking' );
+							?>
+						</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="inv_reserve_pct"><?php esc_html_e( 'Reserve %', 'bhela-booking' ); ?></label></th>
+					<td>
+						<input type="number" min="0" max="100" step="1" id="inv_reserve_pct" name="inv_reserve_pct" value="<?php echo esc_attr( bhela_bm_get_settings()['inv_reserve_pct'] ?? 10 ); ?>" class="small-text">
+						<p class="description"><?php esc_html_e( 'Taken off a month’s profit before anything is distributed — off-season, renovation and maintenance. It is the default on the Distribution screen, which can override it for a single month.', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="inv_investor_pct"><?php esc_html_e( 'Investor share %', 'bhela-booking' ); ?></label></th>
+					<td>
+						<input type="number" min="0" max="100" step="1" id="inv_investor_pct" name="inv_investor_pct" value="<?php echo esc_attr( bhela_bm_get_settings()['inv_investor_pct'] ?? 70 ); ?>" class="small-text">
+						<p class="description"><?php esc_html_e( 'Of what is left after the reserve. Management takes the remainder rather than its own percentage, so the two always add to the whole and cannot round apart.', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+			</table>
+
+			<h2 style="margin-top:28px"><?php esc_html_e( 'Seasons', 'bhela-booking' ); ?></h2>
 			<p class="bha-set__lead"><?php esc_html_e( 'The haor year is not the calendar year, so name yours here. A season is only a label over a date range — every report keeps computing exactly what it computes now, it just gains a way to group by the period you actually think in. None are shipped: inventing your season dates would put a confident wrong answer on the screen.', 'bhela-booking' ); ?></p>
 			<?php
 			$all_seasons  = function_exists( 'bhela_bm_seasons' ) ? bhela_bm_seasons() : array();

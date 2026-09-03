@@ -51,10 +51,19 @@ function bhela_bm_investor_dash_data() {
 		'pending'     => array( 'count' => 0, 'total' => 0 ),
 		'funds'       => array(),
 		'last_run'    => null,
+		// Capital value, kept in its own block rather than mixed into the figures
+		// above. What an investor has been PAID and what their holding is now WORTH
+		// are different kinds of money, and a screen that adds them tells somebody
+		// they have received cash that is still in the boat.
+		'capital'     => array(),
 	);
+
+	// One valuation read for the whole screen, not one per investor.
+	$valuation = bhela_bm_valuation_current();
 
 	foreach ( bhela_bm_investors() as $id ) {
 		$r = bhela_bm_investor_roi( $id );
+		$h = bhela_bm_investor_holding( $id, $valuation );
 		$out['investment']  += $r['investment'];
 		$out['declared']    += $r['declared'];
 		$out['received']    += $r['received'];
@@ -70,11 +79,18 @@ function bhela_bm_investor_dash_data() {
 			'received'    => $r['received'],
 			'outstanding' => $r['outstanding'],
 			'roi'         => $r['roi'],
+			// Alongside, never instead of. Every key above still means exactly what it
+			// meant before valuations existed.
+			'holding'      => $h['holding'],
+			'appreciation' => $h['appreciation'],
+			'appr_pct'     => $h['appr_pct'],
 		);
 	}
 	usort( $out['rows'], function ( $a, $b ) {
 		return $b['shares'] <=> $a['shares'];
 	} );
+
+	$out['capital'] = bhela_bm_holding_totals();
 
 	if ( function_exists( 'bhela_bm_payreq_pending_total' ) ) {
 		$out['pending'] = bhela_bm_payreq_pending_total();
@@ -161,6 +177,52 @@ function bhela_bm_investor_dash_page() {
 			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Outstanding', 'bhela-booking' ); ?></span><span class="bha-card__value <?php echo $d['outstanding'] > 0 ? 'is-danger' : 'is-good'; ?>"><?php echo esc_html( bhela_bm_money( $d['outstanding'] ) ); ?></span></div>
 		</div>
 
+		<h3 class="bha-sheet__h"><?php esc_html_e( 'Capital value', 'bhela-booking' ); ?></h3>
+		<div class="bha-cards">
+			<div class="bha-card">
+				<span class="bha-card__label"><?php esc_html_e( 'Current share value', 'bhela-booking' ); ?></span>
+				<span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $d['capital']['share_value'] ) ); ?></span>
+				<p class="bha-note">
+					<?php
+					echo $d['capital']['valued']
+						? esc_html( sprintf( /* translators: %s: date */ __( 'valued at %s', 'bhela-booking' ), mysql2date( 'j M Y', $d['capital']['as_at'] ) ) )
+						: esc_html__( 'the original issue price — no valuation approved yet', 'bhela-booking' );
+					?>
+				</p>
+			</div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Holding value', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $d['capital']['holding'] ) ); ?></span></div>
+			<div class="bha-card">
+				<span class="bha-card__label"><?php esc_html_e( 'Capital appreciation', 'bhela-booking' ); ?></span>
+				<span class="bha-card__value <?php echo $d['capital']['appreciation'] < 0 ? 'is-danger' : 'is-good'; ?>"><?php echo esc_html( bhela_bm_money( $d['capital']['appreciation'] ) ); ?></span>
+				<p class="bha-note"><?php esc_html_e( 'unrealised — this is value, not cash', 'bhela-booking' ); ?></p>
+			</div>
+		</div>
+		<p class="bha-note">
+			<?php esc_html_e( 'Capital appreciation and profit paid out are deliberately separate figures and are never added together. One is money already in an investor’s hand; the other is what their shares would be worth if the business were sold at the approved valuation.', 'bhela-booking' ); ?>
+			<?php if ( $d['capital']['stale'] ) : ?>
+				<br>
+				<?php
+				printf(
+					/* translators: 1: shares issued since, 2: valuation date */
+					esc_html__( '%1$d shares have been issued since the valuation of %2$s, so that figure is now pre-money and the holdings above are priced from it. Record a new valuation to bring the two back together.', 'bhela-booking' ),
+					(int) $d['capital']['issued_since'],
+					esc_html( mysql2date( 'j M Y', $d['capital']['as_at'] ) )
+				);
+				?>
+			<?php elseif ( $d['capital']['valued'] && ( $d['capital']['unissued'] > 0 || 0 !== $d['capital']['rounding'] ) ) : ?>
+				<br>
+				<?php
+				printf(
+					/* translators: 1: valuation, 2: unissued share value, 3: rounding */
+					esc_html__( 'The holdings above come to less than the %1$s valuation: %2$s of it sits on shares nobody holds yet, and %3$s is the remainder left by pricing each share in whole taka.', 'bhela-booking' ),
+					esc_html( bhela_bm_money( $d['capital']['total'] ) ),
+					esc_html( bhela_bm_money( $d['capital']['unissued'] ) ),
+					esc_html( bhela_bm_money( $d['capital']['rounding'] ) )
+				);
+				?>
+			<?php endif; ?>
+		</p>
+
 		<?php if ( $d['shares']['over'] ) : ?>
 			<p class="bha-callout bha-callout--attention">
 				<?php esc_html_e( 'More shares are issued than the share structure allows, so the percentages already add to more than 100%. Distribution is blocked until that is resolved on the register.', 'bhela-booking' ); ?>
@@ -180,10 +242,12 @@ function bhela_bm_investor_dash_page() {
 					<th class="bha-num"><?php esc_html_e( 'Received', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'Outstanding', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'ROI', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Holding value', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Appreciation', 'bhela-booking' ); ?></th>
 				</tr></thead>
 				<tbody>
 				<?php if ( ! $d['rows'] ) : ?>
-					<tr><td colspan="8"><?php esc_html_e( 'No investors on the register yet.', 'bhela-booking' ); ?></td></tr>
+					<tr><td colspan="10"><?php esc_html_e( 'No investors on the register yet.', 'bhela-booking' ); ?></td></tr>
 				<?php endif; ?>
 				<?php foreach ( $d['rows'] as $r ) : ?>
 					<?php $tones = array( 'active' => 'good', 'suspended' => 'attention', 'exited' => 'neutral' ); ?>
@@ -196,6 +260,10 @@ function bhela_bm_investor_dash_page() {
 						<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['received'] ) ); ?></td>
 						<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['outstanding'] ) ); ?></td>
 						<td class="bha-num"><?php echo esc_html( $r['roi'] ); ?>%</td>
+						<td class="bha-num"><?php echo esc_html( bhela_bm_money( $r['holding'] ) ); ?></td>
+						<td class="bha-num <?php echo $r['appreciation'] < 0 ? 'is-danger' : 'is-good'; ?>">
+							<?php echo esc_html( bhela_bm_money( $r['appreciation'] ) ); ?>
+						</td>
 					</tr>
 				<?php endforeach; ?>
 				</tbody>
@@ -206,6 +274,8 @@ function bhela_bm_investor_dash_page() {
 					<th class="bha-num"><?php echo esc_html( bhela_bm_money( $d['received'] ) ); ?></th>
 					<th class="bha-num"><?php echo esc_html( bhela_bm_money( $d['outstanding'] ) ); ?></th>
 					<th></th>
+					<th class="bha-num"><?php echo esc_html( bhela_bm_money( $d['capital']['holding'] ) ); ?></th>
+					<th class="bha-num"><?php echo esc_html( bhela_bm_money( $d['capital']['appreciation'] ) ); ?></th>
 				</tr></tfoot>
 			</table>
 			</div>
@@ -344,6 +414,8 @@ function bhela_bm_investor_csv() {
 		__( 'Received', 'bhela-booking' ),
 		__( 'Outstanding', 'bhela-booking' ),
 		__( 'ROI %', 'bhela-booking' ),
+		__( 'Holding value', 'bhela-booking' ),
+		__( 'Capital appreciation', 'bhela-booking' ),
 	) ) );
 
 	foreach ( $d['rows'] as $r ) {
@@ -357,6 +429,8 @@ function bhela_bm_investor_csv() {
 			$r['received'],
 			$r['outstanding'],
 			$r['roi'],
+			$r['holding'],
+			$r['appreciation'],
 		) );
 	}
 
@@ -364,6 +438,7 @@ function bhela_bm_investor_csv() {
 		bhela_bm_csv_cell( __( 'Total', 'bhela-booking' ) ),
 		'', $d['shares']['issued'], '',
 		$d['investment'], $d['declared'], $d['received'], $d['outstanding'], '',
+		$d['capital']['holding'], $d['capital']['appreciation'],
 	) );
 
 	fclose( $out );
