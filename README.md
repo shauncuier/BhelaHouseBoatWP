@@ -5,7 +5,7 @@
 
 **Pages**
 - `index.html` — **Overview**: project overview, what the client receives, business value, and why a custom theme + booking engine (vs templates/SaaS).
-- `manual.html` — **Owner's Manual**: plain-language Bangla guide to running the platform day to day, in 28 sections — bookings, invoices, rates, availability, the confirmation message, trip costing, expenses, payroll, monthly and yearly accounts, stock, B2B partners, staff roles, blog, email/SMS and settings.
+- `manual.html` — **Owner's Manual**: plain-language Bangla guide to running the platform day to day, in 35 sections — bookings, invoices, rates, offers and coupons, availability, the confirmation message, trip costing and income by source, expenses, payroll, monthly and yearly accounts, seasons, stock, B2B partners, investors and profit distribution, business valuation and share issues, the investor portal, staff roles, blog, email/SMS and settings.
 
 BHELA – The Haor Exclusive is a **custom WordPress booking platform** for a premium
 houseboat operating on Tanguar Haor, Sunamganj, Bangladesh. It is built from two
@@ -16,9 +16,14 @@ the bookings as well as the bookings themselves:
   food, gallery, FAQ, policies, blog).
 - **BHELA Booking Engine** — a plugin with a multi-step booking wizard, live per-person
   pricing, 6-cabin availability, invoices, guest reviews, trip calendar, and email/SMS —
-  plus the back office: trip cost sheets with a three-person approval chain, expenses,
-  payroll, monthly and yearly statements, a stock register, staff roles with an
-  audit trail, and B2B partners with commission and referral links.
+  plus the back office: trip cost sheets with a three-person approval chain and income
+  broken down by source, expenses, payroll, monthly and yearly statements, seasons, a
+  stock register, staff roles with an audit trail, and B2B partners with commission and
+  referral links.
+- **The ownership side** — an investor register, monthly profit distribution by
+  shareholding, an append-only ledger, reserve and management funds, cash flow, a
+  business valuation history, share issues with honest dilution, and a private portal
+  where each investor sees their own position and nobody else's.
 
 ## What the client receives
 
