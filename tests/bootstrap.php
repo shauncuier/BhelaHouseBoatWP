@@ -266,6 +266,9 @@ function bhela_test_owner_options() {
 		'bhela_bm_inv_mobile_idx',
 		'bhela_bm_inv_periods',   // month => post id. Also the one-sheet-per-month constraint
 		'bhela_bm_agencies',      // B2B partner directory, including live referral tokens
+		// The office branches, their addresses and the staff mobile for each. Added WITH
+		// the feature (§13.26): once the owner saves the screen these exist nowhere else.
+		'bhela_bm_offices',
 		// Owner-built AND a live ledger: `uses` records real redemptions, so losing it
 		// re-opens every spent coupon. Added with the feature, not after a harness
 		// needed it — that order has already cost this project three times.

@@ -17,6 +17,12 @@ $bhela_phone_1 = bhela_contact( 'phone_1' );
 $bhela_phone_2 = bhela_contact( 'phone_2' );
 $bhela_email   = bhela_contact( 'email' );
 $bhela_address = bhela_contact( 'address' );
+
+// The branches that take bookings in person, owner-editable in Settings -> Business.
+// Guarded because the theme has to render with the plugin switched off, and empty
+// because an owner who has removed every office should get no section at all rather
+// than a heading with nothing under it.
+$bhela_offices = function_exists( 'bhela_bm_offices' ) ? bhela_bm_offices() : array();
 ?>
 
 <section class="page-hero">
@@ -106,6 +112,43 @@ $bhela_address = bhela_contact( 'address' );
 				</div>
 			</aside>
 		</div>
+
+		<?php if ( $bhela_offices ) : ?>
+			<div class="offices">
+				<h2 class="section-title"><?php esc_html_e( 'আমাদের অফিস', 'bhela' ); ?></h2>
+				<p class="section-lead"><?php esc_html_e( 'সরাসরি এসে কথা বলতে চাইলে — নিচের যেকোনো অফিসে আসুন, বা সেখানকার দায়িত্বে যিনি আছেন তাঁকে ফোন করুন।', 'bhela' ); ?></p>
+				<div class="office-grid">
+					<?php foreach ( $bhela_offices as $bhela_office ) : ?>
+						<?php $bhela_office_tel = bhela_bm_office_tel( $bhela_office['mobile'] ); ?>
+						<div class="office-card">
+							<h3 class="office-card__name">📍 <?php echo esc_html( $bhela_office['name'] ); ?></h3>
+							<?php if ( $bhela_office['address'] ) : ?>
+								<p class="office-card__address">
+									<?php
+									// Escape first, then introduce the breaks — the address is a
+									// textarea the owner typed, and its line breaks are meaningful.
+									echo nl2br( esc_html( $bhela_office['address'] ) );
+									?>
+								</p>
+							<?php endif; ?>
+							<?php if ( $bhela_office['contact_person'] ) : ?>
+								<p class="office-card__person">
+									<span><?php esc_html_e( 'যোগাযোগ', 'bhela' ); ?></span>
+									<strong><?php echo esc_html( $bhela_office['contact_person'] ); ?></strong>
+								</p>
+							<?php endif; ?>
+							<?php if ( $bhela_office_tel ) : ?>
+								<a class="office-card__phone" href="tel:<?php echo esc_attr( $bhela_office_tel ); ?>">
+									📱 <?php echo esc_html( $bhela_office['mobile'] ); ?>
+								</a>
+							<?php elseif ( $bhela_office['mobile'] ) : ?>
+								<span class="office-card__phone"><?php echo esc_html( $bhela_office['mobile'] ); ?></span>
+							<?php endif; ?>
+						</div>
+					<?php endforeach; ?>
+				</div>
+			</div>
+		<?php endif; ?>
 
 	</div>
 </section>

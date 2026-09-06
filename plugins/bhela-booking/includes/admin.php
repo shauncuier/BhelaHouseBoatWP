@@ -1051,6 +1051,9 @@ function bhela_bm_settings_page() {
 				$s[ $inv_key ] = max( 0, min( 100, (int) $_POST[ $inv_key ] ) );
 			}
 		}
+		if ( isset( $_POST['offices'] ) && function_exists( 'bhela_bm_save_offices' ) ) {
+			bhela_bm_save_offices( wp_unslash( $_POST['offices'] ) );
+		}
 		if ( isset( $_POST['seasons'] ) && function_exists( 'bhela_bm_save_seasons' ) ) {
 			bhela_bm_save_seasons( wp_unslash( $_POST['seasons'] ) );
 		}
@@ -1209,6 +1212,56 @@ function bhela_bm_settings_page() {
 					<textarea name="confirm_notes" rows="5" class="large-text"><?php echo esc_textarea( $s['confirm_notes'] ?? '' ); ?></textarea>
 					<p class="description"><?php esc_html_e( 'One note per line. Printed on the booking confirmation message and on the invoice, from this one field — so the two can never promise a guest different things.', 'bhela-booking' ); ?></p></td></tr>
 			</table>
+			<h2 style="margin-top:28px"><?php esc_html_e( 'Office Locations', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'The branches that take bookings in person, shown on the Contact page. The address above is the boarding ghat — where a trip leaves from, which is not where anybody sits. Add, rename or remove an office here and the website follows; nothing needs a developer.', 'bhela-booking' ); ?></p>
+			<?php $bhela_offices = function_exists( 'bhela_bm_offices' ) ? bhela_bm_offices() : array(); ?>
+			<table class="widefat striped" id="bhela-offices-table">
+				<thead>
+					<tr>
+						<th style="width:44px">#</th>
+						<th style="width:20%"><?php esc_html_e( 'Office', 'bhela-booking' ); ?></th>
+						<th style="width:20%"><?php esc_html_e( 'Contact person', 'bhela-booking' ); ?></th>
+						<th style="width:18%"><?php esc_html_e( 'Mobile', 'bhela-booking' ); ?></th>
+						<th><?php esc_html_e( 'Address', 'bhela-booking' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+				<?php $on = 0; foreach ( $bhela_offices as $okey => $orow ) : $on++; ?>
+					<tr>
+						<td><?php echo esc_html( $on ); ?></td>
+						<td>
+							<input type="hidden" name="offices[<?php echo esc_attr( $okey ); ?>][key]" value="<?php echo esc_attr( $okey ); ?>">
+							<input type="text" class="large-text" name="offices[<?php echo esc_attr( $okey ); ?>][name]" value="<?php echo esc_attr( $orow['name'] ); ?>">
+						</td>
+						<td><input type="text" class="large-text" name="offices[<?php echo esc_attr( $okey ); ?>][contact_person]" value="<?php echo esc_attr( $orow['contact_person'] ); ?>"></td>
+						<td><input type="text" class="large-text" name="offices[<?php echo esc_attr( $okey ); ?>][mobile]" value="<?php echo esc_attr( $orow['mobile'] ); ?>"></td>
+						<td><textarea class="large-text" rows="3" name="offices[<?php echo esc_attr( $okey ); ?>][address]"><?php echo esc_textarea( $orow['address'] ); ?></textarea></td>
+					</tr>
+				<?php endforeach; ?>
+				</tbody>
+			</table>
+			<p><button type="button" class="button" id="bhela-offices-add">+ <?php esc_html_e( 'Add office', 'bhela-booking' ); ?></button></p>
+			<p class="description"><?php esc_html_e( 'One address per line — the line breaks are kept exactly as typed, because a flat number on the same line as a road name is how a guest misreads it. Clearing an office’s name deletes it, and removing every one of them hides the section from the Contact page rather than bringing these three back.', 'bhela-booking' ); ?></p>
+			<script>
+			(function () {
+				var btn = document.getElementById('bhela-offices-add');
+				if (!btn) return;
+				btn.addEventListener('click', function () {
+					var body = document.querySelector('#bhela-offices-table tbody');
+					var key = 'new_' + Date.now().toString(36);
+					var tr = document.createElement('tr');
+					tr.innerHTML =
+						'<td>' + (body.rows.length + 1) + '</td>' +
+						'<td><input type="hidden" name="offices[' + key + '][key]" value="">' +
+						'<input type="text" class="large-text" name="offices[' + key + '][name]" placeholder="<?php echo esc_js( __( 'e.g. Sylhet Office', 'bhela-booking' ) ); ?>"></td>' +
+						'<td><input type="text" class="large-text" name="offices[' + key + '][contact_person]"></td>' +
+						'<td><input type="text" class="large-text" name="offices[' + key + '][mobile]" placeholder="+880 1XXX-XXXXXX"></td>' +
+						'<td><textarea class="large-text" rows="3" name="offices[' + key + '][address]"></textarea></td>';
+					body.appendChild(tr);
+					tr.querySelector('input[type=text]').focus();
+				});
+			})();
+			</script>
 			</div><!-- /business -->
 
 			<div class="bha-set__panel" id="bhela-panel-payment" role="tabpanel" aria-labelledby="bhela-tab-payment">

@@ -4,7 +4,7 @@ Theme URI: https://bhelahouseboat.com
 Author: 3s-Soft
 Author URI: https://3s-soft.com
 Description: "Midnight Monsoon" — a total redesign for BHELA – The Haor Exclusive. Dark ink-teal luxury editorial design with cream sections, serif display typography, glass navigation and a conversion-first booking experience. Built for Tanguar Haor's premium houseboat.
-Version: 2.39.0
+Version: 2.40.0
 Requires at least: 6.0
 Tested up to: 6.7
 Requires PHP: 8.0
@@ -1225,6 +1225,30 @@ input, select, textarea { font-family: inherit; }
 .contact-side__box--cta p { color: var(--text-inverse); margin-bottom: 1.1rem; }
 .social-icons--dark .social-icons__link { background: rgba(10, 42, 47, .06); border-color: var(--line); color: var(--ink); }
 .social-icons--dark .social-icons__link:hover { color: #fff; }
+
+/* Offices — the branches that take bookings in person. A full-width row rather
+   than another .contact-side box: three postal addresses do not fit a sidebar. */
+.offices { margin-top: 4rem; }
+.offices .section-title { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: .4rem; }
+.offices .section-lead { margin-bottom: 2rem; }
+.office-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.2rem; }
+/* The .contact-card treatment without the hover lift — these are not links, and a
+   card that rises under the cursor promises a click that does nothing. */
+.office-card {
+	background: var(--white); border: 1px solid var(--line); border-radius: var(--radius);
+	padding: 1.6rem 1.5rem; box-shadow: var(--shadow-sm);
+	display: flex; flex-direction: column; gap: .55rem;
+}
+.office-card__name { font-family: var(--font-display); font-size: 1.15rem; color: var(--ink); margin: 0; }
+.office-card__address { color: var(--text-soft); font-size: .95rem; margin: 0; line-height: 1.75; }
+.office-card__person { margin: 0; font-size: .95rem; display: flex; flex-direction: column; gap: .1rem; }
+.office-card__person span { color: var(--text-soft); font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; }
+.office-card__person strong { color: var(--ink); }
+.office-card__phone {
+	margin-top: auto; color: var(--primary); font-weight: 600;
+	font-variant-numeric: tabular-nums; word-break: break-word;
+}
+a.office-card__phone:hover { text-decoration: underline; }
 
 @media (max-width: 900px) { .contact-layout { grid-template-columns: 1fr; } }
 
