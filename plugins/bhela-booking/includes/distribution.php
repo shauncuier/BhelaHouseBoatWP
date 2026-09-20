@@ -157,6 +157,14 @@ function bhela_bm_dist_commit( $month, $reserve_pct = null, $note = '' ) {
 	if ( bhela_bm_dist_run( $month ) ) {
 		return new WP_Error( 'already', __( 'এই মাসের বণ্টন আগেই সম্পন্ন হয়েছে।', 'bhela-booking' ) );
 	}
+	// The gate between the two models, and it has to be here rather than on the screen.
+	// Both engines write `profit` ledger rows, so an investor holding shares AND an
+	// Investment Record would be paid twice — once by each — and every row would look
+	// individually correct. Committed runs stay exactly where they are and stay
+	// readable; what stops is writing new ones.
+	if ( function_exists( 'bhela_bm_investor_model' ) && 'fixed' === bhela_bm_investor_model() ) {
+		return new WP_Error( 'model', __( 'বিনিয়োগ এখন নির্দিষ্ট-হার পদ্ধতিতে চলছে — শেয়ারভিত্তিক বণ্টন আর চালানো যাবে না। পুরোনো বণ্টনগুলো রেকর্ডে থাকবে।', 'bhela-booking' ) );
+	}
 
 	$p = bhela_bm_dist_preview( $month, $reserve_pct );
 	if ( $p['gross'] <= 0 ) {

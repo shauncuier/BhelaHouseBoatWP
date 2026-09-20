@@ -81,12 +81,40 @@ function bhela_bm_menu_groups() {
 		),
 		'investors' => array(
 			'title' => __( 'Investors', 'bhela-booking' ),
-			'slug'  => 'bhela-bm-dist',
+			// The slug must be a page that can NEVER be hidden, because it is the
+			// parent every row hangs off. It used to be `bhela-bm-dist` — the
+			// Distribution screen — which is exactly the row that disappears under the
+			// fixed-return model. Hiding it took the parent with it, and
+			// bhela_bm_menu_parent() then fell back to Bookings and dumped all fifteen
+			// remaining rows there. The Dashboard is visible under every model.
+			'slug'  => 'bhela-bm-investor-dash',
 			'icon'  => 'dashicons-groups',
 			'pos'   => 28.5,
 			// OR, like every other group: holding any one of these is reason enough for
-			// the menu to exist.
-			'caps'  => array( 'bhela_investors_view', 'bhela_dist_run', 'bhela_investor_pay' ),
+			// the menu to exist. `bhela_view_statement` is here because Cash Flow is
+			// gated by it rather than by an investor cap — without it, a statement-only
+			// user got a Cash Flow row whose parent did not exist and fell back to
+			// Bookings.
+			'caps'  => array( 'bhela_investors_view', 'bhela_dist_run', 'bhela_investor_pay', 'bhela_view_statement' ),
+		),
+		// Sixteen rows under Investors was the same disease §3.9 split the menus to
+		// cure, when Bookings held 22 — and ui-test's own "no menu holds more than 8
+		// rows" never counted this group, which is the only reason it passed. So the
+		// investor area is two menus: the PEOPLE and what they are owed, and the
+		// INSTRUMENTS that create the obligation. Nothing was merged or removed.
+		'capital'  => array(
+			'title' => __( 'Capital', 'bhela-booking' ),
+			// Investments is visible under every model, for the same reason the
+			// Dashboard is the Investors parent.
+			'slug'  => 'bhela-bm-investments',
+			'icon'  => 'dashicons-portfolio',
+			// 27 / 28 / 28.5 / 29 are taken, and two menus on one float silently
+			// overwrite each other in WordPress.
+			'pos'   => 28.6,
+			// Every other investor permission declares `requires => investors_view`, so
+			// a role holding only one of them ends up with investors_view too — which
+			// is what makes this short list safe.
+			'caps'  => array( 'bhela_investors_view', 'bhela_dist_run', 'bhela_investor_capital' ),
 		),
 		'setup'    => array(
 			'title' => __( 'Setup', 'bhela-booking' ),
@@ -189,6 +217,27 @@ function bhela_bm_menu_page_group( $page ) {
  *
  * @return array parent-group => slug[]
  */
+/**
+ * The parent a SHARE-ERA screen registers against.
+ *
+ * Under the fixed-return model, Distribution, Valuation and Share Issue are inert —
+ * bhela_bm_dist_commit() refuses outright — so their rows come off the menu. They are
+ * NOT unregistered: passing `null` as the parent is WordPress's own pattern for a page
+ * that renders normally but has no menu row, so every committed run, valuation and
+ * share issue stays reachable by URL and readable. Financial records are not hidden by
+ * being deleted (3.7); they are hidden by not being advertised.
+ *
+ * Their slugs stay listed in bhela_bm_menu_layout() either way, because that list is
+ * also the ownership map behind bhela_bm_admin_url() — drop a slug from it and the URL
+ * helper starts emitting an edit.php link the legacy shim refuses to rescue.
+ */
+function bhela_bm_share_menu_parent() {
+	if ( function_exists( 'bhela_bm_investor_model' ) && 'fixed' === bhela_bm_investor_model() ) {
+		return null;
+	}
+	return bhela_bm_menu_parent( 'capital' );
+}
+
 function bhela_bm_menu_layout() {
 	return array(
 		'bookings' => array(
@@ -221,16 +270,32 @@ function bhela_bm_menu_layout() {
 			'bhela-bm-inv-assets',                    // 🏷️ Asset Report
 			'bhela-bm-audit',                         // 🔩 Audit Trail
 		),
+		// The register stays first: a top-level's href comes from its FIRST submenu
+		// row, so clicking Investors opens the register exactly as it did before.
 		'investors' => array(
 			'edit.php?post_type=bhela_investor',      // 👤 Investors
 			'bhela-bm-investor-dash',                 // 🧭 Dashboard
-			'bhela-bm-dist',                          // 💰 Distribution
-			'bhela-bm-investor-report',               // 📊 Investor Report
+			'bhela-bm-investor-report',               // 📇 Investor Report
+			'bhela-bm-settlement',                    // ⚖️ Settlement
 			'bhela-bm-signups',                       // 📝 Registrations
-			'bhela-bm-valuation',                     // 💎 Valuation
-			'bhela-bm-share-issue',                   // 🪙 Share Issue
-			'bhela-bm-funds',                         // 🏦 Funds
+			'bhela-bm-certificates',                  // 📜 Certificates
+			'bhela-bm-settle-import',                 // 📥 Import Payments
 			'bhela-bm-cashflow',                      // 💵 Cash Flow
+		),
+		// Distribution, Valuation and Share Issue stay LISTED here even while the fixed
+		// model hides their rows. This list is also the ownership map: a slug missing
+		// from it makes bhela_bm_menu_page_group() answer 'bookings', so the URL helper
+		// would emit an edit.php link and the legacy shim would refuse to rescue it —
+		// a dead link, silently. Visibility is decided at registration, not here.
+		'capital'  => array(
+			'bhela-bm-investments',                   // 💠 Investments
+			'bhela-bm-agreements',                    // 📑 Agreements
+			'bhela-bm-capital',                       // 💼 Contributions
+			'bhela-bm-profit',                        // ➗ Profit
+			'bhela-bm-dist',                          // 💰 Distribution   (share model)
+			'bhela-bm-valuation',                     // 💎 Valuation      (share model)
+			'bhela-bm-share-issue',                   // 🪙 Share Issue    (share model)
+			'bhela-bm-funds',                         // 🏦 Funds
 		),
 		'setup'    => array(
 			'bhela-bm-settings',                      // ⚙️ Settings

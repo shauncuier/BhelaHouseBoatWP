@@ -1051,6 +1051,48 @@ function bhela_bm_settings_page() {
 				$s[ $inv_key ] = max( 0, min( 100, (int) $_POST[ $inv_key ] ) );
 			}
 		}
+
+		// Which engine may pay investors. This one setting decides whether a share
+		// distribution or an Investment Record is what somebody is owed, so unlike the
+		// percentages around it the CHANGE is audited: the figures on every later
+		// statement depend on it, and "who switched this, and when" is exactly the
+		// question the audit trail exists to answer (§3.7).
+		if ( isset( $_POST['inv_model'] ) ) {
+			$inv_model_new = ( 'fixed' === sanitize_key( wp_unslash( $_POST['inv_model'] ) ) ) ? 'fixed' : 'shares';
+			$inv_model_old = ( 'fixed' === ( $s['inv_model'] ?? '' ) ) ? 'fixed' : 'shares';
+			if ( $inv_model_new !== $inv_model_old ) {
+				bhela_bm_audit( array(
+					'channel'     => 'investor',
+					'action'      => 'investor_model',
+					'object_type' => 'settings',
+					'object_id'   => 0,
+					'object_ref'  => 'inv_model',
+					'field'       => 'model',
+					'old_value'   => $inv_model_old,
+					'new_value'   => $inv_model_new,
+					'reason'      => __( 'Changed which engine decides what an investor is owed.', 'bhela-booking' ),
+				) );
+			}
+			$s['inv_model'] = $inv_model_new;
+		}
+		if ( isset( $_POST['inv_day_basis'] ) ) {
+			$s['inv_day_basis'] = ( 360 === (int) $_POST['inv_day_basis'] ) ? 360 : 365;
+		}
+		// Certificates. The prefix becomes part of a number that has already been
+		// handed out, so an empty box falls back to BHL rather than to nothing; the
+		// other three are free text and blank simply hides their line on the document.
+		if ( isset( $_POST['doc_prefix'] ) ) {
+			$doc_prefix = preg_replace( '/[^A-Za-z0-9]/', '', sanitize_text_field( wp_unslash( $_POST['doc_prefix'] ) ) );
+			$s['doc_prefix'] = '' === $doc_prefix ? 'BHELA' : strtoupper( substr( $doc_prefix, 0, 10 ) );
+		}
+		foreach ( array( 'cert_signatory', 'cert_signatory_role' ) as $cert_key ) {
+			if ( isset( $_POST[ $cert_key ] ) ) {
+				$s[ $cert_key ] = sanitize_text_field( wp_unslash( $_POST[ $cert_key ] ) );
+			}
+		}
+		if ( isset( $_POST['cert_note'] ) ) {
+			$s['cert_note'] = sanitize_textarea_field( wp_unslash( $_POST['cert_note'] ) );
+		}
 		if ( isset( $_POST['offices'] ) && function_exists( 'bhela_bm_save_offices' ) ) {
 			bhela_bm_save_offices( wp_unslash( $_POST['offices'] ) );
 		}
@@ -1639,6 +1681,95 @@ function bhela_bm_settings_page() {
 					<td>
 						<input type="number" min="0" max="100" step="1" id="inv_investor_pct" name="inv_investor_pct" value="<?php echo esc_attr( bhela_bm_get_settings()['inv_investor_pct'] ?? 70 ); ?>" class="small-text">
 						<p class="description"><?php esc_html_e( 'Of what is left after the reserve. Management takes the remainder rather than its own percentage, so the two always add to the whole and cannot round apart.', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+			</table>
+
+			<?php
+			$inv_model_now = function_exists( 'bhela_bm_investor_model' ) ? bhela_bm_investor_model() : 'shares';
+			$inv_dist_runs = count( (array) get_option( 'bhela_bm_dist_runs', array() ) );
+			?>
+			<h2 style="margin-top:28px"><?php esc_html_e( 'Investor model', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead">
+				<?php esc_html_e( 'বিনিয়োগকারী কীসের ভিত্তিতে টাকা পাবেন — ভেলার লাভের অংশ হিসেবে, নাকি চুক্তিতে লেখা নির্দিষ্ট হারে। দুটো একসাথে চালু রাখা যায় না: দুই পদ্ধতিই খাতায় একই ধরনের লাভের এন্ট্রি লেখে, তাই একজন বিনিয়োগকারী দুবার টাকা পেয়ে যেতেন আর দুটো এন্ট্রিই আলাদাভাবে ঠিক দেখাত।', 'bhela-booking' ); ?>
+			</p>
+			<table class="form-table">
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Which model', 'bhela-booking' ); ?></th>
+					<td>
+						<label style="display:block;margin-bottom:6px">
+							<input type="radio" name="inv_model" value="shares" <?php checked( 'shares', $inv_model_now ); ?>>
+							<strong><?php esc_html_e( 'শেয়ারভিত্তিক · Profit sharing', 'bhela-booking' ); ?></strong>
+							— <?php esc_html_e( 'মাসের অনুমোদিত লাভ শেয়ার অনুপাতে বণ্টন হয় (💰 Distribution)।', 'bhela-booking' ); ?>
+						</label>
+						<label style="display:block">
+							<input type="radio" name="inv_model" value="fixed" <?php checked( 'fixed', $inv_model_now ); ?>>
+							<strong><?php esc_html_e( 'নির্দিষ্ট হার · Fixed return', 'bhela-booking' ); ?></strong>
+							— <?php esc_html_e( 'প্রতিটি বিনিয়োগের নিজস্ব শর্ত অনুযায়ী লাভ হিসাব হয় (💠 Investments · ➗ Profit)।', 'bhela-booking' ); ?>
+						</label>
+
+						<div class="bha-callout bha-callout--attention" style="margin-top:12px">
+							<p><strong><?php esc_html_e( 'নির্দিষ্ট হার বেছে নিলে যা যা বদলাবে', 'bhela-booking' ); ?></strong></p>
+							<ul style="margin:6px 0 0 18px;list-style:disc">
+								<li><?php esc_html_e( '💰 Distribution আর নতুন বণ্টন কমিট করতে দেবে না — পুরোনো বণ্টনগুলো রেকর্ডে থেকে যাবে এবং পড়া যাবে।', 'bhela-booking' ); ?></li>
+								<li><?php esc_html_e( 'অনুমোদিত বিনিয়োগ-লাভ মাসিক হিসাবে খরচ হিসেবে বাদ যাবে — কারণ নির্দিষ্ট হারের টাকা লাভ হোক বা না হোক দিতে হয়।', 'bhela-booking' ); ?></li>
+								<li><?php esc_html_e( 'পোর্টালে বিনিয়োগকারী শেয়ারের বদলে নিজের বিনিয়োগ ও মেয়াদ দেখবেন।', 'bhela-booking' ); ?></li>
+							</ul>
+							<?php if ( $inv_dist_runs > 0 ) : ?>
+								<p>
+									<?php
+									printf(
+										/* translators: %d: committed distribution runs on record */
+										esc_html__( 'এই সাইটে ইতিমধ্যে %d মাসের বণ্টন কমিট করা আছে। সেগুলো মুছে যাবে না — শুধু নতুন বণ্টন বন্ধ হবে।', 'bhela-booking' ),
+										(int) $inv_dist_runs
+									);
+									?>
+								</p>
+							<?php endif; ?>
+						</div>
+						<p class="description"><?php esc_html_e( 'এই পরিবর্তনটি Audit Trail-এ লেখা থাকে — কে কখন বদলেছে তা পরে দেখা যাবে।', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="inv_day_basis"><?php esc_html_e( 'Day-count basis', 'bhela-booking' ); ?></label></th>
+					<td>
+						<select id="inv_day_basis" name="inv_day_basis">
+							<option value="365" <?php selected( 365, (int) ( bhela_bm_get_settings()['inv_day_basis'] ?? 365 ) ); ?>>365</option>
+							<option value="360" <?php selected( 360, (int) ( bhela_bm_get_settings()['inv_day_basis'] ?? 365 ) ); ?>>360</option>
+						</select>
+						<p class="description"><?php esc_html_e( 'শুধু দিনভিত্তিক পদ্ধতির জন্য। ৳৫,০০,০০০ ১২% হারে ৯০ দিনে ৩৬৫-ভিত্তিতে ৳১৪,৭৯৫ আর ৩৬০-ভিত্তিতে ৳১৫,০০০ — তাই সনদে কোনটি ব্যবহার হয়েছে তা লেখা থাকে।', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+			</table>
+
+			<h2 style="margin-top:28px"><?php esc_html_e( 'Certificates', 'bhela-booking' ); ?></h2>
+			<p class="bha-set__lead"><?php esc_html_e( 'What goes on an Investment or Season-wise Profit Certificate besides the figures. Leave a box empty and its line is left off the document rather than printed blank — a certificate with a placeholder where a name should be is worse than one with a ruled space to sign.', 'bhela-booking' ); ?></p>
+			<table class="form-table">
+				<tr>
+					<th scope="row"><label for="doc_prefix"><?php esc_html_e( 'Document number prefix', 'bhela-booking' ); ?></label></th>
+					<td>
+						<input type="text" id="doc_prefix" name="doc_prefix" value="<?php echo esc_attr( bhela_bm_get_settings()['doc_prefix'] ?? 'BHELA' ); ?>" class="small-text" maxlength="10">
+						<p class="description"><?php esc_html_e( 'Every document series shares it: BHELA-IN-2026-0001 for an investment, BHELA-AGR- for an agreement, BHELA-IC- and BHELA-PC- for the two certificates. Changing it does not renumber anything already issued — those numbers are on paper somebody is holding.', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cert_signatory"><?php esc_html_e( 'Authorised signatory', 'bhela-booking' ); ?></label></th>
+					<td>
+						<input type="text" id="cert_signatory" name="cert_signatory" value="<?php echo esc_attr( bhela_bm_get_settings()['cert_signatory'] ?? '' ); ?>" class="regular-text">
+						<p class="description"><?php esc_html_e( 'Printed above the signature rule. Blank leaves the rule and drops the name.', 'bhela-booking' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cert_signatory_role"><?php esc_html_e( 'Signatory designation', 'bhela-booking' ); ?></label></th>
+					<td>
+						<input type="text" id="cert_signatory_role" name="cert_signatory_role" value="<?php echo esc_attr( bhela_bm_get_settings()['cert_signatory_role'] ?? '' ); ?>" class="regular-text">
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="cert_note"><?php esc_html_e( 'Standing note', 'bhela-booking' ); ?></label></th>
+					<td>
+						<textarea id="cert_note" name="cert_note" rows="2" class="large-text"><?php echo esc_textarea( bhela_bm_get_settings()['cert_note'] ?? '' ); ?></textarea>
+						<p class="description"><?php esc_html_e( 'A line the office wants on every certificate. The notice saying these are BHELA-issued supporting documents and not NBR tax certificates is always printed and is not editable here — it is what stops the document being read as something it is not.', 'bhela-booking' ); ?></p>
 					</td>
 				</tr>
 			</table>

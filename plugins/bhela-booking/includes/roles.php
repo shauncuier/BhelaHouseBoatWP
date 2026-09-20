@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Bump when bhela_bm_role_defaults() or bhela_bm_permissions() changes, so
 // existing sites re-sync once against the new definition.
-define( 'BHELA_BM_ROLES_VERSION', 10 );
+define( 'BHELA_BM_ROLES_VERSION', 13 );
 
 /* =========================================================
  * CAPABILITY SETS
@@ -57,6 +57,19 @@ function bhela_bm_extra_caps() {
 		// figures. That is a bigger act than editing an investor record, so it is its
 		// own capability rather than something 'edit investors' quietly implies.
 		'bhela_investor_signup' => __( 'Approve investor portal registrations', 'bhela-booking' ),
+		// Bulk-writing payment rows goes round the two-signature payment-request chain by
+		// construction, so it is its own capability and the shipped default gives it to
+		// nobody but the administrator.
+		'bhela_investor_import' => __( 'Import investor payments from a file', 'bhela-booking' ),
+		// Recording dated capital is REGISTER work — it writes down what already
+		// happened and moves no money. Issuing a certificate is not: it puts BHELA's
+		// name on a document that leaves the building and gets filed with a bank. So
+		// they are two capabilities, and the shipped defaults put them in two hands.
+		'bhela_investor_capital' => __( 'Record dated capital contributions', 'bhela-booking' ),
+		'bhela_investor_cert' => __( 'Issue investor certificates', 'bhela-booking' ),
+		// Working out what an investment has earned and handing the money over are two
+		// acts, so approving an accrual is not the same permission as paying it.
+		'bhela_investor_profit' => __( 'Approve investor profit calculations', 'bhela-booking' ),
 		// Inventory & Asset Register. bhela_inv_reopen is separate from
 		// bhela_inv_approve on purpose: reopening a closed month invalidates every
 		// later month's opening balance, which is a bigger act than closing one.
@@ -204,6 +217,30 @@ function bhela_bm_permissions() {
 			'label'    => __( 'Record a business valuation', 'bhela-booking' ),
 			'help'     => __( 'Enter what BHELA is currently worth. Recording one decides nothing on its own — it stays a draft until somebody else approves it.', 'bhela-booking' ),
 			'caps'     => array( 'bhela_investor_valuation' ),
+			'requires' => 'investors_view',
+		),
+		'investor_import' => array(
+			'label'    => __( 'Import payments from a file', 'bhela-booking' ),
+			'help'     => __( 'Write what has already been paid straight into the ledger from a spreadsheet. This skips the second signature a payment request needs, because the money moved before the system existed — give it only to somebody you would let record a payment unchecked.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_import' ),
+			'requires' => 'investors_view',
+		),
+		'investor_capital' => array(
+			'label'    => __( 'Record dated capital', 'bhela-booking' ),
+			'help'     => __( 'Enter, year by year, what each investor actually paid in and when. It writes down history and moves no money — but it is what an Investment Certificate is built from, so a wrong year ends up on a document somebody files with a bank.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_capital' ),
+			'requires' => 'investors_view',
+		),
+		'investor_profit' => array(
+			'label'    => __( 'Approve profit calculations', 'bhela-booking' ),
+			'help'     => __( 'Turn a calculated period into money the investor is owed. Nothing is owed until this is done, and once done it is a ledger entry that can only be reversed, never edited.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_profit' ),
+			'requires' => 'investors_view',
+		),
+		'investor_cert'   => array(
+			'label'    => __( 'Issue certificates', 'bhela-booking' ),
+			'help'     => __( 'Issue an Investment or Season-wise Profit Certificate. The figures are frozen the moment it is issued and the investor may hand it to a bank, so this is a signing act rather than a reporting one.', 'bhela-booking' ),
+			'caps'     => array( 'bhela_investor_cert' ),
 			'requires' => 'investors_view',
 		),
 		'investor_signup' => array(
@@ -374,7 +411,7 @@ function bhela_bm_role_defaults() {
 		'bhela_investor_relations' => array(
 			'name'  => __( 'BHELA Investor Relations', 'bhela-booking' ),
 			'blurb' => __( 'Maintains the investor register, runs monthly profit distribution and records investor payments. Reads the Monthly Statement but cannot approve cost sheets.', 'bhela-booking' ),
-			'perms' => array( 'statement', 'investors_view', 'investors_edit', 'dist_run', 'investor_pay', 'investor_valuation' ),
+			'perms' => array( 'statement', 'investors_view', 'investors_edit', 'dist_run', 'investor_pay', 'investor_valuation', 'investor_capital' ),
 			// Deliberately no 'investor_approve': the person who prepares a payment is
 			// not the person who releases it. Give it to a manager or keep it with the
 			// owner — the Team screen can change this, which is the point of it.
@@ -401,6 +438,9 @@ function bhela_bm_role_defaults() {
 				// Releases an investor payment somebody else prepared, and decides
 				// who gets a portal login.
 				'investors_view', 'investor_approve', 'investor_signup',
+				// Signs the certificates somebody else's register work produced. The
+				// same separation as approving a payment they did not prepare.
+				'investor_cert', 'investor_profit',
 			),
 		),
 		'bhela_booking_staff' => array(

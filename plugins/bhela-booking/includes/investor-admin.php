@@ -23,8 +23,85 @@ function bhela_bm_investor_boxes() {
 	add_meta_box( 'bhela-inv-detail', __( 'Investor Details', 'bhela-booking' ), 'bhela_bm_investor_detail_box', 'bhela_investor', 'normal', 'default' );
 	add_meta_box( 'bhela-inv-position', __( 'Position', 'bhela-booking' ), 'bhela_bm_investor_position_box', 'bhela_investor', 'side', 'default' );
 	add_meta_box( 'bhela-inv-login', __( 'Portal Login', 'bhela-booking' ), 'bhela_bm_investor_login_box', 'bhela_investor', 'side', 'default' );
+	add_meta_box( 'bhela-inv-papers', __( 'Capital & Certificates', 'bhela-booking' ), 'bhela_bm_investor_papers_box', 'bhela_investor', 'side', 'default' );
 }
 add_action( 'add_meta_boxes_bhela_investor', 'bhela_bm_investor_boxes' );
+
+/**
+ * Dated capital, the drift against the register, and what has been issued.
+ *
+ * It sits on the record rather than only on the two screens of its own because this is
+ * where somebody asks "has this investor got a certificate yet" — and because the
+ * drift between the dated rows and `_bhela_inv_amount` is most useful next to the
+ * amount box it disagrees with. It REPORTS the gap and offers no button to close it:
+ * which of the two numbers is wrong is a question for a person.
+ */
+function bhela_bm_investor_papers_box( $post ) {
+	if ( ! function_exists( 'bhela_bm_capital_years' ) ) {
+		return;
+	}
+	$years = bhela_bm_capital_years( $post->ID );
+	$drift = bhela_bm_capital_drift( $post->ID );
+	$certs = function_exists( 'bhela_bm_cert_rows' ) ? bhela_bm_cert_rows( $post->ID ) : array();
+	$types = function_exists( 'bhela_bm_cert_types' ) ? bhela_bm_cert_types() : array();
+	?>
+	<p>
+		<strong><?php esc_html_e( 'তারিখসহ মূলধন', 'bhela-booking' ); ?></strong><br>
+		<?php echo esc_html( bhela_bm_money( $years['dated'] ) ); ?>
+		<?php if ( $years['undated'] > 0 ) : ?>
+			<br><span class="description">
+				<?php
+				printf(
+					/* translators: %s: the amount with no dated record */
+					esc_html__( '%s এর তারিখ রেকর্ড নেই', 'bhela-booking' ),
+					esc_html( bhela_bm_money( $years['undated'] ) )
+				);
+				?>
+			</span>
+		<?php endif; ?>
+	</p>
+
+	<?php if ( $drift['over'] ) : ?>
+		<p class="description" style="color:#8a1f11">
+			<?php
+			printf(
+				/* translators: %s: the gap */
+				esc_html__( 'তারিখসহ রেকর্ড রেজিস্টারের চেয়ে %s বেশি — কোনটি ঠিক তা আপনাকেই দেখতে হবে।', 'bhela-booking' ),
+				esc_html( bhela_bm_money( abs( $drift['gap'] ) ) )
+			);
+			?>
+		</p>
+	<?php endif; ?>
+
+	<?php if ( $certs ) : ?>
+		<p><strong><?php esc_html_e( 'ইস্যু হওয়া সনদ', 'bhela-booking' ); ?></strong></p>
+		<ul style="margin:0 0 8px 0">
+			<?php foreach ( array_slice( $certs, 0, 6 ) as $c ) : ?>
+				<li<?php echo $c['superseded'] ? ' style="opacity:.6"' : ''; ?>>
+					<a href="<?php echo esc_url( bhela_bm_cert_url( $c['id'] ) ); ?>" target="_blank" rel="noopener"><?php echo esc_html( $c['number'] ); ?></a>
+					<span class="description"><?php echo esc_html( $types[ $c['type'] ]['label'] ?? $c['type'] ); ?></span>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+	<?php else : ?>
+		<p class="description"><?php esc_html_e( 'এখনো কোনো সনদ ইস্যু হয়নি।', 'bhela-booking' ); ?></p>
+	<?php endif; ?>
+
+	<p>
+		<?php if ( current_user_can( 'bhela_investor_capital' ) ) : ?>
+			<a class="button button-small" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-capital', array( 'investor' => $post->ID ) ) ); ?>">
+				<?php esc_html_e( 'মূলধন', 'bhela-booking' ); ?>
+			</a>
+		<?php endif; ?>
+		<?php if ( current_user_can( 'bhela_investor_cert' ) ) : ?>
+			<a class="button button-small" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-certificates', array( 'investor' => $post->ID ) ) ); ?>">
+				<?php esc_html_e( 'সনদ ইস্যু', 'bhela-booking' ); ?>
+			</a>
+		<?php endif; ?>
+	</p>
+	<?php
+}
+
 
 function bhela_bm_investor_money_box( $post ) {
 	wp_nonce_field( 'bhela_bm_investor_save', 'bhela_bm_investor_nonce' );
@@ -397,7 +474,7 @@ function bhela_bm_investor_save_login( $post_id ) {
 
 function bhela_bm_investor_menu() {
 	add_submenu_page(
-		bhela_bm_menu_parent( 'investors' ),
+		bhela_bm_share_menu_parent(),
 		__( 'Distribution', 'bhela-booking' ),
 		__( '💰 Distribution', 'bhela-booking' ),
 		'bhela_investors_view',
@@ -407,7 +484,7 @@ function bhela_bm_investor_menu() {
 	add_submenu_page(
 		bhela_bm_menu_parent( 'investors' ),
 		__( 'Investor Report', 'bhela-booking' ),
-		__( '📊 Investor Report', 'bhela-booking' ),
+		__( '📇 Investor Report', 'bhela-booking' ),
 		'bhela_investors_view',
 		'bhela-bm-investor-report',
 		'bhela_bm_investor_report_page'
@@ -879,7 +956,7 @@ add_action( 'admin_init', 'bhela_bm_investor_admin_post' );
 
 function bhela_bm_funds_menu() {
 	add_submenu_page(
-		bhela_bm_menu_parent( 'investors' ),
+		bhela_bm_menu_parent( 'capital' ),
 		__( 'Funds', 'bhela-booking' ),
 		__( '🏦 Funds', 'bhela-booking' ),
 		'bhela_investors_view',
@@ -1256,10 +1333,21 @@ function bhela_bm_investor_column_content( $column, $post_id ) {
 			break;
 
 		case 'inv_due':
-			// The one figure somebody is chasing. Emphasised when there is any.
-			echo $r['outstanding'] > 0
-				? '<strong>' . esc_html( bhela_bm_money( $r['outstanding'] ) ) . '</strong>'
-				: '<span style="opacity:.5">' . esc_html( bhela_bm_money( 0 ) ) . '</span>';
+			// The one figure somebody is chasing — and it runs BOTH ways. This used to
+			// print a greyed-out ৳0 for any balance that was not positive, so an
+			// investor who owed BHELA ৳30,000 showed as owing nothing: the money was
+			// not merely unlabelled, it was invisible in the register.
+			if ( $r['outstanding'] > 0 ) {
+				echo '<strong>' . esc_html( bhela_bm_money( $r['outstanding'] ) ) . '</strong>';
+			} elseif ( $r['outstanding'] < 0 ) {
+				printf(
+					'<strong>%s</strong><br><span class="description">%s</span>',
+					esc_html( bhela_bm_money( abs( $r['outstanding'] ) ) ),
+					esc_html__( 'ভেলা পাবে', 'bhela-booking' )
+				);
+			} else {
+				echo '<span style="opacity:.5">' . esc_html( bhela_bm_money( 0 ) ) . '</span>';
+			}
 			break;
 
 		case 'inv_roi':

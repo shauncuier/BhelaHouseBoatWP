@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-09-04 · Theme & Plugin v2.39.0 (single shared version)
+> Last updated: 2026-09-21 · Theme & Plugin v2.40.0 (single shared version)
 
 ---
 
@@ -98,6 +98,21 @@ wp-content/                          ← Git root
 │   │   ├── investor-login.php       ← Passwordless sign-in: a code to the number on the record (§13.67)
 │   │   ├── investor-signup.php      ← Self-registration. An APPLICATION, never an account (§13.68)
 │   │   ├── investor-signup-admin.php ← 📝 Registrations: the queue, and the approval that mints a login
+│   │   ├── settlement.php           ← Which way the money runs. Two totals that are never netted
+│   │   ├── settlement-admin.php     ← ⚖️ Settlement: per investor, per season, both directions
+│   │   ├── settlement-import.php    ← 📥 What was already paid, from a spreadsheet
+│   │   ├── capital.php              ← Dated capital contributions. Immutable; a mistake is VOIDED
+│   │   ├── capital-admin.php        ← 💼 Capital: the register, the drift, and the importer
+│   │   ├── certificates.php         ← The two certificates. A FROZEN snapshot, never a live view
+│   │   ├── certificates-admin.php   ← 📜 Certificates: preview, issue, version, the register
+│   │   ├── investment.php           ← The Investment Record: terms, states, the lock, the principal
+│   │   ├── investment-admin.php     ← 💠 Investments + 📑 Agreements
+│   │   ├── agreement.php            ← A signed file and a reference. Never generated wording (§25)
+│   │   ├── profit-engine.php        ← Four methods, a derived schedule, idempotent posting
+│   │   ├── profit-admin.php         ← ➗ Profit: calculate, review, approve — and only then owed
+│   │   ├── documents.php            ← Receipts and the account statement. A VIEW, not a snapshot
+│   │   ├── verify.php               ← /verify/{number}: proof a document is genuine, nothing more
+│   │   ├── qr.php                   ← A QR encoder. No dependency; round-trip verified (§13.83)
 │   │   ├── inventory-core.php       ← Stock post types + the lock. Loads on EVERY request (see §3.8)
 │   │   ├── inventory.php            ← Stock lists, quantity model, monthly carry-forward, close workflow, screens
 │   │   ├── inventory-import.php     ← Column-mapped CSV importer: upload → map → dry run → commit
@@ -109,14 +124,22 @@ wp-content/                          ← Git root
 │   │   ├── booking.css              ← Booking form styles (29KB)
 │   │   └── booking.js               ← Booking form logic + stepper wizard (41KB)
 │   └── templates/
-│       └── invoice.php              ← Printable invoice template
+│       ├── invoice.php              ← Printable invoice template
+│       ├── certificate-head.php     ← Both certificates' chrome, masthead and holder block
+│       ├── certificate-foot.php     ← Signature block and the not-an-NBR-certificate notice
+│       ├── certificate-investment.php ← Terms, receipts, agreement reference
+│       ├── certificate-profit.php   ← Basis, period ledger, gross/net/paid/due
+│       ├── doc-style.php            ← The one stylesheet all four documents share
+│       ├── receipt-payment.php      ← One template, two directions (§12 of the brief)
+│       ├── statement-account.php    ← The running balance: what BHELA owes an investor
+│       └── verify.php               ← The public verification result
 │
 ├── tests/                           ← Regression suites (outside themes/ & plugins/, never shipped)
 │   ├── README.md                    ← How to run and how to add a harness
 │   ├── run.php                      ← CLI runner — loads the PHP extensions each harness needs
 │   ├── bootstrap.php                ← Boots WP, resolves the LocalWP DB port, provides ok()
 │   ├── sweep.php                    ← Clears ZZ* fixtures left by a crashed run
-│   ├── *-test.php                   ← 17 headless harnesses
+│   ├── *-test.php                   ← 21 headless harnesses
 │   └── bhela-tests.php              ← Older browser suite (open as an admin)
 │
 ├── docs/
@@ -230,6 +253,10 @@ Location: `bhela-booking.php` → `bhela_bm_calc_multi()`
 | `bhela_bm_audit_db` | Audit-table schema version, compared on `admin_init` priority 5 |
 | `bhela_bm_inv_mobile_idx` | Version of the normalised-mobile index. The portal's sign-in lookup is unusable without it — see §13.67 |
 | `bhela_bm_portal_pages` | Set once, ever, when the two portal pages are provisioned. A page somebody deleted is never resurrected |
+| `bhela_bm_doc_seq` | One counter per document series (`IC-2026` => 7, also `PC`, `IN`, `AGR`). Numbers are **never reused**, so a harness that touches it must restore it — see §13.78 |
+| `bhela_bm_settings` → `inv_model` | `shares` or `fixed`. **Which engine may pay investors.** Both write `profit` ledger rows, so they must never both be live — see §13.80 |
+| `bhela_bm_investment_types` | Owner-defined investment products. A slug is frozen: every saved investment hangs its method off it |
+| `bhela_bm_verify_rw` | Rewrite-rule version for `/verify/{number}`, flushed once when it changes |
 
 The plugin owns exactly **one database table**, `{prefix}bhela_bm_audit` — see §3.7.
 
@@ -248,17 +275,22 @@ Both of the log's affordances are correct for diagnostics and disqualifying for 
 
 Bookings are stored as a **private Custom Post Type** (`bhela_booking`) with post meta for each field.
 
-### 3.9 Four admin menus, and why the parent is asked for rather than written down
+### 3.9 Five admin menus, and why the parent is asked for rather than written down
 
 Everything used to hang off one **Bookings** menu — 22 rows, from Add New Booking to Audit Trail
-to Quick Guide. `includes/menu.php` splits that into five, grouped by the job someone is doing:
+to Quick Guide. `includes/menu.php` splits that into six, grouped by the job someone is doing.
+Investors itself then grew to 16 rows and had to be split again — see §13.88 for why nothing
+caught that, and for the rule a group's slug has to obey:
 
 | Menu | Slug / landing page | Rows |
 |---|---|---|
 | **Bookings** | `edit.php?post_type=bhela_booking` | All Bookings · Add New · 📊 Dashboard · 📄 Trip Report · 📅 Trip Calendar · ⭐ Reviews |
 | **Accounts** | `bhela-bm-statement` | 🧾 Cost Sheets · 💸 Expenses · 👷 Salary · 📈 Monthly Statement · 📚 Yearly Report · 🤝 B2B Report · 🧮 Trip P&L · 💹 Revenue by Source |
 | **Store** | `bhela-bm-inv-month` | 📦 Item Register · 🚚 Import Register · 🔧 Monthly Stock · 📐 Inventory Report · 🏷️ Asset Report · 🔩 Audit Trail |
-| **Investors** | `bhela-bm-dist` | 👤 Investors · 🧭 Dashboard · 💰 Distribution · 📊 Investor Report · 📝 Registrations · 💎 Valuation · 🪙 Share Issue · 🏦 Funds · 💵 Cash Flow |
+| **Investors** | `bhela-bm-investor-dash` | 👤 Investors · 🧭 Dashboard · 📇 Investor Report · ⚖️ Settlement · 📝 Registrations · 📜 Certificates · 📥 Import Payments · 💵 Cash Flow |
+| **Capital** | `bhela-bm-investments` | 💠 Investments · 📑 Agreements · 💼 Contributions · ➗ Profit · 💰 Distribution\* · 💎 Valuation\* · 🪙 Share Issue\* · 🏦 Funds |
+
+\* Hidden from the menu while `inv_model` is `fixed`, and still reachable by URL — see §13.88.
 | **Setup** | `bhela-bm-settings` | ⚙️ Settings · 👥 Team · 🗺️ Spots · 🖼️ Gallery · ⬆️ Bulk Upload · 📋 Activity Log · 🎯 Quick Guide |
 
 Each group's `slug` is a real screen rather than an index page nobody maintains, so the parent
@@ -531,6 +563,39 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_signup_groups()` | `includes/investor-signup.php` | The public form: `bhela_bm_investor_fields()` in Bangla, minus `code`, plus `name` and `note` |
 | `bhela_bm_signup_add($args)` | `includes/investor-signup.php` | File an application. Called only after the phone is proved; one pending per number |
 | `bhela_bm_signup_approve($id,$notify)` | `includes/investor-signup.php` | The ONLY thing that mints a portal login. Needs `bhela_investor_signup` |
+| `bhela_bm_settlement($from,$to)` | `includes/settlement.php` | Every investor's position in a window. `owed_to_investor` and `owed_to_bhela` are **never netted** |
+| `bhela_bm_settlement_investor($id,$from,$to)` | `includes/settlement.php` | One investor, or null. `balance = declared + adjustments − paid`, exactly |
+| `bhela_bm_settlement_window($season,$from,$to)` | `includes/settlement.php` | Season or free range → from/to. Blank means every date, never a sentinel |
+| `bhela_bm_capital_add($args)` | `includes/capital.php` | A dated contribution. **Refuses a row with no date** — the date is the whole point |
+| `bhela_bm_capital_rows($inv,$from,$to)` | `includes/capital.php` | Dated rows with committed share issues merged in, tagged `source` — read once, never copied |
+| `bhela_bm_capital_years($inv)` | `includes/capital.php` | Year ⇒ amount + shares, plus the `undated` remainder that is **named, never given a year** |
+| `bhela_bm_capital_void($id,$reason)` | `includes/capital.php` | A mistake is voided with a reason. There is no delete path |
+| `bhela_bm_capital_drift($inv)` | `includes/capital.php` | Dated rows vs `_bhela_inv_amount`. **Reports, never corrects** |
+| `bhela_bm_cert_preview($type,$inv,$window)` | `includes/certificates.php` | Pure. Exactly what issuing would freeze |
+| `bhela_bm_cert_issue($args)` | `includes/certificates.php` | Mints a number and stores the preview **verbatim**. The one writer |
+| `bhela_bm_cert_data($id)` | `includes/certificates.php` | Reads the STORED snapshot. Nothing is recomputed — see §13.75 |
+| `bhela_bm_investor_model()` | `includes/investment.php` | `shares` or `fixed`. The gate that stops two engines paying the same money |
+| `bhela_bm_investment_add/save()` | `includes/investment.php` | Terms, draft only. Nothing is defaulted — a blank rate refuses activation |
+| `bhela_bm_investment_blockers($id)` | `includes/investment.php` | Everything between a draft and money being owed, as a list the screen can print |
+| `bhela_bm_investment_transition($id,$to,$why)` | `includes/investment.php` | The ONLY writer of `_bhela_ivm_status`. Reopening needs a reason |
+| `bhela_bm_investment_principal($id)` | `includes/investment.php` | The sum of the capital rows pointing here. **Never a typed figure** |
+| `bhela_bm_capital_link($row,$investment)` | `includes/capital.php` | Attaches an existing receipt. Fills an EMPTY link only — never moves one |
+| `bhela_bm_agreement_add($args)` | `includes/agreement.php` | Reference + signed file. The system cites wording, never composes it (§25) |
+| `bhela_bm_profit_methods()` | `includes/profit-engine.php` | The four bases an investment can be written on. A slug is frozen once active |
+| `bhela_bm_profit_schedule($inv)` | `includes/profit-engine.php` | PURE. Periods derived from the terms; they sum to the term exactly (§13.30) |
+| `bhela_bm_profit_post($inv,$period)` | `includes/profit-engine.php` | The ONLY writer of an accrual, and **idempotent** — see §13.81 |
+| `bhela_bm_profit_accrued($from,$to)` | `includes/profit-engine.php` | What the statement deducts. Only rows THIS engine posted — see §13.82 |
+| `bhela_bm_distributable_pot($from,$to)` | `includes/profit-engine.php` | Committed runs in a window, and the months it cannot answer for |
+| `bhela_bm_series_number($infix,$exists)` | `bhela-booking.php` | One minter for every document series, behind one mutex |
+| `bhela_bm_mask_person($name)` | `bhela-booking.php` | `Md. R**** A*****`. Distinct from the booking mask — see the docblock |
+| `bhela_bm_cert_versioned($base,$n)` | `includes/certificates.php` | `…-V2`. A correction keeps the base number and moves the version |
+| `bhela_bm_cert_signoff($cert)` | `includes/certificates.php` | Prepared / verified / approved, read from the records' own history |
+| `bhela_bm_account_statement($id,$from,$to)` | `includes/documents.php` | The running balance: **what BHELA owes**, not a valuation |
+| `bhela_bm_receipt_data($kind,$row)` | `includes/documents.php` | A receipt is a VIEW of an already-immutable row, never a frozen copy |
+| `bhela_bm_verify_lookup($number)` | `includes/verify.php` | All a public page may say. Asserted by absence — see §13.84 |
+| `bhela_bm_qr_matrix($text)` / `_svg()` | `includes/qr.php` | Byte mode, level M, versions 1–6. Inline SVG, nothing fetched |
+| `bhela_bm_cert_supersede($old,$new,$why)` | `includes/certificates.php` | The old certificate still renders and says which number replaced it |
+| `bhela_bm_cert_url($id)` / `_key($id)` | `includes/certificates.php` | The shareable link. `wp_hash` + `hash_equals`, exactly as the invoice |
 | `bhela_bm_signup_copy_to_record($row,$inv)` | `includes/investor-signup.php` | Fills EMPTY fields only. What the office typed always wins — §13.68 |
 | `bhela_bm_signup_ticket_add/ticket/spend()` | `includes/investor-signup.php` | The 30-minute proof that unlocks step three, and with it every upload |
 | `bhela_bm_investor_fields()` | `includes/investors.php` | The record, field for field. **Moved out of the admin screen** so the public form can read it (§13.22) |
@@ -659,11 +724,12 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Seventeen headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+Twenty-one headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
 cost heads, the cost-sheet save round trip, the booking save handler, the stock register, every
 admin screen, WCAG contrast, the front end behind a page cache, OTP, the SMS gateway, the six
-version fields, the yearly rollup, valuation, and the portal's passwordless sign-in and
-self-registration.
+version fields, the yearly rollup, valuation, the portal's passwordless sign-in and
+self-registration, the settlement both ways, the certificates, the profit engine, and the QR
+encoder.
 Exits non-zero on failure. Any PHP 8.x binary works — `run.php` loads the extensions each
 harness needs, so never hand-build a `php -d extension=…` command. The site must be running.
 
@@ -686,7 +752,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all seventeen harnesses
+- [ ] `php tests/run.php` passes — all twenty-one harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -804,6 +870,163 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 73. **A code that went by email proves an address, not a handset — so it cannot claim a record the office already holds.** `sms_enabled` ships **off**, and `bhela_bm_provision_portal_pages()` publishes `/investor-register/` regardless, so on an unconfigured site *every* code goes to the address the applicant typed. That is fine for a new number, where the applicant is only claiming themselves. It is not fine when the number already matches a real investor: somebody could name a shareholder's mobile, take the code at their own inbox, and be approved straight onto that shareholding — and the login persists after SMS comes back, because nothing stops an investor account using WordPress's ordinary password reset. `bhela_bm_signup_approve()` now **refuses** that one combination (existing record + non-SMS proof) with `unproved_link`, and the screen offers a checkbox saying the approver confirmed the person by phone. An SMS-proved match needs no confirmation, and an unknown number never needs one. Note what is deliberately *not* done: the fallback is not withheld from known numbers at step one, because a registration that errors for numbers on the register and succeeds for numbers that are not is §13.67's enumeration oracle in a new place. The check belongs at the gate that binds, not at the gate that sends.
 74. **A test that greps a whole document for a four-digit number will eventually match a hash.** `booking-test.php` §3f asserts a B2B commission of 3,500 appears on none of the guest-facing surfaces — by searching the rendered text for `3500`. The confirmation message and the customer email both carry `{invoice_link}`, whose `key=` is a 32-character `wp_hash()`; roughly one key in 2,300 contains those digits by chance, and when one does the assertion fails on exactly those two surfaces and never on the invoice, which does not print its own URL. It looked like a leak and was a coincidence. The key is masked before the numeric comparison only — the agency name and reference are still matched against the whole document, so a genuine leak into a link is still caught, and injecting `{commission}` into the shipped template was verified to still fail the assertion.
 
+75. **A certificate is a frozen snapshot, and that is the only thing that makes it worth
+issuing.** Everything else in this plugin derives on read (§13.8) — but a certificate is a piece
+of paper somebody is holding, and a reprint that quietly shows different figures because a
+reversal landed last month makes the document worthless and the disagreement invisible. So
+`bhela_bm_cert_issue()` stores the whole preview array verbatim and `bhela_bm_cert_data()` reads
+**only** that; no reader is called at render time. A figure that moves means issuing a NEW
+certificate, and the old one keeps rendering with the number that replaced it printed on it —
+because the investor may still be holding it, and a document that silently vanishes from their
+own list tells them nothing. `certificate-test.php` §7 issues one, then writes a further profit
+row, and asserts the stored snapshot is byte-identical while the live settlement figure moves;
+reverting `cert_data()` to recompute was verified to fail it. Same grain as `_bhela_val_shares`
+(§13.60): the historical fact is snapshotted, the arithmetic is derived.
+76. **Year-wise investment history did not exist, and the gap is NAMED rather than filled in.**
+A founding holding is two undated scalars, `_bhela_inv_shares` and `_bhela_inv_amount`; the only
+dated capital anywhere was `bhela_share_issue`, which began with the valuation module. So
+`includes/capital.php` adds a dated record and the office types the history in once — and until
+they have, the certificate prints the remainder as **"পূর্ববর্তী বিনিয়োগ — তারিখ রেকর্ড নেই"**
+and gives it no year. Pushing it into the earliest year would put a confident wrong date on a
+document somebody files with a bank; §2 of the harness asserts no year carries any part of it,
+and was verified to fail against a version that did. Two more rules follow from the same place:
+a row with **no readable date is refused** rather than dated today, and `bhela_bm_capital_drift()`
+reports a disagreement with the register without correcting either side (§13.30's contract).
+77. **A fourth lock was NOT written.** `bhela_capital` and `bhela_cert` joined the post-type list
+in `includes/valuation-core.php` instead. That file already carries every hook §13.49 and §13.55
+catalogue — three metadata filters, the priority-9 `$delete_all` variant, both `_by_mid` filters —
+and every gap this plugin has shipped came from writing the second copy of a lock from a
+shortened reading of the first. The keys that must stay writable now live in one place,
+`bhela_bm_val_open_keys()`: `_bhela_val_status` so a valuation can be reopened, `_bhela_cap_void*`
+so a wrong row can be marked, `_bhela_crt_super*` so a certificate can be replaced. Everything
+carrying a figure is covered, and each open key's own writer audits it.
+78. **A harness that advances a production counter is a harness that spends real numbers.** The
+certificate series had reached **BHL-INV-2026-0055** before a single real certificate existed,
+because five suite runs a day each issued five and `bhela_bm_cert_seq` was never restored.
+Certificate numbers are deliberately never reused, so nothing repaired itself. The harness now
+snapshots and restores that option alongside `bhela_bm_dist_runs` and `bhela_bm_seasons`. The
+general rule is §13.38 pointed the other way: a harness must not only *assert* deltas, it must
+**leave** a delta of zero — including in options nobody thinks of as data.
+79. **`bha-table` shipped in v2.39.0 with no CSS rule behind it at all.** Four screens emitted
+the class and nothing rendered differently, because `ui-test.php` §8's "no class emitted without
+a rule" check only sees classes on screens that are in the §4 render sweep — and none of those
+four were. It surfaced the moment the two certificate screens were added to the sweep, as a
+failure naming a class from two releases ago. The lesson is about the test, not the CSS: **a
+check that reads rendered markup only covers what the sweep renders**, so adding a screen to §4
+is what makes §5 and §8 true about it. `bha-card__hint` had the same hole from the settlement
+work.
+
+80. **BHELA moved from an equity model to a fixed-return one, and the two engines must
+never both be live.** The share model — 115 shares, monthly distribution of business profit by
+largest-remainder split — is still here and still readable; what changed is that with
+`inv_model` set to `fixed` an investor's entitlement comes from an **Investment Record** with
+its own agreed terms instead. The danger is precise: `bhela_bm_dist_commit()` and
+`bhela_bm_profit_post()` both write `profit` ledger rows, so an investor holding shares AND an
+investment would be **paid twice**, once by each engine, and every row would look individually
+correct. `bhela_bm_dist_commit()` therefore refuses outright while the model is `fixed`.
+Committed runs, valuations and share issues are untouched and stay readable — financial records
+are not deleted here (§3.7) — they simply stop deciding what anybody is owed. The owner chose
+this model with the objection on the table; whether a fixed-return arrangement is a regulated
+deposit in Bangladesh is a question for BHELA's advisers, not for this code.
+81. **A fixed return is a COST, so the Monthly Statement deducts it.** It is owed whether or not
+the month traded well, which makes it financing rather than a share of what was made:
+`gross = trip profit − expenses − payroll − commission − investor profit accrued`. Leaving it
+out would overstate every month by the whole accrual, which is §13.10 (the omitted wage bill)
+happening a second time. It is deliberately **not** in `cost_pp`: it is the cost of the money
+the boat was bought with, not a cost of carrying a passenger, and it does not move with the
+guest count. Only APPROVED accruals count, and only rows the engine itself posted — a `profit`
+row can also come from a committed distribution or the settlement importer, and counting those
+would deduct money that IS the bottom line and would move months already closed.
+`bhela_bm_profit_accrued()` matches rows by resolving the period key on `ref` back to a real
+Investment Record, which is exactly the set this engine wrote and nothing else.
+82. **Posting an accrual is idempotent, because running a month twice is the most ordinary
+mistake there is.** Each period carries `{code}:{from}:{to}` on the ledger row's `ref`, and
+`bhela_bm_profit_post()` refuses when a row already carries it. Two more refusals beside it: a
+period that has not ended (tomorrow's profit is not today's), and an investment that is not
+active. A reversed accrual still counts as posted — reversing and re-posting the same period
+would leave two rows and a contra that net correctly but read as though the investor was paid
+twice. The periods themselves are carved out of the term total by `bhela_bm_split_by_shares()`
+rather than each rounded on its own: 12.5% on ৳5,00,000 is ৳62,500 a year, and twelve rounded
+৳5,208 is ৳62,496 (§13.30 again, in a new place).
+83. **A QR encoder that "looks right" and does not scan is the whole risk, so it is verified by
+round trip.** `includes/qr.php` is written rather than vendored — a remote image service would
+send every certificate number BHELA issues to a third party and leave a blank square on any
+page printed offline. The first version produced perfect-looking codes that **no decoder could
+read**: `bhela_bm_qr_rs_generator()` was building the generator polynomial with its coefficients
+reversed, which is invisible in the output. It was found by rendering the matrices to images and
+decoding them with OpenCV, and `tests/qr-test.php` now pins the exact matrices that round trip.
+A second, subtler bug followed: the format-information strip was reserved eight modules tall
+instead of seven, which quietly overwrote the **dark module**. Some decoders tolerated that; the
+specification does not, and a code that only scans on forgiving readers is worse than one that
+fails everywhere. If the encoder is ever changed, re-run the round trip — do not simply update
+the hashes, because the hash is standing in for "a scanner can read this".
+84. **A public verification page must be asserted by ABSENCE.** `/verify/{number}` is printed on
+paper and scanned by strangers, and the numbers are sequential, so whatever it shows is shown to
+everybody. It shows the number, the document type, the issue date, the status, and the
+investor's **masked** name — no amount, no rate, no term, no mobile, no NID. The harness
+asserts those are missing from the response rather than checking the markup, because an
+assertion that a field is absent from a page is exactly the kind that passes for the wrong
+reason when the template changes. Two behaviours worth keeping: an unknown number is reported
+as not found rather than erroring, and a **superseded** certificate says so rather than 404ing
+— somebody may be holding the replaced paper, and that is the one thing they need to learn.
+85. **A capability name that does not exist denies everything, silently.** The Investment Record
+first shipped guarded by `current_user_can( 'bhela_investors_edit' )` — a plausible string that
+is **not a capability**. `bhela_bm_permissions()` maps a permission called `investors_edit` onto
+the CPT caps `edit_bhela_investors` and friends; the permission key is not itself a capability.
+`current_user_can()` on an unknown string is simply false, for an administrator too, so every
+write refused and the first symptom was a record created with every field blank. Nothing errors
+and nothing logs. When guarding a new writer, take the capability from `bhela_bm_permissions()`
+or from the CPT's `capability_type`, and have the harness exercise the guard as a real role —
+a test running as user 1 with a working cap would have caught it, and this one did.
+86. **A lock that reads a status must treat an ABSENT status as unlocked.** `bhela_bm_investment_locked()`
+was written as `'draft' !== $status`, which is true for a record a moment old that has no status
+meta yet — so the investment locked itself against its own creation, every field silently failed
+to save, and it came out blank with no error anywhere. The write order now puts the status in
+first AND the predicate treats `''` as a draft; belt and braces, because either alone would work
+until somebody reorders the writes. Worth generalising: a state lock has a "not yet a state"
+case, and the locks that lock **from birth** (capital, certificate, agreement, share issue) avoid
+it only because they write every field through `bhela_bm_val_meta_write()`.
+
+87. **§13.62 happened again, so it is now a test rather than a warning.** That entry records
+five `inv_*` settings that existed only as defaults while a comment beside them claimed they
+were configurable. The identical failure shipped with the investor model: `inv_model` had a
+default and a reader and **no control on the Settings screen**, while two admin screens told
+the operator in so many words to "change the model in ⚙️ Settings". The instruction was
+impossible to follow and the switch was unreachable except through the database.
+`ui-test.php` §4b now **renders** the settings page and asserts an `name="…"` input exists for
+every setting the investor and certificate code reads. It checks the rendered markup rather
+than the source, because what matters is that a person can find the control — and it was
+verified by removing one, which fails it. The general rule: **a setting with a reader and no
+control is not configurable, it is a constant with extra steps.** Add the field and the save
+handler in the same change as the default, or the default is a lie.
+
+88. **A menu group's slug must be a page that can never be hidden — and the 8-row rule only
+binds on the parents the test names.** Two failures in one place, both invisible:
+
+*The slug.* The Investors group's slug WAS `bhela-bm-dist`, the Distribution screen. That is
+also the screen that comes off the menu under the fixed-return model. Hiding it would have
+taken the parent with it, and `bhela_bm_menu_parent()` falls back to Bookings rather than
+returning `''` — so **all fifteen remaining rows would have appeared under Bookings**, with no
+error anywhere. The two group slugs are now 🧭 Dashboard and 💠 Investments, both visible under
+every model. Anything that can be conditionally hidden is disqualified from being a parent.
+
+*The cap.* `ui-test.php` §9 has asserted "no menu holds more than 8 rows" since the original
+split — but it counted only Bookings, Accounts, Store and Setup. Investors was never in that
+list, so it reached **sixteen** rows with a green suite the whole way. Both investor parents are
+in the count now, and the icon sweep (§9b) and role map (§9d) gained them too — §9b immediately
+found that 📊 was registered by both Bookings' Dashboard and the Investor Report, and §9d had
+been passing only because `bhela_manager` holds `investors_view` and the map never asked about
+it. **An assertion that names its subjects covers only those subjects**; adding a menu means
+adding it to all three lists, or the rules silently stop applying to it.
+
+*Hiding is not unregistering.* A hidden share-era screen registers with a `null` parent —
+WordPress's own pattern for a page that renders with no menu row — so every committed run,
+valuation and share issue stays reachable by URL. Dropping the `add_submenu_page()` call would
+404 it. Its slug also stays in `bhela_bm_menu_layout()`, because that list is the ownership map
+behind `bhela_bm_admin_url()`: a slug missing from it resolves to the `bookings` group, and the
+URL helper then emits an `edit.php` link the legacy shim explicitly refuses to rescue.
+§9f asserts all of it — no row, menu intact, URL resolves, page still draws.
+
 > **Deployment: the portal must be served over HTTPS.** The sign-in form posts a password, and `wp_signon()` marks the session cookie secure only when `is_ssl()` is true. Over plain HTTP an investor's credentials and their session travel in clear on the network, and no amount of code here can compensate for it. This is the one item on this list that is a hosting decision rather than a bug.
 
 ---
@@ -851,7 +1074,7 @@ git pull origin main
 # Push to GitHub
 git push origin main
 
-# Run the regression suite (sixteen harnesses)
+# Run the regression suite (twenty-one harnesses)
 php tests/run.php
 
 # Validate JS syntax

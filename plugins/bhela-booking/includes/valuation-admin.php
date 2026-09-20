@@ -15,7 +15,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 function bhela_bm_valuation_menu() {
 	add_submenu_page(
-		bhela_bm_menu_parent( 'investors' ),
+		bhela_bm_share_menu_parent(),
 		__( 'Valuation', 'bhela-booking' ),
 		'💎 ' . __( 'Valuation', 'bhela-booking' ),
 		'bhela_investors_view',
@@ -23,7 +23,7 @@ function bhela_bm_valuation_menu() {
 		'bhela_bm_valuation_page'
 	);
 	add_submenu_page(
-		bhela_bm_menu_parent( 'investors' ),
+		bhela_bm_share_menu_parent(),
 		__( 'Share Issue', 'bhela-booking' ),
 		'🪙 ' . __( 'Share Issue', 'bhela-booking' ),
 		'bhela_investors_view',

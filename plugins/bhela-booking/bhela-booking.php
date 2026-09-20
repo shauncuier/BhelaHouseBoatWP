@@ -81,6 +81,22 @@ function bhela_bm_default_settings() {
 		'inv_per_share'        => 100000,
 		'inv_reserve_pct'      => 10,   // off-season, renovation, maintenance
 		'inv_investor_pct'     => 70,   // management takes the remainder, never its own %
+		// Investor certificates. Every one of these is blank-safe: a blank signatory,
+		// designation or house note HIDES its own line rather than printing a
+		// placeholder, the same rule `vessel_reg` follows (13.25). The prefix is the
+		// one exception — it is part of a certificate number that has already been
+		// handed out, so it falls back to BHL rather than to nothing.
+		'doc_prefix'           => 'BHELA',
+		// Which model decides what an investor is owed: `shares` is the original equity
+		// distribution, `fixed` is an Investment Record's own agreed terms. They must
+		// never both be live — see bhela_bm_investor_model(). The shipped default is
+		// `shares`, because that is what every committed run on record was paid under
+		// and a setting must not rewrite history by existing.
+		'inv_model'            => 'shares',
+		'inv_day_basis'        => 365,
+		'cert_signatory'       => '',
+		'cert_signatory_role'  => '',
+		'cert_note'            => '',
 		'advance_percent'  => 50,
 		'child_fee'        => 5000, // flat charge per 4–8 year old, any day type
 		'date_chips'       => 5,    // how many upcoming trips show as quick-pick chips (0 = hide)
@@ -726,6 +742,111 @@ function bhela_bm_money( $amount ) {
 }
 
 /**
+ * The next number in a document series — BHELA-IC-2026-0007 and its siblings.
+ *
+ * Four kinds of record now carry a number a person will quote back at the office:
+ * investments, agreements and the two certificates. Two documents sharing a number is
+ * the one failure none of them can recover from, because the number IS the identity, so
+ * the counter is taken behind the same `add_option()` mutex the Item ID uses and a
+ * number that somehow already exists is SKIPPED rather than collided with.
+ *
+ * It lives in core rather than beside whichever module happened to need it first: four
+ * modules read it and two of them load on a front-end request, which is exactly the
+ * load-order accident §13.22 is about.
+ *
+ * @param string   $infix  IN | AGR | IC | PC — frozen, because it is part of numbers
+ *                         already handed out.
+ * @param callable $exists Given a candidate, returns whether it is already in use.
+ * @param string   $year   Defaults to the current year.
+ * @return string
+ */
+function bhela_bm_series_number( $infix, $exists = null, $year = '' ) {
+	$s      = bhela_bm_get_settings();
+	$prefix = preg_replace( '/[^A-Za-z0-9]/', '', (string) ( $s['doc_prefix'] ?? '' ) );
+	$prefix = '' === $prefix ? 'BHELA' : strtoupper( $prefix );
+	$infix  = strtoupper( preg_replace( '/[^A-Za-z0-9]/', '', (string) $infix ) );
+	$year   = $year ? $year : current_time( 'Y' );
+	$lock   = 'bhela_bm_doc_seq_lock';
+	$held   = false;
+
+	for ( $try = 0; $try < 50; $try++ ) {
+		if ( add_option( $lock, time(), '', 'no' ) ) {
+			$held = true;
+			break;
+		}
+		usleep( 20000 );
+	}
+
+	try {
+		$seq    = (array) get_option( 'bhela_bm_doc_seq', array() );
+		$bucket = $infix . '-' . $year;
+		$n      = (int) ( $seq[ $bucket ] ?? 0 );
+		$number = '';
+		do {
+			$n++;
+			$number = sprintf( '%s-%s-%s-%04d', $prefix, $infix, $year, $n );
+		} while ( $n < 99999 && is_callable( $exists ) && call_user_func( $exists, $number ) );
+		$seq[ $bucket ] = $n;
+		update_option( 'bhela_bm_doc_seq', $seq, false );
+	} finally {
+		if ( $held ) {
+			delete_option( $lock );
+		}
+	}
+	return $number;
+}
+
+/**
+ * Is any post of this type already carrying this number?
+ *
+ * The `$exists` callback every series uses. Kept here so a new document type cannot
+ * accidentally ship without one — a series with no collision check is a series that
+ * will eventually reuse a number.
+ */
+function bhela_bm_series_taken( $post_type, $meta_key, $number ) {
+	$hit = get_posts( array(
+		'post_type'      => $post_type,
+		'post_status'    => array( 'publish', 'private', 'draft' ),
+		'posts_per_page' => 1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'meta_key'       => $meta_key,
+		'meta_value'     => (string) $number,
+	) );
+	return ! empty( $hit );
+}
+
+/**
+ * Hide most of a name, keeping the initials, for a page anyone may open.
+ *
+ * "Md. Rahim Ahmed" becomes "Md. R**** A*****" — enough for somebody holding the paper
+ * to recognise their own certificate, not enough to turn the verification URL into a
+ * directory of BHELA's investors. The first word is left whole only when it is a short
+ * honorific, which is the convention the client own example uses.
+ *
+ * Deliberately NOT merged with bhela_bm_mask_name() in includes/frontend.php, which
+ * masks the whole string ("রা•••ন") for the public booking-status lookup. They are two
+ * presentations for two surfaces: one proves a stranger holds the right booking, this
+ * one lets a bank check a certificate is genuine. Folding them together would change
+ * what the booking page has shown guests since it shipped, to no one benefit.
+ */
+function bhela_bm_mask_person( $name ) {
+	$out = array();
+	foreach ( preg_split( '/\s+/', trim( (string) $name ) ) as $i => $word ) {
+		if ( '' === $word ) {
+			continue;
+		}
+		if ( 0 === $i && mb_strlen( $word ) <= 4 && false !== strpos( $word, '.' ) ) {
+			$out[] = $word;                        // Md. / Mrs. / Dr.
+			continue;
+		}
+		$len   = mb_strlen( $word );
+		$out[] = mb_substr( $word, 0, 1 ) . str_repeat( '*', max( 1, $len - 1 ) );
+	}
+	return implode( ' ', $out );
+}
+
+/**
  * Neutralise a value that a spreadsheet would execute.
  *
  * Excel and LibreOffice treat a cell beginning =, +, - or @ as a formula, so a
@@ -998,6 +1119,27 @@ require_once BHELA_BM_PATH . 'includes/reviews.php';
 require_once BHELA_BM_PATH . 'includes/gallery.php';
 require_once BHELA_BM_PATH . 'includes/spots.php';
 require_once BHELA_BM_PATH . 'includes/offices.php';
+// Seasons moved OUT of the is_admin() block below: the portal and the settlement
+// reader both need a season window, and bhela_bm_portal_data()'s function_exists()
+// guard on bhela_bm_season_for() was always false on the front end.
+require_once BHELA_BM_PATH . 'includes/seasons.php';
+require_once BHELA_BM_PATH . 'includes/settlement.php';
+// Both outside the is_admin() block, and both have to be: a certificate prints on a
+// front-end URL exactly as an invoice does, and it reads the capital rows to do it.
+require_once BHELA_BM_PATH . 'includes/capital.php';
+// The Investment Record and the agreement it cites. Both front-end readable: the
+// portal lists an investor's investments and a certificate prints the agreement
+// reference on its face.
+require_once BHELA_BM_PATH . 'includes/agreement.php';
+require_once BHELA_BM_PATH . 'includes/investment.php';
+require_once BHELA_BM_PATH . 'includes/profit-engine.php';
+// The QR encoder and the public verification page it points at. Both front-end.
+require_once BHELA_BM_PATH . 'includes/qr.php';
+require_once BHELA_BM_PATH . 'includes/verify.php';
+// Receipts and the account statement. Rendered live from records that are already
+// immutable, so unlike a certificate they are not frozen — see the file header.
+require_once BHELA_BM_PATH . 'includes/documents.php';
+require_once BHELA_BM_PATH . 'includes/certificates.php';
 if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/guide.php';
 }
@@ -1011,12 +1153,19 @@ if ( is_admin() ) {
 	require_once BHELA_BM_PATH . 'includes/admin.php';
 	require_once BHELA_BM_PATH . 'includes/investor-admin.php';
 	require_once BHELA_BM_PATH . 'includes/investor-signup-admin.php';
+	require_once BHELA_BM_PATH . 'includes/settlement-admin.php';
+	require_once BHELA_BM_PATH . 'includes/settlement-import.php';
+	// After settlement-import.php: the capital importer reuses its investor resolver
+	// rather than carrying a second copy of the ambiguity rules.
+	require_once BHELA_BM_PATH . 'includes/capital-admin.php';
+	require_once BHELA_BM_PATH . 'includes/investment-admin.php';
+	require_once BHELA_BM_PATH . 'includes/profit-admin.php';
+	require_once BHELA_BM_PATH . 'includes/certificates-admin.php';
 	require_once BHELA_BM_PATH . 'includes/dashboard.php';
 	require_once BHELA_BM_PATH . 'includes/reports.php';
 	require_once BHELA_BM_PATH . 'includes/costs.php';
 require_once BHELA_BM_PATH . 'includes/income.php';
 require_once BHELA_BM_PATH . 'includes/trip-report.php';
-require_once BHELA_BM_PATH . 'includes/seasons.php';
 	require_once BHELA_BM_PATH . 'includes/expenses.php';
 	require_once BHELA_BM_PATH . 'includes/statement.php';
 	require_once BHELA_BM_PATH . 'includes/b2b-report.php';

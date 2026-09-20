@@ -89,6 +89,10 @@ function bhela_bm_investor_fields() {
 				'mother'    => array( 'label' => __( 'Mother name', 'bhela-booking' ) ),
 				'dob'       => array( 'label' => __( 'Date of birth', 'bhela-booking' ), 'type' => 'date' ),
 				'nid'       => array( 'label' => __( 'NID / Passport / Birth certificate', 'bhela-booking' ) ),
+				// TIN is asked for because a certificate may be filed with a tax return
+				// and the office needs it to hand. It is NOT printed on any document —
+				// see bhela_bm_investor_secret_fields() below, which it joins.
+				'tin'       => array( 'label' => __( 'TIN', 'bhela-booking' ) ),
 				'address'   => array( 'label' => __( 'Present address', 'bhela-booking' ), 'type' => 'textarea' ),
 				'address_p' => array( 'label' => __( 'Permanent address', 'bhela-booking' ), 'type' => 'textarea' ),
 				'mobile'    => array( 'label' => __( 'Mobile', 'bhela-booking' ) ),
@@ -148,6 +152,7 @@ function bhela_bm_investor_fields() {
 					'help'  => __( 'Upload the scan to the Media Library and paste its URL here. The record keeps a link, not a second copy.', 'bhela-booking' ),
 				),
 				'sig_nominee'  => array( 'label' => __( 'Nominee signature', 'bhela-booking' ), 'type' => 'file' ),
+				'photo'        => array( 'label' => __( 'Profile photo', 'bhela-booking' ), 'type' => 'file' ),
 				'agreement'    => array( 'label' => __( 'Agreement / KYC document', 'bhela-booking' ), 'type' => 'file' ),
 			),
 		),
@@ -166,7 +171,7 @@ function bhela_bm_investor_fields() {
  * themselves live on the record, where the permissions are.
  */
 function bhela_bm_investor_secret_fields() {
-	return array( 'nid', 'bank_account', 'bank_account_name', 'bank_routing', 'nominee_nid' );
+	return array( 'nid', 'tin', 'bank_account', 'bank_account_name', 'bank_routing', 'nominee_nid' );
 }
 
 /**

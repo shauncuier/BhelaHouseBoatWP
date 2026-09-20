@@ -51,6 +51,7 @@ function bhela_bm_statement_data( $month ) {
 		'expenses' => array( 'rows' => array(), 'by_type' => array(), 'total' => 0 ),
 		'salary' => array( 'total' => 0, 'sheets' => 0, 'ids' => array() ),
 		'commission' => array( 'total' => 0, 'by_agency' => array() ),
+		'investor_profit' => array( 'total' => 0, 'rows' => array() ),
 		'gross' => 0, 'cost_pp' => 0.0, 'profit_pp' => 0.0,
 		'signoff' => array(), 'stale' => array(),
 	);
@@ -161,12 +162,33 @@ function bhela_bm_statement_data( $month ) {
 		? bhela_bm_commission_rows( $from, $to )
 		: $out['commission'];
 
-	$out['gross'] = $out['profit'] - $out['expenses']['total'] - $out['salary']['total'] - $out['commission']['total'];
+	// Investor profit, under the fixed-return model. It is owed whether or not the month
+	// traded well, which makes it a financing COST rather than a share of what was made —
+	// so it comes off the bottom line exactly as payroll and commission do. Omitting it
+	// would overstate every month by the whole accrual, which is §13.10 (the wage bill
+	// that was left out for twelve releases) happening a second time.
+	//
+	// Two guards, and both matter. It is skipped entirely while the model is `shares`,
+	// because under that model this same money IS the distribution of the gross figure
+	// being computed here and deducting it would take it off twice. And it counts only
+	// rows the profit engine itself posted — see bhela_bm_profit_accrued().
+	if ( function_exists( 'bhela_bm_investor_model' ) && 'fixed' === bhela_bm_investor_model()
+		&& function_exists( 'bhela_bm_profit_accrued' ) ) {
+		$out['investor_profit'] = bhela_bm_profit_accrued( $from, $to );
+	}
+
+	$out['gross'] = $out['profit'] - $out['expenses']['total'] - $out['salary']['total']
+		- $out['commission']['total'] - $out['investor_profit']['total'];
 	if ( $out['guests'] > 0 ) {
 		// Cost per person on the owner's sheet includes marketing and
 		// renovation, not just trip cost — the two readings differ by about a
 		// thousand taka a head, so this follows the sheet. Payroll is in here for
 		// the same reason it is in gross profit: it is a cost of carrying them.
+		//
+		// Investor profit is deliberately NOT: it is the cost of the money the boat
+		// was bought with, not a cost of carrying a passenger, and it does not move
+		// with the guest count. So gross falls and cost per head does not — an
+		// asymmetry worth knowing about rather than one worth hiding.
 		$out['cost_pp']   = round( ( $out['cost'] + $out['expenses']['total'] + $out['salary']['total'] + $out['commission']['total'] ) / $out['guests'], 2 );
 		$out['profit_pp'] = round( $out['gross'] / $out['guests'], 2 );
 	}

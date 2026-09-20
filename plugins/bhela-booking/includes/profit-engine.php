@@ -1,0 +1,494 @@
+<?php
+/**
+ * What an investment earns, period by period.
+ *
+ * The client's brief is explicit that the formula must NOT be hard-coded (§7): different
+ * investment types are agreed on different bases, and a system with one formula baked in
+ * quietly misstates every investment written on another one. So this is a registry —
+ * four methods, each a small pure function, each declaring which fields it needs — and
+ * the investment record names which one it was written on.
+ *
+ * Three properties the rest of the plugin depends on:
+ *
+ * 1. **The schedule is derived, never stored** (§13.8). Periods come from the start,
+ *    the maturity and the payment frequency. Change the maturity and the schedule
+ *    follows; a stored schedule would sit there being wrong.
+ * 2. **The periods sum to the term, exactly.** Twelve periods each rounded on their own
+ *    do not add up to the year: 12.5% on ৳5,00,000 is ৳62,500, and twelve rounded
+ *    ৳5,208 is ৳62,496. So the term total is computed once and split across the periods
+ *    by `bhela_bm_split_by_shares()`, the same largest-remainder rule §13.30 settled for
+ *    the distribution. Losing four taka a year is how a ledger stops reconciling.
+ * 3. **Posting is idempotent.** Each period carries a key — `{code}:{from}:{to}` — onto
+ *    the ledger row's `ref`, and posting refuses when a row already carries it. Running
+ *    a month twice is the most ordinary mistake there is, and it must not pay twice.
+ *
+ * What this file does NOT do is decide that money is owed. `bhela_bm_profit_accrue()`
+ * is a reading; `bhela_bm_profit_post()` writes the ledger row and is called only by the
+ * approval on the Profit Calculation screen (the brief's §17). Nothing accrues into
+ * anybody's balance until a person approves it.
+ *
+ * Loaded on EVERY request: the portal shows an investor their own schedule.
+ *
+ * @package BhelaBooking
+ */
+
+if ( ! defined( 'ABSPATH' ) ) {
+	exit;
+}
+
+/* =========================================================
+ * THE METHODS
+ * ========================================================= */
+
+/**
+ * Day-count basis for the day-based method.
+ *
+ * 365 or 360, because both are used in practice and they give different answers —
+ * ৳5,00,000 at 12% for 90 days is ৳14,795 on 365 and ৳15,000 on 360. The certificate
+ * prints which one was used, so nobody has to reverse-engineer it from the figure.
+ */
+function bhela_bm_profit_day_basis() {
+	$s = bhela_bm_get_settings();
+	return 360 === (int) ( $s['inv_day_basis'] ?? 0 ) ? 360 : 365;
+}
+
+/**
+ * The calculation methods, keyed by the slug an investment stores.
+ *
+ * A slug is FROZEN once an investment is active — every posted row and every issued
+ * certificate hangs off it. `rate` is what the rate field MEANS for that method, which
+ * is why the screen labels it from here rather than saying "rate" four times.
+ */
+function bhela_bm_profit_methods() {
+	return array(
+		'fixed_annual' => array(
+			'label'   => __( 'নির্দিষ্ট বার্ষিক হার', 'bhela-booking' ),
+			'en'      => __( 'Fixed annual rate', 'bhela-booking' ),
+			'rate'    => __( 'বার্ষিক হার %', 'bhela-booking' ),
+			'formula' => __( 'মূলধন × বার্ষিক হার × মেয়াদ (মাস) ÷ ১২', 'bhela-booking' ),
+		),
+		'monthly_rate' => array(
+			'label'   => __( 'মাসিক হার', 'bhela-booking' ),
+			'en'      => __( 'Monthly rate', 'bhela-booking' ),
+			'rate'    => __( 'মাসিক হার %', 'bhela-booking' ),
+			'formula' => __( 'মূলধন × মাসিক হার × মাস', 'bhela-booking' ),
+		),
+		'day_based'    => array(
+			'label'   => __( 'দিনভিত্তিক', 'bhela-booking' ),
+			'en'      => __( 'Day-based', 'bhela-booking' ),
+			'rate'    => __( 'বার্ষিক হার %', 'bhela-booking' ),
+			'formula' => __( 'মূলধন × বার্ষিক হার × প্রকৃত দিন ÷ দিন-ভিত্তি', 'bhela-booking' ),
+		),
+		'profit_share' => array(
+			'label'   => __( 'লাভ-বণ্টন', 'bhela-booking' ),
+			'en'      => __( 'Profit sharing', 'bhela-booking' ),
+			'rate'    => __( 'বিনিয়োগকারীর অংশ %', 'bhela-booking' ),
+			'formula' => __( 'বণ্টনযোগ্য লাভ × বিনিয়োগকারীর অংশ', 'bhela-booking' ),
+		),
+	);
+}
+
+/**
+ * What BHELA declared distributable inside a window, and the months it cannot answer for.
+ *
+ * A distribution run is monthly and a term is not, so a period's pot is the sum of the
+ * runs inside it. A run belongs to the window when the **first day of its month** falls
+ * inside it; a boundary that cuts a month in half names that month as partial and
+ * apportions NOTHING. Splitting a month's profit across a boundary would be an
+ * invention — nothing anywhere records which half of July a trip's profit belonged to.
+ *
+ * Moved here from includes/certificates.php: the profit engine needs it for the
+ * `profit_share` method and the certificate needs it for its face, which is two callers
+ * and therefore §13.22's rule about a shared helper parked in one screen's file.
+ *
+ * @return array
+ */
+function bhela_bm_distributable_pot( $from, $to ) {
+	$out = array(
+		'distributable' => 0,
+		'investor_pot'  => 0,
+		'reserve'       => 0,
+		'gross'         => 0,
+		'runs'          => array(),
+		'missing'       => array(),
+		'partial'       => array(),
+	);
+	$from = bhela_bm_report_date( $from );
+	$to   = bhela_bm_report_date( $to );
+	if ( '' === $from || '' === $to || $to < $from ) {
+		return $out;
+	}
+
+	$index  = (array) get_option( 'bhela_bm_dist_runs', array() );
+	$cursor = substr( $from, 0, 7 ) . '-01';
+	$guard  = 0;
+
+	while ( $cursor <= $to && $guard++ < 240 ) {
+		$month = substr( $cursor, 0, 7 );
+		$first = $month . '-01';
+
+		if ( $first >= $from ) {
+			$run_id = isset( $index[ $month ] ) ? (int) $index[ $month ] : 0;
+			if ( $run_id && get_post( $run_id ) && function_exists( 'bhela_bm_dist_data' ) ) {
+				$d                     = bhela_bm_dist_data( $run_id );
+				$out['runs'][]         = $d;
+				$out['distributable'] += $d['distributable'];
+				$out['investor_pot']  += $d['investor'];
+				$out['reserve']       += $d['reserve'];
+				$out['gross']         += $d['gross'];
+			} else {
+				$out['missing'][] = $month;
+			}
+		} else {
+			// The window starts mid-month. That month's run covers days outside it, so
+			// it is named and not counted.
+			$out['partial'][] = $month;
+		}
+
+		$cursor = gmdate( 'Y-m-d', strtotime( $first . ' +1 month' ) );
+	}
+
+	// A window ending mid-month has the same problem at the other end.
+	$last_first = substr( $to, 0, 7 ) . '-01';
+	$last_end   = gmdate( 'Y-m-t', strtotime( $last_first ) );
+	if ( $to < $last_end && ! in_array( substr( $to, 0, 7 ), $out['partial'], true ) ) {
+		$out['partial'][] = substr( $to, 0, 7 );
+	}
+
+	return $out;
+}
+
+/**
+ * What one investment earns over its WHOLE term, before it is split into periods.
+ *
+ * Pure. The term total is the anchor: periods are carved out of it rather than summed
+ * into it, which is what keeps twelve months adding up to the year (see the file
+ * header). Returns 0 for anything it cannot compute rather than guessing.
+ *
+ * @param array $inv A bhela_bm_investment() record.
+ * @return int Taka.
+ */
+function bhela_bm_profit_term_total( $inv ) {
+	$principal = (int) ( $inv['principal'] ?? 0 );
+	$rate      = (int) ( $inv['rate_bp'] ?? 0 ) / 10000;   // basis points → a fraction
+	$months    = (int) ( $inv['months'] ?? 0 );
+
+	if ( $principal <= 0 || $rate <= 0 || $months <= 0 ) {
+		return 0;
+	}
+
+	switch ( (string) ( $inv['method'] ?? '' ) ) {
+		case 'fixed_annual':
+			return (int) round( $principal * $rate * $months / 12 );
+
+		case 'monthly_rate':
+			return (int) round( $principal * $rate * $months );
+
+		case 'day_based':
+			$days = bhela_bm_profit_days( $inv['start'], $inv['maturity'] );
+			return (int) round( $principal * $rate * $days / bhela_bm_profit_day_basis() );
+
+		case 'profit_share':
+			// Not a function of the principal at all: it is a share of what the business
+			// actually declared. A term with no committed distribution in it earns
+			// nothing here, and the screen says which months are missing rather than
+			// quietly returning a smaller number.
+			$pot = bhela_bm_distributable_pot( $inv['start'], $inv['maturity'] );
+			return (int) round( $pot['investor_pot'] * $rate );
+	}
+	return 0;
+}
+
+/** Inclusive day count between two dates. */
+function bhela_bm_profit_days( $from, $to ) {
+	$from = bhela_bm_report_date( $from );
+	$to   = bhela_bm_report_date( $to );
+	if ( '' === $from || '' === $to || $to < $from ) {
+		return 0;
+	}
+	$a = new DateTimeImmutable( $from );
+	$b = new DateTimeImmutable( $to );
+	return (int) $a->diff( $b )->days + 1;
+}
+
+/* =========================================================
+ * THE SCHEDULE
+ * ========================================================= */
+
+/** The reference a posted row carries, and the thing that makes posting idempotent. */
+function bhela_bm_profit_period_key( $code, $from, $to ) {
+	return $code . ':' . $from . ':' . $to;
+}
+
+/**
+ * Every period of an investment's term, with what each one earns.
+ *
+ * PURE — it writes nothing and it is what the Profit Calculation screen renders, so what
+ * is approved on screen is exactly what gets posted. Same contract
+ * `bhela_bm_dist_preview()` has with its commit.
+ *
+ * @param array $inv A bhela_bm_investment() record.
+ * @return array[] from · to · days · months · amount · key · due
+ */
+function bhela_bm_profit_schedule( $inv ) {
+	$start    = (string) ( $inv['start'] ?? '' );
+	$maturity = (string) ( $inv['maturity'] ?? '' );
+	if ( '' === $start || '' === $maturity || $maturity <= $start ) {
+		return array();
+	}
+
+	$freqs = bhela_bm_investment_freqs();
+	$step  = (int) ( $freqs[ $inv['frequency'] ?? '' ]['months'] ?? 0 );
+
+	$periods = array();
+	if ( $step < 1 ) {
+		// Paid at maturity: one period covering the whole term.
+		$periods[] = array( 'from' => $start, 'to' => $maturity );
+	} else {
+		$cursor = $start;
+		$guard  = 0;
+		while ( $cursor <= $maturity && $guard++ < 600 ) {
+			$next = gmdate( 'Y-m-d', strtotime( $cursor . ' +' . $step . ' month' ) );
+			$end  = gmdate( 'Y-m-d', strtotime( $next . ' -1 day' ) );
+			if ( $end >= $maturity ) {
+				$end = $maturity;             // the last period always closes on maturity
+			}
+			$periods[] = array( 'from' => $cursor, 'to' => $end );
+			if ( $end >= $maturity ) {
+				break;
+			}
+			$cursor = $next;
+		}
+	}
+
+	// The term total, carved up. Weighted by days for the day-based method and by month
+	// count for the rest, so an uneven final period gets its honest share rather than a
+	// full one.
+	$total   = bhela_bm_profit_term_total( $inv );
+	$weights = array();
+	foreach ( $periods as $i => $p ) {
+		$weights[ $i ] = ( 'day_based' === ( $inv['method'] ?? '' ) )
+			? bhela_bm_profit_days( $p['from'], $p['to'] )
+			: max( 1, bhela_bm_investment_months( $p['from'], gmdate( 'Y-m-d', strtotime( $p['to'] . ' +1 day' ) ) ) );
+	}
+	$split = bhela_bm_split_by_shares( $total, $weights, array_sum( $weights ) );
+
+	$out = array();
+	foreach ( $periods as $i => $p ) {
+		$out[] = array(
+			'index'  => $i + 1,
+			'from'   => $p['from'],
+			'to'     => $p['to'],
+			'days'   => bhela_bm_profit_days( $p['from'], $p['to'] ),
+			'months' => $weights[ $i ],
+			'amount' => (int) ( $split[ $i ] ?? 0 ),
+			'key'    => bhela_bm_profit_period_key( (string) ( $inv['code'] ?? '' ), $p['from'], $p['to'] ),
+			// A period is due once its last day has passed. Accruing tomorrow's profit
+			// today would put money on a statement the business has not yet earned.
+			'due'    => $p['to'] <= current_time( 'Y-m-d' ),
+		);
+	}
+	return $out;
+}
+
+/**
+ * Has this period already been posted to the ledger?
+ *
+ * Reads the ledger by the period key on `ref`. A reversed row still counts as posted —
+ * reversing a wrong accrual and re-posting the same period would leave two rows and one
+ * contra, which nets correctly but reads as though the investor was paid twice.
+ *
+ * @return int Ledger row id, or 0.
+ */
+function bhela_bm_profit_posted( $key ) {
+	$hit = get_posts( array(
+		'post_type'      => 'bhela_inv_ledger',
+		'post_status'    => 'publish',
+		'posts_per_page' => 1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'meta_key'       => '_bhela_led_ref',
+		'meta_value'     => (string) $key,
+	) );
+	return $hit ? (int) $hit[0] : 0;
+}
+
+/**
+ * One investment's schedule with each period's posted state attached.
+ *
+ * @param array  $inv  A bhela_bm_investment() record.
+ * @param string $upto Only periods ending on or before this date. Blank means today.
+ * @return array
+ */
+function bhela_bm_profit_accrue( $inv, $upto = '' ) {
+	$upto = bhela_bm_report_date( $upto );
+	$upto = '' === $upto ? current_time( 'Y-m-d' ) : $upto;
+
+	$out = array(
+		'investment' => (int) ( $inv['id'] ?? 0 ),
+		'code'       => (string) ( $inv['code'] ?? '' ),
+		'periods'    => array(),
+		'due'        => 0,
+		'posted'     => 0,
+		'unposted'   => 0,
+		'term_total' => bhela_bm_profit_term_total( $inv ),
+	);
+
+	foreach ( bhela_bm_profit_schedule( $inv ) as $p ) {
+		if ( $p['to'] > $upto ) {
+			continue;
+		}
+		$p['row']          = bhela_bm_profit_posted( $p['key'] );
+		$out['periods'][]  = $p;
+		$out['due']       += $p['amount'];
+		if ( $p['row'] ) {
+			$out['posted'] += $p['amount'];
+		} else {
+			$out['unposted'] += $p['amount'];
+		}
+	}
+	return $out;
+}
+
+/* =========================================================
+ * POSTING
+ * ========================================================= */
+
+/**
+ * Write one period's profit to the ledger. The ONLY thing here that writes money.
+ *
+ * Called by the approval on the Profit Calculation screen, never by a reader. It refuses
+ * a period that is already posted, a period that has not ended, and an investment that
+ * is not active — the three ways the same money could otherwise be owed twice.
+ *
+ * @param array $inv    A bhela_bm_investment() record.
+ * @param array $period One row from bhela_bm_profit_schedule().
+ * @return int|WP_Error Ledger row id.
+ */
+function bhela_bm_profit_post( $inv, $period ) {
+	if ( ! current_user_can( 'bhela_investor_profit' ) ) {
+		return new WP_Error( 'denied', __( 'লাভ অনুমোদনের অনুমতি নেই।', 'bhela-booking' ) );
+	}
+	if ( empty( $inv['id'] ) || 'active' !== ( $inv['status'] ?? '' ) ) {
+		return new WP_Error( 'not_active', __( 'সক্রিয় নয় এমন বিনিয়োগে লাভ যোগ করা যাবে না।', 'bhela-booking' ) );
+	}
+	$key = (string) ( $period['key'] ?? '' );
+	if ( '' === $key ) {
+		return new WP_Error( 'bad_period', __( 'সময়কাল সঠিক নয়।', 'bhela-booking' ) );
+	}
+	if ( empty( $period['due'] ) ) {
+		return new WP_Error( 'not_due', __( 'এই সময়কাল এখনো শেষ হয়নি।', 'bhela-booking' ) );
+	}
+	if ( (int) ( $period['amount'] ?? 0 ) <= 0 ) {
+		return new WP_Error( 'zero', __( 'এই সময়কালে হিসাব করার মতো লাভ নেই।', 'bhela-booking' ) );
+	}
+	// The idempotency check, and the reason the screen can be refreshed safely.
+	$already = bhela_bm_profit_posted( $key );
+	if ( $already ) {
+		return new WP_Error( 'already', sprintf(
+			/* translators: %s: the period */
+			__( 'এই সময়কাল (%s) আগেই হিসাবে যোগ করা হয়েছে।', 'bhela-booking' ),
+			$period['from'] . ' — ' . $period['to']
+		) );
+	}
+
+	return bhela_bm_ledger_add( array(
+		'investor' => (int) $inv['investor'],
+		'type'     => 'profit',
+		'amount'   => (int) $period['amount'],
+		// Dated the last day of the period it belongs to, not the day somebody pressed
+		// the button — otherwise a month approved late lands in the wrong window and
+		// every season figure that reads the ledger moves with it.
+		'date'     => (string) $period['to'],
+		'ref'      => $key,
+		'method'   => (string) $inv['method'],
+		'note'     => sprintf(
+			/* translators: 1: investment code, 2: period start, 3: period end */
+			__( '%1$s — %2$s থেকে %3$s', 'bhela-booking' ),
+			(string) $inv['code'],
+			(string) $period['from'],
+			(string) $period['to']
+		),
+	) );
+}
+
+/**
+ * Investment code => post id, built once.
+ *
+ * The per-row lookup was a query per ledger row, and the statement reads a month of
+ * them — the same trap §13.52 describes on the Trip P&L list.
+ */
+function bhela_bm_investment_code_map() {
+	$map = array();
+	foreach ( get_posts( array(
+		'post_type'      => 'bhela_investment',
+		'post_status'    => 'publish',
+		'posts_per_page' => bhela_bm_investment_limit(),
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+	) ) as $id ) {
+		$code = (string) get_post_meta( $id, '_bhela_ivm_code', true );
+		if ( '' !== $code ) {
+			$map[ $code ] = (int) $id;
+		}
+	}
+	return $map;
+}
+
+/**
+ * Everything this engine has posted inside a window — the financing cost of the month.
+ *
+ * This is what the Monthly Statement deducts, and two things about it are load-bearing:
+ *
+ * 1. **Only rows THIS engine posted count.** A `profit` row can also come from a
+ *    committed share distribution or from the settlement importer, and those are not a
+ *    financing cost — the first is a split of profit already counted, the second is
+ *    history being typed in. Counting them would deduct the same money twice and would
+ *    have moved every month the business has already closed. Rows are matched by
+ *    resolving the period key on `ref` back to a real Investment Record, which is
+ *    exactly the set this engine wrote and nothing else.
+ * 2. **Only POSTED periods count.** An accrual nobody has approved is a calculation,
+ *    not a liability. Read from the ledger rather than recomputed, so the statement and
+ *    the investor's own balance can never disagree.
+ *
+ * @return array{total:int,rows:array[]}
+ */
+function bhela_bm_profit_accrued( $from, $to ) {
+	$from = bhela_bm_report_date( $from );
+	$to   = bhela_bm_report_date( $to );
+	$out  = array( 'total' => 0, 'rows' => array() );
+	if ( '' === $from || '' === $to ) {
+		return $out;
+	}
+	$codes = bhela_bm_investment_code_map();
+	if ( ! $codes ) {
+		return $out;
+	}
+
+	foreach ( bhela_bm_investors() as $investor ) {
+		foreach ( bhela_bm_investor_ledger( $investor )['rows'] as $r ) {
+			if ( 'profit' !== $r['type'] || $r['date'] < $from || $r['date'] > $to ) {
+				continue;
+			}
+			// A reversed accrual never happened, exactly as it does not in the balance.
+			if ( bhela_bm_ledger_reversal_of( $r['id'] ) || $r['reverses'] ) {
+				continue;
+			}
+			$code = strtok( (string) $r['ref'], ':' );
+			if ( ! $code || ! isset( $codes[ $code ] ) ) {
+				continue;                    // not ours: a distribution, or an import
+			}
+			$out['total']  += $r['amount'];
+			$out['rows'][]  = array(
+				'investor'   => $investor,
+				'name'       => get_the_title( $investor ),
+				'investment' => $codes[ $code ],
+				'code'       => $code,
+				'date'       => $r['date'],
+				'amount'     => $r['amount'],
+				'ref'        => $r['ref'],
+			);
+		}
+	}
+	return $out;
+}

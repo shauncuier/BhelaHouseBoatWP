@@ -163,43 +163,44 @@ function bhela_bm_season_investors( $key ) {
 		'season' => $season,
 		'rows'   => array(),
 		'declared' => 0, 'paid' => 0, 'outstanding' => 0,
+		// Beside the net, never folded into it.
+		'owed_to_investor' => 0, 'owed_to_bhela' => 0, 'undeclared' => 0,
 	);
 
-	foreach ( bhela_bm_investors() as $id ) {
-		$declared = 0;
-		$paid     = 0;
-		foreach ( bhela_bm_investor_ledger( $id )['rows'] as $r ) {
-			if ( $r['date'] < $season['from'] || $r['date'] > $season['to'] ) {
-				continue;
-			}
-			// A reversed row never happened, exactly as it does not in the position.
-			if ( bhela_bm_ledger_reversal_of( $r['id'] ) || $r['reverses'] ) {
-				continue;
-			}
-			if ( 'profit' === $r['type'] ) {
-				$declared += $r['amount'];
-			} elseif ( in_array( $r['type'], array( 'payment', 'advance' ), true ) ) {
-				$paid += $r['amount'];
-			}
-		}
-		if ( 0 === $declared && 0 === $paid ) {
-			continue;
-		}
+	// One implementation of "declared minus paid inside a window" — see
+	// includes/settlement.php. This used to carry its own copy of the loop, and two
+	// implementations of one money rule is how a silent disagreement starts (§13.23).
+	// Two things changed in the move, both corrections:
+	//   - an ADJUSTMENT inside the season now moves the balance, because the ledger's
+	//     own closing balance has always counted it and this figure did not;
+	//   - a reversal is resolved from the rows already in hand rather than by a query
+	//     per row (§13.52).
+	$settle = bhela_bm_settlement( $season['from'], $season['to'] );
+
+	foreach ( $settle['rows'] as $r ) {
 		$out['rows'][] = array(
-			'investor'    => (int) $id,
-			'name'        => get_the_title( $id ),
-			'shares'      => bhela_bm_investor_shares( $id ),
-			'declared'    => $declared,
-			'paid'        => $paid,
-			// Within a season this is what was declared in it less what was paid in
-			// it. It is deliberately NOT the investor's lifetime outstanding, which
-			// is a different question with a different answer on the report screen.
-			'outstanding' => $declared - $paid,
+			'investor'    => $r['investor'],
+			'name'        => $r['name'],
+			'shares'      => $r['shares'],
+			'declared'    => $r['declared'],
+			'paid'        => $r['paid'],
+			// Within a season: declared in it, plus adjustments, less paid in it. It
+			// is deliberately NOT the investor's lifetime balance, which is a
+			// different question with a different answer on the report screen.
+			'outstanding' => $r['balance'],
+			'state'       => $r['state'],
 		);
-		$out['declared']    += $declared;
-		$out['paid']        += $paid;
-		$out['outstanding'] += $declared - $paid;
 	}
+	$out['declared'] = $settle['declared'];
+	$out['paid']     = $settle['paid'];
+	// The net is kept because this key has always been a net and the dashboard reads
+	// it. The two directions are carried BESIDE it, never folded into it — a season
+	// where one investor is owed 50,000 and another owes 50,000 is not a settled
+	// season, and `outstanding` alone says it is.
+	$out['outstanding']      = $settle['net'];
+	$out['owed_to_investor'] = $settle['owed_to_investor'];
+	$out['owed_to_bhela']    = $settle['owed_to_bhela'];
+	$out['undeclared']       = $settle['undeclared'];
 
 	usort( $out['rows'], function ( $a, $b ) {
 		return $b['declared'] <=> $a['declared'];

@@ -249,9 +249,52 @@ function bhela_bm_portal_data() {
 	// be paid — so nothing reaches this page until it has been signed off.
 	$holding = function_exists( 'bhela_bm_investor_holding' ) ? bhela_bm_investor_holding( $id ) : null;
 
+	// Which way the balance runs, in the investor's own terms. `roi['outstanding']` has
+	// always carried the figure, but under a label meaning "due to you" a NEGATIVE
+	// reads as though BHELA owes them minus thirty thousand taka. The direction is the
+	// thing they need; the sign is an implementation detail of the ledger.
+	$settle = bhela_bm_settlement_investor( $id );
+
+	// The documents the office has issued this investor. Read by id, never by key: the
+	// portal already knows who is asking, so an investor's own list never has to carry
+	// a secret link that would work for anybody who saw it.
+	$certs = function_exists( 'bhela_bm_cert_rows' ) ? bhela_bm_cert_rows( $id ) : array();
+
+	// The investor's own agreements and investments, and the account they add up to.
+	// All three are read by investor id, never from the request — the portal already
+	// knows who is asking, which is the whole of §13.34.
+	$investments = function_exists( 'bhela_bm_investments' ) ? bhela_bm_investments( $id, '' ) : array();
+	$agreements  = function_exists( 'bhela_bm_agreements' ) ? bhela_bm_agreements( $id ) : array();
+	$account     = function_exists( 'bhela_bm_account_statement' ) ? bhela_bm_account_statement( $id ) : null;
+
+	// The brief's §14 summary. `invested` counts only what is still live: a closed
+	// investment was repaid, and showing it as active money would overstate what the
+	// investor has in the business today.
+	$summary = array( 'invested' => 0, 'active' => 0, 'earned' => 0, 'paid' => 0, 'due' => 0 );
+	foreach ( $investments as $iv ) {
+		if ( in_array( $iv['status'], array( 'draft', 'cancelled' ), true ) ) {
+			continue;
+		}
+		$summary['invested'] += $iv['principal'];
+		if ( in_array( $iv['status'], array( 'active', 'matured' ), true ) ) {
+			$summary['active'] += $iv['principal'];
+		}
+	}
+	if ( $settle ) {
+		$summary['earned'] = $settle['declared'];
+		$summary['paid']   = $settle['paid'];
+		$summary['due']    = max( 0, $settle['balance'] );
+	}
+
 	return array(
 		'id'         => $id,
 		'name'       => get_the_title( $id ),
+		'certs'      => $certs,
+		'investments' => $investments,
+		'agreements' => $agreements,
+		'account'    => $account,
+		'summary'    => $summary,
+		'model'      => function_exists( 'bhela_bm_investor_model' ) ? bhela_bm_investor_model() : 'shares',
 		'holding'    => $holding,
 		'code'       => (string) get_post_meta( $id, '_bhela_inv_code', true ),
 		'status'     => bhela_bm_investor_status( $id ),
@@ -266,6 +309,7 @@ function bhela_bm_portal_data() {
 		'season'     => $season,
 		'funds'      => $funds,
 		'pending'    => $pending,
+		'settle'     => $settle,
 	);
 }
 
@@ -366,7 +410,15 @@ function bhela_bm_portal_render( $d ) {
 				array( __( 'বিনিয়োগ', 'bhela-booking' ), $money( $d['roi']['investment'] ) ),
 				array( __( 'ঘোষিত লাভ', 'bhela-booking' ), $money( $d['roi']['declared'] ) ),
 				array( __( 'প্রাপ্ত', 'bhela-booking' ), $money( $d['roi']['received'] ) ),
-				array( __( 'বকেয়া', 'bhela-booking' ), $money( $d['roi']['outstanding'] ) ),
+				// Not "বকেয়া" with a signed number under it: the label promised money
+				// owed TO the investor and printed a minus sign when the truth was the
+				// opposite. The direction is said in words instead.
+				array(
+					$d['settle'] && 'owes' === $d['settle']['state']
+						? __( 'আপনি ভেলাকে দেবেন', 'bhela-booking' )
+						: __( 'ভেলা আপনাকে দেবে', 'bhela-booking' ),
+					$money( $d['settle'] ? abs( $d['settle']['balance'] ) : $d['roi']['outstanding'] )
+				),
 				array( __( 'ROI (প্রাপ্ত)', 'bhela-booking' ), $d['roi']['roi'] . '%' ),
 				array( __( 'ROI (ঘোষিত)', 'bhela-booking' ), $d['roi']['roi_declared'] . '%' ),
 				array( __( 'অবস্থা', 'bhela-booking' ), bhela_bm_portal_status_label( $d['status'] ) ),
@@ -414,6 +466,18 @@ function bhela_bm_portal_render( $d ) {
 			?></p>
 		<?php endif; ?>
 
+		<?php if ( $d['settle'] && 'owes' === $d['settle']['state'] ) : ?>
+			<p class="bhela-inv__note"><?php
+				printf(
+					/* translators: %s: amount */
+					esc_html__( 'এ পর্যন্ত আপনার ঘোষিত লাভের চেয়ে %s বেশি নেওয়া হয়েছে। এটি ভুল নয় — পরের বণ্টনগুলো থেকে সমন্বয় হবে, অথবা অফিসের সাথে কথা বলে মিটিয়ে নেওয়া যাবে।', 'bhela-booking' ),
+					esc_html( bhela_bm_money( abs( $d['settle']['balance'] ) ) )
+				);
+			?></p>
+		<?php elseif ( $d['settle'] && 'undeclared' === $d['settle']['state'] ) : ?>
+			<p class="bhela-inv__note"><?php esc_html_e( 'আপনি টাকা পেয়েছেন, কিন্তু ওই সময়ের লাভ এখনো হিসাবে ঘোষণা করা হয়নি — তাই উপরের অঙ্কটি এখনো চূড়ান্ত নয়। লাভ ঘোষণা হলে নিজে থেকেই ঠিক হয়ে যাবে।', 'bhela-booking' ); ?></p>
+		<?php endif; ?>
+
 		<?php if ( $d['pending']['count'] > 0 ) : ?>
 			<p class="bhela-inv__note"><?php
 				printf(
@@ -455,6 +519,145 @@ function bhela_bm_portal_render( $d ) {
 						</tbody>
 					</table>
 				</div>
+			</section>
+		<?php endif; ?>
+
+		<?php if ( 'fixed' === ( $d['model'] ?? '' ) ) : ?>
+			<?php
+			// Under the fixed-return model this replaces the share figures above as the
+			// headline: an investor holding an agreement wants to know what they put in,
+			// what it has earned and what is still owed — not a percentage of a boat.
+			?>
+			<section class="bhela-inv__card">
+				<h3><?php esc_html_e( 'আমার বিনিয়োগ', 'bhela-booking' ); ?></h3>
+				<div class="bhela-inv__kpis">
+					<div class="bhela-inv__kpi"><span><?php esc_html_e( 'মোট বিনিয়োগ', 'bhela-booking' ); ?></span><strong><?php echo esc_html( $money( $d['summary']['invested'] ) ); ?></strong></div>
+					<div class="bhela-inv__kpi"><span><?php esc_html_e( 'চলমান বিনিয়োগ', 'bhela-booking' ); ?></span><strong><?php echo esc_html( $money( $d['summary']['active'] ) ); ?></strong></div>
+					<div class="bhela-inv__kpi"><span><?php esc_html_e( 'মোট অর্জিত লাভ', 'bhela-booking' ); ?></span><strong><?php echo esc_html( $money( $d['summary']['earned'] ) ); ?></strong></div>
+					<div class="bhela-inv__kpi"><span><?php esc_html_e( 'পরিশোধিত', 'bhela-booking' ); ?></span><strong><?php echo esc_html( $money( $d['summary']['paid'] ) ); ?></strong></div>
+					<div class="bhela-inv__kpi"><span><?php esc_html_e( 'বকেয়া', 'bhela-booking' ); ?></span><strong><?php echo esc_html( $money( $d['summary']['due'] ) ); ?></strong></div>
+				</div>
+
+				<?php if ( $d['investments'] ) : ?>
+					<div class="bhela-inv__scroll">
+						<table class="bhela-inv__table">
+							<thead><tr>
+								<th><?php esc_html_e( 'Investment ID', 'bhela-booking' ); ?></th>
+								<th class="num"><?php esc_html_e( 'মূলধন', 'bhela-booking' ); ?></th>
+								<th><?php esc_html_e( 'মেয়াদ', 'bhela-booking' ); ?></th>
+								<th class="num"><?php esc_html_e( 'হার', 'bhela-booking' ); ?></th>
+								<th><?php esc_html_e( 'অবস্থা', 'bhela-booking' ); ?></th>
+							</tr></thead>
+							<tbody>
+							<?php foreach ( $d['investments'] as $iv ) : ?>
+								<?php if ( in_array( $iv['status'], array( 'draft', 'cancelled' ), true ) ) { continue; } ?>
+								<tr>
+									<td><?php echo esc_html( $iv['code'] ); ?></td>
+									<td class="num"><?php echo esc_html( $money( $iv['principal'] ) ); ?></td>
+									<td>
+										<?php
+										echo $iv['start']
+											? esc_html( mysql2date( 'j M Y', $iv['start'] ) . ' — ' . mysql2date( 'j M Y', $iv['maturity'] ) )
+											: '—';
+										?>
+									</td>
+									<td class="num"><?php echo esc_html( $iv['rate'] . '%' ); ?></td>
+									<td><?php echo esc_html( $iv['status_label'] ); ?></td>
+								</tr>
+							<?php endforeach; ?>
+							</tbody>
+						</table>
+					</div>
+				<?php else : ?>
+					<p class="bhela-inv__muted"><?php esc_html_e( 'এখনো কোনো বিনিয়োগ রেকর্ড নেই। অফিস যোগ করলে এখানে দেখাবে।', 'bhela-booking' ); ?></p>
+				<?php endif; ?>
+			</section>
+		<?php endif; ?>
+
+		<?php
+		// Every document the office has issued this investor, in one place, which is
+		// what the brief's §15 download flow is asking for.
+		?>
+		<section class="bhela-inv__card">
+			<h3><?php esc_html_e( 'আমার কাগজপত্র', 'bhela-booking' ); ?></h3>
+			<ul class="bhela-inv__docs">
+				<li>
+					<a href="<?php echo esc_url( add_query_arg( 'bhela_statement', (int) $d['id'], home_url( '/' ) ) ); ?>" target="_blank" rel="noopener">
+						<?php esc_html_e( 'হিসাব বিবরণী · Account statement', 'bhela-booking' ); ?>
+					</a>
+				</li>
+				<?php foreach ( $d['agreements'] as $ag ) : ?>
+					<?php if ( ! $ag['file'] ) { continue; } ?>
+					<li>
+						<a href="<?php echo esc_url( $ag['file'] ); ?>" target="_blank" rel="noopener">
+							<?php
+							printf(
+								/* translators: 1: reference, 2: date */
+								esc_html__( 'চুক্তি %1$s · %2$s', 'bhela-booking' ),
+								esc_html( $ag['ref'] ),
+								esc_html( mysql2date( 'j M Y', $ag['date'] ) )
+							);
+							?>
+						</a>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+			<p class="bhela-inv__muted"><?php esc_html_e( 'বিবরণী প্রিন্টের সময়ের অবস্থা দেখায়; সনদ ইস্যুর দিনের অবস্থায় জমাট থাকে।', 'bhela-booking' ); ?></p>
+		</section>
+
+		<?php if ( ! empty( $d['certs'] ) ) : ?>
+			<section class="bhela-inv__card">
+				<h3><?php esc_html_e( 'আপনার সনদ', 'bhela-booking' ); ?></h3>
+				<div class="bhela-inv__scroll">
+					<table class="bhela-inv__table">
+						<thead><tr>
+							<th><?php esc_html_e( 'নম্বর', 'bhela-booking' ); ?></th>
+							<th><?php esc_html_e( 'ধরন', 'bhela-booking' ); ?></th>
+							<th><?php esc_html_e( 'সময়', 'bhela-booking' ); ?></th>
+							<th><?php esc_html_e( 'ইস্যু', 'bhela-booking' ); ?></th>
+							<th></th>
+						</tr></thead>
+						<tbody>
+						<?php $cert_types = bhela_bm_cert_types(); ?>
+						<?php foreach ( $d['certs'] as $c ) : ?>
+							<?php
+							// A superseded certificate is shown, struck, with the number
+							// that replaced it. The investor may be holding the paper;
+							// making it vanish from their own list tells them nothing.
+							?>
+							<tr<?php echo $c['superseded'] ? ' class="is-void"' : ''; ?>>
+								<td><?php echo esc_html( $c['number'] ); ?></td>
+								<td><?php echo esc_html( $cert_types[ $c['type'] ]['label'] ?? $c['type'] ); ?></td>
+								<td>
+									<?php
+									echo $c['from']
+										? esc_html( $c['label'] ? $c['label'] : mysql2date( 'j M Y', $c['from'] ) . ' — ' . mysql2date( 'j M Y', $c['to'] ) )
+										: esc_html__( 'সব সময়', 'bhela-booking' );
+									?>
+								</td>
+								<td><?php echo esc_html( mysql2date( 'j M Y', $c['issued'] ) ); ?></td>
+								<td>
+									<a href="<?php echo esc_url( add_query_arg( 'bhela_cert', (int) $c['id'], home_url( '/' ) ) ); ?>" target="_blank" rel="noopener">
+										<?php esc_html_e( 'দেখুন', 'bhela-booking' ); ?>
+									</a>
+									<?php if ( $c['superseded'] ) : ?>
+										<span class="bhela-inv__void">
+											<?php
+											printf(
+												/* translators: %s: the replacing certificate number */
+												esc_html__( 'প্রতিস্থাপিত — %s', 'bhela-booking' ),
+												esc_html( $c['superseded_number'] )
+											);
+											?>
+										</span>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+						</tbody>
+					</table>
+				</div>
+				<p class="bhela-inv__muted"><?php esc_html_e( 'সনদ ভেলার অফিস ইস্যু করে। কোনো হিসাব বদলালে পুরোনো সনদ বদলে যায় না — নতুন একটি সনদ ইস্যু হয়, আর পুরোনোটিতে নতুন নম্বর লেখা থাকে।', 'bhela-booking' ); ?></p>
 			</section>
 		<?php endif; ?>
 

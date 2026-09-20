@@ -46,7 +46,11 @@ function bhela_bm_investor_dash_data() {
 		'investment'  => 0,
 		'declared'    => 0,
 		'received'    => 0,
+		// A net, kept because it always was one. The two directions beside it are what
+		// the screen actually shows — see the comment at the accumulator below.
 		'outstanding' => 0,
+		'owed_to_investor' => 0,
+		'owed_to_bhela'    => 0,
 		'rows'        => array(),
 		'pending'     => array( 'count' => 0, 'total' => 0 ),
 		'funds'       => array(),
@@ -67,7 +71,17 @@ function bhela_bm_investor_dash_data() {
 		$out['investment']  += $r['investment'];
 		$out['declared']    += $r['declared'];
 		$out['received']    += $r['received'];
+		// `outstanding` is a NET and stays one, because this key has always been a net
+		// and every caller reads it as one. What it must not be is the only figure on
+		// screen: an investor owed 50,000 and an investor owing 50,000 sum to zero
+		// here, and "nothing outstanding" is the opposite of the truth. The two
+		// directions are carried separately and the card shows them.
 		$out['outstanding'] += $r['outstanding'];
+		if ( $r['outstanding'] > 0 ) {
+			$out['owed_to_investor'] += $r['outstanding'];
+		} elseif ( $r['outstanding'] < 0 ) {
+			$out['owed_to_bhela'] += abs( $r['outstanding'] );
+		}
 		$out['rows'][] = array(
 			'investor'    => (int) $id,
 			'name'        => get_the_title( $id ),
@@ -174,7 +188,8 @@ function bhela_bm_investor_dash_page() {
 			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Shares issued', 'bhela-booking' ); ?></span><span class="bha-card__value bha-plain"><?php echo esc_html( number_format_i18n( $d['shares']['issued'] ) . ' / ' . number_format_i18n( $d['shares']['configured'] ) ); ?></span></div>
 			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Profit declared', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $d['declared'] ) ); ?></span></div>
 			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Paid out', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $d['received'] ) ); ?></span></div>
-			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'Outstanding', 'bhela-booking' ); ?></span><span class="bha-card__value <?php echo $d['outstanding'] > 0 ? 'is-danger' : 'is-good'; ?>"><?php echo esc_html( bhela_bm_money( $d['outstanding'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'ভেলা দেবে', 'bhela-booking' ); ?></span><span class="bha-card__value <?php echo $d['owed_to_investor'] > 0 ? 'is-danger' : 'is-good'; ?>"><?php echo esc_html( bhela_bm_money( $d['owed_to_investor'] ) ); ?></span></div>
+			<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'ভেলা পাবে', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( bhela_bm_money( $d['owed_to_bhela'] ) ); ?></span></div>
 		</div>
 
 		<h3 class="bha-sheet__h"><?php esc_html_e( 'Capital value', 'bhela-booking' ); ?></h3>

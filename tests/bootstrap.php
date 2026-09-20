@@ -183,6 +183,13 @@ function bhela_test_isolate() {
 		// A registration titles itself "{name} {mobile}", and the name comes from the
 		// fixture — so a ZZ applicant produces a ZZ title and this one DOES belong here.
 		'bhela_inv_signup',
+		// A capital row is titled "{investor} — {date} — {amount}", so a ZZ investor
+		// produces a ZZ title. Same test as the registration: does the FIXTURE control
+		// the first characters of the title.
+		'bhela_capital',
+		// A certificate does NOT: it is titled "BHL-INV-2026-0001 — {name}", so the
+		// LIKE below would hide every certificate from the harness that just issued
+		// it. Scoped by the harness instead, same as bhela_valuation and bhela_dist.
 		// A valuation's title is minted from its own date and total, not from a
 		// fixture's name, so it does NOT belong here either — same reason as
 		// bhela_dist and bhela_fund (§13.37). The harness scopes its own records.

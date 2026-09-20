@@ -26,6 +26,16 @@
 .bhela-inv__actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .bhela-inv__muted { color: var(--inv-soft); font-size: .92rem; margin: .2rem 0; }
 
+/* The documents list: agreement, statement, whatever else the office has issued.
+   One row per document with a comfortable tap target, because on a phone this is the
+   part of the portal an investor actually came for. */
+.bhela-inv__docs { list-style: none; margin: .4rem 0 .6rem; padding: 0; }
+.bhela-inv__docs li { border-bottom: 1px solid var(--inv-line, rgba(255,255,255,.12)); }
+.bhela-inv__docs li:last-child { border-bottom: 0; }
+.bhela-inv__docs a { display: block; padding: .7rem .1rem; text-decoration: none; }
+.bhela-inv__docs a:hover,
+.bhela-inv__docs a:focus { text-decoration: underline; }
+
 /* Something waiting on somebody — a raised payment that has not been released.
    Louder than __muted because it is news, quieter than an error because nothing
    is wrong. */

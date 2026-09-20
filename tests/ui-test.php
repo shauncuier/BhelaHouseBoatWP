@@ -2,7 +2,7 @@
 /** Dev helper: render every BHELA admin screen and check the design system. */
 
 require __DIR__ . '/bootstrap.php';
-bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'yearly', 'salary', 'dashboard', 'guide', 'log', 'audit', 'inventory-core', 'inventory', 'inventory-import', 'investor-signup-admin' );
+bhela_test_modules( 'ui', 'roles', 'admin', 'reports', 'costs', 'expenses', 'statement', 'yearly', 'salary', 'dashboard', 'guide', 'log', 'audit', 'inventory-core', 'inventory', 'inventory-import', 'investor-signup-admin', 'settlement-admin', 'settlement-import' );
 wp_set_current_user( 1 );
 
 echo "=== 1. helpers ===\n";
@@ -107,17 +107,30 @@ $screens = array(
 	// so nothing was checking they render clean, carry the taka on every figure or
 	// keep their columns aligned. That is exactly the gap that let a misaligned
 	// header ship on fourteen tables.
-	'Investor Dash'    => array( 'investors_page_bhela-bm-investor-dash', array( 'page' => 'bhela-bm-investor-dash' ), fn() => bhela_bm_investor_dash_page() ),
-	'Distribution'     => array( 'toplevel_page_bhela-bm-dist', array( 'page' => 'bhela-bm-dist', 'month' => '2026-07' ), fn() => bhela_bm_dist_page() ),
+	//
+	// The prefixes encode which menu owns each row, and sixteen investor rows are now
+	// split across two: `toplevel_page_` for the two group slugs (Dashboard and
+	// Investments), `investors_page_` for the rest of Investors, `capital_page_` for
+	// Capital. §9c re-derives all of this from the menu that actually registered, so a
+	// row moved without editing this list fails there rather than here.
+	'Investor Dash'    => array( 'toplevel_page_bhela-bm-investor-dash', array( 'page' => 'bhela-bm-investor-dash' ), fn() => bhela_bm_investor_dash_page() ),
+	'Distribution'     => array( 'capital_page_bhela-bm-dist', array( 'page' => 'bhela-bm-dist', 'month' => '2026-07' ), fn() => bhela_bm_dist_page() ),
 	'Investor Report'  => array( 'investors_page_bhela-bm-investor-report', array( 'page' => 'bhela-bm-investor-report' ), fn() => bhela_bm_investor_report_page() ),
-	'Funds'            => array( 'investors_page_bhela-bm-funds', array( 'page' => 'bhela-bm-funds' ), fn() => bhela_bm_funds_page() ),
+	'Funds'            => array( 'capital_page_bhela-bm-funds', array( 'page' => 'bhela-bm-funds' ), fn() => bhela_bm_funds_page() ),
 	'Cash Flow'        => array( 'investors_page_bhela-bm-cashflow', array( 'page' => 'bhela-bm-cashflow', 'from' => '2026-07-01', 'to' => '2026-07-31' ), fn() => bhela_bm_cashflow_page() ),
 	'Trip P&L list'    => array( 'accounts_page_bhela-bm-trip-pl', array( 'page' => 'bhela-bm-trip-pl' ), fn() => bhela_bm_trip_pl_page() ),
 	'Trip P&L one'     => array( 'accounts_page_bhela-bm-trip-pl', array( 'page' => 'bhela-bm-trip-pl', 'sheet' => $GLOBALS['zz_cost'] ), fn() => bhela_bm_trip_pl_page() ),
-	'Valuation'        => array( 'investors_page_bhela-bm-valuation', array( 'page' => 'bhela-bm-valuation' ), fn() => bhela_bm_valuation_page() ),
-	'Share Issue'      => array( 'investors_page_bhela-bm-share-issue', array( 'page' => 'bhela-bm-share-issue', 'target' => '1000000' ), fn() => bhela_bm_share_issue_page() ),
+	'Valuation'        => array( 'capital_page_bhela-bm-valuation', array( 'page' => 'bhela-bm-valuation' ), fn() => bhela_bm_valuation_page() ),
+	'Share Issue'      => array( 'capital_page_bhela-bm-share-issue', array( 'page' => 'bhela-bm-share-issue', 'target' => '1000000' ), fn() => bhela_bm_share_issue_page() ),
 	'Revenue'          => array( 'accounts_page_bhela-bm-revenue', array( 'page' => 'bhela-bm-revenue', 'period' => 'month' ), fn() => bhela_bm_revenue_page() ),
 	'Registrations'    => array( 'investors_page_bhela-bm-signups', array( 'page' => 'bhela-bm-signups' ), fn() => bhela_bm_signup_page() ),
+	'Settlement'       => array( 'investors_page_bhela-bm-settlement', array( 'page' => 'bhela-bm-settlement' ), fn() => bhela_bm_settlement_page() ),
+	'Import Payments'  => array( 'investors_page_bhela-bm-settle-import', array( 'page' => 'bhela-bm-settle-import' ), fn() => bhela_bm_settle_import_page() ),
+	'Investments'      => array( 'toplevel_page_bhela-bm-investments', array( 'page' => 'bhela-bm-investments' ), fn() => bhela_bm_investment_page() ),
+	'Agreements'       => array( 'capital_page_bhela-bm-agreements', array( 'page' => 'bhela-bm-agreements' ), fn() => bhela_bm_agreement_page() ),
+	'Profit'           => array( 'capital_page_bhela-bm-profit', array( 'page' => 'bhela-bm-profit' ), fn() => bhela_bm_profit_page() ),
+	'Capital'          => array( 'capital_page_bhela-bm-capital', array( 'page' => 'bhela-bm-capital' ), fn() => bhela_bm_capital_page() ),
+	'Certificates'     => array( 'investors_page_bhela-bm-certificates', array( 'page' => 'bhela-bm-certificates' ), fn() => bhela_bm_cert_page() ),
 );
 $GLOBALS['zz_exp']  = $exp;
 $GLOBALS['zz_sal']  = $sal;
@@ -144,6 +157,46 @@ foreach ( $screens as $name => list( $screen_id, $get, $render ) ) {
 	}
 	ok( ! $bad && strlen( $html ) > 200, sprintf( '%-18s %6d bytes', $name, strlen( $html ) ), implode( ' ', $bad ) );
 }
+
+echo "\n=== 4b. every setting the code reads has a control ===\n";
+
+// §13.62 documented this once: five `inv_*` settings existed only as defaults, with a
+// comment beside them claiming they were configurable. They were not, and nothing
+// noticed. It then happened AGAIN with `inv_model` — the screen that tells the operator
+// "change the model in Settings" was pointing at a control that did not exist, so the
+// instruction was impossible to follow and the switch was unreachable except through
+// the database.
+//
+// This asserts against the RENDERED settings page rather than the source, because what
+// matters is that a human can find the control, not that a string appears in a file.
+$_GET = array( 'page' => 'bhela-bm-settings' );
+set_current_screen( 'toplevel_page_bhela-bm-settings' );
+ob_start();
+bhela_bm_settings_page();
+$ui_set_html = (string) ob_get_clean();
+
+foreach ( array(
+	'inv_model'           => 'which engine pays investors',
+	'inv_day_basis'       => 'the day-count basis a certificate prints',
+	'inv_reserve_pct'     => 'the reserve percentage',
+	'inv_investor_pct'    => 'the investor split',
+	'inv_total_investment' => 'the original investment',
+	'inv_per_share'       => 'the original share value',
+	'doc_prefix'          => 'the document number prefix',
+	'cert_signatory'      => 'the authorised signatory',
+	'cert_signatory_role' => 'the signatory designation',
+	'cert_note'           => 'the standing certificate note',
+) as $ui_key => $ui_what ) {
+	ok(
+		false !== strpos( $ui_set_html, 'name="' . $ui_key . '"' ),
+		'Settings has a control for ' . $ui_what . ' (' . $ui_key . ')'
+	);
+}
+
+// And the one that decides what people are owed offers both of its values, or the
+// operator can see the setting and still not be able to change it.
+ok( false !== strpos( $ui_set_html, 'value="shares"' ) && false !== strpos( $ui_set_html, 'value="fixed"' ),
+	'and the investor model offers both choices' );
 
 echo "\n=== 5. no drift left in the rendered markup ===\n";
 foreach ( array( 'bhela-rep', 'bhela-dash__', 'bhela-st__', 'bhela-cs__', 'bhela-sal', 'bhela-exp', 'bhela-team', 'bhela-set__', 'bhela-disc', 'bhela-meta' ) as $prefix ) {
@@ -352,7 +405,13 @@ list( $m, $sub, $hooks ) = zz_menu( $admin_id );
 
 $bookings = 'edit.php?post_type=bhela_booking';
 $tops     = wp_list_pluck( $m, 2 );
-foreach ( array( 'bhela-bm-statement' => 'Accounts', 'bhela-bm-inv-month' => 'Store', 'bhela-bm-settings' => 'Setup' ) as $slug => $title ) {
+foreach ( array(
+	'bhela-bm-statement'       => 'Accounts',
+	'bhela-bm-inv-month'       => 'Store',
+	'bhela-bm-investor-dash'   => 'Investors',
+	'bhela-bm-investments'     => 'Capital',
+	'bhela-bm-settings'        => 'Setup',
+) as $slug => $title ) {
 	ok( in_array( $slug, $tops, true ), "$title registers as a top-level menu" );
 	// An emoji in a top-level title would make sanitize_title() percent-encode it
 	// and every child's screen id with it, so the hook is asserted, not assumed.
@@ -369,6 +428,9 @@ foreach ( array(
 	'bookings' => 'edit.php?post_type=bhela_booking',
 	'accounts' => 'edit.php?post_type=bhela_cost',
 	'store'    => 'edit.php?post_type=bhela_inv_item',
+	// Investors still opens the register, which is what it opened before the split.
+	'investors' => 'edit.php?post_type=bhela_investor',
+	'capital'  => 'bhela-bm-investments',
 	'setup'    => 'bhela-bm-settings',
 ) as $group => $expected ) {
 	ok( bhela_bm_menu_landing( $group ) === $expected, "clicking $group opens $expected",
@@ -377,16 +439,25 @@ foreach ( array(
 	// Bookings: All Bookings and Add New are added by wp-admin/menu.php, a file rather
 	// than an action, so they are absent here and the first row LOOKS like Dashboard.
 	// Verified in a real request instead — that is where the bug showed up.
-	if ( 'bookings' === $group ) {
+	if ( 'bookings' === $group || 'investors' === $group ) {
 		continue;
 	}
 	$first = $sub[ bhela_bm_menu_groups()[ $group ]['slug'] ][0][2] ?? '';
 	ok( $first === $expected, "$group's first rendered row is $expected", "rendered: $first" );
 }
 
-// The wall of 22 is the thing this change set out to fix.
+// The wall of 22 is the thing this change set out to fix — and the rule only binds on
+// the parents named here. Investors was missing from this list, which is the ONLY reason
+// it reached sixteen rows without anything failing. Both investor parents are in now.
 $counts = array();
-foreach ( array( $bookings, 'bhela-bm-statement', 'bhela-bm-inv-month', 'bhela-bm-settings' ) as $p ) {
+foreach ( array(
+	$bookings,
+	'bhela-bm-statement',
+	'bhela-bm-inv-month',
+	'bhela-bm-investor-dash',
+	'bhela-bm-investments',
+	'bhela-bm-settings',
+) as $p ) {
 	$counts[ $p ] = count( $sub[ $p ] ?? array() );
 }
 ok( max( $counts ) <= 8, 'no menu holds more than 8 rows', 'worst: ' . max( $counts ) );
@@ -427,7 +498,17 @@ ok( ! $dupe_rows, 'no parent lists the same slug twice', implode( ', ', $dupe_ro
 echo "\n=== 9b. menu icons, as registered ===\n";
 $icons = array();
 $plain = array();
-foreach ( array( $bookings, 'bhela-bm-statement', 'bhela-bm-inv-month', 'bhela-bm-settings' ) as $p ) {
+// The investor rows were outside this sweep until the menu split, which is how two
+// screens both came to be registered with a bar chart: Bookings' Dashboard and the
+// Investor Report. Both investor parents are swept now.
+foreach ( array(
+	$bookings,
+	'bhela-bm-statement',
+	'bhela-bm-inv-month',
+	'bhela-bm-investor-dash',
+	'bhela-bm-investments',
+	'bhela-bm-settings',
+) as $p ) {
 	foreach ( $sub[ $p ] ?? array() as $r ) {
 		$label = trim( wp_strip_all_tags( $r[0] ) );
 		// Core's own two rows on the Bookings menu (All Bookings, Add New) are not
@@ -483,8 +564,11 @@ $zz_user = wp_insert_user( array(
 if ( is_wp_error( $zz_user ) ) {
 	ok( false, 'probe user created', $zz_user->get_error_message() );
 } else {
+	// Manager holds `investors_view`, so it has always seen the investor menus in real
+	// life. This passed only because `investors` was absent from the map below — the
+	// assertion could not see what it was not asked about.
 	foreach ( array(
-		'bhela_manager'       => array( 'accounts', 'store' ),
+		'bhela_manager'       => array( 'accounts', 'capital', 'investors', 'store' ),
 		'bhela_booking_staff' => array(),
 		'bhela_cost_checker'  => array( 'accounts', 'store' ),
 		'bhela_cost_preparer' => array( 'accounts' ),
@@ -494,7 +578,13 @@ if ( is_wp_error( $zz_user ) ) {
 		$u->set_role( $role );
 		list( $rm ) = zz_menu( $zz_user );
 		$got = array();
-		foreach ( array( 'accounts' => 'bhela-bm-statement', 'store' => 'bhela-bm-inv-month', 'setup' => 'bhela-bm-settings' ) as $g => $slug ) {
+		foreach ( array(
+			'accounts'  => 'bhela-bm-statement',
+			'store'     => 'bhela-bm-inv-month',
+			'investors' => 'bhela-bm-investor-dash',
+			'capital'   => 'bhela-bm-investments',
+			'setup'     => 'bhela-bm-settings',
+		) as $g => $slug ) {
 			if ( in_array( $slug, wp_list_pluck( $rm, 2 ), true ) ) {
 				$got[] = $g;
 			}
@@ -508,6 +598,56 @@ if ( is_wp_error( $zz_user ) ) {
 	wp_delete_user( $zz_user );
 }
 zz_menu( $admin_id );                            // put the admin back
+
+echo "\n=== 9f. hiding a share-era row does not take its page away ===\n";
+// Under the fixed-return model, Distribution, Valuation and Share Issue are inert, so
+// their rows come off the menu. "Hidden" has to mean exactly that and no more: the page
+// must still render, because somebody may hold a certificate citing a run that only
+// those screens can show. Passing `null` as the parent is what buys that — dropping the
+// add_submenu_page() call entirely would make the URL 404.
+$zz_model_was = get_option( 'bhela_bm_settings', array() );
+$zz_s         = bhela_bm_get_settings();
+
+$zz_s['inv_model'] = 'fixed';
+update_option( 'bhela_bm_settings', $zz_s );
+list( $fm, $fsub ) = zz_menu( $admin_id );
+
+$zz_cap_rows = wp_list_pluck( $fsub['bhela-bm-investments'] ?? array(), 2 );
+foreach ( array( 'bhela-bm-dist', 'bhela-bm-valuation', 'bhela-bm-share-issue' ) as $zz_gone ) {
+	ok( ! in_array( $zz_gone, $zz_cap_rows, true ), "under the fixed model, $zz_gone has no menu row" );
+}
+ok( in_array( 'bhela-bm-investments', $zz_cap_rows, true )
+	&& in_array( 'bhela-bm-profit', $zz_cap_rows, true ),
+	'while the fixed-model rows stay' );
+// The parent itself must survive: it used to BE the Distribution screen, so hiding
+// Distribution took the whole menu with it and orphaned fifteen rows under Bookings.
+ok( in_array( 'bhela-bm-investments', wp_list_pluck( $fm, 2 ), true ),
+	'and the Capital menu itself is still there' );
+ok( count( $zz_cap_rows ) <= 8, 'Capital still respects the row cap under either model',
+	'rows: ' . count( $zz_cap_rows ) );
+
+// Still owned by Capital, so the URL helper keeps emitting admin.php rather than an
+// edit.php link the legacy shim would refuse to rescue.
+ok( 'capital' === bhela_bm_menu_page_group( 'bhela-bm-dist' ),
+	'a hidden row still belongs to its group', bhela_bm_menu_page_group( 'bhela-bm-dist' ) );
+ok( false !== strpos( bhela_bm_admin_url( 'bhela-bm-dist' ), 'admin.php?page=bhela-bm-dist' ),
+	'so its URL still resolves', bhela_bm_admin_url( 'bhela-bm-dist' ) );
+
+// And it still draws.
+$_GET = array( 'page' => 'bhela-bm-dist', 'month' => '2026-07' );
+set_current_screen( 'capital_page_bhela-bm-dist' );
+ob_start();
+try {
+	bhela_bm_dist_page();
+	$zz_hidden_html = (string) ob_get_clean();
+} catch ( Throwable $e ) {
+	ob_end_clean();
+	$zz_hidden_html = 'THREW: ' . $e->getMessage();
+}
+ok( strlen( $zz_hidden_html ) > 200 && false === strpos( $zz_hidden_html, 'THREW' ),
+	'and the hidden page still renders in full', substr( $zz_hidden_html, 0, 60 ) );
+
+update_option( 'bhela_bm_settings', $zz_model_was );
 
 echo "\n=== 9e. URLs and the legacy shim ===\n";
 foreach ( array( 'bhela-bm-dashboard', 'bhela-bm-reports', 'bhela-bm-trips' ) as $slug ) {

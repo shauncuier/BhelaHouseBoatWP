@@ -1,22 +1,28 @@
 <?php
 /**
- * The lock on an approved valuation and a committed share issue.
+ * The lock on an approved valuation, a committed share issue, a capital row and a
+ * certificate.
  *
- * Both records decide money that is reported to named people. An approved valuation is
+ * All four records decide money that is reported to named people. An approved valuation is
  * what every investor's holding value is computed from; a committed share issue is the
  * arithmetic of a completed transaction that moved everybody's ownership percentage. So
  * both are immutable, and for the same reason a committed distribution is: "I changed
  * it" leaves no record of why the figures moved, and an investor who was shown one
  * number last month is entitled to an explanation rather than a different number.
  *
- * The two differ in WHEN they lock, which is why they share a file but not a predicate:
+ * They differ in WHEN they lock, which is why they share a file but not a predicate:
  *
  * - A **valuation** locks on state, like a cost sheet. `draft` is somebody working;
  *   `approved` is signed off. `_bhela_val_status` stays writable so it can be reopened
  *   — a lock that cannot be lifted is a trap (§13.40).
- * - A **share issue** locks from birth, like a distribution run. There is no draft: the
- *   screen calculates freely and nothing is written until Commit, at which point the
- *   share total has already moved and the record is history.
+ * - A **share issue**, a **capital row** and a **certificate** lock from birth, like a
+ *   distribution run. There is no draft: the screen calculates freely and nothing is
+ *   written until Commit, at which point the record is already history — the share
+ *   total has moved, or the certificate has been handed over.
+ *
+ * They share one file rather than growing a lock each because a lock has two lists,
+ * hooks and post types, and every gap this plugin has shipped came from writing the
+ * second copy from a shortened reading of the first (§13.49, §13.54, §13.55).
  *
  * Loaded on EVERY request, not behind `is_admin()`, for the reason §13.9 gives:
  * `wp_delete_post()` from WP-CLI or cron never reaches an admin-only guard. All the
@@ -45,8 +51,20 @@ if ( ! defined( 'ABSPATH' ) ) {
  */
 function bhela_bm_val_locked( $post_id ) {
 	$type = get_post_type( $post_id );
-	if ( 'bhela_share_issue' === $type ) {
-		return true;    // committed on creation; there is no draft state
+	// Locked from birth, all three of them, for one reason: each is the record behind
+	// a figure somebody has already been shown. A share issue moved everybody's
+	// percentage; a capital row and a certificate are the evidence under a document an
+	// investor is holding. None has a draft state — nothing is written until Commit,
+	// and after Commit it is history.
+	if ( in_array( $type, array( 'bhela_share_issue', 'bhela_capital', 'bhela_cert', 'bhela_agreement' ), true ) ) {
+		return true;
+	}
+	// The two that lock on STATE rather than from birth, for the same reason a cost
+	// sheet does: a draft is somebody working, and everything after it is a figure
+	// somebody has been shown. Both keep their status key writable below, so reopening
+	// stays possible and stays audited.
+	if ( 'bhela_investment' === $type ) {
+		return 'draft' !== (string) get_post_meta( $post_id, '_bhela_ivm_status', true );
 	}
 	if ( 'bhela_valuation' !== $type ) {
 		return false;
@@ -62,13 +80,43 @@ function bhela_bm_val_locked( $post_id ) {
  * figure is covered.
  */
 function bhela_bm_val_locked_prefixes() {
-	return array( '_bhela_val_', '_bhela_iss_' );
+	return array( '_bhela_val_', '_bhela_iss_', '_bhela_cap_', '_bhela_crt_', '_bhela_ivm_', '_bhela_agr_' );
 }
 
-/** Whether a key is one this lock owns, minus the status field a reopen must write. */
+/**
+ * Keys a locked record must still be able to write, and why each one.
+ *
+ * Every entry here is a lock that would otherwise be a trap (§13.40):
+ *
+ * - `_bhela_val_status`  — reopening an approved valuation is how it is corrected.
+ * - `_bhela_cap_void*`   — a mistyped capital row is VOIDED, never deleted, so the
+ *                          void flag and its reason have to be writable after the fact.
+ * - `_bhela_crt_super*`  — a superseded certificate has to be able to say which
+ *                          certificate replaced it.
+ *
+ * Every one of them is audited by its own writer. Nothing that carries a figure is on
+ * this list.
+ */
+function bhela_bm_val_open_keys() {
+	return array(
+		'_bhela_val_status',
+		'_bhela_cap_void',
+		'_bhela_cap_void_reason',
+		'_bhela_cap_void_by',
+		'_bhela_crt_super',
+		'_bhela_crt_super_reason',
+		// An investment's own state, so it can be activated and legitimately reopened;
+		// and an agreement's, so a later one can supersede it. Both are the writable
+		// hinge that stops the lock being a trap, and both are audited by their writer.
+		'_bhela_ivm_status',
+		'_bhela_agr_status',
+	);
+}
+
+/** Whether a key is one this lock owns, minus the few bhela_bm_val_open_keys() names. */
 function bhela_bm_val_owns_key( $meta_key ) {
 	$key = (string) $meta_key;
-	if ( '_bhela_val_status' === $key ) {
+	if ( in_array( $key, bhela_bm_val_open_keys(), true ) ) {
 		return false;
 	}
 	foreach ( bhela_bm_val_locked_prefixes() as $prefix ) {

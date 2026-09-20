@@ -530,6 +530,39 @@
 	color: var(--bha-text);
 }
 
+/* A line of context under a card's figure — what a number does NOT include, or
+   which way it runs. Both of the screens that needed it were emitting the class
+   with no rule behind it, so the sentence rendered at full body size directly
+   under the figure and read like a second value. */
+.bha-card__hint {
+	display: block;
+	margin-top: 4px;
+	font-size: 12px;
+	line-height: 1.5;
+	color: var(--bha-muted);
+}
+
+/* Our own table. `widefat striped` already carries WordPress's chrome; this is
+   the part that is ours — tabular figures so columns of money line up, and a
+   header that matches the panel rather than the list-table default. It had been
+   emitted on four screens with no rule at all since v2.39.0: nothing failed
+   because none of those screens were in ui-test's render sweep yet. */
+.bha-table {
+	font-variant-numeric: tabular-nums;
+}
+
+.bha-table th {
+	font-size: 12px;
+	letter-spacing: .02em;
+	color: var(--bha-muted);
+	font-weight: 600;
+}
+
+.bha-table td,
+.bha-table th {
+	vertical-align: middle;
+}
+
 /* Clickable counters — the dashboard's status tiles. Same card, plus the
    affordance that it goes somewhere. */
 .bha-tiles {

@@ -242,7 +242,15 @@ function bhela_bm_payreq_approve( $id ) {
 	}
 	// The person who raised it cannot be the person who approves it. A second
 	// signature the same hand can supply is not a second signature.
-	if ( (int) $r['by'] === get_current_user_id() ) {
+	//
+	// The administrator is exempt, at the owner's instruction. On a business this size
+	// there may be no second person to sign, and a control nobody can satisfy is one
+	// that gets worked around rather than followed. Stated plainly: for an
+	// administrator this IS a single signature, so the request records that it was
+	// self-approved and the audit trail says so in words — a reduction in control that
+	// is visible is worth more than one that is silent.
+	$self = ( (int) $r['by'] === get_current_user_id() );
+	if ( $self && ! current_user_can( 'manage_options' ) ) {
 		return new WP_Error( 'same_person', __( 'যিনি অনুরোধ করেছেন তিনি নিজে অনুমোদন করতে পারবেন না।', 'bhela-booking' ) );
 	}
 	// Belt to the braces on the state check above: a request that already carries a
@@ -321,6 +329,9 @@ function bhela_bm_payreq_approve( $id ) {
 	update_post_meta( $id, '_bhela_pr_decided_by', get_current_user_id() );
 	update_post_meta( $id, '_bhela_pr_decided_at', current_time( 'mysql' ) );
 	update_post_meta( $id, '_bhela_pr_ledger', (int) $row );
+	if ( $self ) {
+		update_post_meta( $id, '_bhela_pr_self', 1 );
+	}
 
 	bhela_bm_audit( array(
 		'channel'     => 'investor',
@@ -332,6 +343,11 @@ function bhela_bm_payreq_approve( $id ) {
 		'old_value'   => 'requested',
 		'new_value'   => 'approved',
 		'approval_ref' => (string) $row,
+		// Named, not implied. A reader a year from now should not have to compare two
+		// user ids to work out that one person did both halves.
+		'reason'      => $self
+			? __( 'Raised and approved by the same administrator — no second signature.', 'bhela-booking' )
+			: '',
 	) );
 
 	return (int) $row;
