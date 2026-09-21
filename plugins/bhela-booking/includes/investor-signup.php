@@ -113,7 +113,17 @@ function bhela_bm_signup_states() {
  * the office; letting a stranger pick one is how two records end up sharing an id.
  */
 function bhela_bm_signup_skip_fields() {
-	return array( 'code' );
+	// The registry is shared with the office's own form (§13.70), so ANYTHING added
+	// there appears here too unless it is named below — which is how `tin` and `photo`
+	// silently became questions put to anonymous applicants.
+	//
+	// `code` is the office's own identifier and is not an applicant's to choose.
+	// `tin` is a tax identifier: the office wants it on the record, but asking a
+	// stranger for one on a public page collects a sensitive number before anybody has
+	// decided the person is an investor at all.
+	// `photo` would be a third file upload on a form whose other two are the NID and
+	// the signature — and a portrait is not evidence of anything the approval needs.
+	return array( 'code', 'tin', 'photo' );
 }
 
 /**

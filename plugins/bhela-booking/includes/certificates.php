@@ -336,7 +336,33 @@ function bhela_bm_cert_issue( $args ) {
 	if ( $old && $old['type'] !== $type ) {
 		return new WP_Error( 'wrong_type', __( 'ভিন্ন ধরনের সনদ প্রতিস্থাপন করা যায় না।', 'bhela-booking' ) );
 	}
-
+	// A certificate issued before versioning existed carries no base number, so there is
+	// nothing to take the next version of. Said plainly here, because falling through
+	// produced "could not create certificate number" — which reads as a numbering fault
+	// and gives no hint that the answer is to issue a fresh certificate.
+	if ( $old && '' === $old['base'] ) {
+		return new WP_Error(
+			'no_base',
+			__( 'এই সনদটি সংস্করণ ব্যবস্থা চালুর আগের — এর পরবর্তী সংস্করণ করা যায় না। নতুন একটি সনদ ইস্যু করুন।', 'bhela-booking' )
+		);
+	}
+	// A version replaces the SAME document, so the record underneath has to be the same
+	// one. Without this, an investor holding two investments could have investment A's
+	// certificate reissued as the next version of a certificate about investment B:
+	// A's number would be reused, A's holder would be told their paper was superseded,
+	// and the replacement would describe something else entirely.
+	if ( $old && (int) $old['investment'] !== (int) $snapshot['investment'] ) {
+		return new WP_Error(
+			'other_investment',
+			__( 'এই সনদটি অন্য একটি বিনিয়োগের — সংস্করণ কেবল একই বিনিয়োগের সনদেরই হতে পারে।', 'bhela-booking' )
+		);
+	}
+	if ( $old && (int) $old['investor'] !== (int) $snapshot['investor'] ) {
+		return new WP_Error(
+			'other_investor',
+			__( 'এই সনদটি অন্য বিনিয়োগকারীর।', 'bhela-booking' )
+		);
+	}
 	$base    = $old ? $old['base'] : bhela_bm_cert_number( $type );
 	$version = $old ? ( (int) $old['version'] + 1 ) : 1;
 	if ( '' === $base ) {
@@ -377,7 +403,16 @@ function bhela_bm_cert_issue( $args ) {
 	}
 
 	if ( $old ) {
-		bhela_bm_cert_supersede( $replaces, (int) $id, (string) ( $args['reason'] ?? '' ) );
+		$marked = bhela_bm_cert_supersede( $replaces, (int) $id, (string) ( $args['reason'] ?? '' ) );
+		if ( is_wp_error( $marked ) ) {
+			// V2 exists but V1 was never marked, so the public verification page would
+			// report BOTH as valid for one document — the single state versioning
+			// exists to prevent. Undo the half-done issue rather than report success:
+			// the record is locked from birth, so it takes the sanctioned delete path
+			// the share-issue abort uses (§13.65).
+			bhela_bm_val_delete( (int) $id );
+			return $marked;
+		}
 	}
 
 	bhela_bm_audit( array(

@@ -256,7 +256,18 @@ function bhela_bm_cert_page() {
 								<select name="replaces" id="cert-replaces">
 									<option value="0"><?php esc_html_e( '— নতুন সনদ —', 'bhela-booking' ); ?></option>
 									<?php foreach ( bhela_bm_cert_rows( (int) $preview['investor'], $type ) as $old ) : ?>
-										<?php if ( $old['superseded'] ) { continue; } ?>
+										<?php
+										// Per investor, so it would otherwise offer the other
+										// investments' certificates too — and a version may only
+										// replace a certificate about the SAME investment. One
+										// with no base predates versioning and has nothing to
+										// take the next version of.
+										if ( $old['superseded']
+											|| (int) $old['investment'] !== (int) $investment
+											|| '' === $old['base'] ) {
+											continue;
+										}
+										?>
 										<option value="<?php echo (int) $old['id']; ?>"><?php echo esc_html( $old['number'] ); ?></option>
 									<?php endforeach; ?>
 								</select>

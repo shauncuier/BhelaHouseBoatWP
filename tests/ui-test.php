@@ -401,6 +401,16 @@ function zz_icon( $label ) {
 echo "\n=== 9. the four menus ===\n";
 
 $admin_id = get_current_user_id();
+
+// §9 to §9e are about the FULL menu — every row registered, under its real parent.
+// Three Capital rows come off the menu under the fixed-return model (§13.88), and a
+// hidden row registers with a `null` parent, so it lands in `$submenu['']` while
+// `$hooks['']` does not exist. §9c then compared its hardcoded `capital_page_…` screen
+// id against the fallback and failed on all three — not because anything was wrong,
+// but because the OWNER had switched the model on the live site. §13.32: a harness
+// states the configuration it asserts against rather than inheriting it. The fixed
+// model is §9f's subject and is asserted there.
+$zz_full_was = bhela_test_settings_set( array( 'inv_model' => 'shares' ) );
 list( $m, $sub, $hooks ) = zz_menu( $admin_id );
 
 $bookings = 'edit.php?post_type=bhela_booking';
@@ -605,12 +615,28 @@ echo "\n=== 9f. hiding a share-era row does not take its page away ===\n";
 // must still render, because somebody may hold a certificate citing a run that only
 // those screens can show. Passing `null` as the parent is what buys that — dropping the
 // add_submenu_page() call entirely would make the URL 404.
-$zz_model_was = get_option( 'bhela_bm_settings', array() );
-$zz_s         = bhela_bm_get_settings();
+// Not `bhela_bm_get_settings()` — that hands back the defaults merged in, and writing
+// them back would store a copy of every default the owner has never saved. §4b below
+// asserts the Settings screen renders `inv_model`, which is exactly the kind of check
+// that stops meaning anything once the defaults are materialised.
+// Hand the owner's own setting back BEFORE §9f snapshots it, or §9f would restore the
+// `shares` that §9 pinned rather than whatever the site actually runs on.
+update_option( 'bhela_bm_settings', $zz_full_was );
 
-$zz_s['inv_model'] = 'fixed';
-update_option( 'bhela_bm_settings', $zz_s );
+$zz_keys_was       = array_keys( is_array( get_option( 'bhela_bm_settings', array() ) ) ? get_option( 'bhela_bm_settings', array() ) : array() );
+$zz_model_was      = bhela_test_settings_set( array( 'inv_model' => 'fixed' ) );
 list( $fm, $fsub ) = zz_menu( $admin_id );
+
+// The discriminator for the helper itself: overriding one setting must not store a
+// copy of every default beside it. `bhela_bm_get_settings()` returns the defaults
+// merged in, so writing that back turns "never saved, falling back" into "explicitly
+// set to today's default" for thirty-odd keys at once — and every later assertion in
+// the suite about an absent setting quietly stops meaning anything.
+$zz_keys_now = array_keys( is_array( get_option( 'bhela_bm_settings', array() ) ) ? get_option( 'bhela_bm_settings', array() ) : array() );
+$zz_gained   = array_values( array_diff( $zz_keys_now, $zz_keys_was, array( 'inv_model' ) ) );
+ok( array() === $zz_gained,
+	'forcing one setting stores one setting, not the whole default table',
+	$zz_gained ? count( $zz_gained ) . ' extra: ' . implode( ',', array_slice( $zz_gained, 0, 6 ) ) : 'none' );
 
 $zz_cap_rows = wp_list_pluck( $fsub['bhela-bm-investments'] ?? array(), 2 );
 foreach ( array( 'bhela-bm-dist', 'bhela-bm-valuation', 'bhela-bm-share-issue' ) as $zz_gone ) {

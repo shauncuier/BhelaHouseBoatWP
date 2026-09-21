@@ -297,6 +297,33 @@ function bhela_test_owner_options() {
 	);
 }
 
+/**
+ * Override settings for a harness, WITHOUT materialising the defaults.
+ *
+ * The idiom across the suite is `$s = bhela_bm_get_settings(); $s['x'] = ...;
+ * update_option( 'bhela_bm_settings', $s );` — and `bhela_bm_get_settings()` returns the
+ * stored array MERGED OVER `bhela_bm_default_settings()`. Writing that back stores a
+ * literal copy of every default the owner had never saved, so for the rest of the run
+ * "unset, falling back to the default" and "explicitly set to today's default" are
+ * indistinguishable. That is the exact distinction §13.62 and §13.87 are about: a
+ * setting with no UI behaves correctly only while it is absent, and a harness that fills
+ * it in is a harness that cannot see the bug.
+ *
+ * Writing the STORED array plus the override keeps absent keys absent.
+ *
+ * @param array $overrides key => value to force.
+ * @return array The stored array as it was, to hand back to update_option().
+ */
+function bhela_test_settings_set( $overrides ) {
+	$before = get_option( 'bhela_bm_settings', array() );
+	$s      = is_array( $before ) ? $before : array();
+	foreach ( (array) $overrides as $k => $v ) {
+		$s[ $k ] = $v;
+	}
+	update_option( 'bhela_bm_settings', $s );
+	return $before;
+}
+
 function bhela_test_restore_period_index() {
 	// sweep.php rewrites the period index on purpose — that is its job, and restoring
 	// a snapshot over the top would undo the repair it just made.

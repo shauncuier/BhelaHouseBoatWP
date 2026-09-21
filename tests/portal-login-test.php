@@ -441,6 +441,28 @@ ok( in_array( 'name', $pl_form_keys, true ), 'plus the name, which on the record
 ok( count( bhela_bm_signup_file_keys() ) >= 3, 'and the three document fields take real uploads',
 	implode( ',', bhela_bm_signup_file_keys() ) );
 
+// The sharing runs BOTH ways, and the second direction is the one that bites. A field
+// added to the registry for the office — `tin`, a portrait — appears on the public form
+// automatically, asked of anonymous applicants, before anybody has decided they are an
+// investor at all. Naming them in the skip list is the decision; this is what forces the
+// decision to be made. A public field with no Bangla label has not been considered:
+// every one that is genuinely wanted out here has wording written for it, and the two
+// that were not showed up in English halfway down a Bangla page.
+$pl_unlabelled = array();
+foreach ( array_keys( bhela_bm_signup_keys() ) as $pl_fk ) {
+	if ( ! isset( bhela_bm_signup_labels()[ $pl_fk ] ) ) {
+		$pl_unlabelled[] = $pl_fk;
+	}
+}
+ok( array() === $pl_unlabelled,
+	'every field the public form asks for has been given Bangla wording on purpose',
+	$pl_unlabelled ? implode( ',', $pl_unlabelled ) : 'all labelled' );
+
+foreach ( array( 'tin', 'photo' ) as $pl_office ) {
+	ok( ! in_array( $pl_office, $pl_form_keys, true ),
+		"the office-only field '$pl_office' is not asked of the public" );
+}
+
 // The sanitiser is the shared one, so a select cannot be posted a value it does not
 // have and a date cannot be posted a sentence.
 ok( '' === bhela_bm_investor_field_sanitize( array( 'type' => 'select', 'options' => array( 'cash' => 'Cash' ) ), 'wire-me-money' ),

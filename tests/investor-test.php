@@ -26,11 +26,22 @@ wp_set_current_user( 1 );
 // is exactly what happened: a genuine 10-share round took the configured total to 125,
 // and ten assertions here failed at once looking like a distribution bug. Restored by
 // the bootstrap's owner-option guard, which is why bhela_bm_settings is on that list.
-$iv_cfg = bhela_bm_get_settings();
-$iv_cfg['inv_total_shares']     = 115;
-$iv_cfg['inv_per_share']        = 100000;
-$iv_cfg['inv_total_investment'] = 11500000;
-update_option( 'bhela_bm_settings', $iv_cfg );
+//
+// `inv_model` belongs on that list for a sharper reason than the three below it. This
+// whole harness is about the SHARE model, and `bhela_bm_dist_commit()` refuses outright
+// once the owner switches to fixed-return (§13.80) — correctly, because two engines must
+// never both pay. The owner did switch it, and sixteen assertions failed at once reading
+// like a distribution bug when the only thing that had changed was a setting. Inheriting
+// it also meant this harness silently stopped testing the share engine at all.
+//
+// Through bhela_test_settings_set() rather than bhela_bm_get_settings(), so the defaults
+// are not materialised into the owner's stored option on the way past — §13.93.
+$iv_cfg_was = bhela_test_settings_set( array(
+	'inv_model'             => 'shares',
+	'inv_total_shares'      => 115,
+	'inv_per_share'         => 100000,
+	'inv_total_investment'  => 11500000,
+) );
 
 $iv_month = '2026-07';
 $iv_made  = array();
@@ -1173,5 +1184,7 @@ foreach ( $iv_made as $z ) {
 	wp_delete_post( $z, true );
 }
 bhela_test_delete( $iv_sheet );
+
+update_option( 'bhela_bm_settings', $iv_cfg_was );
 
 bhela_test_done();

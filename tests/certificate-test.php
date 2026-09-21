@@ -297,6 +297,103 @@ $ct_legacy_body = is_wp_error( $ct_legacy_get ) ? '' : wp_remote_retrieve_body( 
 ok( false !== strpos( $ct_legacy_body, '265,230' ), 'with the figures exactly as they were issued' );
 ok( false !== strpos( $ct_legacy_body, 'BHL-PFT-2099-0001' ), 'under its original number' );
 
+echo "\n=== 7b. a version replaces THAT document, not another one ===\n";
+
+// bhela_bm_cert_issue() checked only that the type matched. An investor with two live
+// investments could therefore have investment A's certificate reissued as the next
+// version of a certificate about investment B: A's base number would be reused, A's
+// holder would be told their paper was superseded, and the replacement would describe
+// somebody else's money. Nothing about the resulting document would look wrong.
+$ct_inv2 = ct_investment( $ct_a, 200000 );
+ok( $ct_inv2 > 0, 'the same investor takes a second investment', (string) $ct_inv2 );
+
+$ct_cross = bhela_bm_cert_issue( array(
+	'type' => 'investment', 'investment' => $ct_inv2, 'replaces' => $ct_v2,
+) );
+ok( is_wp_error( $ct_cross ) && 'other_investment' === $ct_cross->get_error_code(),
+	'a version of another investment\'s certificate is refused',
+	is_wp_error( $ct_cross ) ? $ct_cross->get_error_code() : 'ISSUED' );
+if ( ! is_wp_error( $ct_cross ) ) {
+	$GLOBALS['ct_made'][] = (int) $ct_cross;
+}
+ok( 0 === (int) bhela_bm_cert_data( $ct_v2 )['superseded'],
+	'and the certificate it aimed at is untouched' );
+
+// Another investor entirely, which is the same mistake one step further out.
+$ct_c     = ct_investor( 'ZZ Cert Other', '01700000009', '1990123456799' );
+$ct_inv3  = ct_investment( $ct_c, 400000 );
+$ct_cross2 = bhela_bm_cert_issue( array(
+	'type' => 'investment', 'investment' => $ct_inv3, 'replaces' => $ct_v2,
+) );
+ok( is_wp_error( $ct_cross2 ) && in_array( $ct_cross2->get_error_code(), array( 'other_investment', 'other_investor' ), true ),
+	'so is another investor\'s',
+	is_wp_error( $ct_cross2 ) ? $ct_cross2->get_error_code() : 'ISSUED' );
+if ( ! is_wp_error( $ct_cross2 ) ) {
+	$GLOBALS['ct_made'][] = (int) $ct_cross2;
+}
+
+// A pre-versioning certificate has no base, so there is nothing to take the next
+// version OF. It used to fall through to the number builder and come back "could not
+// create certificate number", which reads as a numbering fault and tells the office
+// nothing about what to do instead.
+$ct_nobase = bhela_bm_cert_issue( array(
+	'type' => 'profit', 'investment' => $ct_inv, 'replaces' => $ct_old_id,
+) );
+ok( is_wp_error( $ct_nobase ) && 'no_base' === $ct_nobase->get_error_code(),
+	'a certificate from before versioning cannot be versioned, and says so',
+	is_wp_error( $ct_nobase ) ? $ct_nobase->get_error_code() : 'ISSUED' );
+if ( ! is_wp_error( $ct_nobase ) ) {
+	$GLOBALS['ct_made'][] = (int) $ct_nobase;
+}
+
+echo "\n=== 7c. a version whose supersede fails is not a version ===\n";
+
+// bhela_bm_cert_supersede() returns a WP_Error and the return was discarded, so a
+// failure left V2 published with V1 never marked — and bhela_bm_verify_lookup() would
+// then report BOTH as valid for one document, which is the single state versioning
+// exists to prevent. The failure is forced here by revoking the capability AFTER the
+// issue's own check has passed: `_bhela_crt_at` is the last meta the issue writes, so
+// the hook fires in the gap between writing the record and marking the old one.
+$ct_v2_before = (int) bhela_bm_cert_data( $ct_v2 )['superseded'];
+$ct_certs_before = ct_count_certs();
+$GLOBALS['ct_block_super'] = false;
+
+$ct_arm = function ( $mid, $post_id, $key ) {
+	if ( '_bhela_crt_at' === $key ) {
+		$GLOBALS['ct_block_super'] = true;
+	}
+};
+add_action( 'added_post_meta', $ct_arm, 10, 3 );
+add_action( 'updated_post_meta', $ct_arm, 10, 3 );
+$ct_deny = function ( $caps ) {
+	if ( ! empty( $GLOBALS['ct_block_super'] ) ) {
+		$caps['bhela_investor_cert'] = false;
+	}
+	return $caps;
+};
+add_filter( 'user_has_cap', $ct_deny );
+
+$ct_halfway = bhela_bm_cert_issue( array(
+	'type' => 'investment', 'investment' => $ct_inv, 'replaces' => $ct_v2,
+	'reason' => 'ZZ supersede will fail',
+) );
+
+remove_filter( 'user_has_cap', $ct_deny );
+remove_action( 'added_post_meta', $ct_arm, 10 );
+remove_action( 'updated_post_meta', $ct_arm, 10 );
+$GLOBALS['ct_block_super'] = false;
+
+ok( is_wp_error( $ct_halfway ), 'the issue reports the failure rather than returning an id',
+	is_wp_error( $ct_halfway ) ? $ct_halfway->get_error_code() : 'ID ' . (int) $ct_halfway );
+if ( ! is_wp_error( $ct_halfway ) ) {
+	$GLOBALS['ct_made'][] = (int) $ct_halfway;
+}
+ok( $ct_v2_before === (int) bhela_bm_cert_data( $ct_v2 )['superseded'],
+	'V1 is left exactly as it was' );
+ok( $ct_certs_before === ct_count_certs(),
+	'and no half-issued certificate is left behind',
+	$ct_certs_before . ' -> ' . ct_count_certs() );
+
 echo "\n=== 13. the capabilities are in two hands ===\n";
 
 bhela_bm_install_roles();

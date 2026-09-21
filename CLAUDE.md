@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-09-21 · Theme & Plugin v2.40.0 (single shared version)
+> Last updated: 2026-09-21 · Theme & Plugin v2.41.0 (single shared version)
 
 ---
 
@@ -572,6 +572,10 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 | `bhela_bm_capital_void($id,$reason)` | `includes/capital.php` | A mistake is voided with a reason. There is no delete path |
 | `bhela_bm_capital_drift($inv)` | `includes/capital.php` | Dated rows vs `_bhela_inv_amount`. **Reports, never corrects** |
 | `bhela_bm_cert_preview($type,$inv,$window)` | `includes/certificates.php` | Pure. Exactly what issuing would freeze |
+| `bhela_bm_month_step($date,$n)` | `includes/investment.php` | A date `$n` months on, **clamped** to the target month's length. PHP's own `+1 month` overflows — §13.89 |
+| `bhela_bm_investment_months($start,$maturity)` | `includes/investment.php` | Whole months, **exact**. A sub-month term is 0, and a month-based method then refuses to activate |
+| `bhela_bm_investment_code_map($codes)` | `includes/profit-engine.php` | Code ⇒ investment id **for the codes asked about**. Uncapped by construction — §13.92 |
+| `bhela_bm_ledger_reversed_set($ids)` | `includes/profit-engine.php` | Which of these rows have a contra row. Asked once, not once per row |
 | `bhela_bm_cert_issue($args)` | `includes/certificates.php` | Mints a number and stores the preview **verbatim**. The one writer |
 | `bhela_bm_cert_data($id)` | `includes/certificates.php` | Reads the STORED snapshot. Nothing is recomputed — see §13.75 |
 | `bhela_bm_investor_model()` | `includes/investment.php` | `shares` or `fixed`. The gate that stops two engines paying the same money |
@@ -1026,6 +1030,122 @@ valuation and share issue stays reachable by URL. Dropping the `add_submenu_page
 behind `bhela_bm_admin_url()`: a slug missing from it resolves to the `bookings` group, and the
 URL helper then emits an `edit.php` link the legacy shim explicitly refuses to rescue.
 §9f asserts all of it — no row, menu intact, URL resolves, page still draws.
+
+89. **PHP's `+1 month` overflows, and a profit schedule stepped with it loses a month.**
+`strtotime( '2024-01-31 +1 month' )` is **2 March** — 31 February normalised forward. The
+period walk added a month to the PREVIOUS cursor, so an investment beginning on the 31st ran
+its first monthly period 31 Jan → 1 Mar with February swallowed whole, and every later
+boundary drifted to the 2nd of the month for the rest of the term. Not cosmetic:
+`bhela_bm_profit_post()` dates each ledger row `$period['to']`, so January AND February's
+profit landed on 1 March and the Monthly Statement deducted both from March.
+`bhela_bm_month_step()` clamps instead of overflowing, and **every boundary is now measured
+from the start date** rather than from its predecessor, so an error cannot compound.
+
+Beside it, `bhela_bm_investment_months()` rounded up whenever the leftover day count reached
+27. That read the 01 Jul → 30 Jun case correctly and also priced a **28-day** term as a whole
+month — about 10% more profit than was earned. It is exact now (the largest `n` whose
+anniversary of the start still falls inside the term), which makes a sub-month term measure
+zero — so `bhela_bm_investment_blockers()` refuses to activate one on a month-based method
+and names the day-based method instead. Every other fixture in `profit-test.php` started on
+the 1st, which is why nothing caught either. §3b and §3c pin them, revert-verified.
+
+90. **A shared field registry runs BOTH ways, and the second direction is the one that
+bites.** §13.70 records moving `bhela_bm_investor_fields()` out of the admin screen so the
+public registration form could read it — one list, no drift. The consequence nobody wrote
+down: a field added to that registry **for the office** appears at `/investor-register/`
+automatically. `tin` (a tax identifier) and `photo` (a portrait) were added for the record
+and became questions put to anonymous applicants, on a form whose whole point (§13.69) is
+that it asks for as little as possible before anybody has decided the person is an investor.
+They are in `bhela_bm_signup_skip_fields()` now. The guard that makes the decision unavoidable
+is not a list of forbidden keys but `portal-login-test.php` §12: **every field the public form
+renders must have Bangla wording written for it**. A field nobody considered has no entry in
+`bhela_bm_signup_labels()`, falls back to the registry's English, and fails the suite — which
+is also exactly how these two looked on screen.
+
+91. **A version replaces THAT document, and a discarded `WP_Error` leaves two valid ones.**
+`bhela_bm_cert_issue()` checked only that the type matched, so an investor with two live
+investments could have investment A's certificate reissued as the next version of a
+certificate about investment B: A's base number reused, A's holder told their paper was
+superseded, and the replacement describing somebody else's money — with nothing about the
+resulting document looking wrong. It now refuses `other_investment` / `other_investor`, and
+the dropdown on the issue screen stops offering them.
+
+Separately, `bhela_bm_cert_supersede()` returns a `WP_Error` and the return was **thrown
+away**. A failure left V2 published with V1 never marked, and `bhela_bm_verify_lookup()` then
+reports **both as valid for one document** — the single state versioning exists to prevent. A
+failed supersede now unwinds the half-done issue through `bhela_bm_val_delete()`, the
+sanctioned path §13.65 built for exactly this shape of abort. And a certificate with **no
+base** predates versioning, which is now said in those words: it used to fall through to the
+number builder and come back "could not create certificate number", a numbering fault that
+gives no hint the answer is to issue a fresh certificate. That check runs FIRST, because it
+is the more specific diagnosis — a legacy snapshot has no `investment` either, so the
+cross-record guard would otherwise answer with the less useful message.
+
+`certificate-test.php` §7c forces the supersede failure by revoking the capability on
+`added_post_meta` for `_bhela_crt_at`, the last meta the issue writes — the gap between
+writing the record and marking the old one. Note §13.56's trap appearing again: run against
+fully-reverted code, §7c **passed**, because §7b's cross-record issue had already succeeded
+and left the number colliding. Reverting only the rollback is what proved it — the orphan V2
+was left behind, 8 certificates became 9.
+
+92. **A cap on a listing is a paging decision; a cap on a figure is a wrong figure.**
+`bhela_bm_profit_accrued()` resolved each ledger row's investment code through a map built by
+LISTING investments, capped at `bhela_bm_investment_limit()` — 500. An investment past that
+cap resolved to nothing, its approved profit was silently dropped, and the Monthly Statement
+then reported a gross profit **higher than the truth**. Same family as
+`bhela_bm_payreq_pending_total()` (§13.40) and the opposite trade-off from §13.66: the fix
+here is not raising the cap or dropping to SQL, but asking a **bounded question** — resolve
+only the codes present on the rows, so the work is bounded by the window rather than by how
+many investments exist, and it stays inside `WP_Query` where `posts_where` still applies.
+
+The same function walked `bhela_bm_investors()` and read each one's WHOLE ledger to keep one
+month of it, plus a query per row to ask whether it had been reversed. The statement calls it
+once; the Yearly Report calls it twelve times. `profit-test.php` §10b measures the
+**marginal** cost per added investor (§13.57): 3.00 queries for the per-investor reader, 0.00
+for the window reader, and the accrual itself 0 against 5,000 under a squeezed cap.
+
+93. **Writing `bhela_bm_get_settings()` back into the option stores every default beside the
+one you meant to change.** The suite's idiom is `$s = bhela_bm_get_settings(); $s['x'] = …;
+update_option( 'bhela_bm_settings', $s )` — and that reader returns the stored array **merged
+over** `bhela_bm_default_settings()`. Writing it back materialises a literal copy of every
+default the owner never saved, so for the rest of the run "unset, falling back" and
+"explicitly set to today's default" become indistinguishable. That is precisely the
+distinction §13.62 and §13.87 are about, and a harness that fills those keys in is a harness
+that cannot see the bug. `bhela_test_settings_set()` writes the STORED array plus the
+override; `ui-test.php` §9f asserts the key set does not grow, and against the old idiom it
+fails naming five keys — `doc_prefix`, `inv_day_basis` and the three `cert_*` settings, all
+added this release and all still correctly absent from the owner's saved options. The other
+call sites across the suite still use the old idiom; they are covered by the shutdown restore
+in `bootstrap.php` (§13.26) and are a mechanical follow-up, not a live fault.
+
+94. **Switching `inv_model` broke two harnesses, and both were §13.32 in a new place.**
+The v2.41.0 release gate failed on a green tree: nineteen of twenty-one, then twenty of
+twenty-one, on a suite that had passed three consecutive times an hour earlier. Nothing in
+the diff was responsible — the **owner had switched the investor model to `fixed` on the
+live site**, which is the whole point of the setting §13.87 added.
+
+*`investor-test`*, sixteen failures. It is entirely about the share engine, and
+`bhela_bm_dist_commit()` refuses outright under the fixed model (§13.80) — correctly. It
+already carried a §13.32 comment and already pinned `inv_total_shares`, `inv_per_share` and
+`inv_total_investment`; `inv_model` simply did not exist when that block was written. Worse
+than the red suite: had the model been switched quietly, this harness would have gone on
+"passing" while testing nothing, because every assertion downstream of the refused commit
+was measuring zeros.
+
+*`ui-test` §9c*, three failures. It cross-checks each screen's hardcoded id against the menu
+that just registered. Under `fixed`, three Capital rows register with a `null` parent
+(§13.88), so they land in `$submenu['']`, `$hooks['']` does not exist, and the expected
+parent falls back to Bookings — `want bhela_booking_page_bhela-bm-dist, have
+capital_page_bhela-bm-dist`, which reads as a menu regression and is not one. §9 to §9e are
+about the FULL menu, so §9 now pins `shares` and hands the owner's value back **before** §9f
+snapshots it; §9f remains the place the fixed model is asserted.
+
+Two things worth carrying forward. **A setting that changes which code paths are live is not
+in the same class as a setting that changes a number** — it needs pinning in every harness
+whose subject it can switch off, and the audit is "which harnesses assert about the thing
+this setting disables", not "which harnesses read it". And the release gate earned its
+keep exactly as §8 step 3 says it would: this was caught by running the suite before
+tagging, on a tree whose own changes were all green.
 
 > **Deployment: the portal must be served over HTTPS.** The sign-in form posts a password, and `wp_signon()` marks the session cookie secure only when `is_ssl()` is true. Over plain HTTP an investor's credentials and their session travel in clear on the network, and no amount of code here can compensate for it. This is the one item on this list that is a hosting decision rather than a bug.
 

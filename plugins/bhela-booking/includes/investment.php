@@ -343,6 +343,13 @@ function bhela_bm_investment_blockers( $id ) {
 	if ( '' === $r['frequency'] ) {
 		$out[] = __( 'লাভ পরিশোধের সময়সূচি নির্বাচন করুন।', 'bhela-booking' );
 	}
+	// Every method except the day-based one measures in whole months, so a term shorter
+	// than one month accrues nothing at all. Refusing is better than activating an
+	// investment that will quietly earn zero for its whole life.
+	if ( 'day_based' !== $r['method'] && $r['start'] && $r['maturity']
+		&& $r['maturity'] > $r['start'] && $r['months'] < 1 ) {
+		$out[] = __( 'এক মাসের কম মেয়াদে মাসভিত্তিক পদ্ধতিতে কোনো লাভ হিসাব হয় না — দিনভিত্তিক পদ্ধতি বেছে নিন।', 'bhela-booking' );
+	}
 	// Every method needs a rate, including profit_share — there the rate IS the
 	// investor's agreed share of distributable profit, which is the brief's own
 	// `Distributable Profit × Investor Share %`. Taking that share from the share
@@ -412,21 +419,54 @@ function bhela_bm_investment_transition( $id, $to, $reason = '' ) {
  * Reading
  * ========================================================= */
 
-/** How many whole months a term runs. Derived, never stored (§13.8). */
+/**
+ * A date `$n` months on, clamped to the target month's length.
+ *
+ * PHP's own `+1 month` OVERFLOWS: `strtotime( '2024-01-31 +1 month' )` is 2 March,
+ * because 31 February is normalised forward. Stepping a schedule with it made the first
+ * monthly period of an investment starting on the 31st run 31 Jan → 1 Mar — February
+ * swallowed whole — and every later period drift to the 2nd of the month permanently.
+ * Anchoring to the start date and clamping the day is what keeps 31 Jan → 29 Feb →
+ * 31 Mar, with no drift and no month skipped.
+ */
+function bhela_bm_month_step( $date, $n ) {
+	$d     = new DateTimeImmutable( $date );
+	$day   = (int) $d->format( 'j' );
+	$first = $d->modify( 'first day of this month' )->modify( sprintf( '%+d month', (int) $n ) );
+	return $first->setDate(
+		(int) $first->format( 'Y' ),
+		(int) $first->format( 'n' ),
+		min( $day, (int) $first->format( 't' ) )
+	)->format( 'Y-m-d' );
+}
+
+/**
+ * How many WHOLE months a term runs. Derived, never stored (§13.8).
+ *
+ * Exact rather than approximate: the largest `n` whose n-month anniversary of the start
+ * still falls inside the term. A term written 01 Jul 2026 → 30 Jun 2027 is twelve
+ * months because 01 Jul 2027 is exactly the day after it ends.
+ *
+ * The first version rounded up whenever the leftover day count reached 27, which read
+ * the twelve-month case correctly and then also priced a 28-DAY term as a full month —
+ * about 10% more profit than was earned. A term shorter than one payment period now
+ * returns 0 and `bhela_bm_investment_blockers()` refuses to activate it on a
+ * month-based method, which is the honest answer: use the day-based method for that.
+ */
 function bhela_bm_investment_months( $start, $maturity ) {
+	$start    = bhela_bm_report_date( $start );
+	$maturity = bhela_bm_report_date( $maturity );
 	if ( '' === $start || '' === $maturity || $maturity <= $start ) {
 		return 0;
 	}
-	$a = new DateTimeImmutable( $start );
-	$b = new DateTimeImmutable( $maturity );
-	$d = $a->diff( $b );
-	$m = ( (int) $d->y * 12 ) + (int) $d->m;
-	// A term written 01 Jul 2026 → 30 Jun 2027 is twelve months, not eleven and
-	// twenty-nine days. Anything past the 27th closes the month.
-	if ( (int) $d->d >= 27 ) {
-		$m++;
+	// The day AFTER the term ends, so a term closing the day before its anniversary
+	// counts as whole.
+	$ends = gmdate( 'Y-m-d', strtotime( $maturity . ' +1 day' ) );
+	$n    = 0;
+	while ( $n < 1200 && bhela_bm_month_step( $start, $n + 1 ) <= $ends ) {
+		$n++;
 	}
-	return max( 0, $m );
+	return $n;
 }
 
 /**

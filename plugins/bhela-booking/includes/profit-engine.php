@@ -245,19 +245,26 @@ function bhela_bm_profit_schedule( $inv ) {
 		// Paid at maturity: one period covering the whole term.
 		$periods[] = array( 'from' => $start, 'to' => $maturity );
 	} else {
-		$cursor = $start;
-		$guard  = 0;
-		while ( $cursor <= $maturity && $guard++ < 600 ) {
-			$next = gmdate( 'Y-m-d', strtotime( $cursor . ' +' . $step . ' month' ) );
+		// Every boundary is measured from the START, not from the previous one. Adding
+		// a month to the previous cursor compounds PHP's month-overflow: an investment
+		// beginning on the 31st lost February and then drifted a day further every
+		// period. bhela_bm_month_step() clamps instead of overflowing.
+		$guard = 0;
+		for ( $k = 0; $k < 600; $k++ ) {
+			$from = bhela_bm_month_step( $start, $k * $step );
+			if ( $from > $maturity ) {
+				break;
+			}
+			$next = bhela_bm_month_step( $start, ( $k + 1 ) * $step );
 			$end  = gmdate( 'Y-m-d', strtotime( $next . ' -1 day' ) );
 			if ( $end >= $maturity ) {
 				$end = $maturity;             // the last period always closes on maturity
 			}
-			$periods[] = array( 'from' => $cursor, 'to' => $end );
+			$periods[] = array( 'from' => $from, 'to' => $end );
 			if ( $end >= $maturity ) {
 				break;
 			}
-			$cursor = $next;
+			$guard++;
 		}
 	}
 
@@ -269,7 +276,7 @@ function bhela_bm_profit_schedule( $inv ) {
 	foreach ( $periods as $i => $p ) {
 		$weights[ $i ] = ( 'day_based' === ( $inv['method'] ?? '' ) )
 			? bhela_bm_profit_days( $p['from'], $p['to'] )
-			: max( 1, bhela_bm_investment_months( $p['from'], gmdate( 'Y-m-d', strtotime( $p['to'] . ' +1 day' ) ) ) );
+			: max( 1, bhela_bm_investment_months( $p['from'], $p['to'] ) );
 	}
 	$split = bhela_bm_split_by_shares( $total, $weights, array_sum( $weights ) );
 
@@ -413,26 +420,92 @@ function bhela_bm_profit_post( $inv, $period ) {
 }
 
 /**
- * Investment code => post id, built once.
+ * Investment code => post id, for the codes ASKED ABOUT and no others.
  *
- * The per-row lookup was a query per ledger row, and the statement reads a month of
- * them — the same trap §13.52 describes on the Trip P&L list.
+ * It used to build the whole map by listing every investment up to
+ * `bhela_bm_investment_limit()` — 500 — and that cap was load-bearing in the worst way:
+ * an investment past it resolved to nothing, its accrued profit was quietly dropped from
+ * `bhela_bm_profit_accrued()`, and the Monthly Statement then reported a gross profit
+ * HIGHER than the truth with no warning anywhere. A cap on a listing is a paging
+ * decision; a cap on a figure is a wrong figure (§13.40's reason, one layer down).
+ *
+ * Resolving only the codes present on the rows removes the cap entirely, because the
+ * question is now bounded by the window rather than by how many investments exist. It
+ * stays inside WP_Query rather than dropping to SQL so `posts_where` — and with it the
+ * harnesses' post-type isolation — still applies (§13.66).
+ *
+ * @param string[] $codes Investment codes seen on the ledger rows.
+ * @return array<string,int>
  */
-function bhela_bm_investment_code_map() {
-	$map = array();
-	foreach ( get_posts( array(
+function bhela_bm_investment_code_map( $codes = null ) {
+	if ( is_array( $codes ) && ! $codes ) {
+		return array();
+	}
+
+	$args = array(
 		'post_type'      => 'bhela_investment',
 		'post_status'    => 'publish',
-		'posts_per_page' => bhela_bm_investment_limit(),
+		'posts_per_page' => -1,
 		'fields'         => 'ids',
 		'no_found_rows'  => true,
-	) ) as $id ) {
+	);
+	if ( is_array( $codes ) ) {
+		$args['meta_query'] = array(
+			array(
+				'key'     => '_bhela_ivm_code',
+				'value'   => array_values( array_unique( $codes ) ),
+				'compare' => 'IN',
+			),
+		);
+	}
+
+	$ids = get_posts( $args );
+	if ( function_exists( '_prime_post_caches' ) ) {
+		_prime_post_caches( $ids, false, true );   // one meta read for the lot
+	}
+
+	$map = array();
+	foreach ( $ids as $id ) {
 		$code = (string) get_post_meta( $id, '_bhela_ivm_code', true );
 		if ( '' !== $code ) {
 			$map[ $code ] = (int) $id;
 		}
 	}
 	return $map;
+}
+
+/**
+ * Which of these ledger rows have been reversed — asked once, not once per row.
+ *
+ * `bhela_bm_ledger_reversal_of()` is a query, and the accrual reader called it for every
+ * profit row in the window.
+ *
+ * @param int[] $ids Ledger row ids.
+ * @return array<int,true> Keyed by the id of each row that has a contra row against it.
+ */
+function bhela_bm_ledger_reversed_set( $ids ) {
+	$ids = array_values( array_filter( array_map( 'intval', (array) $ids ) ) );
+	if ( ! $ids ) {
+		return array();
+	}
+
+	$out = array();
+	foreach ( get_posts( array(
+		'post_type'      => 'bhela_inv_ledger',
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'meta_query'     => array(
+			array( 'key' => '_bhela_led_reverses', 'value' => $ids, 'compare' => 'IN' ),
+		),
+	) ) as $row ) {
+		$target = (int) get_post_meta( $row, '_bhela_led_reverses', true );
+		if ( $target ) {
+			$out[ $target ] = true;
+		}
+	}
+	return $out;
 }
 
 /**
@@ -460,35 +533,78 @@ function bhela_bm_profit_accrued( $from, $to ) {
 	if ( '' === $from || '' === $to ) {
 		return $out;
 	}
-	$codes = bhela_bm_investment_code_map();
+	// The window is asked for directly. Walking `bhela_bm_investors()` and reading each
+	// one's WHOLE ledger to keep a month of it cost a query per investor plus one per
+	// profit row — and the Monthly Statement calls this once, the Yearly Report twelve
+	// times. The work now scales with the rows in the window, not with how many investors
+	// exist or how long they have been on the register.
+	$ids = get_posts( array(
+		'post_type'      => 'bhela_inv_ledger',
+		'post_status'    => 'publish',
+		'posts_per_page' => -1,
+		'fields'         => 'ids',
+		'no_found_rows'  => true,
+		'meta_key'       => '_bhela_led_date',
+		'orderby'        => array( 'meta_value' => 'ASC', 'ID' => 'ASC' ),
+		'meta_query'     => array(
+			'relation' => 'AND',
+			array( 'key' => '_bhela_led_type', 'value' => 'profit' ),
+			array(
+				'key'     => '_bhela_led_date',
+				'value'   => array( $from, $to ),
+				'compare' => 'BETWEEN',
+				'type'    => 'CHAR',      // Y-m-d sorts and compares correctly as text
+			),
+		),
+	) );
+	if ( ! $ids ) {
+		return $out;
+	}
+	if ( function_exists( '_prime_post_caches' ) ) {
+		_prime_post_caches( $ids, false, true );
+	}
+
+	$rows = array();
+	foreach ( $ids as $id ) {
+		$r = bhela_bm_ledger_row( $id );
+		// A contra row is not an accrual; it is the cancellation of one.
+		if ( $r && ! $r['reverses'] ) {
+			$rows[] = $r;
+		}
+	}
+
+	$seen = array();
+	foreach ( $rows as $r ) {
+		$code = strtok( (string) $r['ref'], ':' );
+		if ( $code ) {
+			$seen[ $code ] = true;
+		}
+	}
+	$codes = bhela_bm_investment_code_map( array_keys( $seen ) );
 	if ( ! $codes ) {
 		return $out;
 	}
+	$reversed = bhela_bm_ledger_reversed_set( wp_list_pluck( $rows, 'id' ) );
 
-	foreach ( bhela_bm_investors() as $investor ) {
-		foreach ( bhela_bm_investor_ledger( $investor )['rows'] as $r ) {
-			if ( 'profit' !== $r['type'] || $r['date'] < $from || $r['date'] > $to ) {
-				continue;
-			}
-			// A reversed accrual never happened, exactly as it does not in the balance.
-			if ( bhela_bm_ledger_reversal_of( $r['id'] ) || $r['reverses'] ) {
-				continue;
-			}
-			$code = strtok( (string) $r['ref'], ':' );
-			if ( ! $code || ! isset( $codes[ $code ] ) ) {
-				continue;                    // not ours: a distribution, or an import
-			}
-			$out['total']  += $r['amount'];
-			$out['rows'][]  = array(
-				'investor'   => $investor,
-				'name'       => get_the_title( $investor ),
-				'investment' => $codes[ $code ],
-				'code'       => $code,
-				'date'       => $r['date'],
-				'amount'     => $r['amount'],
-				'ref'        => $r['ref'],
-			);
+	foreach ( $rows as $r ) {
+		// A reversed accrual never happened, exactly as it does not in the balance.
+		if ( isset( $reversed[ $r['id'] ] ) ) {
+			continue;
 		}
+		$code = strtok( (string) $r['ref'], ':' );
+		if ( ! $code || ! isset( $codes[ $code ] ) ) {
+			continue;                        // not ours: a distribution, or an import
+		}
+		$out['total']  += $r['amount'];
+		$out['rows'][]  = array(
+			'investor'   => (int) $r['investor'],
+			'name'       => get_the_title( (int) $r['investor'] ),
+			'investment' => $codes[ $code ],
+			'code'       => $code,
+			'date'       => $r['date'],
+			'amount'     => $r['amount'],
+			'ref'        => $r['ref'],
+		);
 	}
 	return $out;
 }

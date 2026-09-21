@@ -155,6 +155,83 @@ ok( $pf_odd_sum === $pf_odd_total,
 	'and the twelve periods still sum to it exactly',
 	$pf_odd_sum . ' vs ' . $pf_odd_total );
 
+echo "\n=== 3b. a term that starts at a month end ===\n";
+
+// The bug this pins: PHP's own `+1 month` OVERFLOWS. strtotime('2024-01-31 +1 month')
+// is 2 March, so stepping the schedule from the previous cursor made the first monthly
+// period run 31 Jan -> 1 Mar with February swallowed whole, and every later period
+// drifted to the 2nd of the month for the rest of the term. Nothing caught it because
+// every other fixture in this file starts on the 1st.
+//
+// It was not only cosmetic: bhela_bm_profit_post() dates each row $period['to'], so
+// January AND February's profit landed on 2024-03-01 and the Monthly Statement deducted
+// both of them from March.
+$pf_eom            = $pf_r;
+$pf_eom['start']   = '2024-01-31';
+$pf_eom['maturity'] = '2025-01-30';
+$pf_eom['months']  = bhela_bm_investment_months( '2024-01-31', '2025-01-30' );
+$pf_eom_sched      = bhela_bm_profit_schedule( $pf_eom );
+
+ok( 12 === $pf_eom['months'], '31 Jan to 30 Jan is twelve months', (string) $pf_eom['months'] );
+ok( 12 === count( $pf_eom_sched ), 'and twelve periods', (string) count( $pf_eom_sched ) );
+ok( '2024-01-31' === $pf_eom_sched[0]['from'] && '2024-02-28' === $pf_eom_sched[0]['to'],
+	'the first period ends inside February, not past it',
+	$pf_eom_sched[0]['from'] . ' -> ' . $pf_eom_sched[0]['to'] );
+ok( '2024-02-29' === $pf_eom_sched[1]['from'],
+	'the second starts on the clamped anniversary', $pf_eom_sched[1]['from'] );
+
+// No period may start before the previous one ended, and none may be skipped: the
+// periods must tile the term exactly.
+$pf_tiles = true;
+foreach ( $pf_eom_sched as $pf_i => $pf_p ) {
+	if ( $pf_i > 0 ) {
+		$pf_prev_end = $pf_eom_sched[ $pf_i - 1 ]['to'];
+		if ( $pf_p['from'] !== gmdate( 'Y-m-d', strtotime( $pf_prev_end . ' +1 day' ) ) ) {
+			$pf_tiles = false;
+		}
+	}
+}
+ok( $pf_tiles, 'the periods tile the term with no gap and no overlap' );
+ok( '2025-01-30' === $pf_eom_sched[11]['to'], 'and the last closes on maturity', $pf_eom_sched[11]['to'] );
+
+// The drift the old walk produced: by period four it had reached the 2nd of the month.
+$pf_drifted = false;
+foreach ( $pf_eom_sched as $pf_p ) {
+	if ( '02' === substr( $pf_p['from'], 8, 2 ) ) {
+		$pf_drifted = true;
+	}
+}
+ok( ! $pf_drifted, 'and no period has drifted onto the 2nd of a month' );
+
+$pf_eom_sum = 0;
+foreach ( $pf_eom_sched as $pf_p ) {
+	$pf_eom_sum += $pf_p['amount'];
+}
+ok( $pf_eom_sum === bhela_bm_profit_term_total( $pf_eom ),
+	'the month-end schedule still sums to the term total',
+	$pf_eom_sum . ' vs ' . bhela_bm_profit_term_total( $pf_eom ) );
+
+echo "\n=== 3c. a term shorter than one month ===\n";
+
+// The 27-day round-up priced 28 days as a whole month — about 10% more profit than was
+// earned. The month count is exact now, so a sub-month term measures zero months, and
+// activating it on a month-based method is refused rather than silently accruing zero.
+ok( 0 === bhela_bm_investment_months( '2024-07-01', '2024-07-28' ),
+	'28 days is not a month', (string) bhela_bm_investment_months( '2024-07-01', '2024-07-28' ) );
+ok( 1 === bhela_bm_investment_months( '2024-07-01', '2024-07-31' ),
+	'but a full calendar month is', (string) bhela_bm_investment_months( '2024-07-01', '2024-07-31' ) );
+
+$pf_short = pf_investment( $pf_a, array( 'maturity' => '2024-07-28' ) );
+$pf_short_block = bhela_bm_investment_blockers( $pf_short );
+$pf_short_named = false;
+foreach ( $pf_short_block as $pf_b ) {
+	if ( false !== mb_strpos( $pf_b, 'দিনভিত্তিক' ) ) {
+		$pf_short_named = true;
+	}
+}
+ok( $pf_short_named, 'a sub-month term on a monthly method is refused, and says to use day-based' );
+ok( is_wp_error( bhela_bm_investment_transition( $pf_short, 'active' ) ), 'so it cannot be activated' );
+
 echo "\n=== 4. nothing is owed until a person approves it ===\n";
 
 $pf_before = bhela_bm_settlement_investor( $pf_a );
@@ -250,6 +327,74 @@ ok( 5000 === $pf_after_dist['investor_profit']['total'],
 	'a profit row with no investment behind it is ignored',
 	(string) $pf_after_dist['investor_profit']['total'] );
 ok( $pf_after_dist['gross'] === $pf_fixed['gross'], 'so the statement does not move' );
+
+echo "\n=== 10b. no cap may hide an accrual, and the cost is the window ===\n";
+
+// The accrual reader resolved a ledger row's investment code through a map built by
+// LISTING investments, capped at bhela_bm_investment_limit() — 500. An investment past
+// that cap resolved to nothing, its approved profit was silently dropped, and the
+// Monthly Statement then reported a gross profit HIGHER than the truth. A cap on a
+// listing is a paging decision; a cap on a figure is a wrong figure.
+//
+// Forced here by squeezing the limit to 1, which is the same condition a 501st
+// investment produces on a live site and is reproducible in a harness.
+$pf_cap = function () {
+	return 1;
+};
+add_filter( 'bhela_bm_investment_limit', $pf_cap );
+$pf_capped = bhela_bm_statement_data( $pf_month );
+remove_filter( 'bhela_bm_investment_limit', $pf_cap );
+
+ok( 5000 === $pf_capped['investor_profit']['total'],
+	'the accrual is found however many investments exist',
+	(string) $pf_capped['investor_profit']['total'] );
+ok( $pf_capped['gross'] === $pf_fixed['gross'],
+	'so the month does not silently gain profit it has not made' );
+
+// And the cost. It used to walk bhela_bm_investors() and read each one's WHOLE ledger
+// to keep a single month of it — a query per investor, plus one per profit row to ask
+// whether it had been reversed. The Monthly Statement calls this once; the Yearly
+// Report calls it twelve times. The work must scale with the rows in the window, not
+// with how many people are on the register.
+//
+// Measured as a MARGINAL cost between two populations, per §13.57: an absolute count
+// moves with anything else that happens to query, the slope does not.
+$pf_extra = array();
+$pf_pop   = function ( $n ) use ( &$pf_extra ) {
+	for ( $i = 0; $i < $n; $i++ ) {
+		$id = pf_investor( 'ZZ Cost ' . count( $pf_extra ) );
+		// Dated well outside the window, so they add nothing to the answer — only to
+		// the work a per-investor reader would do.
+		bhela_bm_ledger_add( array(
+			'investor' => $id, 'type' => 'profit', 'amount' => 1000,
+			'date' => '2023-01-15', 'ref' => 'ZZ outside', 'note' => 'ZZ cost probe',
+		) );
+		$pf_extra[] = $id;
+	}
+};
+
+$pf_cost = function () use ( $pf_month ) {
+	wp_cache_flush();                     // or the second reading is served from cache
+	$before = get_num_queries();
+	bhela_bm_profit_accrued( $pf_month . '-01', $pf_month . '-31' );
+	return get_num_queries() - $before;
+};
+
+$pf_pop( 3 );
+$pf_cost_a = $pf_cost();
+$pf_pop( 3 );
+$pf_cost_b = $pf_cost();
+$pf_slope  = ( $pf_cost_b - $pf_cost_a ) / 3;
+
+// Measured both ways on this fixture: the per-investor reader costs one query for each
+// investor added, so its slope is 1. The window reader's is 0 — the three new people
+// are not in the window and cost nothing to ignore. Half a query per investor separates
+// them and survives an unrelated constant appearing at either end.
+ok( $pf_slope < 0.5,
+	'the accrual reader does not get more expensive as the register grows',
+	sprintf( '%d -> %d queries for +3 investors (slope %.2f)', $pf_cost_a, $pf_cost_b, $pf_slope ) );
+ok( 5000 === bhela_bm_profit_accrued( $pf_month . '-01', $pf_month . '-31' )['total'],
+	'and still answers with exactly the accrual in the window' );
 
 echo "\n=== 11. two engines never both pay ===\n";
 
