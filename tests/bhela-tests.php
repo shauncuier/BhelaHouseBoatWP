@@ -24,6 +24,51 @@
 // Boot WordPress: this file sits at wp-content/tests/.
 require_once dirname( __DIR__, 2 ) . '/wp-load.php';
 
+/**
+ * Is this a development site? The one check that stands between the suite and a
+ * production database.
+ *
+ * `tests/` is in the git repository. A production server deployed with `git pull`
+ * rather than the release ZIPs therefore HAS these files — and on such a server the
+ * database fallback below is plain `localhost`, i.e. the live database, while
+ * bhela-tests.php is reachable over HTTP. Every harness creates and deletes records;
+ * on 2026-09-23 one deleted a real administrator on the dev site (§13.95). So the
+ * suite refuses outright unless the site's own address is a development host:
+ * `*.local`, `*.test`, `*.localhost`, `localhost` or a loopback IP.
+ *
+ * A staging box with another name can opt in, deliberately and per host, with the
+ * environment variable BHELA_TESTS_ALLOWED_HOST=<exact host>. There is no blanket
+ * override.
+ */
+function bhela_tests_host_allowed( $url ) {
+	$host = strtolower( (string) wp_parse_url( (string) $url, PHP_URL_HOST ) );
+	if ( '' === $host ) {
+		return false;
+	}
+	$allowed = getenv( 'BHELA_TESTS_ALLOWED_HOST' );
+	if ( $allowed && strtolower( $allowed ) === $host ) {
+		return true;
+	}
+	if ( in_array( $host, array( 'localhost', '127.0.0.1', '::1', '[::1]' ), true ) ) {
+		return true;
+	}
+	foreach ( array( '.local', '.test', '.localhost' ) as $tld ) {
+		if ( substr( $host, -strlen( $tld ) ) === $tld ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// This file is reachable over HTTP wherever `tests/` is deployed, and it inserts
+// temporary bookings — which a live site's availability would count. Refused before
+// the capability check, so not even an administrator can run it on production.
+if ( ! bhela_tests_host_allowed( home_url() ) ) {
+	status_header( 404 );
+	exit;
+}
+
+
 if ( ! current_user_can( 'manage_options' ) ) {
 	wp_die( 'You need to be logged in as an administrator to run these tests.', 'Not allowed', array( 'response' => 403 ) );
 }

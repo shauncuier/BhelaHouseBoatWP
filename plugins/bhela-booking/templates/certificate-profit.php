@@ -26,6 +26,10 @@ $rate  = rtrim( rtrim( number_format( $snap['rate'], 2, '.', '' ), '0' ), '.' );
 
 			<p class="cert-sent">
 				<?php
+				// The span the profit was earned in. Older snapshots predate it and keep the
+				// window they were issued with — a frozen certificate is never re-worded.
+				$earned_from = (string) ( $snap['earned_from'] ?? $snap['from'] );
+				$earned_to   = (string) ( $snap['earned_to'] ?? $snap['to'] );
 				printf(
 					/* translators: 1: investor, 2: investor id, 3: investment id, 4: from, 5: to, 6: gross */
 					wp_kses(
@@ -35,8 +39,8 @@ $rate  = rtrim( rtrim( number_format( $snap['rate'], 2, '.', '' ), '0' ), '.' );
 					esc_html( $snap['name'] ),
 					esc_html( '' !== $snap['code'] ? $snap['code'] : '—' ),
 					esc_html( $snap['investment_id'] ),
-					esc_html( mysql2date( 'd M Y', $snap['from'] ) ),
-					esc_html( mysql2date( 'd M Y', $snap['to'] ) ),
+					esc_html( mysql2date( 'd M Y', $earned_from ) ),
+					esc_html( mysql2date( 'd M Y', $earned_to ) ),
 					esc_html( $money( $snap['gross'] ) )
 				);
 				?>
@@ -71,7 +75,7 @@ $rate  = rtrim( rtrim( number_format( $snap['rate'], 2, '.', '' ), '0' ), '.' );
 					</tr>
 					<tr>
 						<td><?php esc_html_e( 'লাভের সময়কাল · Profit period', 'bhela-booking' ); ?></td>
-						<td class="num"><?php echo esc_html( mysql2date( 'd M Y', $snap['from'] ) . ' — ' . mysql2date( 'd M Y', $snap['to'] ) ); ?></td>
+						<td class="num"><?php echo esc_html( mysql2date( 'd M Y', $earned_from ) . ' — ' . mysql2date( 'd M Y', $earned_to ) ); ?></td>
 					</tr>
 				</tbody>
 			</table>

@@ -3,7 +3,7 @@
 > **Purpose:** This is the canonical context document for AI assistants (Claude Code, Gemini, etc.) working on the BHELA WordPress project.
 > Commit this file to GitHub so it's available on any machine you clone to.
 >
-> Last updated: 2026-09-21 · Theme & Plugin v2.41.0 (single shared version)
+> Last updated: 2026-09-23 · Theme & Plugin v2.41.1 (single shared version)
 
 ---
 
@@ -139,7 +139,7 @@ wp-content/                          ← Git root
 │   ├── run.php                      ← CLI runner — loads the PHP extensions each harness needs
 │   ├── bootstrap.php                ← Boots WP, resolves the LocalWP DB port, provides ok()
 │   ├── sweep.php                    ← Clears ZZ* fixtures left by a crashed run
-│   ├── *-test.php                   ← 21 headless harnesses
+│   ├── *-test.php                   ← 22 headless harnesses
 │   └── bhela-tests.php              ← Older browser suite (open as an admin)
 │
 ├── docs/
@@ -728,12 +728,12 @@ Use the `bhela-release` skill (`.agents/skills/bhela-release/SKILL.md`) for the 
 php tests/run.php
 ```
 
-Twenty-one headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
+Twenty-two headless harnesses: security, the July 2026 statement reproduced to the taka, salary,
 cost heads, the cost-sheet save round trip, the booking save handler, the stock register, every
 admin screen, WCAG contrast, the front end behind a page cache, OTP, the SMS gateway, the six
 version fields, the yearly rollup, valuation, the portal's passwordless sign-in and
-self-registration, the settlement both ways, the certificates, the profit engine, and the QR
-encoder.
+self-registration, the settlement both ways, the certificates, the profit engine, the QR
+encoder, and one investment end to end through the rendered screens (`lifecycle-test.php`).
 Exits non-zero on failure. Any PHP 8.x binary works — `run.php` loads the extensions each
 harness needs, so never hand-build a `php -d extension=…` command. The site must be running.
 
@@ -756,7 +756,7 @@ See `tests/README.md` to add a harness. Claude Code users: the `bhela-test` skil
 
 ### Pre-Release Checks
 
-- [ ] `php tests/run.php` passes — all twenty-one harnesses
+- [ ] `php tests/run.php` passes — all twenty-two harnesses
 - [ ] All version numbers bumped and in sync
 - [ ] `git status` clean after version bump commit
 - [ ] ZIP files built with forward-slash paths (verify with ZipFile inspection)
@@ -1147,6 +1147,67 @@ this setting disables", not "which harnesses read it". And the release gate earn
 keep exactly as §8 step 3 says it would: this was caught by running the suite before
 tagging, on a tree whose own changes were all green.
 
+95. **A test harness deleted the site's real administrator, and the suite now makes that
+impossible.** On 2026-09-23 `lifecycle-test.php` created a throwaway admin with
+`wp_insert_user()`. A crashed earlier run had left that login behind, so the call returned a
+`WP_Error` — and **`(int)` of a `WP_Error` is 1**. The harness stored 1 as "its" user, ran as
+the real administrator, renamed it, and its cleanup called `wp_delete_user( 1 )`. With no
+reassign target WordPress also **trashed every page that user wrote** (home, booking, both
+portal pages, the blog) and **hard-deleted their media, files included** — two of which were
+the bKash and Nagad payment QR codes, which had no other copy and had to be re-uploaded.
+
+It was recovered from MySQL's **binary log**: LocalWP's MySQL 8 keeps one by default, in
+row-based format, so every deleted row is in `…/Local/run/<site-id>/mysql/data/binlog.NNNNNN`
+with its full before-image. `mysqlbinlog --base64-output=DECODE-ROWS -v` (MySQL's own binary,
+not MariaDB's) turns it into readable row images from which exact `INSERT`/`UPDATE`s can be
+rebuilt. Two traps in doing that: a trashed post's slug is renamed to `…__trashed` in an
+**earlier** UPDATE than the status change, so the status UPDATE's before-image already carries
+the suffix; and `wp_delete_user()` renamed nothing but the harness had — the display name had
+to come from a separate UPDATE's before-image.
+
+Three things now stand in the way, deliberately in layers:
+- **`tests/bootstrap.php` refuses to delete any user this run did not create** (tracked on
+  `user_register`), other than a `zz_` login left by a crashed run. It hooks `delete_user` at
+  priority −9999, which WordPress fires **before** it touches a single post or row, and stops
+  the process. It does not trust any harness to compute an id correctly.
+- **A user id is never cast out of a possible `WP_Error`.** Check `is_wp_error()` and that the
+  id is greater than 1 before using it — `lifecycle-test.php` now does both.
+- **`security-test.php` §9 fails if any shipped theme or plugin file calls `wp_delete_user`,
+  `wpmu_delete_user`, `remove_user_from_blog`, or deletes from the users table.** Production
+  code has never had such a call; this keeps it that way. Verified by planting one.
+
+96. **The browser run found eleven defects the green suite could not see, because every
+harness called data functions and none drew a page.** `lifecycle-test.php` now replays that
+run — investor, agreement, investment, receipts, approval, statement, yearly report, payment,
+certificates, documents, portal — and **renders each screen**. Each of its assertions was
+verified by reverting its fix alone. In short:
+- **A top-up re-priced months already approved and paid.** A receipt now earns only from the
+  day it arrives (pro rata for the period it lands in), via `bhela_bm_profit_held()`; with a
+  single receipt at the start the original arithmetic runs untouched. An approved period always
+  shows its **posted** figure, and `drift` names any difference rather than restating it.
+- **The Monthly Statement subtracted investor profit and printed no line for it**, and the
+  **Yearly Report had no column for it or for B2B commission**, so its rows did not add up and
+  an accrual-only month drew as "—". `bhela_bm_yearly_idle()` is the one definition of an idle
+  month now.
+- **"Invested ৳0"** for every fixed-return investor: `bhela_bm_investor_roi()` counted the share
+  register only. It adds `bhela_bm_investor_principal()` now; `bhela_bm_investor_amount()` is
+  untouched (§13.61).
+- **A profit certificate stated the whole term as the period it covered.** `earned_from` /
+  `earned_to` are the span of the periods actually included; the window is still what payments
+  are counted over.
+- **Certificate signatures were read live**, so renaming or deleting a staff account rewrote
+  paper already issued. `signoff` is frozen into the record at issue (§13.75).
+- **Receipts and the account statement were built and linked from nowhere.** The Investments
+  screen links each capital receipt; the Investor Report links each payment receipt and the
+  statement.
+- **The portal's Month column was blank** for fixed-model rows (it keyed on `ref`, which is a
+  period key there), it told a ৳5,00,000 investor **"0 of 125 shares"**, and it printed a PHP
+  warning into the certificate list.
+- **Every profit period arrived pre-ticked**, so one click posted a year of irreversible rows.
+- **Documents overflowed a phone** (406px in 360px); `doc-style.php` has a screen-only phone rule.
+- **Every edit screen of a moved post type highlighted Bookings.** `bhela_bm_menu_highlight()`
+  sets `parent_file` from the same map that moves the rows, `bhela_bm_menu_cpt_groups()`.
+
 > **Deployment: the portal must be served over HTTPS.** The sign-in form posts a password, and `wp_signon()` marks the session cookie secure only when `is_ssl()` is true. Over plain HTTP an investor's credentials and their session travel in clear on the network, and no amount of code here can compensate for it. This is the one item on this list that is a hosting decision rather than a bug.
 
 ---
@@ -1194,7 +1255,7 @@ git pull origin main
 # Push to GitHub
 git push origin main
 
-# Run the regression suite (twenty-one harnesses)
+# Run the regression suite (twenty-two harnesses)
 php tests/run.php
 
 # Validate JS syntax

@@ -251,7 +251,11 @@ function bhela_bm_investor_position_box( $post ) {
 	$row( __( 'ROI (received)', 'bhela-booking' ), $roi['roi'] . '%' );
 	$row( __( 'ROI (declared)', 'bhela-booking' ), $roi['roi_declared'] . '%' );
 
-	// The capital side, under a rule of its own so nobody reads it as more cash.
+	// The capital side, under a rule of its own so nobody reads it as more cash —
+	// and only for somebody who holds shares. A fixed-return investor has no holding;
+	// "Current share value ৳1,47,826 · Holding ৳0" beside their ৳5,00,000 reads as
+	// though their money had vanished.
+	if ( bhela_bm_investor_shares( $post->ID ) > 0 ) :
 	$h = bhela_bm_investor_holding( $post->ID );
 	echo '<hr style="margin:.8rem 0">';
 	$row( __( 'Current share value', 'bhela-booking' ), bhela_bm_money( $h['share_value'] ) );
@@ -272,6 +276,7 @@ function bhela_bm_investor_position_box( $post ) {
 				: __( 'No approved valuation — this is the original issue price.', 'bhela-booking' )
 		)
 	);
+	endif;
 
 	printf( '<p><a class="button" href="%s">%s</a></p>',
 		esc_url( bhela_bm_admin_url( 'bhela-bm-investor-report', array( 'investor' => $post->ID ) ) ),
@@ -647,6 +652,9 @@ function bhela_bm_investor_report_page() {
 			<p>
 				<a class="button" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-investor-report' ) ); ?>">← <?php esc_html_e( 'All investors', 'bhela-booking' ); ?></a>
 				<a class="button" href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=bhela_bm_ledger_csv&investor=' . (int) $one ), 'bhela_bm_ledger_csv' ) ); ?>"><?php esc_html_e( 'Download CSV', 'bhela-booking' ); ?></a>
+				<?php if ( function_exists( 'bhela_bm_statement_url' ) ) : ?>
+					<a class="button" href="<?php echo esc_url( bhela_bm_statement_url( $one ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Account statement', 'bhela-booking' ); ?></a>
+				<?php endif; ?>
 			</p>
 			<?php
 			$led = bhela_bm_investor_ledger( $one );
@@ -660,6 +668,7 @@ function bhela_bm_investor_report_page() {
 				<div class="bha-card"><span class="bha-card__label"><?php esc_html_e( 'ROI', 'bhela-booking' ); ?></span><span class="bha-card__value"><?php echo esc_html( $roi['roi'] ); ?>%</span></div>
 			</div>
 
+			<?php if ( bhela_bm_investor_shares( $one ) > 0 ) : ?>
 			<?php $h = bhela_bm_investor_holding( $one ); ?>
 			<h3 class="bha-sheet__h"><?php esc_html_e( 'Capital value', 'bhela-booking' ); ?></h3>
 			<div class="bha-cards">
@@ -682,6 +691,7 @@ function bhela_bm_investor_report_page() {
 					: esc_html__( 'No valuation has been approved, so this uses the original issue price. Record one under Valuation to see what the holding is worth today.', 'bhela-booking' );
 				?>
 			</p>
+			<?php endif; ?>
 
 			<?php if ( current_user_can( 'bhela_investor_pay' ) ) : ?>
 				<div class="bha-panel">
@@ -693,7 +703,7 @@ function bhela_bm_investor_report_page() {
 							<div class="bha-field"><label><?php esc_html_e( 'Type', 'bhela-booking' ); ?></label>
 								<select name="type">
 									<?php foreach ( bhela_bm_ledger_types() as $k => $t ) : ?>
-										<?php if ( 'profit' === $k ) { continue; } // profit comes from a distribution run, never by hand ?>
+										<?php if ( 'profit' === $k ) { continue; } // profit comes from an approved period or a run, never by hand ?>
 										<option value="<?php echo esc_attr( $k ); ?>"><?php echo esc_html( $t['label'] ); ?></option>
 									<?php endforeach; ?>
 								</select></div>
@@ -711,7 +721,7 @@ function bhela_bm_investor_report_page() {
 								<input type="text" name="note"></div>
 							<button type="submit" class="button button-primary"><?php esc_html_e( 'Submit', 'bhela-booking' ); ?></button>
 						</div>
-						<p class="description"><?php esc_html_e( 'A payment or an advance is raised as a request and moves no money until somebody else approves it — the investor’s outstanding does not change while it is waiting. An adjustment is a correction and is recorded straight away. Profit is never entered by hand: it comes from a distribution run, so the ledger always traces back to an approved month.', 'bhela-booking' ); ?></p>
+						<p class="description"><?php esc_html_e( 'A payment or an advance is raised as a request and moves no money until somebody else approves it — the investor’s outstanding does not change while it is waiting. An adjustment is a correction and is recorded straight away. Profit is never entered by hand: it comes from an approved profit period or a distribution run, so the ledger always traces back to something a person signed off.', 'bhela-booking' ); ?></p>
 					</form>
 				</div>
 			<?php endif; ?>
@@ -806,6 +816,9 @@ function bhela_bm_investor_report_page() {
 							<td class="bha-num"><?php echo esc_html( ( $r['signed'] > 0 ? '+' : '' ) . bhela_bm_money( $r['signed'] ) ); ?></td>
 							<td class="bha-num"><strong><?php echo esc_html( bhela_bm_money( $r['balance'] ) ); ?></strong></td>
 							<td class="bha-noprint">
+								<?php if ( in_array( $r['type'], array( 'payment', 'advance' ), true ) && function_exists( 'bhela_bm_receipt_url' ) ) : ?>
+									<a class="button button-small" href="<?php echo esc_url( bhela_bm_receipt_url( 'payment', (int) $r['id'] ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Receipt', 'bhela-booking' ); ?></a>
+								<?php endif; ?>
 								<?php if ( ! $undone && ! $r['reverses'] && current_user_can( 'bhela_investor_pay' ) ) : ?>
 									<form method="post" onsubmit="return confirm('<?php echo esc_js( __( 'Reverse this entry?', 'bhela-booking' ) ); ?>');">
 										<?php wp_nonce_field( 'bhela_bm_ledger_rev', 'bhela_rev_nonce' ); ?>

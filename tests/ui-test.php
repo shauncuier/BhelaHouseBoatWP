@@ -675,6 +675,27 @@ ok( strlen( $zz_hidden_html ) > 200 && false === strpos( $zz_hidden_html, 'THREW
 
 update_option( 'bhela_bm_settings', $zz_model_was );
 
+echo "\n=== 9g. a moved post type lights up its own menu ===\n";
+// WordPress picks the highlighted top-level from `show_in_menu`, fixed at init and
+// pointing at Bookings. Moving the row re-homed the link but not the highlight, so
+// adding an investor, editing a cost sheet or a store item all lit up Bookings.
+global $typenow, $pagenow, $submenu_file;
+$zz_hl_was = array( $typenow, $pagenow, $submenu_file );
+foreach ( bhela_bm_menu_cpt_groups() as $zz_t => $zz_g ) {
+	foreach ( array( 'post-new.php', 'post.php', 'edit.php' ) as $zz_pn ) {
+		$typenow      = $zz_t;
+		$pagenow      = $zz_pn;
+		$submenu_file = null;
+		$zz_got       = apply_filters( 'parent_file', 'edit.php?post_type=bhela_booking' );
+		if ( bhela_bm_menu_parent( $zz_g ) !== $zz_got || 'edit.php?post_type=' . $zz_t !== $submenu_file ) {
+			ok( false, "$zz_t on $zz_pn highlights its own menu", "got $zz_got / $submenu_file" );
+			continue 2;
+		}
+	}
+	ok( true, "$zz_t lights up " . $zz_g . ' on its list, editor and Add New screens' );
+}
+list( $typenow, $pagenow, $submenu_file ) = $zz_hl_was;
+
 echo "\n=== 9e. URLs and the legacy shim ===\n";
 foreach ( array( 'bhela-bm-dashboard', 'bhela-bm-reports', 'bhela-bm-trips' ) as $slug ) {
 	ok( false !== strpos( bhela_bm_admin_url( $slug ), 'edit.php?post_type=bhela_booking&page=' . $slug ),

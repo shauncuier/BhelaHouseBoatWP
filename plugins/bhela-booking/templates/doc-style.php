@@ -64,6 +64,19 @@ if ( ! defined( 'ABSPATH' ) ) {
 	.print-bar { max-width:820px; margin:0 auto 14px; display:flex; justify-content:flex-end; }
 	.print-bar button { background:#14676B; color:#fff; border:0; padding:10px 22px; border-radius:6px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
 	.print-bar button:hover { background:#0f5054; }
+	/* A phone. Every document is laid out for A4, and an investor opens it from the
+	   portal on a handset: at 360px the certificate ran 406px wide and the statement
+	   462px, pushing the amount column off the screen. Screen only — the printed page
+	   is untouched. The tables scroll inside their own box rather than squeezing a
+	   money column onto two lines. */
+	@media screen and (max-width: 640px) {
+		.cert-head { flex-direction:column; gap:10px; padding:16px; }
+		.cert-no { text-align:left; }
+		table.cert-tbl { display:block; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+		.cert-sign { flex-direction:column; gap:22px; }
+		.cert-verify { flex-direction:column; align-items:flex-start; }
+		.cert-foot, .cert-disc { padding:9px 16px; }
+	}
 	@media print {
 		body { background:#fff; padding:0; font-size:12px; }
 		.print-bar { display:none; }

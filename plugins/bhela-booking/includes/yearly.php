@@ -107,7 +107,8 @@ function bhela_bm_yearly_label( $year, $mode = 'financial' ) {
 function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 	$totals = array(
 		'trips' => 0, 'guests' => 0, 'earnings' => 0,
-		'cost' => 0, 'profit' => 0, 'expenses' => 0, 'salary' => 0, 'gross' => 0,
+		'cost' => 0, 'profit' => 0, 'expenses' => 0, 'salary' => 0,
+		'commission' => 0, 'investor' => 0, 'gross' => 0,
 	);
 	$out = array(
 		'months' => array(), 'totals' => $totals, 'by_type' => array(),
@@ -130,6 +131,13 @@ function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 			'expenses' => (int) $d['expenses']['total'],
 			// Payroll is a cost of the month like any other, so it rolls up too.
 			'salary'   => (int) $d['salary']['total'],
+			// The two deductions the statement has always subtracted and this report
+			// never showed. Without them a row read profit − expenses − salary and
+			// arrived at a different gross, and a month whose only movement was an
+			// approved investor accrual printed "—" on every column while the year's
+			// total quietly fell by it.
+			'commission' => (int) ( $d['commission']['total'] ?? 0 ),
+			'investor'   => (int) ( $d['investor_profit']['total'] ?? 0 ),
 			'gross'    => (int) $d['gross'],
 			'pending'  => count( $d['pending'] ),
 		);
@@ -142,6 +150,8 @@ function bhela_bm_yearly_data( $year, $mode = 'financial' ) {
 		$out['totals']['profit']   += $row['profit'];
 		$out['totals']['expenses'] += $row['expenses'];
 		$out['totals']['salary']   += $row['salary'];
+		$out['totals']['commission'] += $row['commission'];
+		$out['totals']['investor']   += $row['investor'];
 		$out['totals']['gross']    += $row['gross'];
 		$out['pending']            += $row['pending'];
 		$out['stale']              += count( $d['stale'] );
@@ -213,6 +223,20 @@ function bhela_bm_yearly_available( $mode = 'financial' ) {
 	return $years;
 }
 
+/**
+ * Did anything at all happen in this month?
+ *
+ * One definition, used by the table, the statement link and the chart. The table
+ * used to ask about trips, expenses and salary; the chart asked about trips and
+ * expenses only. Neither knew about commission or investor profit, so a month
+ * carrying nothing but an approved accrual drew as empty — with its money still in
+ * the year's total.
+ */
+function bhela_bm_yearly_idle( $m ) {
+	return 0 === (int) $m['trips'] && 0 === (int) $m['expenses'] && 0 === (int) $m['salary']
+		&& 0 === (int) ( $m['commission'] ?? 0 ) && 0 === (int) ( $m['investor'] ?? 0 );
+}
+
 /** The year we are in right now, under the given mode. */
 function bhela_bm_yearly_current( $mode = 'financial' ) {
 	$start = bhela_bm_year_modes()[ $mode ]['start_month'] ?? 7;
@@ -244,16 +268,17 @@ function bhela_bm_yearly_csv() {
 	// Excel reads a UTF-8 CSV as the local codepage without a BOM, which turns
 	// every Bengali expense label into mojibake.
 	fwrite( $fh, "\xEF\xBB\xBF" );
-	fputcsv( $fh, array( 'Month', 'Trips', 'Guests', 'Earnings', 'Trip Cost', 'Trip Profit', 'Expenses', 'Salary', 'Gross Profit' ) );
+	fputcsv( $fh, array( 'Month', 'Trips', 'Guests', 'Earnings', 'Trip Cost', 'Trip Profit', 'Expenses', 'Salary', 'B2B Commission', 'Investor Profit', 'Gross Profit' ) );
 	foreach ( $d['months'] as $m ) {
 		fputcsv( $fh, array(
 			$m['label'], $m['trips'], $m['guests'], $m['earnings'],
-			$m['cost'], $m['profit'], $m['expenses'], $m['salary'], $m['gross'],
+			$m['cost'], $m['profit'], $m['expenses'], $m['salary'],
+			$m['commission'], $m['investor'], $m['gross'],
 		) );
 	}
 	$t = $d['totals'];
 	fputcsv( $fh, array() );
-	fputcsv( $fh, array( 'TOTAL', $t['trips'], $t['guests'], $t['earnings'], $t['cost'], $t['profit'], $t['expenses'], $t['salary'], $t['gross'] ) );
+	fputcsv( $fh, array( 'TOTAL', $t['trips'], $t['guests'], $t['earnings'], $t['cost'], $t['profit'], $t['expenses'], $t['salary'], $t['commission'], $t['investor'], $t['gross'] ) );
 
 	if ( $d['by_type'] ) {
 		$types = function_exists( 'bhela_bm_expense_types' ) ? bhela_bm_expense_types( true ) : array();
@@ -289,6 +314,14 @@ function bhela_bm_yearly_page() {
 	$types   = function_exists( 'bhela_bm_expense_types' ) ? bhela_bm_expense_types( true ) : array();
 	$s       = bhela_bm_get_settings();
 	$years   = bhela_bm_yearly_available( $mode );
+	// A year reached by URL or by the statement's link may hold no cost sheet at all
+	// (a month carrying only an investor accrual, say). Without it in the list the
+	// selector fell back to its first option and labelled the page with a year the
+	// table was not showing.
+	if ( ! in_array( (int) $year, $years, true ) ) {
+		$years[] = (int) $year;
+		rsort( $years );
+	}
 	// Scale on the largest magnitude, not the largest profit. Measuring only
 	// the positive side drew a losing month as an empty bar — September could
 	// be ৳215,000 down and look exactly like a month with no trips at all.
@@ -410,6 +443,8 @@ function bhela_bm_yearly_page() {
 					<th class="bha-num"><?php esc_html_e( 'Trip Profit', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'Expenses', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'Salary', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'B2B Commission', 'bhela-booking' ); ?></th>
+					<th class="bha-num"><?php esc_html_e( 'Investor Profit', 'bhela-booking' ); ?></th>
 					<th class="bha-num"><?php esc_html_e( 'Gross Profit', 'bhela-booking' ); ?></th>
 					<th class="bha-noprint" style="width:110px"></th>
 				</tr>
@@ -417,6 +452,7 @@ function bhela_bm_yearly_page() {
 			<tbody>
 			<?php foreach ( $d['months'] as $m ) :
 				$empty = 0 === $m['trips'];
+				$idle  = bhela_bm_yearly_idle( $m );
 				?>
 				<tr class="<?php echo $empty ? 'bha-row--muted' : ''; ?>">
 					<td>
@@ -436,11 +472,13 @@ function bhela_bm_yearly_page() {
 					<td class="bha-num"><?php echo $empty ? '—' : esc_html( bhela_bm_money( $m['profit'] ) ); ?></td>
 					<td class="bha-num"><?php echo $m['expenses'] ? esc_html( bhela_bm_money( $m['expenses'] ) ) : '—'; ?></td>
 					<td class="bha-num"><?php echo $m['salary'] ? esc_html( bhela_bm_money( $m['salary'] ) ) : '—'; ?></td>
-					<td class="bha-num <?php echo $empty ? '' : ( $m['gross'] < 0 ? 'bha-num--due' : 'bha-num--clear' ); ?>">
-						<?php echo $empty && ! $m['expenses'] && ! $m['salary'] ? '—' : esc_html( bhela_bm_money( $m['gross'] ) ); ?>
+					<td class="bha-num"><?php echo $m['commission'] ? esc_html( bhela_bm_money( $m['commission'] ) ) : '—'; ?></td>
+					<td class="bha-num"><?php echo $m['investor'] ? esc_html( bhela_bm_money( $m['investor'] ) ) : '—'; ?></td>
+					<td class="bha-num <?php echo $idle ? '' : ( $m['gross'] < 0 ? 'bha-num--due' : 'bha-num--clear' ); ?>">
+						<?php echo $idle ? '—' : esc_html( bhela_bm_money( $m['gross'] ) ); ?>
 					</td>
 					<td class="bha-noprint">
-						<?php if ( ! $empty || $m['expenses'] || $m['salary'] ) : ?>
+						<?php if ( ! $idle ) : ?>
 							<a class="button button-small" href="<?php echo esc_url( bhela_bm_admin_url( 'bhela-bm-statement', array( 'month' => $m['key'] ) ) ); ?>"><?php esc_html_e( 'Statement', 'bhela-booking' ); ?></a>
 						<?php endif; ?>
 					</td>
@@ -457,6 +495,8 @@ function bhela_bm_yearly_page() {
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['profit'] ) ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['expenses'] ) ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['salary'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['commission'] ) ); ?></td>
+					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['investor'] ) ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $t['gross'] ) ); ?></td>
 					<td class="bha-noprint"></td>
 				</tr>
@@ -475,7 +515,7 @@ function bhela_bm_yearly_page() {
 							// loss runs red; a month that never sailed draws nothing.
 							$pct  = (int) round( abs( $m['gross'] ) / $peak * 100 );
 							$loss = $m['gross'] < 0;
-							$idle = 0 === $m['trips'] && 0 === $m['expenses'];
+							$idle = bhela_bm_yearly_idle( $m );
 							?>
 							<tr>
 								<td style="width:74px"><?php echo esc_html( mysql2date( 'M', $m['key'] . '-01' ) ); ?></td>

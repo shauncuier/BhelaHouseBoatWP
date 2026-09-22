@@ -177,6 +177,14 @@ function bhela_bm_profit_term_total( $inv ) {
 		return 0;
 	}
 
+	// Money that arrived part-way through the term earns only from when it arrived.
+	// This path engages only when the principal genuinely varies over the term; a
+	// single receipt at the start takes the formula below exactly as it always has.
+	$held = bhela_bm_profit_held( $inv );
+	if ( $held ) {
+		return (int) round( $held['unit'] * $held['weighted'] / $held['weight_sum'] );
+	}
+
 	switch ( (string) ( $inv['method'] ?? '' ) ) {
 		case 'fixed_annual':
 			return (int) round( $principal * $rate * $months / 12 );
@@ -230,7 +238,13 @@ function bhela_bm_profit_period_key( $code, $from, $to ) {
  * @param array $inv A bhela_bm_investment() record.
  * @return array[] from · to · days · months · amount · key · due
  */
-function bhela_bm_profit_schedule( $inv ) {
+/**
+ * The period boundaries alone — shared by the schedule and by the held-principal
+ * weighting, so the two can never disagree about where a period begins.
+ *
+ * @return array[] Each `from`, `to`.
+ */
+function bhela_bm_profit_periods( $inv ) {
 	$start    = (string) ( $inv['start'] ?? '' );
 	$maturity = (string) ( $inv['maturity'] ?? '' );
 	if ( '' === $start || '' === $maturity || $maturity <= $start ) {
@@ -267,6 +281,106 @@ function bhela_bm_profit_schedule( $inv ) {
 			$guard++;
 		}
 	}
+	return $periods;
+}
+
+/** How much each period weighs: days for the day-based method, whole months otherwise. */
+function bhela_bm_profit_period_weight( $inv, $p ) {
+	return ( 'day_based' === ( $inv['method'] ?? '' ) )
+		? bhela_bm_profit_days( $p['from'], $p['to'] )
+		: max( 1, bhela_bm_investment_months( $p['from'], $p['to'] ) );
+}
+
+/**
+ * The principal actually held in each period — or null when it never varies.
+ *
+ * The first version priced every period on the investment's CURRENT principal. So a
+ * ৳1,00,000 top-up received on 1 October re-priced July, August and September as
+ * though the money had been there all along: periods already approved and paid at
+ * ৳5,000 re-displayed as ৳6,000, the term total rose by what three months of money
+ * the business never held would have earned, and the investor was owed it.
+ *
+ * A receipt counts in full for every period that starts on or after the day it
+ * arrived, pro rata by days for the period it arrives in, and not at all before. A
+ * receipt dated before the term counts from the start — the agreement is what starts
+ * the clock. Returns null when every period holds the same principal, so the ordinary
+ * single-receipt investment keeps its original arithmetic to the taka.
+ *
+ * @return array{eff:float[],w:int[],weighted:float,weight_sum:int,unit:float}|null
+ */
+function bhela_bm_profit_held( $inv ) {
+	$method = (string) ( $inv['method'] ?? '' );
+	$id     = (int) ( $inv['id'] ?? 0 );
+	if ( 'profit_share' === $method || ! $id || ! function_exists( 'bhela_bm_capital_rows_for_investment' ) ) {
+		return null;
+	}
+	$rows = bhela_bm_capital_rows_for_investment( $id );
+	if ( ! $rows ) {
+		return null;
+	}
+	$periods = bhela_bm_profit_periods( $inv );
+	if ( ! $periods ) {
+		return null;
+	}
+
+	$start = (string) $inv['start'];
+	$eff   = array();
+	$w     = array();
+	foreach ( $periods as $i => $p ) {
+		$len  = max( 1, bhela_bm_profit_days( $p['from'], $p['to'] ) );
+		$held = 0.0;
+		foreach ( $rows as $r ) {
+			$d = (string) $r['date'];
+			$d = ( '' === $d || $d < $start ) ? $start : $d;
+			if ( $d <= $p['from'] ) {
+				$held += (int) $r['amount'];
+			} elseif ( $d <= $p['to'] ) {
+				$held += (int) $r['amount'] * bhela_bm_profit_days( $d, $p['to'] ) / $len;
+			}
+		}
+		$eff[ $i ] = $held;
+		$w[ $i ]   = bhela_bm_profit_period_weight( $inv, $p );
+	}
+
+	// Constant principal: hand back to the original formula.
+	if ( count( array_unique( array_map( 'strval', $eff ) ) ) === 1 && (float) reset( $eff ) === (float) (int) ( $inv['principal'] ?? 0 ) ) {
+		return null;
+	}
+
+	$rate   = (int) ( $inv['rate_bp'] ?? 0 ) / 10000;
+	$months = (int) ( $inv['months'] ?? 0 );
+	switch ( $method ) {
+		case 'fixed_annual':
+			$unit = $rate * $months / 12;
+			break;
+		case 'monthly_rate':
+			$unit = $rate * $months;
+			break;
+		case 'day_based':
+			$unit = $rate * bhela_bm_profit_days( $inv['start'], $inv['maturity'] ) / bhela_bm_profit_day_basis();
+			break;
+		default:
+			return null;
+	}
+
+	$weighted = 0.0;
+	foreach ( $eff as $i => $e ) {
+		$weighted += $e * $w[ $i ];
+	}
+	return array(
+		'eff'        => $eff,
+		'w'          => $w,
+		'weighted'   => $weighted,
+		'weight_sum' => max( 1, array_sum( $w ) ),
+		'unit'       => $unit,
+	);
+}
+
+function bhela_bm_profit_schedule( $inv ) {
+	$periods = bhela_bm_profit_periods( $inv );
+	if ( ! $periods ) {
+		return array();
+	}
 
 	// The term total, carved up. Weighted by days for the day-based method and by month
 	// count for the rest, so an uneven final period gets its honest share rather than a
@@ -274,11 +388,20 @@ function bhela_bm_profit_schedule( $inv ) {
 	$total   = bhela_bm_profit_term_total( $inv );
 	$weights = array();
 	foreach ( $periods as $i => $p ) {
-		$weights[ $i ] = ( 'day_based' === ( $inv['method'] ?? '' ) )
-			? bhela_bm_profit_days( $p['from'], $p['to'] )
-			: max( 1, bhela_bm_investment_months( $p['from'], $p['to'] ) );
+		$weights[ $i ] = bhela_bm_profit_period_weight( $inv, $p );
 	}
-	$split = bhela_bm_split_by_shares( $total, $weights, array_sum( $weights ) );
+	// Where the principal varied, each period's share is its weight times the money
+	// actually held in it — still carved by largest remainder, so the periods sum to
+	// the term total to the taka (§13.30). Weights are in paisa so a pro-rata part of
+	// a period is not truncated away by the integer split.
+	$held  = bhela_bm_profit_held( $inv );
+	$carve = $weights;
+	if ( $held ) {
+		foreach ( $carve as $i => $wt ) {
+			$carve[ $i ] = (int) round( $held['eff'][ $i ] * $wt * 100 );
+		}
+	}
+	$split = bhela_bm_split_by_shares( $total, $carve, array_sum( $carve ) );
 
 	$out = array();
 	foreach ( $periods as $i => $p ) {
@@ -345,7 +468,19 @@ function bhela_bm_profit_accrue( $inv, $upto = '' ) {
 		if ( $p['to'] > $upto ) {
 			continue;
 		}
-		$p['row']          = bhela_bm_profit_posted( $p['key'] );
+		$p['row'] = bhela_bm_profit_posted( $p['key'] );
+		// A posted period is a fact in the ledger, and the screen shows THAT figure —
+		// never a recomputation. Terms can move under a posted period (a back-dated
+		// receipt, a reopened record); when they do, `computed` keeps the new
+		// arithmetic and `drift` says by how much, so somebody can decide on an
+		// adjustment instead of the page quietly restating what was paid.
+		$p['computed'] = $p['amount'];
+		$p['drift']    = 0;
+		if ( $p['row'] ) {
+			$posted_row  = bhela_bm_ledger_row( $p['row'] );
+			$p['amount'] = $posted_row ? (int) $posted_row['amount'] : $p['amount'];
+			$p['drift']  = $p['computed'] - $p['amount'];
+		}
 		$out['periods'][]  = $p;
 		$out['due']       += $p['amount'];
 		if ( $p['row'] ) {

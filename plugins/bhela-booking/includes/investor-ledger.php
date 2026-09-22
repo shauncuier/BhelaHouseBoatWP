@@ -162,6 +162,24 @@ function bhela_bm_ledger_reversal_of( $row_id ) {
 	return $hit ? (int) $hit[0] : 0;
 }
 
+/**
+ * Principal across an investor's investments that actually took money.
+ *
+ * @return int Taka.
+ */
+function bhela_bm_investor_principal( $investor_id ) {
+	if ( ! function_exists( 'bhela_bm_investments' ) || ! function_exists( 'bhela_bm_investment_principal' ) ) {
+		return 0;
+	}
+	$sum = 0;
+	foreach ( bhela_bm_investments( (int) $investor_id ) as $r ) {
+		if ( in_array( $r['status'], array( 'active', 'matured', 'closed' ), true ) ) {
+			$sum += (int) bhela_bm_investment_principal( (int) $r['id'] );
+		}
+	}
+	return $sum;
+}
+
 /** One row, with its signed effect on the balance already worked out. */
 function bhela_bm_ledger_row( $id ) {
 	if ( 'bhela_inv_ledger' !== get_post_type( $id ) ) {
@@ -310,7 +328,19 @@ function bhela_bm_investor_position( $investor_id ) {
  */
 function bhela_bm_investor_roi( $investor_id ) {
 	$pos   = bhela_bm_investor_position( $investor_id );
-	$given = bhela_bm_investor_amount( $investor_id );
+	// What was paid in is the share-register amount PLUS the principal of every
+	// investment that actually took money. It used to be the register alone, so an
+	// investor whose ৳5,00,000 arrived through an Investment Record — which is every
+	// investor under the fixed-return model — read "Invested ৳0, ROI 0%" on the
+	// Position box, the ledger, the dashboard and their own portal.
+	//
+	// The two stores never overlap: `_bhela_inv_amount` is the share-era scalar, and a
+	// principal is the sum of the capital rows LINKED to an investment. Draft and
+	// cancelled investments took no money and are left out; a closed one did, so its
+	// principal stays in the denominator of a lifetime return.
+	// `bhela_bm_investor_amount()` itself is deliberately untouched — the share engine
+	// prices issues from it (§13.61).
+	$given = bhela_bm_investor_amount( $investor_id ) + bhela_bm_investor_principal( $investor_id );
 	return array(
 		'investment'   => $given,
 		'received'     => $pos['received'],

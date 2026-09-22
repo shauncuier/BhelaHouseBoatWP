@@ -288,8 +288,16 @@ function bhela_bm_cert_preview_profit( $base, $inv, $window ) {
 	}
 
 	return $base + array(
+		// `from`/`to` are the WINDOW — what was searched, and what payments are
+		// counted over. They are not what the certificate may say the profit was
+		// earned in: with three of twelve months approved, printing the window made
+		// "earned ৳15,000 for 01 Jul 2025 to 30 Jun 2026" read as a full year's
+		// return. `earned_*` is the span of the periods actually included, and it is
+		// what the document states.
 		'from'              => $from,
 		'to'                => $to,
+		'earned_from'       => $periods[0]['from'],
+		'earned_to'         => $periods[ count( $periods ) - 1 ]['to'],
 		'periods'           => $periods,
 		'gross'             => $gross,
 		'adjustments'       => $adjust,
@@ -395,6 +403,12 @@ function bhela_bm_cert_issue( $args ) {
 		'to'         => (string) ( $snapshot['to'] ?? '' ),
 		'note'       => sanitize_textarea_field( $args['note'] ?? '' ),
 		'snapshot'   => $snapshot,
+		// The three names are part of the paper, not a view of who the staff are
+		// today. Read live, renaming an account, deleting a departed employee, or
+		// reopening the investment and having someone else re-activate it rewrote
+		// the signatures on every certificate already handed out — §13.75 broken in
+		// the one place a bank looks hardest.
+		'signoff'    => bhela_bm_cert_signoff( array( 'investment' => (int) $snapshot['investment'], 'by' => get_current_user_id() ) ),
 		'issued'     => current_time( 'Y-m-d' ),
 		'by'         => get_current_user_id(),
 		'at'         => current_time( 'mysql' ),
@@ -492,6 +506,7 @@ function bhela_bm_cert_data( $id ) {
 		'type'              => (string) $m( 'type' ),
 		'investor'          => (int) $m( 'investor' ),
 		'investment'        => (int) $m( 'investment' ),
+		'signoff'           => is_array( $m( 'signoff' ) ) ? $m( 'signoff' ) : null,
 		'from'              => (string) $m( 'from' ),
 		'to'                => (string) $m( 'to' ),
 		'note'              => (string) $m( 'note' ),
@@ -660,7 +675,10 @@ function bhela_bm_maybe_render_certificate() {
 
 	$settings = bhela_bm_get_settings();
 	$snap     = $cert['snapshot'];
-	$signoff  = bhela_bm_cert_signoff( $cert );
+	// Frozen at issue. A certificate issued before the names were stored has no
+	// frozen copy, so it keeps the live reading it has always had rather than
+	// losing its signatures.
+	$signoff  = is_array( $cert['signoff'] ?? null ) ? $cert['signoff'] : bhela_bm_cert_signoff( $cert );
 	include BHELA_BM_PATH . 'templates/' . $template;
 	exit;
 }

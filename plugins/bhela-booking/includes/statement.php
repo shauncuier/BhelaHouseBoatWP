@@ -386,6 +386,36 @@ function bhela_bm_statement_page() {
 						<td class="bha-num">− <?php echo esc_html( bhela_bm_money( $ag_row['total'] ) ); ?></td>
 					</tr>
 				<?php endforeach; ?>
+				<?php
+				// Investor profit — the fixed return approved for the month, one row per
+				// investment. bhela_bm_statement_data() has subtracted this from gross since
+				// the fixed-return model shipped, and nothing drew it: the owner saw Gross
+				// Profit fall by ৳5,000 with no line anywhere saying why. A deduction the
+				// page does not name is indistinguishable from an arithmetic error.
+				$bhela_ip = array();
+				foreach ( $d['investor_profit']['rows'] as $ip_row ) {
+					$ip_key = (string) $ip_row['code'];
+					if ( ! isset( $bhela_ip[ $ip_key ] ) ) {
+						$bhela_ip[ $ip_key ] = array( 'name' => $ip_row['name'], 'code' => $ip_key, 'periods' => 0, 'total' => 0 );
+					}
+					$bhela_ip[ $ip_key ]['periods']++;
+					$bhela_ip[ $ip_key ]['total'] += (int) $ip_row['amount'];
+				}
+				foreach ( $bhela_ip as $ip ) :
+					?>
+					<tr class="bha-row--deduct">
+						<td colspan="6"><?php
+							printf(
+								/* translators: 1: investor name, 2: investment code, 3: approved periods */
+								esc_html__( 'Less: Investor profit — %1$s (%2$s, %3$d period(s))', 'bhela-booking' ),
+								esc_html( $ip['name'] ),
+								esc_html( $ip['code'] ),
+								(int) $ip['periods']
+							);
+						?></td>
+						<td class="bha-num">− <?php echo esc_html( bhela_bm_money( $ip['total'] ) ); ?></td>
+					</tr>
+				<?php endforeach; ?>
 				<tr class="bha-row--total">
 					<td colspan="6"><?php esc_html_e( 'Gross Profit', 'bhela-booking' ); ?></td>
 					<td class="bha-num"><?php echo esc_html( bhela_bm_money( $d['gross'] ) ); ?></td>

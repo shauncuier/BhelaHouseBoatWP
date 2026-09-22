@@ -456,11 +456,12 @@ function bhela_bm_investment_editor( $r, $methods, $freqs, $types, $states ) {
 				<th class="bha-num"><?php esc_html_e( 'পরিমাণ', 'bhela-booking' ); ?></th>
 				<th><?php esc_html_e( 'মাধ্যম', 'bhela-booking' ); ?></th>
 				<th><?php esc_html_e( 'রেফারেন্স', 'bhela-booking' ); ?></th>
+				<th class="bha-noprint"></th>
 			</tr></thead>
 			<tbody>
 			<?php $caps = bhela_bm_capital_rows_for_investment( $id ); ?>
 			<?php if ( ! $caps ) : ?>
-				<tr><td colspan="4"><?php esc_html_e( 'কোনো প্রাপ্তি রেকর্ড নেই।', 'bhela-booking' ); ?></td></tr>
+				<tr><td colspan="5"><?php esc_html_e( 'কোনো প্রাপ্তি রেকর্ড নেই।', 'bhela-booking' ); ?></td></tr>
 			<?php endif; ?>
 			<?php foreach ( $caps as $c ) : ?>
 				<tr>
@@ -468,12 +469,20 @@ function bhela_bm_investment_editor( $r, $methods, $freqs, $types, $states ) {
 					<td class="bha-num"><?php echo esc_html( $money( $c['amount'] ) ); ?></td>
 					<td><?php echo esc_html( $c['method'] ); ?></td>
 					<td><?php echo esc_html( $c['ref'] ); ?></td>
+					<td class="bha-noprint">
+						<?php
+						// The receipt the office hands over when the money arrives. It was
+						// fully built in documents.php and linked from nowhere, so the only
+						// way to print one was to know its URL shape and hash.
+						?>
+						<a class="button button-small" href="<?php echo esc_url( bhela_bm_receipt_url( 'capital', (int) $c['id'] ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'রসিদ', 'bhela-booking' ); ?></a>
+					</td>
 				</tr>
 			<?php endforeach; ?>
 				<tr>
 					<td><strong><?php esc_html_e( 'মোট মূলধন', 'bhela-booking' ); ?></strong></td>
 					<td class="bha-num"><strong><?php echo esc_html( $money( $r['principal'] ) ); ?></strong></td>
-					<td colspan="2"></td>
+					<td colspan="3"></td>
 				</tr>
 			</tbody>
 		</table>

@@ -179,6 +179,33 @@ ok( ! $hits, 'the SMS gateway credentials are in no tracked file', implode( ', '
 ok( false === strpos( (string) file_get_contents( WP_PLUGIN_DIR . '/bhela-booking/bhela-booking.php' ), 'sms_api_key\' => \'' ),
 	'no API key baked into the defaults' );
 
+echo "\n=== 9. the shipped code never deletes a user ===\n";
+
+// The theme and plugin have no business removing a WordPress account, and with no
+// reassign target WordPress also trashes every page that user wrote and hard-deletes
+// their media. A test harness did exactly that to this site's administrator on
+// 2026-09-23 (see tests/bootstrap.php). The harness side is guarded at runtime; this
+// is the production side, asserted at source level so a deletion path cannot be added
+// to a release without the suite failing.
+$sec_user_kill = array();
+foreach ( array( WP_CONTENT_DIR . '/themes/bhela', WP_PLUGIN_DIR . '/bhela-booking' ) as $sec_root ) {
+	$sec_it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $sec_root, FilesystemIterator::SKIP_DOTS ) );
+	foreach ( $sec_it as $sec_f ) {
+		if ( 'php' !== strtolower( $sec_f->getExtension() ) ) {
+			continue;
+		}
+		$sec_src = (string) file_get_contents( $sec_f->getPathname() );
+		// Comments are allowed to NAME the functions (this very rule is explained in
+		// some); only a call counts.
+		$sec_code = preg_replace( '#/\*.*?\*/|//[^\n]*|\#[^\n]*#s', '', $sec_src );
+		if ( preg_match( '/\b(wp_delete_user|wpmu_delete_user|remove_user_from_blog)\s*\(|DELETE\s+FROM\s+[^;]*users\b/i', $sec_code, $sec_m ) ) {
+			$sec_user_kill[] = str_replace( WP_CONTENT_DIR, '', $sec_f->getPathname() ) . ': ' . $sec_m[0];
+		}
+	}
+}
+ok( array() === $sec_user_kill, 'no shipped theme or plugin file can delete a user',
+	$sec_user_kill ? implode( ' | ', $sec_user_kill ) : 'none' );
+
 echo "\n=== cleanup ===\n";
 wp_delete_post( $b, true );
 bhela_bm_install_roles();

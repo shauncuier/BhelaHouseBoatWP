@@ -128,6 +128,53 @@ bhela_test_register_shutdown();
 
 require_once $bhela_wp_root . '/wp-load.php';
 
+/**
+ * Is this a development site? The one check that stands between the suite and a
+ * production database.
+ *
+ * `tests/` is in the git repository. A production server deployed with `git pull`
+ * rather than the release ZIPs therefore HAS these files — and on such a server the
+ * database fallback below is plain `localhost`, i.e. the live database, while
+ * bhela-tests.php is reachable over HTTP. Every harness creates and deletes records;
+ * on 2026-09-23 one deleted a real administrator on the dev site (§13.95). So the
+ * suite refuses outright unless the site's own address is a development host:
+ * `*.local`, `*.test`, `*.localhost`, `localhost` or a loopback IP.
+ *
+ * A staging box with another name can opt in, deliberately and per host, with the
+ * environment variable BHELA_TESTS_ALLOWED_HOST=<exact host>. There is no blanket
+ * override.
+ */
+function bhela_tests_host_allowed( $url ) {
+	$host = strtolower( (string) wp_parse_url( (string) $url, PHP_URL_HOST ) );
+	if ( '' === $host ) {
+		return false;
+	}
+	$allowed = getenv( 'BHELA_TESTS_ALLOWED_HOST' );
+	if ( $allowed && strtolower( $allowed ) === $host ) {
+		return true;
+	}
+	if ( in_array( $host, array( 'localhost', '127.0.0.1', '::1', '[::1]' ), true ) ) {
+		return true;
+	}
+	foreach ( array( '.local', '.test', '.localhost' ) as $tld ) {
+		if ( substr( $host, -strlen( $tld ) ) === $tld ) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Checked against BOTH addresses WordPress holds, straight after it loads and before
+// any harness code runs — so no fixture, option write or delete can reach a live site.
+if ( ! bhela_tests_host_allowed( get_option( 'home' ) ) || ! bhela_tests_host_allowed( get_option( 'siteurl' ) ) ) {
+	fwrite( STDERR, sprintf(
+		"\n*** REFUSED: %s is not a development site. The BHELA tests create and delete records and must never run against production. Nothing was changed. ***\n",
+		(string) get_option( 'home' )
+	) );
+	exit( 1 );
+}
+
+
 // wp-load stops at the front end. Harnesses that render an admin screen need
 // the pieces admin-header.php would normally have pulled in — set_current_screen()
 // and add_meta_box() among them.
@@ -348,6 +395,46 @@ function bhela_test_restore_period_index() {
 
 // Taken here, after WordPress is up and before any harness code runs. `null` records
 // "there was no such option", so a harness that creates one does not leave it behind.
+/* ---------- No harness may delete a user it did not create ---------- */
+
+/**
+ * On 2026-09-23 a harness deleted the site's real administrator.
+ *
+ * `lifecycle-test.php` created its own admin with wp_insert_user(); a crashed earlier
+ * run had left that login behind, so the call returned a WP_Error — and `(int)` of a
+ * WP_Error is 1. The harness stored 1 as "its" user, ran as the real admin, renamed
+ * it, and its cleanup called wp_delete_user( 1 ). With no reassign target WordPress
+ * also trashed every page (home, booking, portal) and hard-deleted the admin's media,
+ * files included. It was recovered from the MySQL binary log.
+ *
+ * The rule is enforced here, once, rather than trusted to every harness: a user may be
+ * deleted only if it was REGISTERED DURING THIS RUN, or carries a `zz_` login (a
+ * leftover from a run that crashed). A pre-existing account can never qualify, however
+ * a harness computes the id. `delete_user` fires before WordPress touches a single
+ * post or row, so refusing here stops the deletion entirely.
+ */
+$GLOBALS['bhela_test_born_users'] = array();
+add_action( 'user_register', function ( $id ) {
+	$GLOBALS['bhela_test_born_users'][ (int) $id ] = true;
+}, 0 );
+
+function bhela_test_user_delete_guard( $id, $reassign = null, $user = null ) {
+	$id    = (int) $id;
+	$u     = ( $user instanceof WP_User ) ? $user : get_userdata( $id );
+	$login = $u ? (string) $u->user_login : '';
+	if ( isset( $GLOBALS['bhela_test_born_users'][ $id ] ) || 0 === strpos( $login, 'zz_' ) ) {
+		return;
+	}
+	printf(
+		"\n*** REFUSED: a harness tried to delete user #%d (%s), which this run did not create. Nothing was deleted. ***\n",
+		$id,
+		$login
+	);
+	exit( 1 );
+}
+add_action( 'delete_user', 'bhela_test_user_delete_guard', -9999, 3 );
+add_action( 'wpmu_delete_user', 'bhela_test_user_delete_guard', -9999, 2 );
+
 $GLOBALS['bhela_owner_options_before'] = array();
 foreach ( bhela_test_owner_options() as $bhela_opt ) {
 	$GLOBALS['bhela_owner_options_before'][ $bhela_opt ] = get_option( $bhela_opt, null );

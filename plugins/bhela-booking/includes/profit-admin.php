@@ -127,14 +127,24 @@ function bhela_bm_profit_page() {
 		?>
 
 		<?php if ( is_array( $msg ) ) : ?>
-			<div class="notice notice-success">
+			<?php
+			// "0 periods approved" in green read as success after a double-click or a
+			// back-button resubmit, when what happened is that nothing was posted —
+			// because it already had been, or because nothing was ticked.
+			$made = (int) $msg[0];
+			?>
+			<div class="notice <?php echo $made > 0 ? 'notice-success' : 'notice-warning'; ?>">
 				<p>
 					<?php
-					printf(
-						/* translators: %d: periods posted */
-						esc_html__( '%d টি সময়কাল অনুমোদিত হয়েছে।', 'bhela-booking' ),
-						(int) $msg[0]
-					);
+					if ( $made > 0 ) {
+						printf(
+							/* translators: %d: periods posted */
+							esc_html__( '%d টি সময়কাল অনুমোদিত হয়েছে।', 'bhela-booking' ),
+							$made
+						);
+					} else {
+						esc_html_e( 'নতুন কোনো সময়কাল অনুমোদিত হয়নি — বাছাই করা সময়কালগুলো আগেই অনুমোদিত, অথবা কিছুই টিক দেওয়া হয়নি।', 'bhela-booking' );
+					}
 					?>
 				</p>
 				<?php if ( ! empty( $msg[1] ) ) : ?>
@@ -177,7 +187,12 @@ function bhela_bm_profit_page() {
 			<div class="bha-panel">
 				<table class="widefat striped bha-table">
 					<thead><tr>
-						<th style="width:34px"></th>
+						<th style="width:34px">
+							<?php if ( current_user_can( 'bhela_investor_profit' ) ) : ?>
+								<input type="checkbox" aria-label="<?php esc_attr_e( 'সব বাছাই করুন', 'bhela-booking' ); ?>"
+									onclick="var c=this.checked;this.closest('table').querySelectorAll('input[name=\'period[]\']').forEach(function(b){b.checked=c;});">
+							<?php endif; ?>
+						</th>
 						<th><?php esc_html_e( 'Investment ID', 'bhela-booking' ); ?></th>
 						<th><?php esc_html_e( 'বিনিয়োগকারী', 'bhela-booking' ); ?></th>
 						<th><?php esc_html_e( 'সময়কাল', 'bhela-booking' ); ?></th>
@@ -193,14 +208,30 @@ function bhela_bm_profit_page() {
 						<tr>
 							<td>
 								<?php if ( ! $p['row'] && current_user_can( 'bhela_investor_profit' ) ) : ?>
-									<input type="checkbox" name="period[]" value="<?php echo esc_attr( $p['key'] ); ?>" checked>
+									<?php
+									// Unticked by default. Approving writes a ledger row that can
+									// only be reversed, never removed; with every due period
+									// pre-ticked, one click posted a whole year at once.
+									?>
+									<input type="checkbox" name="period[]" value="<?php echo esc_attr( $p['key'] ); ?>">
 								<?php endif; ?>
 							</td>
 							<td class="bha-plain"><?php echo esc_html( $p['inv']['code'] ); ?></td>
 							<td><?php echo esc_html( $p['inv']['name'] ); ?></td>
 							<td class="bha-plain"><?php echo esc_html( mysql2date( 'j M Y', $p['from'] ) . ' — ' . mysql2date( 'j M Y', $p['to'] ) ); ?></td>
 							<td><?php echo esc_html( $methods[ $p['inv']['method'] ]['label'] ?? $p['inv']['method'] ); ?></td>
-							<td class="bha-num"><?php echo esc_html( $money( $p['amount'] ) ); ?></td>
+							<td class="bha-num">
+								<?php echo esc_html( $money( $p['amount'] ) ); ?>
+								<?php if ( $p['row'] && ! empty( $p['drift'] ) ) : ?>
+									<span class="bha-sub bha-flag"><?php
+									printf(
+										/* translators: %s: what the terms compute today */
+										esc_html__( 'শর্ত এখন %s বলে — প্রয়োজনে সমন্বয় করুন', 'bhela-booking' ),
+										esc_html( $money( $p['computed'] ) )
+									);
+									?></span>
+								<?php endif; ?>
+							</td>
 							<td>
 								<?php
 								echo $p['row']

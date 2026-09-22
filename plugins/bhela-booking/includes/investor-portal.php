@@ -152,7 +152,13 @@ function bhela_bm_portal_data() {
 		if ( 'profit' !== $r['type'] ) {
 			continue;
 		}
-		$key = $r['ref'] ? $r['ref'] : substr( $r['date'], 0, 7 );
+		// A distribution writes `YYYY-MM` on `ref`; the fixed-return engine writes its
+		// period key, `BHELA-IN-2026-0001:2025-07-01:2025-07-31`. Keying on `ref` alone
+		// made every fixed-model row a "month" that mysql2date() cannot read, so the
+		// Month column printed blank on every row. The row's own date is the month the
+		// profit belongs to in both cases, so it is the fallback for anything that is
+		// not already a month.
+		$key = preg_match( '/^\d{4}-\d{2}$/', (string) $r['ref'] ) ? $r['ref'] : substr( $r['date'], 0, 7 );
 		if ( ! isset( $by_month[ $key ] ) ) {
 			$by_month[ $key ] = 0;
 		}
@@ -247,7 +253,9 @@ function bhela_bm_portal_data() {
 	// Capital value, from an APPROVED valuation only. A draft is somebody still
 	// working, and a figure an investor has already seen is a figure they will ask to
 	// be paid — so nothing reaches this page until it has been signed off.
-	$holding = function_exists( 'bhela_bm_investor_holding' ) ? bhela_bm_investor_holding( $id ) : null;
+	$holding = function_exists( 'bhela_bm_investor_holding' ) && bhela_bm_investor_shares( $id ) > 0
+		? bhela_bm_investor_holding( $id )
+		: null;   // no shares, no holding to show — see bhela_bm_investor_roi()
 
 	// Which way the balance runs, in the investor's own terms. `roi['outstanding']` has
 	// always carried the figure, but under a label meaning "due to you" a NEGATIVE
@@ -386,15 +394,21 @@ function bhela_bm_portal_render( $d ) {
 			<div>
 				<h2><?php echo esc_html( $d['name'] ); ?></h2>
 				<p class="bhela-inv__muted">
-					<?php if ( $d['code'] ) : ?><?php echo esc_html( $d['code'] ); ?> · <?php endif; ?>
+					<?php if ( $d['code'] ) : ?><?php echo esc_html( $d['code'] ); ?><?php endif; ?>
 					<?php
-					printf(
-						/* translators: 1: shares held, 2: total shares, 3: percentage */
-						esc_html__( '%1$d of %2$d shares · %3$s%%', 'bhela-booking' ),
-						(int) $d['shares'],
-						(int) $d['total_shares'],
-						esc_html( (string) $d['share_pct'] )
-					);
+					// Only a shareholder is told their share of the boat. A fixed-return
+					// investor with ৳5,00,000 in read "0 of 125 shares · 0%" directly under
+					// their own name — which says they own nothing.
+					if ( (int) $d['shares'] > 0 ) {
+						echo $d['code'] ? ' · ' : '';
+						printf(
+							/* translators: 1: shares held, 2: total shares, 3: percentage */
+							esc_html__( '%1$d of %2$d shares · %3$s%%', 'bhela-booking' ),
+							(int) $d['shares'],
+							(int) $d['total_shares'],
+							esc_html( (string) $d['share_pct'] )
+						);
+					}
 					?>
 				</p>
 			</div>
@@ -630,8 +644,15 @@ function bhela_bm_portal_render( $d ) {
 								<td><?php echo esc_html( $cert_types[ $c['type'] ]['label'] ?? $c['type'] ); ?></td>
 								<td>
 									<?php
-									echo $c['from']
-										? esc_html( $c['label'] ? $c['label'] : mysql2date( 'j M Y', $c['from'] ) . ' — ' . mysql2date( 'j M Y', $c['to'] ) )
+									// `label` is a season name, and only a share-era certificate
+									// carries one — reading it unguarded printed a PHP warning
+									// into every fixed-model row. And the span shown is the one
+									// the profit was EARNED in, the same span the certificate
+									// itself states (see bhela_bm_cert_preview_profit()).
+									$c_from = (string) ( $c['snapshot']['earned_from'] ?? $c['from'] );
+									$c_to   = (string) ( $c['snapshot']['earned_to'] ?? $c['to'] );
+									echo $c_from
+										? esc_html( ! empty( $c['label'] ) ? $c['label'] : mysql2date( 'j M Y', $c_from ) . ' — ' . mysql2date( 'j M Y', $c_to ) )
 										: esc_html__( 'সব সময়', 'bhela-booking' );
 									?>
 								</td>

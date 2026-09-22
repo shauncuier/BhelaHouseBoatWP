@@ -404,26 +404,62 @@ function bhela_bm_menu_move( $slug, $to, $from = '' ) {
 }
 
 /**
+ * Post type ⇒ the group its rows live in. Everything not listed stays under Bookings.
+ *
+ * One list for two jobs — moving the row, and highlighting the menu while that post
+ * type's screens are open — so the two can never disagree about where it lives.
+ */
+function bhela_bm_menu_cpt_groups() {
+	return array(
+		'bhela_cost'     => 'accounts',
+		'bhela_expense'  => 'accounts',
+		'bhela_salary'   => 'accounts',
+		'bhela_inv_item' => 'store',
+		'bhela_investor' => 'investors',
+		'bhela_spot'     => 'setup',
+		'bhela_gallery'  => 'setup',
+	);
+}
+
+/**
  * Re-home the post-type rows.
  *
  * Priority 20, because core's _add_post_type_submenus() runs at 10 and the row has
- * to exist before it can be moved. Everything not listed stays under Bookings.
+ * to exist before it can be moved.
  */
 function bhela_bm_menu_move_cpts() {
-	$moves = array(
-		'edit.php?post_type=bhela_cost'     => 'accounts',
-		'edit.php?post_type=bhela_expense'  => 'accounts',
-		'edit.php?post_type=bhela_salary'   => 'accounts',
-		'edit.php?post_type=bhela_inv_item' => 'store',
-		'edit.php?post_type=bhela_investor' => 'investors',
-		'edit.php?post_type=bhela_spot'     => 'setup',
-		'edit.php?post_type=bhela_gallery'  => 'setup',
-	);
-	foreach ( $moves as $slug => $group ) {
-		bhela_bm_menu_move( $slug, bhela_bm_menu_parent( $group ) );
+	foreach ( bhela_bm_menu_cpt_groups() as $type => $group ) {
+		bhela_bm_menu_move( 'edit.php?post_type=' . $type, bhela_bm_menu_parent( $group ) );
 	}
 }
 add_action( 'admin_menu', 'bhela_bm_menu_move_cpts', 20 );
+
+/**
+ * Highlight the menu a moved post type now lives in.
+ *
+ * Moving the row re-homed the LINK, but WordPress picks the highlighted top-level from
+ * the post type's registered `show_in_menu`, which is fixed at `init` — before there is
+ * a user to ask about (§3.9) — and says Bookings. So adding an investor, editing a
+ * cost sheet, opening a store item or a spot all lit up Bookings and expanded its
+ * submenu, while the row the person had just clicked sat collapsed in another menu.
+ * `parent_file` runs after the menu is built, which is the first moment the real
+ * parent is known.
+ */
+function bhela_bm_menu_highlight( $parent_file ) {
+	global $typenow, $submenu_file, $pagenow;
+	$groups = bhela_bm_menu_cpt_groups();
+	if ( ! $typenow || ! isset( $groups[ $typenow ] ) ) {
+		return $parent_file;
+	}
+	if ( ! in_array( $pagenow, array( 'edit.php', 'post.php', 'post-new.php' ), true ) ) {
+		return $parent_file;
+	}
+	// The list row is the one to light up on the list, the editor and "Add New" alike:
+	// the moved menus carry no separate Add New row.
+	$submenu_file = 'edit.php?post_type=' . $typenow; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+	return bhela_bm_menu_parent( $groups[ $typenow ] );
+}
+add_filter( 'parent_file', 'bhela_bm_menu_highlight' );
 
 /**
  * Sort every parent into its intended order.
